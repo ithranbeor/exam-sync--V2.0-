@@ -100,6 +100,7 @@ const SectionCourses: React.FC = () => {
     setIsSubmitting(true);
 
     if (editMode) {
+      // ✨ Edit only one section
       const { error } = await supabase
         .from('tbl_sectioncourse')
         .update({
@@ -118,16 +119,36 @@ const SectionCourses: React.FC = () => {
       }
 
     } else {
-      const { error } = await supabase
-        .from('tbl_sectioncourse')
-        .insert([newSection]);
+      // ✨ Insert multiple sections split by comma
+      const sectionList = section_name
+        .split(',')
+        .map(s => s.trim())
+        .filter(s => s.length > 0);
 
-      if (error) {
-        console.error("❌ Insert error:", error);
-        toast.error(`Insert failed: ${error.message || 'Unknown error'}`);
-      } else {
-        toast.success('Section added');
+      let successCount = 0;
+      let failedCount = 0;
+
+      for (const name of sectionList) {
+        const { error } = await supabase
+          .from('tbl_sectioncourse')
+          .insert([{
+            course_id,
+            program_id,
+            section_name: name,
+            number_of_students,
+            year_level,
+            term_id
+          }]);
+
+        if (error) {
+          console.error(`Insert failed for ${name}:`, error);
+          failedCount++;
+        } else {
+          successCount++;
+        }
       }
+
+      toast.success(`${successCount} section(s) added. ${failedCount > 0 ? failedCount + ' failed.' : ''}`);
     }
 
     setShowModal(false);
@@ -170,14 +191,20 @@ const SectionCourses: React.FC = () => {
         const prog = programs.find(p => p.program_id === program_id);
         if (!term || !course || !prog) continue;
 
-        const { error } = await supabase.from('tbl_sectioncourse').insert([{
-          course_id, program_id,
-          section_name,
-          number_of_students: num_students,
-          year_level,
-          term_id: term.term_id
-        }]);
-        if (!error) added++;
+        const sectionList = section_name.split(',').map((s: string) => s.trim()).filter((s: string) => s.length > 0);
+
+        for (const name of sectionList) {
+          const { error } = await supabase.from('tbl_sectioncourse').insert([{
+            course_id,
+            program_id,
+            section_name: name,
+            number_of_students: num_students,
+            year_level,
+            term_id: term.term_id
+          }]);
+          if (!error) added++;
+        }
+
       }
       toast.success(`Import completed: ${added} section(s) added`);
       fetchAll(); setShowImport(false);
@@ -320,13 +347,14 @@ const SectionCourses: React.FC = () => {
               </select>
             </div>
             <div className="input-group">
-              <label>Section Name</label>
+              <label>Section Name (comma-separated)</label>
               <input
                 type="text"
                 value={newSection.section_name}
                 onChange={(e) =>
                   setNewSection({ ...newSection, section_name: e.target.value })
                 }
+                placeholder="e.g., BSIT 1A, BSIT 1B"
               />
             </div>
             <div className="input-group">
