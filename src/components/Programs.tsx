@@ -22,7 +22,7 @@ interface User { user_id: string; }
 
 interface ProgramsProps { user: User; }
 
-const Programs: React.FC<ProgramsProps> = ({ user }) => {
+const Programs: React.FC<ProgramsProps> = ({ user: _user }) => {
   const [programs, setPrograms] = useState<Program[]>([]);
   const [departments, setDepartments] = useState<Department[]>([]);
   const [searchTerm, setSearchTerm] = useState('');

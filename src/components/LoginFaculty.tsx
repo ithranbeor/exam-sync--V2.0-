@@ -15,8 +15,10 @@ const getGreeting = () => {
 const roleToDashboardMap: Record<string, string> = {
   proctor: '/faculty-dashboard',
   faculty: '/faculty-dashboard',
-  admin: '/admin-login'
-
+  scheduler: '/faculty-dashboard',
+  'bayanihan leader': '/faculty-dashboard',
+  dean: '/faculty-dashboard',
+  admin: '/admin-login',
 };
 
 const LoginFaculty: React.FC = () => {
@@ -95,13 +97,30 @@ const LoginFaculty: React.FC = () => {
         return;
       }
 
-      if (activeRoles.length === 1) {
-        completeLogin(activeRoles[0], fullUser);
-      } else {
-        setAvailableRoles(activeRoles);
-        setUserProfile(fullUser);
-        setAwaitingRoleSelection(true);
+      const rolesExcludingAdmin = activeRoles.filter((role) => role !== 'admin');
+
+      // If only admin
+      if (rolesExcludingAdmin.length === 0 && activeRoles.includes('admin')) {
+        completeLogin('admin', fullUser);
+        return;
       }
+
+      // If only one role (excluding admin), go directly
+      if (rolesExcludingAdmin.length === 1) {
+        completeLogin(rolesExcludingAdmin[0], fullUser);
+        return;
+      }
+
+      // If multiple non-admin roles → use merged dashboard
+      if (rolesExcludingAdmin.length >= 2) {
+        completeLogin('faculty', fullUser); // faculty-dashboard handles merged roles
+        return;
+      }
+
+      // Fallback to role selection
+      setAvailableRoles(rolesExcludingAdmin);
+      setUserProfile(fullUser);
+      setAwaitingRoleSelection(true);
     } catch (err) {
       console.error('Unexpected error:', err);
       setError('An unexpected error occurred.');
@@ -109,10 +128,12 @@ const LoginFaculty: React.FC = () => {
   };
 
   const completeLogin = (role: string, profile: any) => {
+    const payload = { ...profile, roles: [{ role_name: role }] };
+
     if (rememberMe) {
-      localStorage.setItem('user', JSON.stringify({ ...profile, roles: [{ role_name: role }] }));
+      localStorage.setItem('user', JSON.stringify(payload));
     } else {
-      sessionStorage.setItem('user', JSON.stringify({ ...profile, roles: [{ role_name: role }] }));
+      sessionStorage.setItem('user', JSON.stringify(payload));
     }
 
     const dashboard = roleToDashboardMap[role];

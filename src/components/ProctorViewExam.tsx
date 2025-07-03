@@ -169,8 +169,6 @@ const ProctorViewExam = () => {
 
   return (
     <div className="set-availability-container">
-      <h2>Exam Schedule</h2>
-
       <div className="availability-sections" style={{ flexDirection: 'column', gap: 25 }}>
         <div className="availability-card" style={{ width: '100%' }}>
           <div className="form-group" style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' }}>

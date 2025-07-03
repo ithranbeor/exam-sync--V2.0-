@@ -26,7 +26,7 @@ interface DepartmentsProps {
   user: User;
 }
 
-const Departments: React.FC<DepartmentsProps> = ({ user }) => {
+const Departments: React.FC<DepartmentsProps> = ({ user: _user }) => {
   const [departments, setDepartments] = useState<Department[]>([]);
   const [colleges, setColleges] = useState<College[]>([]);
   const [searchTerm, setSearchTerm] = useState('');

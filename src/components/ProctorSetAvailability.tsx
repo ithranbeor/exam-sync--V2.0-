@@ -115,7 +115,7 @@ const ProctorSetAvailability: React.FC<ProctorSetAvailabilityProps> = ({ user })
       <div className="availability-sections">
         <div className="availability-card">
           <div className="card-header-set">Set Availability</div>
-          <div className="subtitle">(This will allow the proctor to choose his/her availability for the exam schedule.)</div>
+          <div className="subtitle">(This will allow the proctor to choose his/her availability for the exam schedule. Scroll down to Request Change of Availability)</div>
           <form onSubmit={handleSubmitAvailability} className="availability-form">
             <div className="form-group">
               <label htmlFor="day">Day</label>
