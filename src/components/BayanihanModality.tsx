@@ -59,7 +59,6 @@ const BayanihanModality: React.FC<UserProps> = ({ user }) => {
         userCourseIds.includes(sc.course_id)
       );
 
-      // Flatten section names split by comma
       const expandedSections = filteredSections.flatMap(sc => {
         return sc.section_name
           .split(',')
