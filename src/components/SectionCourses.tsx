@@ -100,16 +100,19 @@ const SectionCourses: React.FC = () => {
     setIsSubmitting(true);
 
     if (editMode) {
-      // ✨ Edit only one section
       const { error } = await supabase
         .from('tbl_sectioncourse')
         .update({
-          section_name,
           number_of_students,
           year_level,
           term_id
         })
-        .match({ course_id, program_id });
+        .match({
+          course_id,
+          program_id,
+          section_name,
+          term_id
+        });
 
       if (error) {
         console.error("❌ Update error:", error);
@@ -119,36 +122,16 @@ const SectionCourses: React.FC = () => {
       }
 
     } else {
-      // ✨ Insert multiple sections split by comma
-      const sectionList = section_name
-        .split(',')
-        .map(s => s.trim())
-        .filter(s => s.length > 0);
+      const { error } = await supabase
+        .from('tbl_sectioncourse')
+        .insert([newSection]);
 
-      let successCount = 0;
-      let failedCount = 0;
-
-      for (const name of sectionList) {
-        const { error } = await supabase
-          .from('tbl_sectioncourse')
-          .insert([{
-            course_id,
-            program_id,
-            section_name: name,
-            number_of_students,
-            year_level,
-            term_id
-          }]);
-
-        if (error) {
-          console.error(`Insert failed for ${name}:`, error);
-          failedCount++;
-        } else {
-          successCount++;
-        }
+      if (error) {
+        console.error("❌ Insert error:", error);
+        toast.error(`Insert failed: ${error.message || 'Unknown error'}`);
+      } else {
+        toast.success('Section added');
       }
-
-      toast.success(`${successCount} section(s) added. ${failedCount > 0 ? failedCount + ' failed.' : ''}`);
     }
 
     setShowModal(false);
@@ -156,12 +139,17 @@ const SectionCourses: React.FC = () => {
     fetchAll();
   };
 
-  const handleDelete = async (course_id: string, program_id: string) => {
+  const handleDelete = async (sc: SectionCourse) => {
     const { error } = await supabase
       .from('tbl_sectioncourse')
       .delete()
-      .eq('course_id', course_id)
-      .eq('program_id', program_id);
+      .match({
+        course_id: sc.course_id,
+        program_id: sc.program_id,
+        section_name: sc.section_name,
+        term_id: sc.term_id
+      });
+
     toast[error ? 'error' : 'success'](error ? 'Failed to delete section' : 'Section deleted');
     fetchAll();
   };
@@ -191,20 +179,14 @@ const SectionCourses: React.FC = () => {
         const prog = programs.find(p => p.program_id === program_id);
         if (!term || !course || !prog) continue;
 
-        const sectionList = section_name.split(',').map((s: string) => s.trim()).filter((s: string) => s.length > 0);
-
-        for (const name of sectionList) {
-          const { error } = await supabase.from('tbl_sectioncourse').insert([{
-            course_id,
-            program_id,
-            section_name: name,
-            number_of_students: num_students,
-            year_level,
-            term_id: term.term_id
-          }]);
-          if (!error) added++;
-        }
-
+        const { error } = await supabase.from('tbl_sectioncourse').insert([{
+          course_id, program_id,
+          section_name,
+          number_of_students: num_students,
+          year_level,
+          term_id: term.term_id
+        }]);
+        if (!error) added++;
       }
       toast.success(`Import completed: ${added} section(s) added`);
       fetchAll(); setShowImport(false);
@@ -277,7 +259,7 @@ const SectionCourses: React.FC = () => {
           </thead>
           <tbody>
             {filtered.map((sc,i) => (
-              <tr key={`${sc.course_id}-${sc.program_id}`}>
+              <tr key={`${sc.course_id}-${sc.program_id}-${sc.section_name}-${sc.term_id}`}>
                 <td>{i+1}</td>
                 <td>{sc.course_id}</td>
                 <td>{sc.program_id}</td>
@@ -298,8 +280,11 @@ const SectionCourses: React.FC = () => {
                     setNewSection(sc);
                     setShowModal(true);
                   }}><FaEdit /></button>
-                  <button type='button' className="icon-button delete-button"
-                    onClick={() => handleDelete(sc.course_id, sc.program_id)}>
+                  <button
+                    type='button'
+                    className="icon-button delete-button"
+                    onClick={() => handleDelete(sc)}
+                  >
                     <FaTrash />
                   </button>
                 </td>
@@ -325,7 +310,7 @@ const SectionCourses: React.FC = () => {
                 <option value="">Select Course</option>
                 {courses.map(c => (
                   <option key={c.course_id} value={c.course_id}>
-                    {c.course_name}
+                    {c.course_id} ({c.course_name})
                   </option>
                 ))}
               </select>
@@ -341,20 +326,19 @@ const SectionCourses: React.FC = () => {
                 <option value="">Select Program</option>
                 {programs.map(p => (
                   <option key={p.program_id} value={p.program_id}>
-                    {p.program_name}
+                    {p.program_id} ({p.program_name})
                   </option>
                 ))}
               </select>
             </div>
             <div className="input-group">
-              <label>Section Name (comma-separated)</label>
+              <label>Section Name</label>
               <input
                 type="text"
                 value={newSection.section_name}
                 onChange={(e) =>
                   setNewSection({ ...newSection, section_name: e.target.value })
                 }
-                placeholder="e.g., BSIT 1A, BSIT 1B"
               />
             </div>
             <div className="input-group">

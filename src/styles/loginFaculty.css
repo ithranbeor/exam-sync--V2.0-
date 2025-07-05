@@ -134,21 +134,8 @@ body {
   margin-top: 20px;
   transition: background-color 0.3s ease;
 }
-
 .login-button:hover {
   background-color: #ffa000;
-}
-
-.admin-login-link {
-  width: 33%;
-  text-align: right;
-  margin-top: auto;
-  padding: 12px 20px;
-  background-color: #ffa000;
-  border: none;
-  margin-left: 70%;
-  margin-bottom: -14%;
-  border-top-left-radius: 20px;
 }
 
 .admin-login-link a {

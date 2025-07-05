@@ -202,7 +202,7 @@ const Programs: React.FC<ProgramsProps> = ({ user: _user }) => {
           <thead>
             <tr>
               <th>#</th>
-              <th>Program ID</th>
+              <th>Program Code</th>
               <th>Name</th>
               <th>Department</th>
               <th>Actions</th>

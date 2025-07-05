@@ -1,0 +1,200 @@
+/* notifications.css */
+
+
+.notification-container {
+  padding: 20px;
+  font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+  background-color: #f9f9f9;
+  min-height: 100vh;
+}
+
+
+.notification-header h2 {
+  font-size: 22px;
+  color: #444;
+  margin-bottom: 15px;
+}
+
+
+.notification-banner {
+  background-color: #1e1a47;
+  color: white;
+  font-weight: bold;
+  padding: 10px 16px;
+  border-radius: 6px;
+  margin-bottom: 15px;
+  font-size: 16px;
+}
+
+
+.notification-message {
+  font-size: 15px;
+  margin-bottom: 20px;
+  color: #333;
+}
+
+
+.notification-card {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  background-color: #eeeeee;
+  padding: 12px 18px;
+  border-radius: 10px;
+  margin-bottom: 12px;
+  box-shadow: 0 1px 4px rgba(0, 0, 0, 0.04);
+  transition: background-color 0.2s ease;
+  cursor: pointer;
+}
+
+
+.notification-card:hover {
+  background-color: #e2e2e2;
+}
+
+
+.notif-left {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  font-weight: 600;
+  color: #2c2c2c;
+}
+
+
+.notif-icon {
+  font-size: 18px;
+  color: #333;
+}
+
+
+.notif-center {
+  flex: 1;
+  margin-left: 20px;
+  color: #555;
+  font-weight: 500;
+}
+
+
+.notif-date {
+  font-size: 13px;
+  color: #888;
+}
+
+
+/* Modal */
+.modal-overlay {
+  position: fixed;
+  top: 0;
+  left: 0;
+  height: 100vh;
+  width: 100vw;
+  background: rgba(0, 0, 0, 0.4);
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  z-index: 1000;
+  padding: 20px;
+  box-sizing: border-box;
+}
+
+
+.modal-message-pane {
+  background: #fff;
+  width: 600px;
+  max-height: 90vh;
+  overflow-y: auto;
+  border-radius: 16px;
+  padding: 25px 30px;
+  box-shadow: 0 5px 25px rgba(0, 0, 0, 0.25);
+  font-family: 'Georgia', 'Times New Roman', serif;
+  color: #222;
+  line-height: 1.7;
+  font-size: 15px;
+  position: relative;
+  animation: fadeIn 0.3s ease-in-out;
+}
+
+
+.modal-message-pane h3 {
+  font-size: 18px;
+  margin-bottom: 5px;
+  color: #1e1a47;
+}
+
+
+.modal-message-pane h4 {
+  font-size: 16px;
+  color: #444;
+  margin-bottom: 20px;
+}
+
+
+.message-body {
+  margin-bottom: 20px;
+}
+
+
+.message-body p {
+  margin-bottom: 1em;
+}
+
+
+.attachment {
+  margin: 15px 0;
+  font-size: 15px;
+}
+
+
+.attachment a {
+  text-decoration: underline;
+  color: #1e1a47;
+}
+
+
+.disclaimer {
+  background-color: #f8f8f8;
+  border-left: 4px solid #999;
+  padding: 10px 15px;
+  border-radius: 8px;
+  margin-top: 30px;
+  color: #666;
+  font-size: 11px;
+  font-style: italic;
+}
+
+
+.modal-actions {
+  display: flex;
+  justify-content: flex-end;
+  margin-top: 15px;
+}
+
+
+.modal-button.cancel {
+  background-color: #1e1a47;
+  color: white;
+  font-weight: bold;
+  padding: 8px 16px;
+  border-radius: 8px;
+  border: none;
+  cursor: pointer;
+  transition: background-color 0.2s ease;
+}
+
+
+.modal-button.cancel:hover {
+  background-color: #342e78;
+}
+
+
+@keyframes fadeIn {
+  from {
+    opacity: 0;
+    transform: translateY(10px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}

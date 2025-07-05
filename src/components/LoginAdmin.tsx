@@ -1,6 +1,6 @@
 // deno-lint-ignore-file no-explicit-any
 import React, { useState, useEffect } from 'react';
-import { useNavigate, Link } from 'react-router-dom';
+import { useNavigate } from 'react-router-dom';
 import { supabase } from '../lib/supabaseClient.ts';
 import { FaEye, FaEyeSlash } from 'react-icons/fa';
 import '../styles/loginAdmin.css';
@@ -175,7 +175,11 @@ const LoginAdmin: React.FC = () => {
         </div>
 
         <div className="admin-login-link">
-          <Link to="/">Sign in as Faculty</Link>
+          <button 
+          type='button' 
+          className="faculty-login-btn" 
+          onClick={() => navigate('/')}>
+            Sign in as Faculty</button>
         </div>
       </div>
     </div>
