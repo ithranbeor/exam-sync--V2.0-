@@ -13,10 +13,13 @@ interface UserProps {
     avatar_url?: string;
   } | null;
 }
-interface Course {
-  course_id: string;
-  course_name: string;
-}
+
+const modalityRoomTypeMap: { [key: string]: string } = {
+  'Written': 'Lecture',
+  'PIT or Projects': 'No Room',
+  'Pitching': 'Lecture',
+  'Online': 'Laboratory',
+};
 
 const BayanihanModality: React.FC<UserProps> = ({ user }) => {
   const [form, setForm] = useState({
@@ -34,10 +37,8 @@ const BayanihanModality: React.FC<UserProps> = ({ user }) => {
     program_id: string;
     section_name: string;
   }[]>([]);
-  const [roomOptions, setRoomOptions] = useState<{ room_id: string; room_name: string }[]>([]);
+  const [roomOptions, setRoomOptions] = useState<{ room_id: string; room_name: string; room_type: string }[]>([]);
   const [sectionDropdownOpen, setSectionDropdownOpen] = useState(false);
-  const [_userCollege, setUserCollege] = useState<string | null>(null);
-  const [_userDepartment, setUserDepartment] = useState<string | null>(null);
   const dropdownRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
@@ -46,72 +47,99 @@ const BayanihanModality: React.FC<UserProps> = ({ user }) => {
 
       const { data: roles, error: roleError } = await supabase
         .from('tbl_user_role')
-        .select('department_id, college_id')
+        .select('college_id, department_id')
         .eq('user_id', user.user_id);
 
-      if (roleError || !roles?.length) {
-        toast.error('No role data found.');
+      if (roleError || !roles || roles.length === 0) {
+        toast.error('No role found.');
         return;
       }
 
-      const firstRole = roles[0];
-      setUserDepartment(firstRole.department_id);
-      setUserCollege(firstRole.college_id);
+      const hasValidAssignment = roles.some(role => role.college_id || role.department_id);
 
-     const { data: userCourses, error: courseError } = await supabase
-      .from('tbl_course_users')
-      .select('course_id')
-      .eq('user_id', user.user_id);
+      if (!hasValidAssignment) {
+        toast.warn('You are not assigned to any department or college.');
+        setCourseOptions([]);
+        return;
+      }
 
-    if (courseError || !userCourses) {
-      toast.error('Failed to load your courses');
-      return;
-    }
+      const { data: userCourses, error: courseUserError } = await supabase
+        .from('tbl_course_users')
+        .select('course_id')
+        .eq('user_id', user.user_id);
 
-    const courseIds = userCourses.map(c => c.course_id);
+      if (courseUserError || !userCourses) {
+        toast.error('Failed to load your assigned courses');
+        return;
+      }
 
-    const { data: coursesWithNames, error: courseNameError } = await supabase
-      .from('tbl_course')
-      .select('course_id, course_name')
-      .in('course_id', courseIds);
+      const courseIds = userCourses.map(c => c.course_id);
 
-    if (courseNameError || !coursesWithNames) {
-      toast.error('Failed to get course names');
-      return;
-    }
+      const { data: coursesWithNames, error: courseError } = await supabase
+        .from('tbl_course')
+        .select('course_id, course_name')
+        .in('course_id', courseIds);
 
-    setCourseOptions(coursesWithNames);
+      if (courseError || !coursesWithNames) {
+        toast.error('Failed to fetch course names');
+        return;
+      }
 
-    const uniqueCourses = Array.from(
-      new Map(
-        coursesWithNames.map((c: { course_id: string; course_name: string }) => [c.course_id, c])
-      ).values()
-    );
-    setCourseOptions(uniqueCourses);
-
-      const userCourseIds = userCourses.map(c => c.course_id);
+      setCourseOptions(coursesWithNames);
 
       const { data: sectionCourses, error: sectionError } = await supabase
         .from('tbl_sectioncourse')
         .select('course_id, program_id, section_name');
 
       if (sectionError || !sectionCourses) {
-        toast.error('Failed to load sections');
+        toast.error('Failed to fetch section data');
         return;
       }
 
-      const filteredSections = sectionCourses.filter(sc =>
-        userCourseIds.includes(sc.course_id)
-      );
-
+      const filteredSections = sectionCourses.filter(sc => courseIds.includes(sc.course_id));
       setSectionOptions(filteredSections);
 
-      const { data: rooms } = await supabase.from('tbl_rooms').select('room_id');
-      if (rooms) setRoomOptions(rooms.map(r => ({ room_id: r.room_id, room_name: r.room_id })));
+      const { data: rooms } = await supabase
+        .from('tbl_rooms')
+        .select('room_id, room_name, room_type');
+
+      setRoomOptions(rooms ?? []);
     };
 
     fetchData();
   }, [user]);
+
+  useEffect(() => {
+    const autoSelectRoom = () => {
+      const requiredRoomType = modalityRoomTypeMap[form.modality];
+      if (!requiredRoomType) {
+        setForm(prev => ({
+          ...prev,
+          room: '',
+          roomType: '',
+        }));
+        return;
+      }
+
+      const matchingRoom = roomOptions.find(room => room.room_type === requiredRoomType);
+      if (matchingRoom) {
+        setForm(prev => ({
+          ...prev,
+          room: matchingRoom.room_id,
+          roomType: matchingRoom.room_type,
+        }));
+      } else {
+        setForm(prev => ({
+          ...prev,
+          room: '',
+          roomType: requiredRoomType,
+        }));
+        toast.warn(`No rooms available for ${requiredRoomType}.`);
+      }
+    };
+
+    autoSelectRoom();
+  }, [form.modality, roomOptions]);
 
   const handleChange = (
     e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement | HTMLTextAreaElement>
@@ -136,50 +164,43 @@ const BayanihanModality: React.FC<UserProps> = ({ user }) => {
       return;
     }
 
-    try {
-      const selectedSections = sectionOptions.filter(s =>
-        form.sections.includes(s.section_name)
-      );
+    const selectedSections = sectionOptions.filter(s =>
+      form.sections.includes(s.section_name)
+    );
 
-      if (selectedSections.length === 0) {
-        toast.warn('Please select at least one section.');
+    if (selectedSections.length === 0) {
+      toast.warn('Please select at least one section.');
+      return;
+    }
+
+    for (const section of selectedSections) {
+      const { error } = await supabase.from('tbl_modality').insert([{
+        modality_type: form.modality,
+        room_type: form.roomType,
+        modality_remarks: form.remarks,
+        course_id: section.course_id,
+        program_id: section.program_id,
+        room_id: form.room,
+        user_id: user.user_id,
+        created_at: new Date().toISOString(),
+      }]);
+
+      if (error) {
+        console.error('Insert error:', error.message);
+        toast.error(`Failed to save modality: ${error.message}`);
         return;
       }
-
-      for (const section of selectedSections) {
-        const { error } = await supabase.from('tbl_modality').insert([
-          {
-            modality_type: form.modality,
-            room_type: form.roomType,
-            modality_remarks: form.remarks,
-            course_id: section.course_id,
-            program_id: section.program_id,
-            room_id: form.room,
-            user_id: user.user_id,
-            created_at: new Date().toISOString(),
-          },
-        ]);
-
-        if (error) {
-          console.error('Insert error:', error.message);
-          toast.error(`Failed to save modality: ${error.message}`);
-          return;
-        }
-      }
-
-      toast.success('Modality successfully submitted!');
-      setForm({
-        modality: '',
-        room: '',
-        roomType: '',
-        sections: [],
-        course: '',
-        remarks: '',
-      });
-    } catch (err) {
-      console.error('Unexpected error:', err);
-      toast.error('An unexpected error occurred.');
     }
+
+    toast.success('Modality successfully submitted!');
+    setForm({
+      modality: '',
+      room: '',
+      roomType: '',
+      sections: [],
+      course: '',
+      remarks: '',
+    });
   };
 
   useEffect(() => {
@@ -223,28 +244,29 @@ const BayanihanModality: React.FC<UserProps> = ({ user }) => {
                   value={form.room}
                   onChange={handleChange}
                   className="custom-select"
+                  disabled={!form.roomType}
                 >
                   <option value="">Select</option>
-                  {roomOptions.map((r) => (
-                    <option key={r.room_id} value={r.room_id}>
-                      {r.room_name}
-                    </option>
-                  ))}
+                  {roomOptions
+                    .filter(r => r.room_type === form.roomType)
+                    .map((r) => (
+                      <option key={r.room_id} value={r.room_id}>
+                        {r.room_id} - {r.room_name}
+                      </option>
+                    ))}
                 </select>
               </div>
 
               <div className="form-group">
                 <label>Room Type</label>
-                <select
+                <input
+                  type="text"
                   name="roomType"
                   value={form.roomType}
-                  onChange={handleChange}
+                  readOnly
                   className="custom-select"
-                >
-                  <option value="">Select</option>
-                  <option value="Laboratory">Laboratory</option>
-                  <option value="Lecture">Lecture</option>
-                </select>
+                  placeholder="Auto-filled"
+                />
               </div>
 
               <div className="form-group">

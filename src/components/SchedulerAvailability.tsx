@@ -224,7 +224,6 @@ const SchedulerAvailability: React.FC = () => {
         </table>
       </div>
 
-      {/* Modal */}
       {showModal && (
         <div className="modal-overlay">
           <div className="modal">
