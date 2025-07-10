@@ -193,7 +193,11 @@ const DashboardFaculty = () => {
                   className="faculty-avatar"
                 />
                 <h4>{user.first_name} {user.middle_name} {user.last_name}</h4>
-                <p>{roles.length ? roles.join(', ') : 'Loading role(s)...'}</p>
+                <p>
+                  {roles.length
+                    ? roles.map(role => role.charAt(0).toUpperCase() + role.slice(1)).join(', ')
+                    : 'Loading role(s)...'}
+                </p>
               </div>
               <div className="full-width-section">
                 <h2>Shortcut</h2>
@@ -211,7 +215,7 @@ const DashboardFaculty = () => {
           {activeMenu === 'exam-Schedule' && <ProctorViewExam />}
           {activeMenu === 'notification' && <Notification />}
           {activeMenu === 'set-Modality' && <BayanihanModality user={user} />}
-          {activeMenu === 'plot-Schedule' && <SchedulerPlotSchedule />}
+          {activeMenu === 'plot-Schedule' && <SchedulerPlotSchedule user={user} />}
           {activeMenu === 'proctor-Availability' && <SchedulerAvailability/>}
         </main>
       </div>

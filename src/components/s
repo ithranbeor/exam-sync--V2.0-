@@ -1,0 +1,284 @@
+// deno-lint-ignore-file jsx-button-has-type no-explicit-any
+import React, { useState, useEffect } from 'react';
+import { supabase } from '../lib/supabaseClient.ts';
+import { FaTrash, FaEdit, FaEye, FaSearch } from 'react-icons/fa';
+import '../styles/plotschedule.css';
+
+const Scheduler_PlotSchedule: React.FC = () => {
+  const [showModal, setShowModal] = useState(false);
+  const [showPlot, setShowPlot] = useState(false);
+
+  // Dropdown data
+  const [courses, setCourses] = useState<any[]>([]);
+  const [programs, setPrograms] = useState<any[]>([]);
+  const [modalities, setModalities] = useState<any[]>([]);
+  const [rooms, setRooms] = useState<any[]>([]);
+  const [proctors, setProctors] = useState<any[]>([]);
+  const [examPeriods, setExamPeriods] = useState<any[]>([]);
+
+  // Selected values
+  const [courseCode, setCourseCode] = useState('');
+  const [program, setProgram] = useState('');
+  const [modality, setModality] = useState<number>(0);
+  const [roomId, setRoomId] = useState('');
+  const [userId, setUserId] = useState<number>(0);
+  const [examPeriodId, setExamPeriodId] = useState<number>(0);
+
+  useEffect(() => {
+    const fetchDropdownData = async () => {
+      const { data: courseData } = await supabase.from('tbl_course').select('*');
+      const { data: programData } = await supabase.from('tbl_program').select('*');
+      const { data: modalityData } = await supabase.from('tbl_modality').select('*');
+      const { data: roomData } = await supabase.from('tbl_rooms').select('*');
+      const { data: userData } = await supabase.from('tbl_users').select('user_id, first_name, last_name');
+      const { data: examPeriodData } = await supabase.from('tbl_examperiod').select('*');
+
+      setCourses(courseData ?? []);
+      setPrograms(programData ?? []);
+      setModalities(modalityData ?? []);
+      setRooms(roomData ?? []);
+      setProctors(userData ?? []);
+      setExamPeriods(examPeriodData ?? []);
+    };
+
+    fetchDropdownData();
+  }, []);
+
+  const handleNext = async (e: React.FormEvent) => {
+    e.preventDefault();
+
+    const examStart = new Date('2025-07-20T09:00:00');
+    const examEnd = new Date('2025-07-20T10:30:00');
+    const duration = '01:30:00'; // later compute from start/end
+
+    const { error } = await supabase.from('tbl_examDetails').insert([{
+      course_id: courseCode,
+      program_id: program,
+      room_id: roomId,
+      modality_id: modality,
+      user_id: userId,
+      examperiod_id: examPeriodId,
+      exam_duration: duration,
+      exam_start_time: examStart,
+      exam_end_time: examEnd,
+      proctor_timein: new Date('2025-07-20T08:45:00'),
+      proctor_timeout: new Date('2025-07-20T10:45:00'),
+    }]);
+
+    if (error) {
+      console.error(error);
+      alert('Failed to save schedule.');
+    } else {
+      alert('Schedule saved!');
+      setShowModal(false);
+      setShowPlot(true);
+    }
+  };
+
+  const handleBack = () => {
+    setShowPlot(false);
+    setShowModal(true);
+  };
+
+  return (
+    <div className="colleges-container">
+      {!showModal && !showPlot && (
+        <>
+          <div className="colleges-header">
+            <h2 className="colleges-title">Manage Schedule</h2>
+            <div className="search-bar">
+              <input type="text" placeholder="Search for Schedule" />
+              <button className="search-button"><FaSearch /></button>
+            </div>
+          </div>
+
+          <div className="colleges-actions">
+            <button className="action-button add-new" onClick={() => setShowModal(true)}>
+              Add New Schedule
+            </button>
+          </div>
+
+          <div className="colleges-table-container">
+            <table className="colleges-table">
+              <thead>
+                <tr>
+                  <th>#</th>
+                  <th>Start Date</th>
+                  <th>Actions</th>
+                </tr>
+              </thead>
+              <tbody>
+                <tr>
+                  <td>1</td>
+                  <td>2025-05-23</td>
+                  <td className="action-buttons">
+                    <button className="icon-button view-button"><FaEye /></button>
+                    <button className="icon-button edit-button"><FaEdit /></button>
+                    <button className="icon-button delete-button"><FaTrash /></button>
+                  </td>
+                </tr>
+              </tbody>
+            </table>
+          </div>
+
+          <div className="save-changes-footer">
+            <button className="action-button save-changes">Save Changes</button>
+          </div>
+        </>
+      )}
+
+      {showModal && (
+        <div className="modal-overlay">
+          <div className="modal">
+            <h3 className="modal-title">Add Schedule</h3>
+            <form onSubmit={handleNext}>
+              <div className="form-group">
+                <label>Course</label>
+                <select required value={courseCode} onChange={(e) => setCourseCode(e.target.value)}>
+                  <option value="">Select Course</option>
+                  {courses.map((c) => (
+                    <option key={c.course_id} value={c.course_id}>{c.course_name}</option>
+                  ))}
+                </select>
+              </div>
+
+              <div className="form-group">
+                <label>Program</label>
+                <select required value={program} onChange={(e) => setProgram(e.target.value)}>
+                  <option value="">Select Program</option>
+                  {programs.map((p) => (
+                    <option key={p.program_id} value={p.program_id}>{p.program_name}</option>
+                  ))}
+                </select>
+              </div>
+
+              <div className="form-group">
+                <label>Modality</label>
+                <select required value={modality} onChange={(e) => setModality(Number(e.target.value))}>
+                  <option value="">Select Modality</option>
+                  {modalities.map((m) => (
+                    <option key={m.modality_id} value={m.modality_id}>{m.modality_name}</option>
+                  ))}
+                </select>
+              </div>
+
+              <div className="form-group">
+                <label>Room</label>
+                <select required value={roomId} onChange={(e) => setRoomId(e.target.value)}>
+                  <option value="">Select Room</option>
+                  {rooms.map((r) => (
+                    <option key={r.room_id} value={r.room_id}>{r.room_id}</option>
+                  ))}
+                </select>
+              </div>
+
+              <div className="form-group">
+                <label>Proctor</label>
+                <select required value={userId} onChange={(e) => setUserId(Number(e.target.value))}>
+                  <option value="">Select Proctor</option>
+                  {proctors.map((u) => (
+                    <option key={u.user_id} value={u.user_id}>
+                      {u.first_name} {u.last_name}
+                    </option>
+                  ))}
+                </select>
+              </div>
+
+              <div className="form-group">
+                <label>Exam Period</label>
+                <select required value={examPeriodId} onChange={(e) => setExamPeriodId(Number(e.target.value))}>
+                  <option value="">Select Exam Period</option>
+                  {examPeriods.map((ep) => (
+                    <option key={ep.examperiod_id} value={ep.examperiod_id}>
+                      {ep.exam_category_enum} - {ep.academic_year_enum}
+                    </option>
+                  ))}
+                </select>
+              </div>
+
+              <div className="modal-buttons">
+                <button type="submit" className="next-button">Next</button>
+                <button onClick={() => setShowModal(false)} className="modal-button cancel">Close</button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+
+      {showPlot && (
+        <div className="plot-schedule">
+          <div className="plot-controls">
+            <h3>Plot Schedule</h3>
+            <div>
+              <label>Exam Period</label>
+              <input type="date" defaultValue="2025-05-23" />
+            </div>
+
+            <div className="radio-group">
+              <label>Assign Proctor</label>
+              <label><input type="radio" name="proctor" defaultChecked /> All</label>
+              <label><input type="radio" name="proctor" /> Available only</label>
+            </div>
+
+            <div>
+              <label>Hour/s per exam</label>
+              <div className="duration-inputs">
+                <input type="number" min="0" max="5" defaultValue={1} /> hrs
+                <input type="number" min="0" max="59" defaultValue={30} /> mins
+              </div>
+            </div>
+
+            <button className="action-button save-changes" style={{ marginTop: '20px' }}>
+              Generate
+            </button>
+          </div>
+
+          <div className="plot-grid">
+            <table>
+              <thead>
+                <tr>
+                  <th>Time</th>
+                  {['9-203','9-204','9-205','9-206','9-207','9-208','9-209'].map(room => (
+                    <th key={room}>{room}</th>
+                  ))}
+                </tr>
+              </thead>
+              <tbody>
+                {[
+                  '7:30AM - 8:00AM', '8:00AM - 8:30AM', '8:30AM - 9:00AM',
+                  '9:00AM - 9:30AM', '9:30AM - 10:00AM', '10:00AM - 10:30AM',
+                  '10:30AM - 11:00AM', '11:00AM - 11:30AM', '11:30AM - 12:00PM',
+                  '12:00PM - 12:30PM', '12:30PM - 1:00PM', '1:00PM - 1:30PM',
+                  '1:30PM - 2:00PM', '2:00PM - 2:30PM', '2:30PM - 3:00PM',
+                  '3:00PM - 3:30PM', '3:30PM - 4:00PM', '4:00PM - 4:30PM',
+                  '4:30PM - 5:00PM', '5:00PM - 5:30PM', '5:30PM - 6:00PM',
+                  '6:00PM - 6:30PM', '6:30PM - 7:00PM', '7:00PM - 7:30PM',
+                  '7:30PM - 8:00PM', '8:00PM - 8:30PM', '8:30PM - 9:00PM'
+                ].map((time, idx) => (
+                  <tr key={idx}>
+                    <td>{time}</td>
+                    {Array.from({ length: 7 }).map((_, i) => <td key={i}></td>)}
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+
+            <div className="plot-footer">
+              <button onClick={handleBack} className="action-button save-changes" style={{ backgroundColor: '#ccc', color: '#000' }}>
+                Back
+              </button>
+              <div>
+                <button className="action-button save-changes" style={{ marginRight: '10px' }}>
+                  Save and Export
+                </button>
+                <button className="action-button save-changes">Save</button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+    </div>
+  );
+};
+
+export default Scheduler_PlotSchedule;

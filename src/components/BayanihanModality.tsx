@@ -56,7 +56,6 @@ const BayanihanModality: React.FC<UserProps> = ({ user }) => {
       }
 
       const hasValidAssignment = roles.some(role => role.college_id || role.department_id);
-
       if (!hasValidAssignment) {
         toast.warn('You are not assigned to any department or college.');
         setCourseOptions([]);
@@ -113,11 +112,7 @@ const BayanihanModality: React.FC<UserProps> = ({ user }) => {
     const autoSelectRoom = () => {
       const requiredRoomType = modalityRoomTypeMap[form.modality];
       if (!requiredRoomType) {
-        setForm(prev => ({
-          ...prev,
-          room: '',
-          roomType: '',
-        }));
+        setForm(prev => ({ ...prev, room: '', roomType: '' }));
         return;
       }
 
@@ -129,11 +124,7 @@ const BayanihanModality: React.FC<UserProps> = ({ user }) => {
           roomType: matchingRoom.room_type,
         }));
       } else {
-        setForm(prev => ({
-          ...prev,
-          room: '',
-          roomType: requiredRoomType,
-        }));
+        setForm(prev => ({ ...prev, room: '', roomType: requiredRoomType }));
         toast.warn(`No rooms available for ${requiredRoomType}.`);
       }
     };
@@ -164,8 +155,8 @@ const BayanihanModality: React.FC<UserProps> = ({ user }) => {
       return;
     }
 
-    const selectedSections = sectionOptions.filter(s =>
-      form.sections.includes(s.section_name)
+    const selectedSections = sectionOptions.filter(
+      s => s.course_id === form.course && form.sections.includes(s.section_name)
     );
 
     if (selectedSections.length === 0) {
@@ -173,21 +164,47 @@ const BayanihanModality: React.FC<UserProps> = ({ user }) => {
       return;
     }
 
+    const conflictWarnings: string[] = [];
+
     for (const section of selectedSections) {
-      const { error } = await supabase.from('tbl_modality').insert([{
+      const { data: existing, error: fetchError } = await supabase
+        .from('tbl_modality')
+        .select('modality_id')
+        .eq('room_id', form.room)
+        .eq('course_id', section.course_id)
+        .eq('program_id', section.program_id);
+
+      if (fetchError) {
+        console.error('Error checking existing modality:', fetchError.message);
+        toast.error('Failed to check for existing modality conflicts.');
+        return;
+      }
+
+      if (existing && existing.length > 0) {
+        conflictWarnings.push(section.section_name);
+      }
+    }
+
+    if (conflictWarnings.length > 0) {
+      toast.warn(`⚠️ Room already assigned for: ${conflictWarnings.join(', ')}. Proceeding anyway.`);
+    }
+
+    for (const section of selectedSections) {
+      const { error: insertError } = await supabase.from('tbl_modality').insert([{
         modality_type: form.modality,
         room_type: form.roomType,
         modality_remarks: form.remarks,
         course_id: section.course_id,
         program_id: section.program_id,
+        section_name: section.section_name,
         room_id: form.room,
         user_id: user.user_id,
         created_at: new Date().toISOString(),
       }]);
 
-      if (error) {
-        console.error('Insert error:', error.message);
-        toast.error(`Failed to save modality: ${error.message}`);
+      if (insertError) {
+        console.error('Insert error:', insertError.message);
+        toast.error(`Failed to save modality for ${section.section_name}`);
         return;
       }
     }
@@ -295,7 +312,7 @@ const BayanihanModality: React.FC<UserProps> = ({ user }) => {
                   >
                     {form.sections.length === 0
                       ? 'Select sections'
-                      : `${form.sections.length} section${form.sections.length > 1 ? 's' : ''} selected`}
+                      : `${form.sections.length} section${form.sections.length > 1 ? 's' : ''} are selected`}
                   </div>
 
                   {sectionDropdownOpen && (

@@ -1,3 +1,4 @@
+/* === General Container === */
 .colleges-container {
   padding: 20px;
   font-family: Arial, sans-serif;
@@ -8,7 +9,7 @@
   border-radius: 5%;
 }
 
-
+/* === Header === */
 .colleges-header {
   display: flex;
   justify-content: space-between;
@@ -16,14 +17,13 @@
   margin-bottom: 20px;
 }
 
-
 .colleges-title {
   font-size: 24px;
   color: #333;
   margin: 0;
 }
 
-
+/* === Search Bar === */
 .search-bar {
   display: flex;
   align-items: center;
@@ -33,7 +33,6 @@
   background-color: #8d6715;
   box-shadow: 0 1px 2px rgba(205, 16, 16, 0.05);
 }
-
 
 .search-bar input {
   border: none;
@@ -45,7 +44,6 @@
   color: #333;
 }
 
-
 .search-bar .search-button {
   border: none;
   padding: 8px 10px;
@@ -55,20 +53,16 @@
   background-color: transparent;
 }
 
-
 .search-bar .search-button:hover {
   background-color: #f0f0f0;
 }
 
-
-
-
+/* === Actions === */
 .colleges-actions {
   display: flex;
   gap: 10px;
   margin-bottom: 20px;
 }
-
 
 .action-button {
   padding: 10px 20px;
@@ -81,32 +75,23 @@
   font-weight: bold;
 }
 
-
 .action-button:active {
-    transform: translateY(1px);
+  transform: translateY(1px);
 }
 
-
-.action-button.add-new {
+.action-button.add-new,
+.action-button.import,
+.action-button.save-changes {
   background-color: #ffb800;
 }
 
-
-.action-button.add-new:hover {
+.action-button.add-new:hover,
+.action-button.import:hover,
+.action-button.save-changes:hover {
   background-color: #e6a700;
 }
 
-
-.action-button.import {
-  background-color: #ffb800;
-}
-
-
-.action-button.import:hover {
-  background-color: #e6a700;
-}
-
-
+/* === Table === */
 .colleges-table-container {
   background-color: #fff;
   border-radius: 8px;
@@ -114,61 +99,38 @@
   box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
 }
 
-
 .colleges-table {
   width: 100%;
   border-collapse: collapse;
   color: #333;
 }
 
-
-.colleges-table th {
-  padding: 12px 15px;
-  text-align: left;
-  background-color: #333d52;
-  color: white;
-  font-weight: bold;
-  border-bottom: 2px solid #092C4C;
-}
+.colleges-table th,
 .colleges-table td {
   padding: 12px 15px;
   border-bottom: 1px solid #eee;
   text-align: left;
 }
 
-
-.colleges-table thead {
+.colleges-table th {
   background-color: #333d52;
   color: white;
+  font-weight: bold;
 }
-
-
-.colleges-table th:first-child {
-  width: 50px;
-  text-align: LEFT;
-}
-
-
-.colleges-table td:first-child {
-    text-align: left;
-}
-
 
 .colleges-table tbody tr:nth-child(even) {
   background-color: #f8f8f8;
 }
 
-
 .colleges-table tbody tr:hover {
   background-color: #f0f0f0;
 }
 
-
+/* === Icons === */
 .action-buttons {
   display: flex;
   gap: 5px;
 }
-
 
 .icon-button {
   background: none;
@@ -182,324 +144,51 @@
   transition: color 0.2s ease, transform 0.1s ease;
 }
 
-
 .icon-button:active {
-    transform: translateY(1px);
+  transform: translateY(1px);
 }
-
 
 .icon-button.delete-button {
   color: #ff4d4f;
 }
 
-
 .icon-button.delete-button:hover {
   color: #cc0000;
 }
-
 
 .icon-button.edit-button {
   color: #1890ff;
 }
 
-
 .icon-button.edit-button:hover {
   color: #0056b3;
 }
 
-
-.no-data-message {
-    text-align: center;
-    padding: 20px;
-    color: #666;
-    font-style: italic;
+.icon-button.view-button {
+  color: #28a745;
 }
 
-
-.save-changes-footer {
-  display: flex;
-  justify-content: flex-end;
-  padding-top: 20px;
+.icon-button.view-button:hover {
+  color: #1e7e34;
 }
 
-
-.action-button.save-changes {
-  background-color: #ffb800;
-  padding: 12px 25px;
-  font-size: 16px;
-  font-weight: bold;
-}
-
-
-.action-button.save-changes:hover {
-  background-color: #e6a700;
-}
-
-
-.modal-overlay {
-  position: absolute;
-  top: 0;
-  left: 0;
-  width: 100%;
-  height: 100%;
-  background: rgba(51, 51, 51, 0.4);
-  display: flex;
-  justify-content: center;
-  align-items: center;
-  backdrop-filter: blur(2px);
-}
-
-
-.modal {
-  background: #fff;
-  padding: 20px;
-  width: 400px;
-  border-radius: 8px;
-  box-shadow: 0 5px 15px rgba(0,0,0,0.3);
-  display: flex;
-  flex-direction: column;
-  gap: 10px;
-}
-
-
-.modal input,
-.modal textarea {
-  width: 95%;
-  padding: 8px;
-  font-size: 14px;
-  border: 2px solid #092C4C;
-  background-color: transparent;
-  border-radius: 5px;
-  color: black;
-}
-
-
-.modal select {
-  width: 100%;
-  padding: 8px;
-  font-size: 14px;
-  border: 2px solid #092C4C;
-  background-color: transparent;
-  border-radius: 5px;
-  color: black;
-}
-
-
-h3 {
-  margin: 0;
-  font-size: 20px;
-  color: #ffb800;
-  align-self: center;
-}
-
-
-.modal textarea {
-  resize: vertical;
-  min-height: 80px;
-}
-
-
-.modal-actions {
-  display: flex;
-  justify-content: flex-end;
-  gap: 10px;
-}
-
-
-.modal-actions button {
-  gap: 10px;
-  background-color: rgb(6, 5, 64);
-  color: white;
-  font-weight: bold;
-  border: none;
-  border-radius: 10px;
-  padding: 8px 16px;
-}
-
-
-.modal-button {
-  padding: 8px 16px;
-  border: none;
-  border-radius: 5px;
-  cursor: pointer;
-  font-weight: bold;
-  transition: background-color 0.3s ease;
-}
-
-
-.modal-button.save {
-  background-color: #9f760c;
-  color: white;
-}
-
-
-.modal-button.save:hover {
-  background-color: #e6a700;
-}
-
-
-.modal-button.cancel {
-  background-color: #092C4C;
-  color: black;
-  color: white;
-}
-
-
-.modal-button.cancel:hover {
-  background-color: #193e60;
-}
-.date-input-wrapper {
-  position: relative;
-  display: flex;
-  align-items: center;
-  width: 100%;
-}
-
-
-.date-input-wrapper input[type="date"] {
-  padding: 8px;
-  border: 2px solid #193e60;
-  border-radius: 4px;
-  font-size: 14px;
-}
-
-
-.calendar-icon-right {
-  position: absolute;
-  right: 12px;
-  color: #193e60;
-  pointer-events: none;
-  font-size: 16px;
-}
-.search-bar {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 10px;
-  align-items: center;
-}
-
-
-.search-bar select,
-.search-bar input {
-  padding: 6px 10px;
-  border-radius: 5px;
-  border: 1px solid #ccc;
-}
-.search-bar-container {
-  position: relative;
-  margin-bottom: 10px;
-  display: flex;
-  flex-direction: column;
-}
-
-
-.search-bar {
-  position: relative;
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  padding: 6px 10px;
-  border: 1px solid #ccc;
-  border-radius: 6px;
-  cursor: text;
-  background-color: #fff;
-}
-
-
-.search-bar input {
-  flex: 1;
-  border: none;
-  outline: none;
-  font-size: 14px;
-  background-color: transparent;
-}
-
-
-.search-icon {
-  color: #ffb800;
-}
-.advanced-filters select {
-    background-color: #092C4C;
-}
-.advanced-filters {
-  margin-top: 2px;
-  display: flex;
-  flex-wrap: wrap;
-  gap: 1px;
-  animation: fadeIn 0.2s ease-in-out;
-}
-
-
-.advanced-filters select {
-  padding: 6px 10px;
-  border-radius: 6px;
-  border: 1px solid #ccc;
-  min-width: 1px;
-}
-
-
-@keyframes fadeIn {
-  from { opacity: 0; transform: translateY(-5px); }
-  to { opacity: 1; transform: translateY(0); }
-}
-
-
-.form-group {
-  display: flex;
-  flex-direction: column;
-  margin-bottom: 15px;
-}
-
-
-.form-group label {
-  margin-bottom: 5px;
-  font-weight: bold;
-  color: #333;
-}
-
-
-.modal-buttons {
-  display: flex;
-  justify-content: space-between;
-  margin-top: 20px;
-}
-
-
-.next-button {
-  padding: 10px 20px;
-  background-color: #FAB417;
-  color: white;
-  font-weight: bold;
-  border: none;
-  border-radius: 5px;
-  cursor: pointer;
-  flex: 1;
-  margin-right: 10px;
-  transition: background-color 0.3s ease;
-}
-
-
-.next-button:hover {
-  background-color: #e6a700;
-}
-
-
+/* === Plot Schedule Section === */
 .plot-schedule {
   display: flex;
-  flex-direction: row;
+  flex-wrap: wrap;
   gap: 30px;
   margin-top: 20px;
 }
 
-
+/* Left Side - Form */
 .plot-controls {
-  min-width: 260px;
-  background-color: white;
+  min-width: 300px;
+  flex: 1;
+  background-color: #fff;
   padding: 20px;
-  border-radius: 8px;
+  border-radius: 10px;
   box-shadow: 0 1px 6px rgba(0, 0, 0, 0.1);
 }
-
 
 .plot-controls h3 {
   font-size: 20px;
@@ -507,112 +196,125 @@ h3 {
   color: #092C4C;
 }
 
+.form-group {
+  margin-bottom: 15px;
+  display: flex;
+  flex-direction: column;
+}
 
-.plot-controls label {
+.form-group label {
   font-weight: bold;
   font-size: 14px;
   color: #333;
-  display: block;
-  margin-bottom: 4px;
+  margin-bottom: 5px;
 }
 
-
-.plot-controls input[type="date"],
-.plot-controls input[type="number"] {
+.form-group select,
+.form-group input[type="date"],
+.form-group input[type="number"] {
   width: 100%;
   padding: 8px;
+  font-size: 14px;
   border: 2px solid #092C4C;
-  border-radius: 5px;
+  border-radius: 6px;
   background-color: transparent;
   color: black;
-  font-size: 14px;
-  margin-bottom: 15px;
 }
 
-
-.plot-controls .radio-group {
-  margin-bottom: 15px;
-}
-
-
-.plot-controls .radio-group label {
-  font-weight: normal;
+.radio-group {
   display: flex;
-  gap: 5px;
-  align-items: center;
-  margin-top: 4px;
-  font-size: 14px;
-}
-
-
-.plot-controls .duration-inputs {
-  display: flex;
-  align-items: center;
   gap: 10px;
+  margin-bottom: 15px;
 }
 
+.radio-group label {
+  font-weight: normal;
+  font-size: 14px;
+}
 
-.plot-controls .duration-inputs input {
+/* Duration Inputs */
+.duration-inputs {
+  display: flex;
+  gap: 10px;
+  align-items: center;
+}
+
+.duration-inputs input {
   width: 60px;
   text-align: center;
 }
 
-
+/* Right Side - Grid */
 .plot-grid {
-  flex: 1;
+  flex: 2;
   overflow-x: auto;
 }
-
 
 .plot-grid table {
   width: 100%;
   border-collapse: collapse;
-}
-
-
-.plot-grid th,
-.plot-grid td {
-  border: 1px solid #ccc;
-  text-align: center;
-  padding: 10px;
   font-size: 13px;
 }
 
+.plot-grid th,
+.plot-grid td {
+  padding: 10px;
+  border: 1px solid #ccc;
+  text-align: center;
+  min-width: 80px;
+}
 
 .plot-grid th {
   background-color: #333d52;
   color: white;
-  font-weight: bold;
 }
-
 
 .plot-grid td:first-child {
   background-color: #f9f9f9;
   font-weight: bold;
   text-align: left;
   white-space: nowrap;
+  color: #092C4C;
 }
 
-
+/* Footer Buttons under the Grid */
 .plot-footer {
   display: flex;
-  justify-content: space-between;
+  justify-content: flex-end;
+  gap: 10px;
   margin-top: 20px;
+  flex-wrap: wrap;
+}
+/* Modality Details Container */
+.modality-details {
+  background-color: #f9f9f9;
+  padding: 15px 20px;
+  margin-top: 15px;
+  border-left: 5px solid #007BFF;
+  border-radius: 6px;
+  box-shadow: 0 1px 3px rgba(0,0,0,0.1);
 }
 
-
-.next-button {
-  background-color: #ffb800;
-  color: white;
-  font-weight: bold;
-  padding: 8px 16px;
-  border: none;
-  border-radius: 5px;
-  margin-right: 10px;
-  cursor: pointer;
+/* Modality Details Title */
+.modality-details h3 {
+  margin-top: 0;
+  font-size: 1.25rem;
+  color: #333;
 }
 
+/* Section List Styling */
+.modality-details ul {
+  list-style-type: disc;
+  padding-left: 20px;
+  margin-top: 10px;
+}
 
-.next-button:hover {
-  background-color: #e6a700;
+.modality-details li {
+  margin-bottom: 8px;
+  font-size: 14px;
+  color: #444;
+}
+
+.modality-details li strong {
+  color: #000;
 }

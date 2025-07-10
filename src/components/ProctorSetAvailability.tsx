@@ -20,6 +20,7 @@ const ProctorSetAvailability: React.FC<ProctorSetAvailabilityProps> = ({ user })
   const [reason, setReason] = useState('');
   const [showDatePicker, setShowDatePicker] = useState(false);
   const [currentMonth, setCurrentMonth] = useState(new Date());
+  const [allowedDates, setAllowedDates] = useState<string[]>([]);
 
   const today = new Date();
 
@@ -28,6 +29,61 @@ const ProctorSetAvailability: React.FC<ProctorSetAvailabilityProps> = ({ user })
     localToday.setHours(12, 0, 0, 0);
     setSelectedDate(localToday.toISOString().split('T')[0]);
     setCurrentMonth(new Date(localToday.getFullYear(), localToday.getMonth(), 1));
+  }, []);
+
+  useEffect(() => {
+    const fetchExamPeriods = async () => {
+      const { data: roleData, error: roleError } = await supabase
+        .from('tbl_user_role')
+        .select('college_id, department_id')
+        .eq('user_id', user.user_id)
+        .limit(1)
+        .single();
+
+      if (roleError || !roleData) {
+        console.error('Error fetching user role:', roleError?.message);
+        return;
+      }
+
+      const { college_id, department_id } = roleData;
+
+      const { data: periods, error: examError } = await supabase
+        .from('tbl_examperiod')
+        .select('start_date, end_date')
+        .or(`college_id.eq.${college_id},department_id.eq.${department_id}`);
+
+      if (examError || !periods) {
+        console.error('Error fetching exam periods:', examError?.message);
+        return;
+      }
+
+      const generatedDates: string[] = [];
+
+      for (const period of periods) {
+        if (!period.start_date || !period.end_date) continue;
+
+        const start = new Date(period.start_date);
+        const end = new Date(period.end_date);
+
+        if (isNaN(start.getTime()) || isNaN(end.getTime())) continue;
+
+        for (const i = new Date(start); i <= end; i.setDate(i.getDate() + 1)) {
+          const dateCopy = new Date(i);
+          generatedDates.push(dateCopy.toISOString().split('T')[0]);
+        }
+      }
+
+      generatedDates.sort();
+      setAllowedDates(generatedDates);
+
+      const todayStr = new Date().toISOString().split('T')[0];
+      setSelectedDate(generatedDates.includes(todayStr) ? todayStr : generatedDates[0] || '');
+
+      const today = new Date();
+      setCurrentMonth(new Date(today.getFullYear(), today.getMonth(), 1));
+    };
+
+    fetchExamPeriods();
   }, []);
 
   const daysInMonth = (year: number, month: number) => new Date(year, month + 1, 0).getDate();
@@ -46,9 +102,13 @@ const ProctorSetAvailability: React.FC<ProctorSetAvailabilityProps> = ({ user })
   };
 
   const handleDateSelect = (day: number | null) => {
-    if (day) {
-      const newDate = new Date(currentMonth.getFullYear(), currentMonth.getMonth(), day, 12);
-      setSelectedDate(newDate.toISOString().split('T')[0]);
+    if (!day) return;
+
+    const selected = new Date(currentMonth.getFullYear(), currentMonth.getMonth(), day, 12);
+    const iso = selected.toISOString().split('T')[0];
+
+    if (allowedDates.includes(iso)) {
+      setSelectedDate(iso);
       setShowDatePicker(false);
     }
   };
@@ -141,23 +201,26 @@ const ProctorSetAvailability: React.FC<ProctorSetAvailabilityProps> = ({ user })
                         <div key={i} className="day-name">{d}</div>
                       ))}
                       {getCalendarDays().map((day, index) => {
-                        const dayDate = day
-                          ? new Date(currentMonth.getFullYear(), currentMonth.getMonth(), day, 12)
-                          : null;
+                      const dayDate = day
+                        ? new Date(currentMonth.getFullYear(), currentMonth.getMonth(), day, 12)
+                        : null;
 
-                        const isSelected = dayDate && selectedDate === dayDate.toISOString().split('T')[0];
-                        const isToday = dayDate && dayDate.toDateString() === today.toDateString();
+                      const isoDate = dayDate ? dayDate.toISOString().split('T')[0] : '';
+                      const isAllowed = allowedDates.includes(isoDate);
+                      const isSelected = isoDate === selectedDate;
+                      const isToday = dayDate && dayDate.toDateString() === today.toDateString();
 
-                        return (
-                          <div
-                            key={index}
-                            className={`calendar-day ${day ? 'selectable' : ''} ${isSelected ? 'selected' : ''} ${isToday && !isSelected ? 'today' : ''}`}
-                            onClick={() => handleDateSelect(day)}
-                          >
-                            {day}
-                          </div>
-                        );
-                      })}
+                      return (
+                        <div
+                          key={index}
+                          className={`calendar-day ${day ? 'selectable' : ''} ${isSelected ? 'selected' : ''} ${isToday && !isSelected ? 'today' : ''} ${isAllowed ? '' : 'disabled'}`}
+                          onClick={() => isAllowed && handleDateSelect(day)}
+                          style={{ pointerEvents: isAllowed ? 'auto' : 'none', opacity: isAllowed ? 1 : 0.3 }}
+                        >
+                          {day}
+                        </div>
+                      );
+                    })}
                     </div>
                     <div className="date-picker-footer">
                       <button type="button" onClick={goToToday}>Now</button>

@@ -127,7 +127,7 @@ const SchedulerAvailability: React.FC = () => {
   return (
     <div className="colleges-container">
       <div className="colleges-header">
-        <h2 className="colleges-title">Proctors Status</h2>
+        <h2 className="colleges-title"></h2>
         <div className="search-bar">
           <input
             type="text"

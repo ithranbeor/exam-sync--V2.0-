@@ -72,6 +72,7 @@ const ExamPeriod: React.FC = () => {
 
   const handleSubmit = async () => {
     const { start_date, end_date, academic_year, exam_category, term_id, department_id, college_id } = newExam;
+
     if (!start_date || !end_date || !academic_year || !exam_category || !term_id) {
       toast.error('Please fill in all required fields');
       return;
@@ -79,27 +80,47 @@ const ExamPeriod: React.FC = () => {
 
     setIsSubmitting(true);
 
-    const payload = {
-      start_date,
-      end_date,
+    const start = new Date(start_date);
+    const end = new Date(end_date);
+    const dates: string[] = [];
+
+    // Generate all dates from start_date to end_date
+    while (start <= end) {
+      dates.push(new Date(start).toISOString());
+      start.setDate(start.getDate() + 1);
+    }
+
+    // Build and insert payloads for each date
+    const payloads = dates.map((date) => ({
+      start_date: date,
+      end_date: date,
       academic_year,
       exam_category,
       term_id,
       department_id: department_id || null,
       college_id: college_id || null,
-    };
+    }));
 
-    const { error } = editMode
-      ? await supabase
-          .from('tbl_examperiod')
-          .update(payload)
-          .eq('examperiod_id', newExam.examperiod_id!)
-      : await supabase.from('tbl_examperiod').insert([payload]);
+    let error = null;
+
+    if (editMode && newExam.examperiod_id) {
+      // Only support editing one record in edit mode
+      const { error: updateError } = await supabase
+        .from('tbl_examperiod')
+        .update(payloads[0])
+        .eq('examperiod_id', newExam.examperiod_id);
+      error = updateError;
+    } else {
+      const { error: insertError } = await supabase
+        .from('tbl_examperiod')
+        .insert(payloads);
+      error = insertError;
+    }
 
     if (error) {
       toast.error('Failed to save exam period');
     } else {
-      toast.success(editMode ? 'Exam period updated' : 'Exam period added');
+      toast.success(editMode ? 'Exam period updated' : `Added ${payloads.length} exam date(s)`);
       fetchAll();
     }
 

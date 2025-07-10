@@ -280,7 +280,7 @@
     background-color: #f7b731;
     color: white;
     font-weight: bold;
-    box-shadow: 0 2px 5px rgba(247, 183, 49, 0.3);
+    box-shadow: 0 5px 5px rgba(253, 173, 0, 0.3);
 }
 
 
@@ -452,3 +452,34 @@
   font-size: 0.8rem;
   padding: 4px 10px;
 }
+.calendar-day.disabled {
+  color: #000000;
+  pointer-events: none;
+  background-color: #f5f5f5;
+  cursor: not-allowed;
+}
+.calendar-cell.disabled {
+  color: #bbb;
+  background-color: #f3f3f3;
+  cursor: not-allowed;
+  pointer-events: none;
+}
+
+.calendar-cell.selectable {
+  cursor: pointer;
+}
+
+.calendar-cell.selected {
+  background-color: #007bff;
+  color: white;
+  font-weight: bold;
+}
+
+.calendar-cell.today {
+  border: 2px solid #007bff;
+}
+.calendar-day.disabled {
+  cursor: not-allowed;
+  background-color: #ffffff;
+}
+
