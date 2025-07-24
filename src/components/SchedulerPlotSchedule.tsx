@@ -2,6 +2,10 @@ import React, { useState, useEffect } from 'react';
 import { FaTrash, FaEdit, FaEye, FaSearch } from 'react-icons/fa';
 import { supabase } from '../lib/supabaseClient.ts';
 import '../styles/plotschedule.css';
+import 'react-toastify/dist/ReactToastify.css';
+import { ToastContainer, toast } from 'react-toastify';
+import html2pdf from 'html2pdf.js';
+import * as XLSX from 'xlsx';
 
 interface Course {
   course_id: string;
@@ -68,6 +72,26 @@ interface ExamPeriod {
   college_name?: string;
 }
 
+interface ExamDetail {
+  examdetails_id: string;
+  course_id: string;
+  program_id: string;
+  room_id: string;
+  modality_id: string;
+  user_id: string;
+  exam_period: string;
+  exam_date: string;
+  exam_duration: string;
+  exam_start_time: string;
+  exam_end_time: string;
+  time_in: string | null;
+  time_out: string | null;
+  section_name: string;
+  academic_year: string;
+  semester: string;
+  exam_category: string;
+}
+
 const Scheduler_PlotSchedule: React.FC = () => {
   const [showPlot, setShowPlot] = useState(false);
   const [courses, setCourses] = useState<Course[]>([]);
@@ -80,18 +104,95 @@ const Scheduler_PlotSchedule: React.FC = () => {
   const [selectedModality, setSelectedModality] = useState<Modality | null>(null);
   const [availableProctors, setAvailableProctors] = useState<Proctor[]>([]);
   const [examDetails, setExamDetails] = useState<any[]>([]);
+  const [searchTerm, setSearchTerm] = useState('');
+  const [selectedExam, setSelectedExam] = useState<ExamDetail | null>(null);
+  const [isExporting, setIsExporting] = useState(false);
+  const [mergedPeriods, setMergedPeriods] = useState<
+    { label: string; value: string }[]
+  >([]);
+  const [examCategories, setExamCategories] = useState<string[]>([]);
+
+  const filteredExamDetails = examDetails.filter((ed) =>
+    ed.examdetails_id?.toString().toLowerCase().includes(searchTerm.toLowerCase())
+  );
+
+  const exportAsPDF = async () => {
+    setIsExporting(true); // hide dropdowns
+
+    await new Promise((resolve) => setTimeout(resolve, 100)); // wait for UI to update
+
+    const element = document.querySelector('.export-section');
+    if (element) {
+      html2pdf().set({
+        margin: 0.5,
+        filename: 'ExamSchedule.pdf',
+        image: { type: 'jpeg', quality: 0.98 },
+        html2canvas: { scale: 2 },
+        jsPDF: { unit: 'in', format: 'a3', orientation: 'landscape' },
+      }).from(element).save().then(() => {
+        setIsExporting(false); // show dropdowns again
+      });
+    } else {
+      setIsExporting(false);
+    }
+  };
+
+  const exportAsWord = () => {
+    const element = document.querySelector('.export-section');
+    if (!element) return;
+
+    const html = element.outerHTML;
+    const blob = new Blob(['\ufeff' + html], {
+      type: 'application/msword',
+    });
+
+    const link = document.createElement('a');
+    link.href = URL.createObjectURL(blob);
+    link.download = 'ExamSchedule.doc';
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+  };
+
+  const exportAsExcel = () => {
+    const table = document.querySelector('.export-section table');
+    if (!table) return;
+
+    const workbook = XLSX.utils.table_to_book(table as HTMLTableElement);
+    XLSX.writeFile(workbook, 'ExamSchedule.xlsx');
+  };
   
   const [formData, setFormData] = useState({
     course_id: '',
     program_id: '',
     modality_id: '',
     examperiod_id: '',
+    academic_term: '',
+    exam_category: '',
+    days_period_id: '',
     hours: 1,
     minutes: 30,
     proctor_all: true,
     exam_date: '',
     proctor_filter: 'available_only',
   });
+
+  useEffect(() => {
+    const fetchExamDetails = async () => {
+      const { data, error } = await supabase
+        .from('tbl_examdetails')
+        .select('*');
+
+      if (error) {
+        console.error("Failed to fetch exam details:", error.message);
+        setExamDetails([]);
+      } else {
+        setExamDetails(data || []);
+      }
+    };
+
+    fetchExamDetails();
+  }, []);
 
   useEffect(() => {
     const fetchInitialData = async () => {
@@ -123,7 +224,7 @@ const Scheduler_PlotSchedule: React.FC = () => {
           status,
           tbl_users ( first_name, last_name )
         `)
-        .eq('status', 'available');
+        .eq('status', 'available')
 
       const availableProctors: Proctor[] = (availabilityData || []).map((entry: any) => ({
         user_id: entry.user_id,
@@ -235,31 +336,115 @@ const Scheduler_PlotSchedule: React.FC = () => {
           exam_category: ep.exam_category,
           term: ep.term || { term_name: 'Unknown' },
           college_id: ep.college_id,
-          college_name: ep.college?.college_name || 'N/A'
+          college_name: ep.college?.college_name || 'N/A',
         }));
 
         setExamPeriods(fixed);
+
+        const merged = Array.from(
+          new Map(
+            fixed.map((ep) => [
+              `${ep.academic_year}-${ep.term.term_name}`,
+              {
+                label: `${ep.academic_year} ${ep.term.term_name}`,
+                value: `${ep.academic_year}||${ep.term.term_name}`,
+              },
+            ])
+          ).values()
+        );
+        setMergedPeriods(merged);
+
+        const categories = Array.from(new Set(fixed.map((ep) => ep.exam_category)));
+        setExamCategories(categories);
       }
     };
 
     fetchInitialData();
   }, []);
 
+  const [daysPeriods, setDaysPeriods] = useState<
+    { label: string; value: string; examperiod_id: number }[]
+  >([]);
+
+  const formatFullDate = (dateStr: string) =>
+  new Date(dateStr).toLocaleDateString('en-US', {
+    month: 'long',
+    day: 'numeric',
+    year: 'numeric',
+  });
+
+  useEffect(() => {
+    if (!formData.academic_term || !formData.exam_category) {
+      setDaysPeriods([]);
+      return;
+    }
+
+    const [year, term] = formData.academic_term.split('||');
+
+    const matchingPeriods = examPeriods.filter(
+      (ep) =>
+        ep.academic_year === year &&
+        ep.term.term_name === term &&
+        ep.exam_category === formData.exam_category
+    );
+
+    const allDates: { label: string; value: string; examperiod_id: number }[] = [];
+
+    matchingPeriods.forEach((ep) => {
+      const start = new Date(ep.start_date);
+      const end = new Date(ep.end_date);
+      for (let d = new Date(start); d <= end; d.setDate(d.getDate() + 1)) {
+        const formatted = formatFullDate(d.toISOString());
+        allDates.push({
+          label: formatted,
+          value: d.toISOString().split('T')[0], 
+          examperiod_id: ep.examperiod_id,
+        });
+      }
+    });
+
+    setDaysPeriods(allDates);
+  }, [formData.academic_term, formData.exam_category, examPeriods]);
+
+  useEffect(() => {
+    if (!formData.academic_term || !formData.exam_category) return;
+
+    const [year, term] = formData.academic_term.split('||');
+
+    const match = examPeriods.find(
+      (ep) =>
+        ep.academic_year === year &&
+        ep.term.term_name === term &&
+        ep.exam_category === formData.exam_category
+    );
+
+    if (match) {
+      setFormData((prev) => ({
+        ...prev,
+        examperiod_id: match.examperiod_id.toString(),
+        exam_date: match.start_date,
+      }));
+    }
+  }, [formData.academic_term, formData.exam_category, examPeriods]);
+
   const filteredCourses = formData.program_id
-    ? sectionCourses
-        .filter((sc) => sc.program_id === formData.program_id)
-        .map((sc) => {
-          const course = courses.find((c) => c.course_id === sc.course_id);
+    ? modalities
+        .filter((m) => m.program_id === formData.program_id)
+        .map((m) => {
+          const course = courses.find((c) => c.course_id === m.course_id);
           return course
             ? {
                 course_id: course.course_id,
                 course_name: course.course_name,
-                year_level: sc.year_level,
-                term_name: sc.term?.term_name || 'Unknown',
+                year_level: m.section?.year_level,
+                term_name: m.section?.term?.term_name || 'Unknown',
               }
             : null;
         })
-        .filter((c) => c !== null) as {
+        .filter((c, index, self) =>
+          c !== null &&
+          index === self.findIndex((t) => t?.course_id === c.course_id)
+        ) as {
           course_id: string;
           course_name: string;
           year_level: string;
@@ -326,11 +511,9 @@ const Scheduler_PlotSchedule: React.FC = () => {
       return;
     }
 
-    const examStartBase = new Date(selectedExamPeriod.start_date);
-    examStartBase.setHours(7, 30, 0, 0);
+    const initialStartTime = new Date(`${formData.exam_date}T07:30:00`);
 
     const durationMinutes = formData.hours * 60 + formData.minutes;
-    const examEndTime = new Date(examStartBase.getTime() + durationMinutes * 60000);
 
     const pad = (n: number) => String(n).padStart(2, '0');
     const intervalString = `${pad(formData.hours)}:${pad(formData.minutes)}:00`;
@@ -353,35 +536,70 @@ const Scheduler_PlotSchedule: React.FC = () => {
         m.program_id === selectedMod.program_id
     );
 
-    const inserts = matchingModalities.map((modality) => ({
-      course_id: modality.course_id,
-      program_id: modality.program_id,
-      room_id: modality.room_id,
-      modality_id: modality.modality_id,
-      user_id: parseInt(userId),
-      examperiod_id: parseInt(formData.examperiod_id),
-      exam_duration: intervalString,
-      exam_start_time: examStartBase.toISOString(),
-      exam_end_time: examEndTime.toISOString(),
-      proctor_timein: null,
-      proctor_timeout: null,
-      section_name: modality.section_name,
+    const existingCheck = await supabase
+      .from('tbl_examdetails')
+      .select('*')
+      .eq('examperiod_id', formData.examperiod_id)
+      .eq('exam_date', formData.exam_date)
+      .eq('course_id', formData.course_id)
+      .eq('program_id', formData.program_id);
 
-      academic_year: selectedExamPeriod.academic_year,
-      semester: selectedExamPeriod.term?.term_name || 'N/A',
-      exam_category: selectedExamPeriod.exam_category,
-      exam_period: examPeriodRange,
-      exam_date: formData.exam_date,
-    }));
+    const existingDetails = existingCheck.data ?? [];
+
+    const existingSections = new Set(
+      existingDetails.map((ed) => ed.section_name?.toLowerCase().trim())
+    );
+
+    const newModalities = matchingModalities.filter(
+      (mod) => !existingSections.has(mod.section_name.toLowerCase().trim())
+    );
+
+    if (newModalities.length === 0) {
+      toast.error('Schedule already exists for this course, program, and sections on this date.');
+      return;
+    }
+
+    let proctorIndex = 0;
+    const totalAvailable = availableProctors.length;3
+
+    const inserts = newModalities.map((modality, index) => {
+      const offsetMinutes = index * durationMinutes;
+      const examStartTime = new Date(initialStartTime.getTime() + offsetMinutes * 60000);
+      const examEndTime = new Date(examStartTime.getTime() + durationMinutes * 60000);
+
+      let assignedProctorId: number | null = null;
+      if (formData.proctor_filter === 'available_only' && totalAvailable > 0) {
+        assignedProctorId = availableProctors[proctorIndex % totalAvailable].user_id;
+        proctorIndex++;
+      }
+
+      return {
+        course_id: modality.course_id,
+        program_id: modality.program_id,
+        room_id: modality.room_id,
+        modality_id: modality.modality_id,
+        user_id: assignedProctorId ?? parseInt(userId),
+        examperiod_id: parseInt(formData.examperiod_id),
+        exam_duration: intervalString,
+        exam_start_time: examStartTime.toISOString(),
+        exam_end_time: examEndTime.toISOString(),
+        proctor_timein: null,
+        proctor_timeout: null,
+        section_name: modality.section_name,
+        academic_year: selectedExamPeriod.academic_year,
+        semester: selectedExamPeriod.term?.term_name || 'N/A',
+        exam_category: selectedExamPeriod.exam_category,
+        exam_period: examPeriodRange,
+        exam_date: formData.exam_date,
+      };
+    });
 
     const { error } = await supabase.from('tbl_examdetails').insert(inserts);
 
     if (error) {
-      console.error('Insert error:', error.message);
-      alert('Failed to save schedule. Please check console for details.');
+      toast.error(`Failed to save schedule. ${error.message}`);
     } else {
-      alert('Schedule saved successfully!');
-      setShowPlot(false);
+      toast.success('Schedule saved successfully!');
 
       const { data: updatedExamDetails } = await supabase
         .from('tbl_examdetails')
@@ -399,7 +617,12 @@ const Scheduler_PlotSchedule: React.FC = () => {
           <div className="colleges-header">
             <h2 className="colleges-title">Manage Schedule</h2>
             <div className="search-bar">
-              <input type="text" placeholder="Search for Schedule" />
+              <input 
+                type="text" 
+                placeholder="Search for Schedule" 
+                value={searchTerm}
+                onChange={(e) => setSearchTerm(e.target.value)}
+              />
               <button type="button" className="search-button">
                 <FaSearch />
               </button>
@@ -421,34 +644,66 @@ const Scheduler_PlotSchedule: React.FC = () => {
               <thead>
                 <tr>
                   <th>#</th>
-                  <th>Start Date</th>
+                  <th>Course ID</th>
+                  <th>Program ID</th>
+                  <th>Room ID</th>
                   <th>Actions</th>
                 </tr>
               </thead>
               <tbody>
-                <tr>
-                  <td>1</td>
-                  <td>2025-05-23</td>
-                  <td className="action-buttons">
-                    <button type="button" className="icon-button view-button">
-                      <FaEye />
-                    </button>
-                    <button type="button" className="icon-button edit-button">
-                      <FaEdit />
-                    </button>
-                    <button type="button" className="icon-button delete-button">
-                      <FaTrash />
-                    </button>
-                  </td>
-                </tr>
+                {filteredExamDetails.length === 0 ? (
+                  <tr>
+                    <td colSpan={6}>No schedule found.</td>
+                  </tr>
+                ) : (
+                  filteredExamDetails.map((ed, index) => (
+                    <tr key={ed.examdetails_id}>
+                      <td>{index + 1}</td>
+                      <td>{ed.course_id}</td>
+                      <td>{ed.program_id}</td>
+                      <td>{ed.room_id}</td>
+                      <td>
+                        <button type="button"
+                          className="icon-button view-button"
+                          onClick={() => setSelectedExam(ed)}
+                        >
+                          <FaEye />
+                        </button>
+                      </td>
+                    </tr>
+                  ))
+                )}
               </tbody>
             </table>
-          </div>
 
-          <div className="save-changes-footer">
-            <button type="button" className="action-button save-changes">
-              Save Changes
-            </button>
+            {/* Modal */}
+            {selectedExam && (
+              <div className="modal-overlay">
+                <div className="modal-content">
+                  <div className="profile-header">Exam Details</div>
+                  <div className="details-grid">
+                    <div className="details-item"><span className="details-label">Exam ID</span><span className="details-value">{selectedExam.examdetails_id}</span></div>
+                    <div className="details-item"><span className="details-label">Course ID</span><span className="details-value">{selectedExam.course_id}</span></div>
+                    <div className="details-item"><span className="details-label">Program ID</span><span className="details-value">{selectedExam.program_id}</span></div>
+                    <div className="details-item"><span className="details-label">Room ID</span><span className="details-value">{selectedExam.room_id}</span></div>
+                    <div className="details-item"><span className="details-label">Modality ID</span><span className="details-value">{selectedExam.modality_id}</span></div>
+                    <div className="details-item"><span className="details-label">User ID</span><span className="details-value">{selectedExam.user_id}</span></div>
+                    <div className="details-item"><span className="details-label">Exam Period</span><span className="details-value">{selectedExam.exam_period}</span></div>
+                    <div className="details-item"><span className="details-label">Exam Date</span><span className="details-value">{selectedExam.exam_date}</span></div>
+                    <div className="details-item"><span className="details-label">Duration</span><span className="details-value">{selectedExam.exam_duration}</span></div>
+                    <div className="details-item"><span className="details-label">Start Time</span><span className="details-value">{selectedExam.exam_start_time}</span></div>
+                    <div className="details-item"><span className="details-label">End Time</span><span className="details-value">{selectedExam.exam_end_time}</span></div>
+                    <div className="details-item"><span className="details-label">Time In</span><span className="details-value">{selectedExam.time_in || 'N/A'}</span></div>
+                    <div className="details-item"><span className="details-label">Time Out</span><span className="details-value">{selectedExam.time_out || 'N/A'}</span></div>
+                    <div className="details-item"><span className="details-label">Section</span><span className="details-value">{selectedExam.section_name}</span></div>
+                    <div className="details-item"><span className="details-label">Academic Year</span><span className="details-value">{selectedExam.academic_year}</span></div>
+                    <div className="details-item"><span className="details-label">Semester</span><span className="details-value">{selectedExam.semester}</span></div>
+                    <div className="details-item"><span className="details-label">Exam Category</span><span className="details-value">{selectedExam.exam_category}</span></div>
+                  </div>
+                  <button type='button' className="close-button" onClick={() => setSelectedExam(null)}>Close</button>
+                </div>
+              </div>
+            )}
           </div>
         </>
       ) : (
@@ -457,14 +712,61 @@ const Scheduler_PlotSchedule: React.FC = () => {
             <h3>Add Schedule</h3>
 
             <div className="form-group">
-              <label>Exam Period</label>
-              <select name="examperiod_id" value={formData.examperiod_id} onChange={handleChange}>
-                <option value="">-- Select Period --</option>
-                {examPeriods.map((e) => (
-                  <option key={e.examperiod_id + e.start_date} value={e.examperiod_id}>
-                    SY {e.academic_year} | {e.term.term_name} | {e.exam_category} | {e.college_id} | {new Date(e.start_date).toLocaleDateString('en-US', {
-                      month: 'short', day: '2-digit', year: 'numeric'
-                    })}
+              <label>School Year & Semester</label>
+              <select
+                name="academic_term"
+                value={formData.academic_term}
+                onChange={handleChange}
+              >
+                <option value="">-- Select --</option>
+                {mergedPeriods.map((p, i) => (
+                  <option key={i} value={p.value}>
+                    {p.label}
+                  </option>
+                ))}
+              </select>
+            </div>
+
+            <div className="form-group">
+              <label>Exam Category</label>
+              <select
+                name="exam_category"
+                value={formData.exam_category}
+                onChange={handleChange}
+              >
+                <option value="">-- Select --</option>
+                {examCategories.map((cat, i) => (
+                  <option key={i} value={cat}>
+                    {cat}
+                  </option>
+                ))}
+              </select>
+            </div>
+
+            <div className="form-group">
+              <label>Days Period</label>
+              <select
+                name="days_period_id"
+                value={formData.days_period_id}
+                onChange={(e) => {
+                const selected = daysPeriods.find((p) => p.value === e.target.value);
+                const _match = examPeriods.find(
+                  (ep) => ep.examperiod_id === Number(selected?.examperiod_id)
+                );
+
+                setFormData((prev) => ({
+                  ...prev,
+                  days_period_id: e.target.value,
+                  examperiod_id: selected?.examperiod_id.toString() || '',
+                  exam_date: selected?.value || '',
+                }));
+              }}
+                disabled={daysPeriods.length === 0}
+              >
+                <option value="">-- Select Days Period --</option>
+                {daysPeriods.map((p, i) => (
+                  <option key={i} value={p.value}>
+                    {p.label}
                   </option>
                 ))}
               </select>
@@ -635,7 +937,7 @@ const Scheduler_PlotSchedule: React.FC = () => {
             </div>
           </div>
 
-          <div className="plot-grid" style={{ flex: 2 }}>
+          <div className="plot-grid export-section" style={{ flex: 2 }}>
             {formData.examperiod_id && (
               <div style={{ marginBottom: '10px', fontWeight: 'bold', lineHeight: '1.8', color: '#333' }}>
                 {(() => {
@@ -780,7 +1082,43 @@ const Scheduler_PlotSchedule: React.FC = () => {
                                   >
                                     <div><strong>Course:</strong> {detail.course_id}</div>
                                     <div><strong>Section:</strong> {detail.section_name ?? '—'}</div>
-                                    <div><strong>Proctor/s:</strong> {detail.user_id}</div>
+                                    <div>
+                                      <strong>Proctor:</strong>{' '}
+                                      <select
+                                        value={detail.user_id}
+                                        onChange={async (e) => {
+                                          const newUserId = parseInt(e.target.value);
+
+                                          const { error } = await supabase
+                                            .from('tbl_examdetails')
+                                            .update({ user_id: newUserId })
+                                            .eq('examperiod_id', detail.examperiod_id)
+                                            .eq('exam_start_time', detail.exam_start_time)
+                                            .eq('room_id', detail.room_id);
+
+                                          if (error) {
+                                            toast.error("Failed to update proctor.");
+                                          } else {
+                                            toast.success("Proctor updated!");
+                                            setExamDetails((prev) =>
+                                              prev.map((ed) =>
+                                                ed.examperiod_id === detail.examperiod_id &&
+                                                ed.exam_start_time === detail.exam_start_time &&
+                                                ed.room_id === detail.room_id
+                                                  ? { ...ed, user_id: newUserId }
+                                                  : ed
+                                              )
+                                            );
+                                          }
+                                        }}
+                                      >
+                                        {availableProctors.map((proctor) => (
+                                          <option key={proctor.user_id} value={proctor.user_id}>
+                                            {proctor.full_name}
+                                          </option>
+                                        ))}
+                                      </select>
+                                    </div>
                                     <div style={{ fontSize: '11px', marginTop: '4px', fontStyle: 'italic' }}>
                                       {formatTime12Hour(new Date(detail.exam_start_time))} - {formatTime12Hour(new Date(detail.exam_end_time))}
                                     </div>
@@ -801,16 +1139,20 @@ const Scheduler_PlotSchedule: React.FC = () => {
             </table>
 
             <div className="plot-footer" style={{ marginTop: '20px', textAlign: 'right' }}>
-              <button type="button" className="action-button save-changes" style={{ marginRight: '10px' }}>
-                Save and Export
+              <button onClick={exportAsPDF} className="action-button save-changes" style={{ marginRight: '10px' }}>
+                Export as PDF
               </button>
-              <button type="button" className="action-button save-changes">
-                Save
+              <button onClick={exportAsWord} className="action-button save-changes" style={{ marginRight: '10px' }}>
+                Export as Word
+              </button>
+              <button onClick={exportAsExcel} className="action-button save-changes">
+                Export as Excel
               </button>
             </div>
           </div>
         </div>
       )}
+      <ToastContainer position="top-right" autoClose={3000} />
     </div>
   );
 };

@@ -15,10 +15,11 @@ interface UserProps {
 }
 
 const modalityRoomTypeMap: { [key: string]: string } = {
-  'Written': 'Lecture',
+  'Written (Lecture)': 'Lecture',
+  'Written (Laboratory)': 'Laboratory',
   'PIT or Projects': 'No Room',
-  'Pitching': 'Lecture',
-  'Online': 'Laboratory',
+  'Pitching': 'No Room',
+  'Hands-on': 'Laboratory',
 };
 
 const BayanihanModality: React.FC<UserProps> = ({ user }) => {
@@ -247,8 +248,9 @@ const BayanihanModality: React.FC<UserProps> = ({ user }) => {
                   className="custom-select"
                 >
                   <option value="">Select</option>
-                  <option value="Online">Online</option>
-                  <option value="Written">Written</option>
+                  <option value="Hands-on">Hands-on</option>
+                  <option value="Written (Lecture)">Written (Lecture)</option>
+                  <option value="Written (Laboratory)">Written (Laboratory)</option>
                   <option value="PIT or Projects">PIT or Projects</option>
                   <option value="Pitching">Pitching</option>
                 </select>
