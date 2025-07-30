@@ -42,6 +42,7 @@ interface SectionCourse {
   term: {
     term_name: string;
   };
+  user_id: number;
 }
 
 interface Program {
@@ -52,6 +53,10 @@ interface Program {
 interface Room {
   room_id: string;
   room_name: string;
+  building?: {
+    building_id: string;
+    building_name: string;
+  };
 }
 
 interface Modality {
@@ -65,12 +70,15 @@ interface ExamPeriod {
   end_date: string;
   academic_year: string;
   exam_category: string;
+  college_id?: string;
   term: {
     term_name: string;
   };
-  college_id?: string;
-  college_name?: string;
+  college: {
+    college_name: string;
+  };
 }
+
 
 interface ExamDetail {
   examdetails_id: string;
@@ -103,23 +111,34 @@ const Scheduler_PlotSchedule: React.FC = () => {
   const [sectionCourses, setSectionCourses] = useState<SectionCourse[]>([]);
   const [selectedModality, setSelectedModality] = useState<Modality | null>(null);
   const [availableProctors, setAvailableProctors] = useState<Proctor[]>([]);
-  const [examDetails, setExamDetails] = useState<any[]>([]);
+  const [examDetails, setExamDetails] = useState<ExamDetail[]>([]);
   const [searchTerm, setSearchTerm] = useState('');
   const [selectedExam, setSelectedExam] = useState<ExamDetail | null>(null);
-  const [isExporting, setIsExporting] = useState(false);
-  const [mergedPeriods, setMergedPeriods] = useState<
-    { label: string; value: string }[]
-  >([]);
+  const [_isExporting, setIsExporting] = useState(false);
+  const [mergedPeriods, setMergedPeriods] = useState<{ label: string; value: string }[]>([]);
   const [examCategories, setExamCategories] = useState<string[]>([]);
+  const [instructors, setInstructors] = useState<{ user_id: number; first_name: string; last_name: string }[]>([]);
+  const [isReassigning, setIsReassigning] = useState(false);
+  const [selectedProctors, setSelectedProctors] = useState<Record<string, string>>({});
+
+  const getInstructorName = (courseId: string, programId: string): string => {
+    const section = sectionCourses.find(
+      (s) => s.course_id === courseId && s.program_id === programId
+    );
+    const instructor = instructors.find(
+      (i) => String(i.user_id) === String(section?.user_id)
+    );
+    return instructor ? `${instructor.first_name} ${instructor.last_name}` : '—';
+  };
 
   const filteredExamDetails = examDetails.filter((ed) =>
     ed.examdetails_id?.toString().toLowerCase().includes(searchTerm.toLowerCase())
   );
 
   const exportAsPDF = async () => {
-    setIsExporting(true); // hide dropdowns
+    setIsExporting(true);
 
-    await new Promise((resolve) => setTimeout(resolve, 100)); // wait for UI to update
+    await new Promise((resolve) => setTimeout(resolve, 100));
 
     const element = document.querySelector('.export-section');
     if (element) {
@@ -128,9 +147,9 @@ const Scheduler_PlotSchedule: React.FC = () => {
         filename: 'ExamSchedule.pdf',
         image: { type: 'jpeg', quality: 0.98 },
         html2canvas: { scale: 2 },
-        jsPDF: { unit: 'in', format: 'a3', orientation: 'landscape' },
+        jsPDF: { unit: 'in', format: 'a4', orientation: 'portrait' }
       }).from(element).save().then(() => {
-        setIsExporting(false); // show dropdowns again
+        setIsExporting(false);
       });
     } else {
       setIsExporting(false);
@@ -176,6 +195,22 @@ const Scheduler_PlotSchedule: React.FC = () => {
     exam_date: '',
     proctor_filter: 'available_only',
   });
+
+  useEffect(() => {
+    const fetchInstructors = async () => {
+      const { data, error } = await supabase
+        .from('tbl_users')
+        .select('*');
+
+      if (error) {
+        console.error('Error fetching instructors:', error);
+      } else {
+        setInstructors(data || []);
+      }
+    };
+
+    fetchInstructors();
+  }, []);
 
   useEffect(() => {
     const fetchExamDetails = async () => {
@@ -237,8 +272,9 @@ const Scheduler_PlotSchedule: React.FC = () => {
         .from('tbl_sectioncourse')
         .select(`
           course_id,
-          program_id,
+          program_id, 
           year_level,
+          user_id,
           term:term_id (
             term_name
           )
@@ -252,6 +288,7 @@ const Scheduler_PlotSchedule: React.FC = () => {
           term: sc.term && !Array.isArray(sc.term)
             ? sc.term
             : { term_name: 'Unknown' },
+          user_id: sc.user_id,
         }));
 
         setSectionCourses(cleanedSectionCourses);
@@ -288,7 +325,16 @@ const Scheduler_PlotSchedule: React.FC = () => {
           .from('tbl_program')
           .select('program_id, program_name, department_id')
           .in('department_id', departmentIds),
-        supabase.from('tbl_rooms').select('room_id, room_name'),
+        supabase
+          .from('tbl_rooms')
+          .select(`
+            room_id,
+            room_name,
+            building: building_id (
+              building_id,
+              building_name
+            )
+          `),
         supabase
         .from('tbl_modality')
         .select(`
@@ -324,7 +370,14 @@ const Scheduler_PlotSchedule: React.FC = () => {
 
       if (courseRes.data) setCourses(courseRes.data);
       if (progRes.data) setPrograms(progRes.data);
-      if (roomRes.data) setRooms(roomRes.data);
+      if (roomRes.data) {
+        const cleanedRooms: Room[] = roomRes.data.map((room: any) => ({
+          room_id: room.room_id,
+          room_name: room.room_name,
+          building: Array.isArray(room.building) ? room.building[0] : room.building,
+        }));
+        setRooms(cleanedRooms);
+      }
       if (modRes.data) setModalities(modRes.data);
 
       if (examRes.data) {
@@ -336,7 +389,7 @@ const Scheduler_PlotSchedule: React.FC = () => {
           exam_category: ep.exam_category,
           term: ep.term || { term_name: 'Unknown' },
           college_id: ep.college_id,
-          college_name: ep.college?.college_name || 'N/A',
+          college: ep.college || { college_name: 'N/A' },
         }));
 
         setExamPeriods(fixed);
@@ -428,22 +481,23 @@ const Scheduler_PlotSchedule: React.FC = () => {
   }, [formData.academic_term, formData.exam_category, examPeriods]);
 
   const filteredCourses = formData.program_id
-    ? modalities
-        .filter((m) => m.program_id === formData.program_id)
-        .map((m) => {
-          const course = courses.find((c) => c.course_id === m.course_id);
+    ? sectionCourses
+        .filter((sc) => sc.program_id === formData.program_id)
+        .map((sc) => {
+          const course = courses.find((c) => c.course_id === sc.course_id);
           return course
             ? {
                 course_id: course.course_id,
                 course_name: course.course_name,
-                year_level: m.section?.year_level,
-                term_name: m.section?.term?.term_name || 'Unknown',
+                year_level: sc.year_level,
+                term_name: sc.term?.term_name || 'Unknown',
               }
             : null;
         })
-        .filter((c, index, self) =>
-          c !== null &&
-          index === self.findIndex((t) => t?.course_id === c.course_id)
+        .filter(
+          (c, index, self) =>
+            c !== null &&
+            index === self.findIndex((t) => t?.course_id === c?.course_id)
         ) as {
           course_id: string;
           course_name: string;
@@ -848,7 +902,7 @@ const Scheduler_PlotSchedule: React.FC = () => {
               )}
             </div>
 
-            <div className="form-group">
+            <div className="form-group"> 
               <label>Proctors</label>
               <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
                 <label>
@@ -876,6 +930,59 @@ const Scheduler_PlotSchedule: React.FC = () => {
                   All Proctors (Available or Unavailable)
                 </label>
               </div>
+
+              <div className="d-flex gap-2 mt-2">
+                <button
+                  type="button"
+                  onClick={() => {
+                    setIsReassigning(true);
+                    const initialSelections: Record<string, string> = {};
+                    examDetails.forEach((ed) => {
+                      initialSelections[ed.examdetails_id] = ed.user_id;
+                    });
+                    setSelectedProctors(initialSelections);
+                  }}
+                  className="btn btn-primary"
+                >
+                  Reassign Proctor
+                </button>
+
+                {isReassigning && (
+                  <button
+                    type="button"
+                    className="btn btn-success"
+                    onClick={async () => {
+                      const updates = Object.entries(selectedProctors);
+                      let hasError = false;
+
+                      for (const [examdetails_id, user_id] of updates) {
+                        const { error } = await supabase
+                          .from('tbl_examdetails')
+                          .update({ user_id })
+                          .eq('examdetails_id', examdetails_id);
+
+                        if (error) {
+                          toast.error(`Failed to update examdetails_id ${examdetails_id}`);
+                          hasError = true;
+                        }
+                      }
+
+                      if (!hasError) {
+                        toast.success('All proctors updated!');
+                        setIsReassigning(false);
+
+                        const { data, error } = await supabase.from('tbl_examdetails').select('*');
+                        if (!error && data) {
+                          setExamDetails(data);
+                        }
+                      }
+                    }}
+                  >
+                    Save Changes
+                  </button>
+                )}
+              </div>
+
             </div>
 
             <div className="form-group">
@@ -935,32 +1042,63 @@ const Scheduler_PlotSchedule: React.FC = () => {
                 Generate / Save
               </button>
             </div>
-          </div>
 
+            <div className="plot-footer" style={{ marginTop: '20px', textAlign: 'right', position: 'relative', display: 'inline-block' }}>
+              <div className="dropdown">
+                <button type="button" className="action-button save-changes dropdown-toggle">
+                  Export
+                </button>
+                <div className="dropdown-menu">
+                  <button type="button" className="dropdown-item" onClick={exportAsPDF}>
+                    Export as PDF
+                  </button>
+                  <button type="button" className="dropdown-item" onClick={exportAsWord}>
+                    Export as Word
+                  </button>
+                  <button type="button" className="dropdown-item" onClick={exportAsExcel}>
+                    Export as Excel
+                  </button>
+                </div>
+              </div>
+            </div>
+          </div>
+          
           <div className="plot-grid export-section" style={{ flex: 2 }}>
-            {formData.examperiod_id && (
-              <div style={{ marginBottom: '10px', fontWeight: 'bold', lineHeight: '1.8', color: '#333' }}>
+            <div style={{ textAlign: 'center', marginBottom: '15px' }}>
+              <img
+                src="/USTPlogo.png"
+                alt="School Logo"
+                style={{ width: '130px', height: '95px', marginBottom: '-8px', fontFamily: 'serif' }}
+              />
+              <div style={{ fontSize: '20px', color: '#333', marginBottom: '-8px', fontFamily: 'serif' }}>
+                University of Science and Technology of Southern Philippines
+              </div>
+              <div style={{ fontSize: '10px', color: '#555', marginBottom: '-8px', fontFamily: 'serif' }}>
+                Alubijid | Balubal |Cagayan de Oro City | Claveria | Jasaan | Oroquieta | Panaon | Villanueva
+              </div>
+              <div style={{ fontSize: '14px', color: '#333', marginBottom: '-8px', fontFamily: 'serif' }}>
                 {(() => {
                   const selected = examPeriods.find(
                     (ep) => ep.examperiod_id === parseInt(formData.examperiod_id)
                   );
                   if (!selected) return null;
 
-                  const matchingGroup = examPeriods.filter((ep) =>
-                    ep.academic_year === selected.academic_year &&
-                    ep.exam_category === selected.exam_category &&
-                    ep.term.term_name === selected.term.term_name &&
-                    ep.college_id === selected.college_id
+                  const matchingGroup = examPeriods.filter(
+                    (ep) =>
+                      ep.academic_year === selected.academic_year &&
+                      ep.exam_category === selected.exam_category &&
+                      ep.term.term_name === selected.term.term_name &&
+                      ep.college_id === selected.college_id
                   );
 
                   const sortedDates = matchingGroup
-                    .map(ep => ({
+                    .map((ep) => ({
                       start: new Date(ep.start_date),
-                      end: new Date(ep.end_date)
+                      end: new Date(ep.end_date),
                     }))
                     .sort((a, b) => a.start.getTime() - b.start.getTime());
 
-                  const formatDate = (date: Date) =>
+                  const formatShortDate = (date: Date) =>
                     date.toLocaleDateString('en-US', {
                       month: 'short',
                       day: 'numeric',
@@ -972,26 +1110,43 @@ const Scheduler_PlotSchedule: React.FC = () => {
 
                   return (
                     <>
-                      School Year: {selected.academic_year} {selected.term?.term_name}
-                      <br />
-                      Exam: {selected.exam_category}
-                      <br />
-                      Exam Period: {formatDate(earliest.start)} – {formatDate(latest.end)}
-                      <br />
-                      Date: {formData.exam_date ? formatDate(new Date(formData.exam_date)) : 'N/A'}
+                      <div style={{ fontSize: '20px', color: '#333', marginBottom: '-8px' , fontFamily: 'serif' }}>{selected.college?.college_name || 'College Name'}</div>
+                      <div><strong>{selected.exam_category} Examination Schedule | {selected.term?.term_name} S.Y. {selected.academic_year}</strong></div>
+                      <div>{formatShortDate(earliest.start)} – {formatShortDate(latest.end)}</div>
                     </>
                   );
                 })()}
               </div>
-            )}
+            </div>
 
             <table>
               <thead>
                 <tr>
+                  <th></th>
+                  <th colSpan={rooms.length} style={{ textAlign: 'center' }}>
+                    {formData.exam_date
+                      ? new Date(formData.exam_date).toLocaleDateString('en-US', {
+                          weekday: 'long',
+                          year: 'numeric',
+                          month: 'long',
+                          day: 'numeric',
+                        })
+                      : 'Date: N/A'}
+                  </th>
+                </tr>
+
+                <tr>
+                  <th></th>
+                  <th colSpan={rooms.length} style={{ textAlign: 'center' }}>
+                    {rooms[0]?.building?.building_name || 'Unknown'} ({rooms[0]?.building?.building_id || '-'})
+                  </th>
+                </tr>
+
+                <tr>
                   <th>Time</th>
                   {rooms.map((room) => (
                     <th key={room.room_id}>
-                      {room.room_id} {room.room_name}
+                      {room.room_id}
                     </th>
                   ))}
                 </tr>
@@ -1007,17 +1162,40 @@ const Scheduler_PlotSchedule: React.FC = () => {
                       hour12: true,
                     });
 
-                  return [
-                    '07:30', '08:00', '08:30', '09:00', '09:30', '10:00',
-                    '10:30', '11:00', '11:30', '12:00', '12:30', '13:00',
-                    '13:30', '14:00', '14:30', '15:00', '15:30', '16:00',
-                    '16:30', '17:00', '17:30', '18:00', '18:30', '19:00',
-                    '19:30', '20:00', '20:30'
-                  ].map((start, rowIdx) => {
+                  const times = [
+                    '07:30',
+                    '08:00',
+                    '08:30',
+                    '09:00',
+                    '09:30',
+                    '10:00',
+                    '10:30',
+                    '11:00',
+                    '11:30',
+                    '12:00',
+                    '12:30',
+                    '13:00',
+                    '13:30',
+                    '14:00',
+                    '14:30',
+                    '15:00',
+                    '15:30',
+                    '16:00',
+                    '16:30',
+                    '17:00',
+                    '17:30',
+                    '18:00',
+                    '18:30',
+                    '19:00',
+                    '19:30',
+                    '20:00',
+                    '20:30',
+                  ];
+
+                  return times.map((start, rowIdx) => {
                     const currentSlot = new Date(`2023-01-01T${start}:00`);
                     const end = new Date(currentSlot);
                     end.setMinutes(end.getMinutes() + 30);
-
                     return (
                       <tr key={rowIdx}>
                         <td>
@@ -1067,63 +1245,65 @@ const Scheduler_PlotSchedule: React.FC = () => {
                                   border: '1px solid #ccc',
                                 }}
                               >
-                                {matchingDetails.map((detail, idx) => (
-                                  <div
-                                    key={idx}
-                                    style={{
-                                      backgroundColor: courseColor(detail.course_id),
-                                      border: '1px solid #888',
-                                      padding: '5px',
-                                      fontSize: '12px',
-                                      borderRadius: '4px',
-                                      marginBottom: '6px',
-                                      lineHeight: '1.4',
-                                    }}
-                                  >
-                                    <div><strong>Course:</strong> {detail.course_id}</div>
-                                    <div><strong>Section:</strong> {detail.section_name ?? '—'}</div>
-                                    <div>
-                                      <strong>Proctor:</strong>{' '}
-                                      <select
-                                        value={detail.user_id}
-                                        onChange={async (e) => {
-                                          const newUserId = parseInt(e.target.value);
-
-                                          const { error } = await supabase
-                                            .from('tbl_examdetails')
-                                            .update({ user_id: newUserId })
-                                            .eq('examperiod_id', detail.examperiod_id)
-                                            .eq('exam_start_time', detail.exam_start_time)
-                                            .eq('room_id', detail.room_id);
-
-                                          if (error) {
-                                            toast.error("Failed to update proctor.");
-                                          } else {
-                                            toast.success("Proctor updated!");
-                                            setExamDetails((prev) =>
-                                              prev.map((ed) =>
-                                                ed.examperiod_id === detail.examperiod_id &&
-                                                ed.exam_start_time === detail.exam_start_time &&
-                                                ed.room_id === detail.room_id
-                                                  ? { ...ed, user_id: newUserId }
-                                                  : ed
-                                              )
-                                            );
-                                          }
-                                        }}
+                                {matchingDetails.map((detail, idx) => {
+                                  return (
+                                    <div
+                                      key={idx}
+                                      style={{
+                                        height: '100%',
+                                        display: 'flex',
+                                        flexDirection: 'column',
+                                        justifyContent: 'space-between',
+                                        backgroundColor: courseColor(detail.course_id),
+                                        border: '1px solid #888',
+                                        padding: '6px',
+                                        fontSize: '12px',
+                                        borderRadius: '6px',
+                                        lineHeight: '1.6',
+                                        color: '#333',
+                                        boxSizing: 'border-box',
+                                      }}
+                                    >
+                                      <div><strong>{detail.course_id}</strong></div>
+                                      <div><strong>{detail.section_name ?? '—'}</strong></div>
+                                      <div><strong>
+                                        Instructor: {getInstructorName(detail.course_id, detail.program_id)}
+                                      </strong></div>
+                                      <div>
+                                        <strong>Proctor:</strong>{' '}
+                                        {isReassigning ? (
+                                          <select
+                                            className="custom-select"
+                                            value={selectedProctors[detail.examdetails_id] || ''}
+                                            onChange={(e) => {
+                                              const selectedUser = e.target.value;
+                                              setSelectedProctors((prev) => ({
+                                                ...prev,
+                                                [detail.examdetails_id]: selectedUser,
+                                              }));
+                                            }}
+                                          >
+                                            {availableProctors.map((proctor) => (
+                                              <option key={proctor.user_id} value={proctor.user_id}>
+                                                {proctor.full_name}
+                                              </option>
+                                            ))}
+                                          </select>
+                                        ) : (
+                                          availableProctors.find(
+                                            (p) => p.user_id.toString() === detail.user_id.toString()
+                                          )?.full_name || 'No proctor'
+                                        )}
+                                      </div>
+                                      <div
+                                        style={{ fontSize: '11px', marginTop: '4px', fontStyle: 'italic' }}
                                       >
-                                        {availableProctors.map((proctor) => (
-                                          <option key={proctor.user_id} value={proctor.user_id}>
-                                            {proctor.full_name}
-                                          </option>
-                                        ))}
-                                      </select>
+                                        {formatTime12Hour(new Date(detail.exam_start_time))} -{' '}
+                                        {formatTime12Hour(new Date(detail.exam_end_time))}
+                                      </div>
                                     </div>
-                                    <div style={{ fontSize: '11px', marginTop: '4px', fontStyle: 'italic' }}>
-                                      {formatTime12Hour(new Date(detail.exam_start_time))} - {formatTime12Hour(new Date(detail.exam_end_time))}
-                                    </div>
-                                  </div>
-                                ))}
+                                  );
+                                })}
                               </td>
                             );
                           }
@@ -1135,20 +1315,7 @@ const Scheduler_PlotSchedule: React.FC = () => {
                   });
                 })()}
               </tbody>
-
             </table>
-
-            <div className="plot-footer" style={{ marginTop: '20px', textAlign: 'right' }}>
-              <button onClick={exportAsPDF} className="action-button save-changes" style={{ marginRight: '10px' }}>
-                Export as PDF
-              </button>
-              <button onClick={exportAsWord} className="action-button save-changes" style={{ marginRight: '10px' }}>
-                Export as Word
-              </button>
-              <button onClick={exportAsExcel} className="action-button save-changes">
-                Export as Excel
-              </button>
-            </div>
           </div>
         </div>
       )}

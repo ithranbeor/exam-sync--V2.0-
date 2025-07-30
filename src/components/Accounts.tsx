@@ -51,11 +51,11 @@ export const Accounts: React.FC<AccountsProps> = ({ user }) => {
       .from('tbl_users')
       .select('user_id, first_name, last_name, middle_name, email_address, contact_number, status, created_at, avatar_url');
 
-    if (error) {
+    if (error || !data) {
       toast.error('Error fetching accounts');
-    } else {
-      setAccounts(data);
+      return;
     }
+    setAccounts(data);
   };
 
   const handleSearchChange = (e: React.ChangeEvent<HTMLInputElement>) => {
