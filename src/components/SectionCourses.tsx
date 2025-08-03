@@ -6,6 +6,7 @@ import { ToastContainer, toast } from 'react-toastify';
 import * as XLSX from 'xlsx';
 import 'react-toastify/dist/ReactToastify.css';
 import '../styles/colleges.css';
+import Select from 'react-select';
 
 interface Course {
   course_id: string;
@@ -62,7 +63,9 @@ const SectionCourses: React.FC = () => {
     user_id: undefined,
   });
 
-  useEffect(() => { fetchAll(); }, []);
+  useEffect(() => { 
+    fetchAll(); 
+  }, []);
 
   const fetchAll = async () => {
     const [secData, courseData, progData, termData, courseUserData] = await Promise.all([
@@ -128,7 +131,6 @@ const SectionCourses: React.FC = () => {
       } else {
         toast.success('Section updated');
       }
-
     } else {
       const { error } = await supabase.from('tbl_sectioncourse').insert([newSection]);
       if (error) {
@@ -161,6 +163,7 @@ const SectionCourses: React.FC = () => {
   const handleImportFile = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (!file) return;
+
     const reader = new FileReader();
     reader.onload = async (evt: any) => {
       const data = new Uint8Array(evt.target.result);
@@ -169,45 +172,52 @@ const SectionCourses: React.FC = () => {
       const rows: any[] = XLSX.utils.sheet_to_json(sheet);
 
       let added = 0;
+
       for (const row of rows) {
         const section_name = row['Section Name']?.trim();
-        const num_students = parseInt(row['Number of Students'] || 0);
+        const number_of_students = parseInt(row['Number of Students'] || 0);
         const year_level = row['Year Level']?.trim();
         const term_name = row['Term Name']?.trim();
         const course_id = row['Course ID']?.trim();
         const program_id = row['Program ID']?.trim();
-        const user_id = parseInt(row['User ID']);
+        const instructor_name = row['Instructor Name']?.trim();
 
-        if (!section_name || !num_students || !year_level || !term_name || !course_id || !program_id || !user_id) continue;
+        if (!section_name || !number_of_students || !year_level || !term_name || !course_id || !program_id || !instructor_name) continue;
 
         const term = terms.find(t => t.term_name === term_name);
-        const validInstructor = courseInstructorsMap[course_id]?.some(u => u.user_id === user_id);
+        if (!term) continue;
 
-        if (!term || !validInstructor) continue;
+        const user = (courseInstructorsMap[course_id] || []).find(
+          u => u.full_name.toLowerCase() === instructor_name.toLowerCase()
+        );
+
+        if (!user) continue;
 
         const { error } = await supabase.from('tbl_sectioncourse').insert([{
           course_id,
           program_id,
           section_name,
-          number_of_students: num_students,
+          number_of_students,
           year_level,
           term_id: term.term_id,
-          user_id,
+          user_id: user.user_id,
         }]);
 
         if (!error) added++;
       }
 
       toast.success(`Import completed: ${added} section(s) added`);
-      fetchAll(); setShowImport(false);
+      fetchAll();
+      setShowImport(false);
     };
+
     reader.readAsArrayBuffer(file);
   };
 
   const downloadTemplate = () => {
     const ws = XLSX.utils.aoa_to_sheet([
-      ['Course ID','Program ID','Section Name','Number of Students','Year Level','Term Name','User ID'],
-      ['IT 112','BSIT','IT 1R1','30','1st Year','1st Semester','123']
+      ['Course ID','Program ID','Section Name','Number of Students','Year Level','Term Name','Instructor Name'],
+      ['IT 112','BSIT','IT 1R1','30','1st Year','1st Semester','Ithran Beor Turno']
     ]);
     const wb = XLSX.utils.book_new();
     XLSX.utils.book_append_sheet(wb, ws, 'SectionCourses Template');
@@ -286,8 +296,12 @@ const SectionCourses: React.FC = () => {
                     setEditMode(true);
                     setNewSection(sc);
                     setShowModal(true);
-                  }}><FaEdit /></button>
-                  <button type='button' className="icon-button delete-button" onClick={() => handleDelete(sc)}><FaTrash /></button>
+                  }}>
+                    <FaEdit />
+                  </button>
+                  <button type='button' className="icon-button delete-button" onClick={() => handleDelete(sc)}>
+                    <FaTrash />
+                  </button>
                 </td>
               </tr>
             ))}
@@ -299,49 +313,116 @@ const SectionCourses: React.FC = () => {
       {showModal && (
         <div className="modal-overlay">
           <div className="modal">
-            <h3 style={{ textAlign: 'center' }}>{editMode ? 'Edit Section' : 'Add New Section'}</h3>
+            <h3 style={{ textAlign: 'center' }}>
+              {editMode ? 'Edit Section' : 'Add New Section'}
+            </h3>
+
+            {/* Course Selection */}
             <div className="input-group">
               <label>Course</label>
-              <select value={newSection.course_id} disabled={editMode}
-                onChange={(e) => setNewSection({ ...newSection, course_id: e.target.value, user_id: undefined })}
-              >
-                <option value="">Select Course</option>
-                {courses.map(c => (
-                  <option key={c.course_id} value={c.course_id}>
-                    {c.course_id} ({c.course_name})
-                  </option>
-                ))}
-              </select>
+              {editMode ? (
+                <div className="text-value">
+                  {newSection.course_id} ({courses.find(c => c.course_id === newSection.course_id)?.course_name || 'N/A'})
+                </div>
+              ) : (
+                <Select
+                  className="custom-select"
+                  classNamePrefix="custom"
+                  options={courses
+                    .sort((a, b) => a.course_id.localeCompare(b.course_id))
+                    .map(c => ({
+                      value: c.course_id,
+                      label: `${c.course_id} (${c.course_name})`
+                    }))}
+                  value={courses.find(c => c.course_id === newSection.course_id)
+                    ? {
+                        value: newSection.course_id,
+                        label: `${newSection.course_id} (${courses.find(c => c.course_id === newSection.course_id)?.course_name})`
+                      }
+                    : null}
+                  onChange={(selected) =>
+                    setNewSection({
+                      ...newSection,
+                      course_id: selected?.value || '',
+                      user_id: undefined // Reset instructor on course change
+                    })
+                  }
+                  placeholder="Select Course"
+                />
+              )}
             </div>
+
+            {/* Program Selection */}
             <div className="input-group">
               <label>Program</label>
-              <select value={newSection.program_id} disabled={editMode}
-                onChange={(e) => setNewSection({ ...newSection, program_id: e.target.value })}
-              >
-                <option value="">Select Program</option>
-                {programs.map(p => (
-                  <option key={p.program_id} value={p.program_id}>
-                    {p.program_id} ({p.program_name})
-                  </option>
-                ))}
-              </select>
+              {editMode ? (
+                <div className="text-value">
+                  {newSection.program_id} ({programs.find(p => p.program_id === newSection.program_id)?.program_name || 'N/A'})
+                </div>
+              ) : (
+                <Select
+                  className="custom-select"
+                  classNamePrefix="custom"
+                  options={programs
+                    .sort((a, b) => a.program_name.localeCompare(b.program_name))
+                    .map(p => ({
+                      value: p.program_id,
+                      label: `${p.program_id} (${p.program_name})`
+                    }))}
+                  value={programs.find(p => p.program_id === newSection.program_id)
+                    ? {
+                        value: newSection.program_id,
+                        label: `${newSection.program_id} (${programs.find(p => p.program_id === newSection.program_id)?.program_name})`
+                      }
+                    : null}
+                  onChange={(selected) =>
+                    setNewSection({
+                      ...newSection,
+                      program_id: selected?.value || ''
+                    })
+                  }
+                  placeholder="Select Program"
+                />
+              )}
             </div>
+
+            {/* Section Name */}
             <div className="input-group">
               <label>Section Name</label>
-              <input type="text" value={newSection.section_name}
-                onChange={(e) => setNewSection({ ...newSection, section_name: e.target.value })}
+              <input
+                type="text"
+                value={newSection.section_name}
+                onChange={(e) =>
+                  setNewSection({ ...newSection, section_name: e.target.value })
+                }
+                placeholder="Enter section name"
               />
             </div>
+
+            {/* Number of Students */}
             <div className="input-group">
               <label>Number of Students</label>
-              <input type="number" value={newSection.number_of_students}
-                onChange={(e) => setNewSection({ ...newSection, number_of_students: parseInt(e.target.value) || 0 })}
+              <input
+                type="number"
+                value={newSection.number_of_students}
+                onChange={(e) =>
+                  setNewSection({
+                    ...newSection,
+                    number_of_students: parseInt(e.target.value) || 0
+                  })
+                }
+                placeholder="e.g., 40"
               />
             </div>
+
+            {/* Year Level */}
             <div className="input-group">
               <label>Year Level</label>
-              <select value={newSection.year_level}
-                onChange={(e) => setNewSection({ ...newSection, year_level: e.target.value })}
+              <select
+                value={newSection.year_level}
+                onChange={(e) =>
+                  setNewSection({ ...newSection, year_level: e.target.value })
+                }
               >
                 <option value="">Select Year</option>
                 <option value="1st Year">1st Year</option>
@@ -350,10 +431,18 @@ const SectionCourses: React.FC = () => {
                 <option value="4th Year">4th Year</option>
               </select>
             </div>
+
+            {/* Term */}
             <div className="input-group">
               <label>Term</label>
-              <select value={newSection.term_id}
-                onChange={(e) => setNewSection({ ...newSection, term_id: parseInt(e.target.value) })}
+              <select
+                value={newSection.term_id}
+                onChange={(e) =>
+                  setNewSection({
+                    ...newSection,
+                    term_id: parseInt(e.target.value)
+                  })
+                }
               >
                 <option value="">Select Term</option>
                 {terms.map(t => (
@@ -363,22 +452,54 @@ const SectionCourses: React.FC = () => {
                 ))}
               </select>
             </div>
+
+            {/* Instructor */}
             <div className="input-group">
               <label>Instructor</label>
-              <select value={newSection.user_id || ''}
-                onChange={(e) => setNewSection({ ...newSection, user_id: parseInt(e.target.value) })}
-              >
-                <option value="">Select Instructor</option>
-                {(courseInstructorsMap[newSection.course_id] || []).map(u => (
-                  <option key={u.user_id} value={u.user_id}>{u.full_name}</option>
-                ))}
-              </select>
+              <Select
+                className="custom-select"
+                classNamePrefix="custom"
+                options={(courseInstructorsMap[newSection.course_id] || [])
+                  .sort((a, b) => a.full_name.localeCompare(b.full_name))
+                  .map(u => ({
+                    value: u.user_id,
+                    label: u.full_name
+                  }))}
+                value={
+                  (courseInstructorsMap[newSection.course_id] || []).find(
+                    u => u.user_id === newSection.user_id
+                  )
+                    ? {
+                        value: newSection.user_id!,
+                        label: courseInstructorsMap[newSection.course_id]?.find(
+                          u => u.user_id === newSection.user_id
+                        )?.full_name || ''
+                      }
+                    : null
+                }
+                onChange={(selected) =>
+                  setNewSection({
+                    ...newSection,
+                    user_id: selected?.value
+                  })
+                }
+                placeholder="Select Instructor"
+                menuPlacement="top"
+              />
             </div>
+
+            {/* Action Buttons */}
             <div className="modal-actions">
-              <button type='button' onClick={handleSubmit} disabled={isSubmitting}>
+              <button
+                type="button"
+                onClick={handleSubmit}
+                disabled={isSubmitting}
+              >
                 {isSubmitting ? 'Saving...' : 'Save'}
               </button>
-              <button type='button' onClick={() => setShowModal(false)}>Cancel</button>
+              <button type="button" onClick={() => setShowModal(false)}>
+                Cancel
+              </button>
             </div>
           </div>
         </div>

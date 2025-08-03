@@ -494,6 +494,46 @@ h3 {
   height: 16px;
   cursor: pointer;
 }
+.custom-select {
+  font-size: 14px;
+}
+
+.custom__control {
+  border-radius: 10px;
+  border: 1px solid #ccc;
+  min-height: 40px;
+  transition: border 0.2s ease-in-out;
+}
+
+.custom__control--is-focused {
+  border-color: #007bff;
+  box-shadow: 0 0 0 2px rgba(0, 123, 255, 0.25);
+}
+
+.custom__multi-value {
+  background-color: #e0f0ff;
+  border-radius: 8px;
+}
+
+.custom__multi-value__label {
+  color: #0056b3;
+  font-size: 13px;
+}
+
+.custom__option--is-focused {
+  background-color: #f0f8ff;
+  color: #007bff;
+}
+
+.custom__option--is-selected {
+  background-color: #007bff;
+  color: white;
+}
+.text-value {
+  padding: 0.1rem 0.75rem;
+  border-radius: 6px;
+  color: #333;
+}
 
 
 

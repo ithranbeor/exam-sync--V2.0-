@@ -269,3 +269,68 @@ h3 {
 .modal-button.cancel:hover {
   background-color: #193e60;
 }
+/* Container */
+.custom__control {
+  border: 1px solid #ccc;
+  border-radius: 12px;
+  min-height: 38px;
+  box-shadow: none;
+  transition: border-color 0.3s, box-shadow 0.3s;
+  font-size: 14px;
+}
+
+/* Focus state */
+.custom__control--is-focused {
+  border-color: #0066cc;
+  box-shadow: 0 0 0 2px rgba(0, 102, 204, 0.2);
+}
+
+/* Dropdown indicator */
+.custom__indicator {
+  color: #666;
+}
+
+.custom__indicator:hover {
+  color: #333;
+}
+
+/* Placeholder and selected value */
+.custom__single-value,
+.custom__placeholder {
+  color: #333;
+  font-weight: 500;
+}
+
+/* Menu */
+.custom__menu {
+  border-radius: 12px;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
+  z-index: 9999;
+}
+
+/* Option */
+.custom__option {
+  padding: 10px 12px;
+  font-size: 14px;
+  cursor: pointer;
+}
+
+.custom__option--is-focused {
+  background-color: #f0f8ff;
+  color: #0066cc;
+}
+
+.custom__option--is-selected {
+  background-color: #0066cc;
+  color: white;
+}
+.css-b62m3t-container {
+    position: relative;
+    box-sizing: border-box;
+    width: 100%;
+    font-family: Arial, sans-serif;
+    font-size: 14px;
+    color: #333;
+    background-color: #fff;
+    padding: 0%;
+}

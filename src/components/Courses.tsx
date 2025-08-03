@@ -7,6 +7,7 @@ import * as XLSX from 'xlsx';
 import 'react-toastify/dist/ReactToastify.css';
 import '../styles/colleges.css';
 import { useRef } from 'react';
+import Select from 'react-select';
 
 interface Term {
   term_id: number;
@@ -311,53 +312,32 @@ const Courses: React.FC = () => {
                 ))}
               </select>
             </div>
-            <div className="input-group" ref={dropdownRef}>
+            <div className="input-group">
               <label>Instructors</label>
-              <div
-                className="dropdown-box-adv"
-                onClick={() => setDropdownOpen(prev => !prev)}
-              >
-                {newCourse.user_ids.length > 0
-                  ? users
-                      .filter(u => newCourse.user_ids.includes(u.user_id))
-                      .map(u => `${u.first_name} ${u.last_name}`)
-                      .join(', ')
-                  : 'Select Instructors'}
-              </div>
-
-              {dropdownOpen && (
-                <div className="dropdown-menu-adv">
-                  <input
-                    type="text"
-                    placeholder="Search instructor..."
-                    className="dropdown-search"
-                    value={instructorSearch}
-                    onChange={e => setInstructorSearch(e.target.value)}
-                  />
-                  <div className="dropdown-list">
-                    {users
-                      .filter(u =>
-                        `${u.first_name} ${u.last_name}`.toLowerCase().includes(instructorSearch.toLowerCase())
-                      )
-                      .map(u => (
-                        <label key={u.user_id} className="dropdown-item-adv">
-                          <input
-                            type="checkbox"
-                            checked={newCourse.user_ids.includes(u.user_id)}
-                            onChange={e => {
-                              const updated = e.target.checked
-                                ? [...newCourse.user_ids, u.user_id]
-                                : newCourse.user_ids.filter(id => id !== u.user_id);
-                              setNewCourse({ ...newCourse, user_ids: updated });
-                            }}
-                          />
-                          <span>{u.first_name} {u.last_name}</span>
-                        </label>
-                      ))}
-                    {users.length === 0 && <div className="dropdown-item-adv">No instructors found.</div>}
-                  </div>
-                </div>
-              )}
+              <Select
+                isMulti
+                className="custom-select"
+                classNamePrefix="custom"
+                options={users
+                  .sort((a, b) => a.first_name.localeCompare(b.first_name))
+                  .map(user => ({
+                    value: user.user_id,
+                    label: `${user.first_name} ${user.last_name}`,
+                  }))
+                }
+                value={users
+                  .filter(user => newCourse.user_ids.includes(user.user_id))
+                  .map(user => ({
+                    value: user.user_id,
+                    label: `${user.first_name} ${user.last_name}`,
+                  }))
+                }
+                onChange={(selectedOptions) => {
+                  const selectedIds = selectedOptions.map(option => option.value);
+                  setNewCourse({ ...newCourse, user_ids: selectedIds });
+                }}
+                placeholder="Select instructors..."
+              />
             </div>
             <div className="modal-actions">
               <button type="button" onClick={handleSubmit} disabled={isSubmitting}>{isSubmitting ? 'Saving...' : 'Save'}</button>

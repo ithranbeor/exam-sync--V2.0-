@@ -6,6 +6,7 @@ import * as XLSX from 'xlsx';
 import { ToastContainer, toast } from 'react-toastify';
 import 'react-toastify/dist/ReactToastify.css';
 import '../styles/colleges.css';
+import Select from 'react-select';
 
 interface ExamPeriod {
   examperiod_id?: number;
@@ -342,24 +343,60 @@ const ExamPeriod: React.FC = () => {
             </div>
             <div className="input-group">
               <label>Term</label>
-              <select value={newExam.term_id} onChange={(e) => setNewExam({ ...newExam, term_id: parseInt(e.target.value) })}>
-                <option value="">Select Term</option>
-                {terms.map(t => <option key={t.term_id} value={t.term_id}>{t.term_name}</option>)}
-              </select>
+              <Select
+                className="react-select"
+                classNamePrefix="select"
+                options={terms
+                  .sort((a, b) => a.term_name.localeCompare(b.term_name))
+                  .map(t => ({ value: t.term_id, label: t.term_name }))}
+                value={newExam.term_id
+                  ? { value: newExam.term_id, label: terms.find(t => t.term_id === newExam.term_id)?.term_name || '' }
+                  : null}
+                onChange={opt =>
+                  setNewExam({ ...newExam, term_id: opt?.value ?? 0 })
+                }
+                placeholder="Select Term"
+                isClearable
+              />
             </div>
+
             <div className="input-group">
               <label>Department</label>
-              <select value={newExam.department_id ?? ''} onChange={(e) => setNewExam({ ...newExam, department_id: e.target.value })}>
-                <option value="">Select Department</option>
-                {departments.map(d => <option key={d.department_id} value={d.department_id}>{d.department_name}</option>)}
-              </select>
+              <Select
+                className="react-select"
+                classNamePrefix="select"
+                options={departments
+                  .sort((a, b) => a.department_name.localeCompare(b.department_name))
+                  .map(d => ({ value: d.department_id, label: d.department_name }))}
+                value={newExam.department_id
+                  ? { value: newExam.department_id, label: departments.find(d => d.department_id === newExam.department_id)?.department_name || '' }
+                  : null}
+                onChange={opt =>
+                  setNewExam({ ...newExam, department_id: opt?.value || null })
+                }
+                placeholder="Select Department"
+                isClearable
+              />
             </div>
+
             <div className="input-group">
               <label>College</label>
-              <select value={newExam.college_id ?? ''} onChange={(e) => setNewExam({ ...newExam, college_id: e.target.value })}>
-                <option value="">Select College</option>
-                {colleges.map(c => <option key={c.college_id} value={c.college_id}>{c.college_name}</option>)}
-              </select>
+              <Select
+                className="react-select"
+                classNamePrefix="select"
+                options={colleges
+                  .sort((a, b) => a.college_name.localeCompare(b.college_name))
+                  .map(c => ({ value: c.college_id, label: c.college_name }))}
+                value={newExam.college_id
+                  ? { value: newExam.college_id, label: colleges.find(c => c.college_id === newExam.college_id)?.college_name || '' }
+                  : null}
+                onChange={opt =>
+                  setNewExam({ ...newExam, college_id: opt?.value || null })
+                }
+                placeholder="Select College"
+                isClearable
+                menuPlacement="top"
+              />
             </div>
             <div className="modal-actions">
               <button type='button' onClick={handleSubmit} disabled={isSubmitting}>

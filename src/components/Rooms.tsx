@@ -6,6 +6,7 @@ import { ToastContainer, toast } from 'react-toastify';
 import * as XLSX from 'xlsx';
 import 'react-toastify/dist/ReactToastify.css';
 import '../styles/colleges.css';
+import Select from 'react-select';
 
 interface Room {
   room_id: string;
@@ -218,15 +219,26 @@ const Rooms: React.FC = () => {
             </div>
             <div className="input-group">
               <label>Building</label>
-              <select value={newRoom.building_id}
-                onChange={(e) => setNewRoom({ ...newRoom, building_id: e.target.value })}>
-                <option value="">Select Building</option>
-                {buildings.map(b => (
-                  <option key={b.building_id} value={b.building_id}>
-                    {b.building_name} ({b.building_id})
-                  </option>
-                ))}
-              </select>
+              <Select
+                className="react-select"
+                classNamePrefix="select"
+                options={buildings
+                  .sort((a, b) => a.building_name.localeCompare(b.building_name))
+                  .map(b => ({
+                    value: b.building_id,
+                    label: `${b.building_name} (${b.building_id})`
+                  }))
+                }
+                value={buildings
+                  .map(b => ({ value: b.building_id, label: `${b.building_name} (${b.building_id})` }))
+                  .find(option => option.value === newRoom.building_id)
+                }
+                onChange={(selected) =>
+                  setNewRoom({ ...newRoom, building_id: selected?.value || '' })
+                }
+                placeholder="Select Building"
+                isClearable
+              />
             </div>
             <div className="modal-actions">
               <button type="button" onClick={handleSubmit} disabled={isSubmitting}>

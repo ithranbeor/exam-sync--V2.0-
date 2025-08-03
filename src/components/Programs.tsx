@@ -6,6 +6,7 @@ import { ToastContainer, toast } from 'react-toastify';
 import * as XLSX from 'xlsx';
 import 'react-toastify/dist/ReactToastify.css';
 import '../styles/programs.css';
+import Select from 'react-select';
 
 interface Program {
   program_id: string;
@@ -252,14 +253,24 @@ const Programs: React.FC<ProgramsProps> = ({ user: _user }) => {
           </div>
           <div className="input-group">
             <label>Department</label>
-            <select value={newDeptId} onChange={e => setNewDeptId(e.target.value)}>
-              <option value="">Select department</option>
-              {departments.map(d => (
-                <option key={d.department_id} value={d.department_id}>
-                  {d.department_name} ({d.department_id})
-                </option>
-              ))}
-            </select>
+            <Select
+              className="custom-select"
+              classNamePrefix="custom"
+              options={[...departments]
+                .sort((a, b) => a.department_name.localeCompare(b.department_name))
+                .map(d => ({
+                  value: d.department_id,
+                  label: `${d.department_name} (${d.department_id})`
+                }))
+              }
+              value={departments
+                .map(d => ({ value: d.department_id, label: `${d.department_name} (${d.department_id})` }))
+                .find(opt => opt.value === newDeptId) || null
+              }
+              onChange={selected => setNewDeptId(selected ? selected.value : '')}
+              placeholder="Select department"
+              isClearable
+            />
           </div>
           <div className="modal-actions">
             <button type="button" onClick={handleModalSubmit} disabled={isSubmitting}>
