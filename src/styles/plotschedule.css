@@ -6,7 +6,7 @@
   min-height: calc(100vh - 60px);
   display: flex;
   flex-direction: column;
-  border-radius: 5%;
+  border-radius: 1%;
 }
 
 /* === Header === */
@@ -277,7 +277,6 @@
   color: #092C4C;
 }
 
-/* Footer Buttons under the Grid */
 .plot-footer {
   display: flex;
   justify-content: flex-end;
@@ -285,23 +284,61 @@
   margin-top: 20px;
   flex-wrap: wrap;
 }
-/* Modality Details Container */
 .modality-details {
   background-color: #f9f9f9;
   padding: 15px 20px;
   margin-top: 15px;
-  border-left: 5px solid #007BFF;
+  border-left: 5px solid #092c4c;
   border-radius: 6px;
   box-shadow: 0 1px 3px rgba(0,0,0,0.1);
 }
-
-/* Modality Details Title */
 .modality-details h3 {
-  margin-top: 0;
-  font-size: 1.25rem;
+  margin-bottom: 10px;
+  color: #092c4c;
+}
+
+.modality-list {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  max-height: 250px; 
+  overflow-y: auto;
+  padding-right: 8px;
+}
+
+.modality-item {
+  background: #fff;
+  padding: 12px;
+  border-radius: 5px;
+  border: 1px solid #e0e0e0;
+}
+
+.modality-section {
+  font-weight: bold;
+  font-size: 1.1em;
+  margin-bottom: 6px;
   color: #333;
 }
 
+.modality-info p {
+  margin: 4px 0;
+  font-size: 0.95em;
+}
+
+.label {
+  font-weight: bold;
+  color: #555;
+  margin-right: 5px;
+}
+
+/* Optional: nice thin scrollbar */
+.modality-list::-webkit-scrollbar {
+  width: 6px;
+}
+.modality-list::-webkit-scrollbar-thumb {
+  background-color: #555;
+  border-radius: 3px;
+}
 /* Section List Styling */
 .modality-details ul {
   list-style-type: disc;

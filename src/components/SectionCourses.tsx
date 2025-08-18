@@ -52,6 +52,8 @@ const SectionCourses: React.FC = () => {
   const [showImport, setShowImport] = useState(false);
   const [editMode, setEditMode] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [currentPage, setCurrentPage] = useState(1);
+  const itemsPerPage = 20;
 
   const [newSection, setNewSection] = useState<SectionCourse>({
     course_id: '',
@@ -67,32 +69,60 @@ const SectionCourses: React.FC = () => {
     fetchAll(); 
   }, []);
 
+  useEffect(() => {
+    setCurrentPage(1);
+  }, [searchTerm, sectionCourses]);
+
   const fetchAll = async () => {
-    const [secData, courseData, progData, termData, courseUserData] = await Promise.all([
-      supabase.from('tbl_sectioncourse').select('*'),
-      supabase.from('tbl_course').select('course_id, course_name'),
-      supabase.from('tbl_program').select('program_id, program_name'),
-      supabase.from('tbl_term').select(`term_id, term_name, tbl_examperiod ( academic_year )`),
-      supabase.from('tbl_course_users').select('course_id, user_id, tbl_users ( first_name, last_name )'),
+    const [
+      { data: secData, error: secError },
+      { data: courseData, error: courseError },
+      { data: progData, error: progError },
+      { data: termData, error: termError },
+      { data: courseUserData, error: courseUserError }
+    ] = await Promise.all([
+      supabase
+        .from('tbl_sectioncourse')
+        .select('course_id, program_id, section_name, number_of_students, year_level, term_id, user_id'),
+      supabase
+        .from('tbl_course')
+        .select('course_id, course_name'),
+      supabase
+        .from('tbl_program')
+        .select('program_id, program_name'),
+      supabase
+        .from('tbl_term')
+        .select('term_id, term_name, tbl_examperiod(academic_year)'),
+      supabase
+        .from('tbl_course_users')
+        .select('course_id, user_id, tbl_users(first_name, last_name)'),
     ]);
 
-    if (secData.data) setSectionCourses(secData.data);
-    if (courseData.data) setCourses(courseData.data);
-    if (progData.data) setPrograms(progData.data);
+    if (secError || courseError || progError || termError || courseUserError) {
+      console.error('Failed to fetch some data');
+      toast.error('Error fetching initial data.');
+      return;
+    }
 
-    if (termData.data) {
-      const mapped = termData.data.map((t: any) => {
-        const academicYear = Array.isArray(t.tbl_examperiod) && t.tbl_examperiod.length > 0
-          ? t.tbl_examperiod[0].academic_year
-          : 'N/A';
-        return { ...t, tbl_examperiod: { academic_year: academicYear } };
-      });
+    setSectionCourses(secData || []);
+    setCourses(courseData || []);
+    setPrograms(progData || []);
+
+    if (termData) {
+      const mapped = termData.map((t: any) => ({
+        ...t,
+        tbl_examperiod: {
+          academic_year: Array.isArray(t.tbl_examperiod) && t.tbl_examperiod.length > 0
+            ? t.tbl_examperiod[0].academic_year
+            : 'N/A'
+        }
+      }));
       setTerms(mapped);
     }
 
-    if (courseUserData.data) {
+    if (courseUserData) {
       const map: Record<string, User[]> = {};
-      courseUserData.data.forEach((row: any) => {
+      courseUserData.forEach((row: any) => {
         const user: User = {
           user_id: row.user_id,
           full_name: `${row.tbl_users.first_name} ${row.tbl_users.last_name}`,
@@ -226,7 +256,16 @@ const SectionCourses: React.FC = () => {
 
   const filtered = sectionCourses.filter(sc =>
     sc.section_name.toLowerCase().includes(searchTerm.toLowerCase())
+    || sc.course_id.toLowerCase().includes(searchTerm.toLowerCase())
+    || sc.program_id.toLowerCase().includes(searchTerm.toLowerCase())
+    || sc.year_level.toLowerCase().includes(searchTerm.toLowerCase())
+    || terms.find(t => t.term_id === sc.term_id)?.term_name.toLowerCase().includes(searchTerm.toLowerCase())
+    || (courseInstructorsMap[sc.course_id] || []).some(u => u.full_name.toLowerCase().includes(searchTerm.toLowerCase()))
   );
+
+  const totalPages = Math.ceil(filtered.length / itemsPerPage);
+  const paginated = filtered.slice((currentPage - 1) * itemsPerPage, currentPage * itemsPerPage).sort((a, b) => a.section_name.localeCompare(b.section_name));
+
 
   return (
     <div className="colleges-container">
@@ -265,6 +304,22 @@ const SectionCourses: React.FC = () => {
         </button>
       </div>
 
+      <div className="pagination-controls">
+        <button type='button'
+          onClick={() => setCurrentPage((prev) => Math.max(prev - 1, 1))}
+          disabled={currentPage === 1}
+        >
+          ←
+        </button>
+        <span>Page {currentPage} of {totalPages}</span>
+        <button type='button'
+          onClick={() => setCurrentPage((prev) => Math.min(prev + 1, totalPages))}
+          disabled={currentPage === totalPages}
+        >
+           →
+        </button>
+      </div>
+
       <div className="colleges-table-container">
         <table className="colleges-table">
           <thead>
@@ -281,9 +336,9 @@ const SectionCourses: React.FC = () => {
             </tr>
           </thead>
           <tbody>
-            {filtered.map((sc, i) => (
+            {paginated.map((sc, i) => (
               <tr key={`${sc.course_id}-${sc.program_id}-${sc.section_name}-${sc.term_id}`}>
-                <td>{i + 1}</td>
+                <td>{(currentPage - 1) * itemsPerPage + i + 1}</td>
                 <td>{sc.course_id}</td>
                 <td>{sc.program_id}</td>
                 <td>{sc.section_name}</td>

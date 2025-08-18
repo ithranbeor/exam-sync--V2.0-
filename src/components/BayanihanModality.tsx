@@ -3,6 +3,7 @@ import { supabase } from '../lib/supabaseClient.ts';
 import '../styles/bayanihanModality.css';
 import { ToastContainer, toast } from 'react-toastify';
 import 'react-toastify/dist/ReactToastify.css';
+import Select from 'react-select';
 
 interface UserProps {
   user: {
@@ -27,11 +28,13 @@ const BayanihanModality: React.FC<UserProps> = ({ user }) => {
     modality: '',
     room: '',
     roomType: '',
+    program: '',
     sections: [] as string[],
     course: '',
     remarks: '',
   });
 
+  const [programOptions, setProgramOptions] = useState<{ program_id: string; program_name: string }[]>([]);
   const [courseOptions, setCourseOptions] = useState<{ course_id: string; course_name: string }[]>([]);
   const [sectionOptions, setSectionOptions] = useState<{
     course_id: string;
@@ -39,8 +42,47 @@ const BayanihanModality: React.FC<UserProps> = ({ user }) => {
     section_name: string;
   }[]>([]);
   const [roomOptions, setRoomOptions] = useState<{ room_id: string; room_name: string; room_type: string }[]>([]);
-  const [sectionDropdownOpen, setSectionDropdownOpen] = useState(false);
+  const [_sectionDropdownOpen, setSectionDropdownOpen] = useState(false);
   const dropdownRef = useRef<HTMLDivElement>(null);
+    const [roomStatus, setRoomStatus] = useState<{
+    [key: string]: { occupied: boolean; sections: string[] }
+  }>({});
+
+  useEffect(() => {
+    const fetchRoomStatus = async () => {
+      const { data: modalities, error } = await supabase
+        .from("tbl_modality")
+        .select(`
+          room_id,
+          section_name,
+          program:tbl_program(program_id, program_name, department:tbl_department(college:tbl_college(college_name)))
+        `);
+
+      if (error) {
+        console.error("Error fetching modalities:", error.message);
+        return;
+      }
+
+      const statusMap: {
+        [key: string]: { occupied: boolean; sections: string[] };
+      } = {};
+
+      modalities?.forEach((m) => {
+        const collegeName = m.program?.department?.college?.college_name || "Unknown College";
+        const displayName = `${collegeName} (${m.section_name})`;
+
+        if (!statusMap[m.room_id]) {
+          statusMap[m.room_id] = { occupied: false, sections: [] };
+        }
+        statusMap[m.room_id].occupied = true;
+        statusMap[m.room_id].sections.push(displayName);
+      });
+
+      setRoomStatus(statusMap);
+    };
+
+    fetchRoomStatus();
+  }, []);
 
   useEffect(() => {
     const fetchData = async () => {
@@ -104,6 +146,17 @@ const BayanihanModality: React.FC<UserProps> = ({ user }) => {
         .select('room_id, room_name, room_type');
 
       setRoomOptions(rooms ?? []);
+
+      // Fetch programs based on user's assigned courses
+      const { data: programs, error: programError } = await supabase
+        .from('tbl_program')
+        .select('program_id, program_name');
+
+      if (programError || !programs) {
+        toast.error('Failed to load programs');
+        return;
+      }
+      setProgramOptions(programs);
     };
 
     fetchData();
@@ -134,19 +187,20 @@ const BayanihanModality: React.FC<UserProps> = ({ user }) => {
   }, [form.modality, roomOptions]);
 
   const handleChange = (
-    e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement | HTMLTextAreaElement>
-  ) => {
-    setForm({ ...form, [e.target.name]: e.target.value });
-  };
-
-  const handleSectionToggle = (value: string) => {
-    setForm(prev => {
-      const updatedSections = prev.sections.includes(value)
-        ? prev.sections.filter(s => s !== value)
-        : [...prev.sections, value];
-      return { ...prev, sections: updatedSections };
-    });
-  };
+        e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement | HTMLTextAreaElement>
+      ) => {
+        const { name, value } = e.target;
+        if (name === 'program') {
+          setForm(prev => ({
+            ...prev,
+            program: value,
+            course: '', // reset course
+            sections: [] // reset sections
+          }));
+        } else {
+          setForm({ ...form, [name]: value });
+        }
+      };
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -215,6 +269,7 @@ const BayanihanModality: React.FC<UserProps> = ({ user }) => {
       modality: '',
       room: '',
       roomType: '',
+      program: '',
       sections: [],
       course: '',
       remarks: '',
@@ -241,39 +296,85 @@ const BayanihanModality: React.FC<UserProps> = ({ user }) => {
             <div className="availability-grid">
               <div className="form-group">
                 <label>Modality Type</label>
-                <select
-                  name="modality"
-                  value={form.modality}
-                  onChange={handleChange}
-                  className="custom-select"
-                >
-                  <option value="">Select</option>
-                  <option value="Hands-on">Hands-on</option>
-                  <option value="Written (Lecture)">Written (Lecture)</option>
-                  <option value="Written (Laboratory)">Written (Laboratory)</option>
-                  <option value="PIT or Projects">PIT or Projects</option>
-                  <option value="Pitching">Pitching</option>
-                </select>
+                <Select
+                  options={[
+                    { value: 'Hands-on', label: 'Hands-on' },
+                    { value: 'Written (Lecture)', label: 'Written (Lecture)' },
+                    { value: 'Written (Laboratory)', label: 'Written (Laboratory)' },
+                    { value: 'PIT or Projects', label: 'PIT or Projects' },
+                    { value: 'Pitching', label: 'Pitching' }
+                  ]}
+                  value={
+                    form.modality
+                      ? { value: form.modality, label: form.modality }
+                      : null
+                  }
+                  onChange={(selected) => {
+                    setForm(prev => ({
+                      ...prev,
+                      modality: selected?.value || ''
+                    }));
+                  }}
+                  placeholder="Select modality..."
+                  isClearable
+                />
               </div>
 
               <div className="form-group">
                 <label>Building-Room</label>
-                <select
-                  name="room"
-                  value={form.room}
-                  onChange={handleChange}
-                  className="custom-select"
-                  disabled={!form.roomType}
-                >
-                  <option value="">Select</option>
-                  {roomOptions
-                    .filter(r => r.room_type === form.roomType)
-                    .map((r) => (
-                      <option key={r.room_id} value={r.room_id}>
-                        {r.room_id} - {r.room_name}
-                      </option>
-                    ))}
-                </select>
+                <Select
+                  isDisabled={!form.roomType}
+                  options={roomOptions
+                    .filter((r) => r.room_type === form.roomType)
+                    .map((r) => {
+                      const status = roomStatus[r.room_id];
+                      const occupied = status?.occupied ?? false;
+                      return {
+                        value: r.room_id,
+                        label: `${r.room_id} - ${r.room_name}`,
+                        occupied,
+                        tooltip: occupied
+                          ? `Occupied by: ${status.sections.join(", ")}`
+                          : "Vacant",
+                      };
+                    })}
+                  value={roomOptions
+                    .filter((r) => r.room_id === form.room)
+                    .map((r) => {
+                      const status = roomStatus[r.room_id];
+                      const occupied = status?.occupied ?? false;
+                      return {
+                        value: r.room_id,
+                        label: `${r.room_id} - ${r.room_name}`,
+                        occupied,
+                      };
+                    })}
+                  onChange={(selected) => {
+                    setForm((prev) => ({
+                      ...prev,
+                      room: selected?.value || "",
+                    }));
+                  }}
+                  placeholder="Select room..."
+                  isClearable
+                  formatOptionLabel={(option: any) => (
+                    <div
+                      title={option.tooltip}
+                      style={{ display: "flex", alignItems: "center", gap: "6px" }}
+                    >
+                      <span
+                        style={{
+                          width: 10,
+                          height: 10,
+                          borderRadius: "50%",
+                          backgroundColor: option.occupied ? "red" : "green",
+                          display: "inline-block",
+                        }}
+                      />
+                      <span>{option.label}</span>
+                    </div>
+                  )}
+                />
               </div>
 
               <div className="form-group">
@@ -289,58 +390,74 @@ const BayanihanModality: React.FC<UserProps> = ({ user }) => {
               </div>
 
               <div className="form-group">
+                <label>Program</label>
+                <Select
+                  options={programOptions.map(p => ({
+                    value: p.program_id,
+                    label: `${p.program_id} - ${p.program_name}`
+                  }))}
+                  value={programOptions
+                    .filter(p => p.program_id === form.program)
+                    .map(p => ({ value: p.program_id, label: `${p.program_id} - ${p.program_name}` }))}
+                  onChange={(selected) => {
+                    setForm(prev => ({
+                      ...prev,
+                      program: selected?.value || '',
+                      course: '',
+                      sections: []
+                    }));
+                  }}
+                  placeholder="Select program..."
+                  isClearable
+                />
+              </div>
+
+              <div className="form-group">
                 <label>Course</label>
-                <select
-                  name="course"
-                  value={form.course}
-                  onChange={handleChange}
-                  className="custom-select"
-                >
-                  <option value="">Select</option>
-                  {courseOptions.map((c) => (
-                    <option key={c.course_id} value={c.course_id}>
-                      {c.course_id} ({c.course_name})
-                    </option>
-                  ))}
-                </select>
+                <Select
+                  isDisabled={!form.program}
+                  options={courseOptions
+                    .filter(c => sectionOptions.some(s => s.program_id === form.program && s.course_id === c.course_id))
+                    .map(c => ({
+                      value: c.course_id,
+                      label: `${c.course_id} (${c.course_name})`
+                    }))}
+                  value={courseOptions
+                    .filter(c => c.course_id === form.course)
+                    .map(c => ({ value: c.course_id, label: `${c.course_id} (${c.course_name})` }))}
+                  onChange={(selected) => {
+                    setForm(prev => ({
+                      ...prev,
+                      course: selected?.value || '',
+                      sections: []
+                    }));
+                  }}
+                  placeholder="Select course..."
+                  isClearable
+                />
               </div>
 
               <div className="form-group full-width">
                 <label>Sections</label>
-                <div className="dropdown-multiselect" ref={dropdownRef}>
-                  <div
-                    className="dropdown-input"
-                    onClick={() => setSectionDropdownOpen((prev) => !prev)}
-                  >
-                    {form.sections.length === 0
-                      ? 'Select sections'
-                      : `${form.sections.length} section${form.sections.length > 1 ? 's' : ''} are selected`}
-                  </div>
-
-                  {sectionDropdownOpen && (
-                    <div className="dropdown-menu">
-                      {sectionOptions.filter((s) => s.course_id === form.course).length === 0 ? (
-                        <div className="dropdown-item">No sections available for this course.</div>
-                      ) : (
-                        sectionOptions
-                          .filter((s) => s.course_id === form.course)
-                          .map((s) => (
-                            <label
-                              key={`${s.course_id}-${s.program_id}-${s.section_name}`}
-                              className="dropdown-item"
-                            >
-                              <input
-                                type="checkbox"
-                                checked={form.sections.includes(s.section_name)}
-                                onChange={() => handleSectionToggle(s.section_name)}
-                              />
-                              {s.section_name}
-                            </label>
-                          ))
-                      )}
-                    </div>
-                  )}
-                </div>
+                <Select
+                  isMulti
+                  isDisabled={!form.course}
+                  options={sectionOptions
+                    .filter(s => s.course_id === form.course)
+                    .map(s => ({
+                      value: s.section_name,
+                      label: s.section_name
+                    }))}
+                  value={form.sections.map(sec => ({ value: sec, label: sec }))}
+                  onChange={(selected) => {
+                    setForm(prev => ({
+                      ...prev,
+                      sections: selected ? selected.map(s => s.value) : []
+                    }));
+                  }}
+                  placeholder="Select sections..."
+                  isClearable
+                />
               </div>
             </div>
 

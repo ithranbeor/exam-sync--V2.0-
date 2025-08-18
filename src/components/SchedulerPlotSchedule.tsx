@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { FaTrash, FaEdit, FaEye, FaSearch } from 'react-icons/fa';
+import { FaEye, FaSearch } from 'react-icons/fa';
 import { supabase } from '../lib/supabaseClient.ts';
 import '../styles/plotschedule.css';
 import 'react-toastify/dist/ReactToastify.css';
@@ -120,6 +120,46 @@ const Scheduler_PlotSchedule: React.FC = () => {
   const [instructors, setInstructors] = useState<{ user_id: number; first_name: string; last_name: string }[]>([]);
   const [isReassigning, setIsReassigning] = useState(false);
   const [selectedProctors, setSelectedProctors] = useState<Record<string, string>>({});
+  const [examDate, setExamDate] = useState<string>('');
+  const [examStartTime, setExamStartTime] = useState<string>('');
+  const [examEndTime, setExamEndTime] = useState<string>('');
+  const [selectedRoomId, setSelectedRoom] = useState<number | null>(null);
+
+
+  const isRoomAvailable = async (
+    roomId: number,
+    date: string,
+    startTime: string,
+    endTime: string
+  ): Promise<boolean> => {
+    const { data, error } = await supabase
+      .from('tbl_examdetails')
+      .select('*')
+      .eq('room_id', roomId)
+      .eq('exam_date', date)
+      .or(`and(start_time,lt.${endTime},end_time,gt.${startTime})`);
+
+    if (error) {
+      console.error('Error checking room availability:', error);
+      return false;
+    }
+
+  useEffect(() => {
+    if (!selectedRoomId || !examDate || !examStartTime || !examEndTime) return;
+
+    const checkRoom = async () => {
+      const available = await isRoomAvailable(selectedRoomId, examDate, examStartTime, examEndTime);
+      if (!available) {
+        alert('⚠ This room is already booked for that time. Please adjust date/time.');
+        // Optionally reset date/time here if needed
+      }
+    };
+
+    checkRoom();
+  }, [selectedRoomId, examDate, examStartTime, examEndTime]);
+
+    return data.length === 0;
+  };
 
   const getInstructorName = (courseId: string, programId: string): string => {
     const section = sectionCourses.find(
@@ -347,8 +387,7 @@ const Scheduler_PlotSchedule: React.FC = () => {
           room_id,
           section_name,
           user_id
-        `)
-        .eq('user_id', userMeta.user_id),
+        `),
         supabase
           .from('tbl_examperiod')
           .select(`
@@ -879,7 +918,7 @@ const Scheduler_PlotSchedule: React.FC = () => {
               {selectedModality && (
                 <div className="modality-details">
                   <h3>Modality Details</h3>
-                  <ul>
+                  <div className="modality-list">
                     {modalities
                       .filter(
                         (m) =>
@@ -887,17 +926,22 @@ const Scheduler_PlotSchedule: React.FC = () => {
                           m.course_id === selectedModality.course_id &&
                           m.program_id === selectedModality.program_id
                       )
-                      .map((m, idx) => (
-                        <li key={idx}>
-                          <strong>{m.section_name}</strong> — 
-                          Room: <strong>{rooms.find(r => r.room_id === m.room_id)?.room_name || m.room_id}</strong>, 
-                          Room Type: <strong>{m.room_type}</strong>, 
-                          Course: <strong>{m.course_id}</strong>, 
-                          Program: <strong>{m.program_id}</strong>, 
-                          Remarks: <strong>{m.modality_remarks || 'None'}</strong>
-                        </li>
-                      ))}
-                  </ul>
+                      .map((m, idx) => {
+                        const roomName = rooms.find(r => r.room_id === m.room_id)?.room_name || m.room_id;
+                        return (
+                          <div key={idx} className="modality-item">
+                            <div className="modality-section">{m.section_name}</div>
+                            <div className="modality-info">
+                              <p><span className="label">Room:</span>{m.room_id} {roomName}</p>
+                              <p><span className="label">Room Type:</span> {m.room_type}</p>
+                              <p><span className="label">Course:</span> {m.course_id}</p>
+                              <p><span className="label">Program:</span> {m.program_id}</p>
+                              <p><span className="label">Remarks:</span> {m.modality_remarks || 'None'}</p>
+                            </div>
+                          </div>
+                        );
+                      })}
+                  </div>
                 </div>
               )}
             </div>

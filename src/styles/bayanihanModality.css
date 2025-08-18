@@ -211,3 +211,61 @@ textarea {
   color: #333;
   cursor: pointer;
 }
+.building-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  font-weight: bold;
+  margin-bottom: 10px;
+}
+
+.building-header button {
+  background: #ddd;
+  border: none;
+  padding: 5px 10px;
+  cursor: pointer;
+}
+
+.room-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(80px, 1fr));
+  gap: 8px;
+}
+
+.room-box {
+  padding: 10px;
+  text-align: center;
+  border-radius: 6px;
+  font-size: 0.9rem;
+  cursor: pointer;
+  user-select: none;
+}
+
+.room-box.vacant {
+  background-color: #4caf50; /* Green */
+  color: white;
+}
+
+.room-box.occupied {
+  background-color: #9e9e9e; /* Gray */
+  color: white;
+  cursor: not-allowed;
+}
+
+.room-box.selected {
+  outline: 3px solid #ffeb3b;
+}
+.react-select__option[title]::after {
+  content: attr(title);
+  display: none;
+  position: absolute;
+  background: #333;
+  color: #fff;
+  padding: 4px 8px;
+  border-radius: 6px;
+  font-size: 12px;
+  white-space: nowrap;
+}
+.react-select__option:hover::after {
+  display: block;
+}

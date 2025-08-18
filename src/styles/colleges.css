@@ -7,7 +7,6 @@
   min-height: calc(100vh - 60px);
   display: flex;
   flex-direction: column;
-  border-radius: 5%;
 }
 
 .colleges-header {
@@ -533,6 +532,56 @@ h3 {
   padding: 0.1rem 0.75rem;
   border-radius: 6px;
   color: #333;
+}
+.filter-bar {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 1rem;
+  margin: 1rem 0;
+  align-items: center;
+}
+
+.filter-bar input[type="text"] {
+  padding: 8px;
+  font-size: 14px;
+  width: 200px;
+  border: 1px solid #ccc;
+  border-radius: 8px;
+}
+
+.filter-bar .custom-select {
+  width: 220px;
+}
+
+@media (max-width: 768px) {
+  .filter-bar {
+    flex-direction: column;
+    align-items: stretch;
+  }
+
+  .filter-bar input[type="text"],
+  .filter-bar .custom-select {
+    width: 100%;
+  }
+}
+.pagination-controls {
+  display: flex;
+  justify-content: flex-end;
+  align-items: center;
+  gap: 1rem;
+  margin-bottom: 10px;
+  color: #333;
+}
+.pagination-controls button {
+  background-color: #007bff;
+  color: white;
+  border: none;
+  padding: 5px 10px;
+  cursor: pointer;
+}
+.pagination-controls button:disabled {
+  background-color: #ccc;
+  cursor: not-allowed;
 }
 
 

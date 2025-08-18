@@ -172,8 +172,6 @@ button {
     transition: border-color 0.25s;
     border-top-left-radius: 15px;
     border-bottom-right-radius: 15px;
-    border-top-right-radius: 15px;
-    border-bottom-left-radius: 15px;
 
 
 }
