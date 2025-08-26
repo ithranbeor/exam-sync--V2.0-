@@ -30,6 +30,7 @@ interface Course {
   term_name?: string;
   instructor_names?: string[];
   user_ids?: number[];
+  leaders?: number[];
 }
 
 const Courses: React.FC = () => {
@@ -39,17 +40,17 @@ const Courses: React.FC = () => {
   const [searchTerm, setSearchTerm] = useState('');
   const [showModal, setShowModal] = useState(false);
   const [showImport, setShowImport] = useState(false);
-  const [newCourse, setNewCourse] = useState({
+    const [newCourse, setNewCourse] = useState({
     course_id: '',
     course_name: '',
     term_id: 0,
-    user_ids: [] as number[]
+    user_ids: [] as number[],
+    leaders: [] as number[]
   });
   const [editMode, setEditMode] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
-  const [dropdownOpen, setDropdownOpen] = useState(false);
+  const [_dropdownOpen, setDropdownOpen] = useState(false);
   const dropdownRef = useRef<HTMLDivElement>(null);
-  const [instructorSearch, setInstructorSearch] = useState('');
 
   useEffect(() => {
     const handleClickOutside = (e: MouseEvent) => {
@@ -75,7 +76,7 @@ const Courses: React.FC = () => {
         course_name,
         term_id,
         tbl_term ( term_name, tbl_examperiod ( academic_year ) ),
-        tbl_course_users ( user_id, tbl_users ( first_name, last_name ) )
+        tbl_course_users ( user_id, is_bayanihan_leader, tbl_users ( first_name, last_name ) )
       `);
 
     if (error) {
@@ -89,17 +90,21 @@ const Courses: React.FC = () => {
         ? term.tbl_examperiod[0].academic_year
         : 'N/A';
 
-      const instructors = course.tbl_course_users?.map((cu: any) =>
-        `${cu.tbl_users.first_name} ${cu.tbl_users.last_name}`
+      const instructors = course.tbl_course_users?.map((cu: any) => 
+        `${cu.tbl_users.first_name} ${cu.tbl_users.last_name}${cu.is_bayanihan_leader ? ' (Leader)' : ''}`
       );
 
       const userIds = course.tbl_course_users?.map((cu: any) => cu.user_id);
+      const leaders = course.tbl_course_users
+        ?.filter((cu: any) => cu.is_bayanihan_leader)
+        .map((cu: any) => cu.user_id);
 
       return {
         ...course,
         term_name: `${term?.term_name || 'N/A'} (${academicYear})`,
         instructor_names: instructors,
-        user_ids: userIds
+        user_ids: userIds,
+        leaders
       };
     });
 
@@ -140,18 +145,21 @@ const Courses: React.FC = () => {
     setIsSubmitting(true);
 
     if (editMode) {
-      await supabase.from('tbl_course').update({ course_name, term_id }).eq('course_id', course_id);
+      await supabase.from('tbl_course')
+        .update({ course_name, term_id })
+        .eq('course_id', course_id);
+
       await supabase.from('tbl_course_users').delete().eq('course_id', course_id);
+
       for (const uid of user_ids) {
-        await supabase.from('tbl_course_users').insert({ course_id, user_id: uid });
+        await supabase.from('tbl_course_users').insert({
+          course_id,
+          user_id: uid,
+          is_bayanihan_leader: newCourse.leaders.includes(uid)
+        });
       }
+
       toast.success('Course updated');
-    } else {
-      await supabase.from('tbl_course').insert({ course_id, course_name, term_id });
-      for (const uid of user_ids) {
-        await supabase.from('tbl_course_users').insert({ course_id, user_id: uid });
-      }
-      toast.success('Course added');
     }
 
     fetchCourses();
@@ -238,7 +246,7 @@ const Courses: React.FC = () => {
 
       <div className="colleges-actions">
         <button type="button" className="action-button add-new" onClick={() => {
-          setNewCourse({ course_id: '', course_name: '', term_id: 0, user_ids: [] });
+          setNewCourse({ course_id: '', course_name: '', term_id: 0, user_ids: [], leaders: [] });
           setEditMode(false);
           setShowModal(true);
         }}>Add Course</button>
@@ -272,7 +280,8 @@ const Courses: React.FC = () => {
                       course_id: c.course_id,
                       course_name: c.course_name,
                       term_id: c.term_id,
-                      user_ids: c.user_ids || []
+                      user_ids: c.user_ids || [],
+                      leaders: c.leaders || []
                     });
                     setEditMode(true);
                     setShowModal(true);
@@ -316,29 +325,53 @@ const Courses: React.FC = () => {
               <label>Instructors</label>
               <Select
                 isMulti
-                className="custom-select"
-                classNamePrefix="custom"
-                options={users
-                  .sort((a, b) => a.first_name.localeCompare(b.first_name))
-                  .map(user => ({
-                    value: user.user_id,
-                    label: `${user.first_name} ${user.last_name}`,
-                  }))
-                }
+                options={users.map(user => ({
+                  value: user.user_id,
+                  label: `${user.first_name} ${user.last_name}`,
+                }))}
                 value={users
                   .filter(user => newCourse.user_ids.includes(user.user_id))
                   .map(user => ({
                     value: user.user_id,
                     label: `${user.first_name} ${user.last_name}`,
-                  }))
-                }
-                onChange={(selectedOptions) => {
-                  const selectedIds = selectedOptions.map(option => option.value);
-                  setNewCourse({ ...newCourse, user_ids: selectedIds });
+                  }))}
+                onChange={(selected) => {
+                  const ids = selected.map(opt => opt.value);
+                  setNewCourse({
+                    ...newCourse,
+                    user_ids: ids,
+                    leaders: newCourse.leaders.filter(l => ids.includes(l)),
+                  });
                 }}
                 placeholder="Select instructors..."
               />
             </div>
+
+            {newCourse.user_ids.length > 0 && (
+              <div className="input-group">
+                <label>Bayanihan Leaders</label>
+                <Select
+                  isMulti
+                  options={users
+                    .filter(u => newCourse.user_ids.includes(u.user_id))
+                    .map(u => ({
+                      value: u.user_id,
+                      label: `${u.first_name} ${u.last_name}`,
+                    }))}
+                  value={users
+                    .filter(u => newCourse.leaders.includes(u.user_id))
+                    .map(u => ({
+                      value: u.user_id,
+                      label: `${u.first_name} ${u.last_name}`,
+                    }))}
+                  onChange={(selected) => {
+                    const ids = selected.map(opt => opt.value);
+                    setNewCourse({ ...newCourse, leaders: ids });
+                  }}
+                  placeholder="Select Bayanihan Leaders..."
+                />
+              </div>
+            )}
             <div className="modal-actions">
               <button type="button" onClick={handleSubmit} disabled={isSubmitting}>{isSubmitting ? 'Saving...' : 'Save'}</button>
               <button type="button" onClick={() => setShowModal(false)}>Cancel</button>
@@ -358,7 +391,6 @@ const Courses: React.FC = () => {
           </div>
         </div>
       )}
-
       <ToastContainer position="top-right" autoClose={3000} />
     </div>
   );

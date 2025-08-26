@@ -101,7 +101,8 @@ const BayanihanModality: React.FC<UserProps> = ({ user }) => {
       const { data: userCourses, error: courseUserError } = await supabase
         .from('tbl_course_users')
         .select('course_id')
-        .eq('user_id', user.user_id);
+        .eq('user_id', user.user_id)
+        .eq('is_bayanihan_leader', true); // ✅ only leader courses
 
       if (courseUserError || !userCourses) {
         toast.error('Failed to load your assigned courses');
@@ -140,15 +141,26 @@ const BayanihanModality: React.FC<UserProps> = ({ user }) => {
 
       setRoomOptions(rooms ?? []);
 
-      // Fetch programs based on user's assigned courses
+      const leaderDepartments = roles
+        .map(r => r.department_id)
+        .filter(Boolean);
+
+      if (leaderDepartments.length === 0) {
+        toast.warn("You are not assigned to any department as Bayanihan Leader.");
+        setProgramOptions([]);
+        return;
+      }
+
       const { data: programs, error: programError } = await supabase
         .from('tbl_program')
-        .select('program_id, program_name');
+        .select('program_id, program_name, department_id')
+        .in('department_id', leaderDepartments);
 
       if (programError || !programs) {
         toast.error('Failed to load programs');
         return;
       }
+
       setProgramOptions(programs);
     };
 
@@ -231,7 +243,7 @@ const BayanihanModality: React.FC<UserProps> = ({ user }) => {
           course_id: section.course_id,
           program_id: section.program_id,
           section_name: section.section_name,
-          possible_rooms: rooms, // ✅ cleaned string[]
+          possible_rooms: rooms,
           user_id: user.user_id,
           created_at: new Date().toISOString(),
         },
