@@ -140,6 +140,7 @@ const BayanihanModality: React.FC<UserProps> = ({ user }) => {
 
       setRoomOptions(rooms ?? []);
 
+      // Fetch programs based on user's assigned courses
       const { data: programs, error: programError } = await supabase
         .from('tbl_program')
         .select('program_id, program_name');
@@ -186,8 +187,8 @@ const BayanihanModality: React.FC<UserProps> = ({ user }) => {
           setForm(prev => ({
             ...prev,
             program: value,
-            course: '',
-            sections: []
+            course: '', // reset course
+            sections: [] // reset sections
           }));
         } else {
           setForm({ ...form, [name]: value });
@@ -207,6 +208,8 @@ const BayanihanModality: React.FC<UserProps> = ({ user }) => {
       return;
     }
 
+    // ✅ Instead of assigning rooms directly, just save them as possible options
+    // ✅ Sanitize rooms here before looping
     const rooms: string[] = Array.isArray(form.rooms)
       ? form.rooms.map((r: any) => (typeof r === "string" ? r : r.value))
       : [];
@@ -228,7 +231,7 @@ const BayanihanModality: React.FC<UserProps> = ({ user }) => {
           course_id: section.course_id,
           program_id: section.program_id,
           section_name: section.section_name,
-          possible_rooms: rooms,
+          possible_rooms: rooms, // ✅ cleaned string[]
           user_id: user.user_id,
           created_at: new Date().toISOString(),
         },
@@ -396,25 +399,38 @@ const BayanihanModality: React.FC<UserProps> = ({ user }) => {
                 <Select
                   isDisabled={!form.program}
                   options={courseOptions
+                    .filter(c =>
+                      sectionOptions.some(
+                        s => s.program_id === form.program && s.course_id === c.course_id
+                      )
+                    )
                     .map(c => ({
                       value: c.course_id,
-                      label: `${c.course_id} (${c.course_name})`
+                      label: `${c.course_id} (${c.course_name})`,
                     }))}
-                  value={courseOptions
-                    .filter(c => c.course_id === form.course)
-                    .map(c => ({ value: c.course_id, label: `${c.course_id} (${c.course_name})` }))}
-                  onChange={(selected) => {
+                  value={
+                    form.course
+                      ? {
+                          value: form.course,
+                          label: `${
+                            courseOptions.find(c => c.course_id === form.course)?.course_id
+                          } (${
+                            courseOptions.find(c => c.course_id === form.course)?.course_name
+                          })`,
+                        }
+                      : null
+                  }
+                  onChange={(selected) =>
                     setForm(prev => ({
                       ...prev,
                       course: selected?.value || '',
-                      sections: []
-                    }));
-                  }}
+                      sections: [],
+                    }))
+                  }
                   placeholder="Select course..."
                   isClearable
                 />
               </div>
-
               <div className="form-group full-width">
                 <label>Sections</label>
                 <Select
