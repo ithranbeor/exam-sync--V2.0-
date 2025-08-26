@@ -2,7 +2,7 @@
 import React, { useState, useEffect } from 'react';
 import { supabase } from '../lib/supabaseClient.ts';
 import { ToastContainer, toast } from 'react-toastify';
-import { FaSearch, FaTrash, FaDownload, FaPen, FaCalendarAlt, FaRedoAlt } from 'react-icons/fa';
+import { FaSearch, FaTrash, FaDownload, FaPen, FaCalendarAlt, FaRedoAlt, FaLock, FaLockOpen} from 'react-icons/fa';
 import * as XLSX from 'xlsx';
 import 'react-toastify/dist/ReactToastify.css';
 import '../styles/userroles.css';
@@ -377,7 +377,28 @@ const UserRoles = () => {
                           onClick={() => toggleUserRoleStatus(role.user_role_id, role.status || 'Active')}
                           title={role.status === 'Suspended' ? 'Reactivate Role' : 'Suspend Role'}
                         >
-                          {role.status === 'Suspended' ? <FaRedoAlt /> : <FaTrash />}
+                          {role.status === 'Suspended' ? <FaLockOpen /> : <FaLock />}
+                        </button>
+                        <button
+                          className="icon-button delete-button"
+                          onClick={async () => {
+                            if (confirm('Are you sure you want to delete this role? This action cannot be undone.')) {
+                              const { error } = await supabase
+                                .from('tbl_user_role')
+                                .delete()
+                                .eq('user_role_id', role.user_role_id);
+
+                              if (error) {
+                                toast.error('Failed to delete role.');
+                              } else {
+                                toast.success('Role deleted.');
+                                fetchData();
+                              }
+                            }
+                          }}
+                          title="Delete Role"
+                        >
+                          <FaTrash />
                         </button>
                       </td>
                     </tr>
