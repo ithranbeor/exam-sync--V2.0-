@@ -26,7 +26,7 @@ const modalityRoomTypeMap: { [key: string]: string } = {
 const BayanihanModality: React.FC<UserProps> = ({ user }) => {
   const [form, setForm] = useState({
     modality: '',
-    room: '',
+    rooms: [] as string[], 
     roomType: '',
     program: '',
     sections: [] as string[],
@@ -52,11 +52,7 @@ const BayanihanModality: React.FC<UserProps> = ({ user }) => {
     const fetchRoomStatus = async () => {
       const { data: modalities, error } = await supabase
         .from("tbl_modality")
-        .select(`
-          room_id,
-          section_name,
-          program:tbl_program(program_id, program_name, department:tbl_department(college:tbl_college(college_name)))
-        `);
+        .select("room_id, section_name");
 
       if (error) {
         console.error("Error fetching modalities:", error.message);
@@ -68,14 +64,11 @@ const BayanihanModality: React.FC<UserProps> = ({ user }) => {
       } = {};
 
       modalities?.forEach((m) => {
-        const collegeName = m.program?.department?.college?.college_name || "Unknown College";
-        const displayName = `${collegeName} (${m.section_name})`;
-
         if (!statusMap[m.room_id]) {
           statusMap[m.room_id] = { occupied: false, sections: [] };
         }
         statusMap[m.room_id].occupied = true;
-        statusMap[m.room_id].sections.push(displayName);
+        statusMap[m.room_id].sections.push(m.section_name);
       });
 
       setRoomStatus(statusMap);
@@ -210,64 +203,52 @@ const BayanihanModality: React.FC<UserProps> = ({ user }) => {
       return;
     }
 
-    const selectedSections = sectionOptions.filter(
-      s => s.course_id === form.course && form.sections.includes(s.section_name)
-    );
-
-    if (selectedSections.length === 0) {
+    if (form.sections.length === 0) {
       toast.warn('Please select at least one section.');
       return;
     }
 
-    const conflictWarnings: string[] = [];
+    // ✅ Instead of assigning rooms directly, just save them as possible options
+    // ✅ Sanitize rooms here before looping
+    const rooms: string[] = Array.isArray(form.rooms)
+      ? form.rooms.map((r: any) => (typeof r === "string" ? r : r.value))
+      : [];
 
-    for (const section of selectedSections) {
-      const { data: existing, error: fetchError } = await supabase
-        .from('tbl_modality')
-        .select('modality_id')
-        .eq('room_id', form.room)
-        .eq('course_id', section.course_id)
-        .eq('program_id', section.program_id);
+    for (const sectionName of form.sections) {
+      const section = sectionOptions.find(
+        (s) => s.course_id === form.course && s.section_name === sectionName
+      );
 
-      if (fetchError) {
-        console.error('Error checking existing modality:', fetchError.message);
-        toast.error('Failed to check for existing modality conflicts.');
-        return;
-      }
+      if (!section) continue;
 
-      if (existing && existing.length > 0) {
-        conflictWarnings.push(section.section_name);
-      }
-    }
+      console.log("Saving:", section.section_name, "Rooms:", rooms);
 
-    if (conflictWarnings.length > 0) {
-      toast.warn(`⚠️ Room already assigned for: ${conflictWarnings.join(', ')}. Proceeding anyway.`);
-    }
-
-    for (const section of selectedSections) {
-      const { error: insertError } = await supabase.from('tbl_modality').insert([{
-        modality_type: form.modality,
-        room_type: form.roomType,
-        modality_remarks: form.remarks,
-        course_id: section.course_id,
-        program_id: section.program_id,
-        section_name: section.section_name,
-        room_id: form.room,
-        user_id: user.user_id,
-        created_at: new Date().toISOString(),
-      }]);
+      const { error: insertError } = await supabase.from("tbl_modality").insert([
+        {
+          modality_type: form.modality,
+          room_type: form.roomType,
+          modality_remarks: form.remarks,
+          course_id: section.course_id,
+          program_id: section.program_id,
+          section_name: section.section_name,
+          possible_rooms: rooms, // ✅ cleaned string[]
+          user_id: user.user_id,
+          created_at: new Date().toISOString(),
+        },
+      ]);
 
       if (insertError) {
-        console.error('Insert error:', insertError.message);
-        toast.error(`Failed to save modality for ${section.section_name}`);
-        return;
+        console.error("Insert error:", insertError.message, insertError.details);
+        toast.error(`Failed to save for ${section.section_name}`);
+      } else {
+        toast.success(`Saved for ${section.section_name}`);
       }
     }
 
     toast.success('Modality successfully submitted!');
     setForm({
       modality: '',
-      room: '',
+      rooms: [],
       roomType: '',
       program: '',
       sections: [],
@@ -323,6 +304,7 @@ const BayanihanModality: React.FC<UserProps> = ({ user }) => {
               <div className="form-group">
                 <label>Building-Room</label>
                 <Select
+                  isMulti
                   isDisabled={!form.roomType}
                   options={roomOptions
                     .filter((r) => r.room_type === form.roomType)
@@ -338,24 +320,25 @@ const BayanihanModality: React.FC<UserProps> = ({ user }) => {
                           : "Vacant",
                       };
                     })}
-                  value={roomOptions
-                    .filter((r) => r.room_id === form.room)
-                    .map((r) => {
-                      const status = roomStatus[r.room_id];
-                      const occupied = status?.occupied ?? false;
-                      return {
-                        value: r.room_id,
-                        label: `${r.room_id} - ${r.room_name}`,
-                        occupied,
-                      };
-                    })}
+                  value={form.rooms.map((roomId) => {
+                    const r = roomOptions.find((x) => x.room_id === roomId);
+                    const status = r ? roomStatus[r.room_id] : undefined;
+                    const occupied = status?.occupied ?? false;
+                    return r
+                      ? {
+                          value: r.room_id,
+                          label: `${r.room_id} - ${r.room_name}`,
+                          occupied,
+                        }
+                      : null;
+                  }).filter(Boolean)}
                   onChange={(selected) => {
                     setForm((prev) => ({
                       ...prev,
-                      room: selected?.value || "",
+                      rooms: selected ? selected.map((s: any) => s.value) : [],
                     }));
                   }}
-                  placeholder="Select room..."
+                  placeholder="Select room(s)..."
                   isClearable
                   formatOptionLabel={(option: any) => (
                     <div
@@ -367,7 +350,7 @@ const BayanihanModality: React.FC<UserProps> = ({ user }) => {
                           width: 10,
                           height: 10,
                           borderRadius: "50%",
-                          backgroundColor: option.occupied ? "red" : "green",
+                          backgroundColor: option.occupied ? "red" : "green", // 🔴 if occupied, 🟢 if free
                           display: "inline-block",
                         }}
                       />
@@ -376,7 +359,6 @@ const BayanihanModality: React.FC<UserProps> = ({ user }) => {
                   )}
                 />
               </div>
-
               <div className="form-group">
                 <label>Room Type</label>
                 <input

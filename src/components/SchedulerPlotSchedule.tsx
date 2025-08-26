@@ -24,7 +24,8 @@ interface Modality {
   modality_remarks: string;
   course_id: string;
   program_id: string;
-  room_id: string;
+  room_id: string | null;
+  possible_rooms?: string[];
   section_name: string;
   user_id: number;
   section?: {
@@ -120,11 +121,11 @@ const Scheduler_PlotSchedule: React.FC = () => {
   const [instructors, setInstructors] = useState<{ user_id: number; first_name: string; last_name: string }[]>([]);
   const [isReassigning, setIsReassigning] = useState(false);
   const [selectedProctors, setSelectedProctors] = useState<Record<string, string>>({});
-  const [examDate, setExamDate] = useState<string>('');
-  const [examStartTime, setExamStartTime] = useState<string>('');
-  const [examEndTime, setExamEndTime] = useState<string>('');
-  const [selectedRoomId, setSelectedRoom] = useState<number | null>(null);
-
+  const [examDate, _setExamDate] = useState<string>('');
+  const [examStartTime, _setExamStartTime] = useState<string>('');
+  const [examEndTime, _setExamEndTime] = useState<string>('');
+  const [selectedRoomId, _setSelectedRoom] = useState<number | null>(null);
+  
 
   const isRoomAvailable = async (
     roomId: number,
@@ -385,6 +386,7 @@ const Scheduler_PlotSchedule: React.FC = () => {
           course_id,
           program_id,
           room_id,
+          possible_rooms,
           section_name,
           user_id
         `),
@@ -655,7 +657,10 @@ const Scheduler_PlotSchedule: React.FC = () => {
     let proctorIndex = 0;
     const totalAvailable = availableProctors.length;3
 
-    const inserts = newModalities.map((modality, index) => {
+    // Use flatMap instead of map to avoid nested arrays
+    const inserts: any[] = [];
+
+    newModalities.forEach((modality, index) => {
       const offsetMinutes = index * durationMinutes;
       const examStartTime = new Date(initialStartTime.getTime() + offsetMinutes * 60000);
       const examEndTime = new Date(examStartTime.getTime() + durationMinutes * 60000);
@@ -666,10 +671,15 @@ const Scheduler_PlotSchedule: React.FC = () => {
         proctorIndex++;
       }
 
-      return {
+      // ✅ Pick unique room for each section (don’t duplicate)
+      const possibleRooms = modality.possible_rooms || [];
+      const chosenRooms = possibleRooms.slice(0, newModalities.length); 
+      const chosenRoom = chosenRooms[index % chosenRooms.length];
+
+      inserts.push({
         course_id: modality.course_id,
         program_id: modality.program_id,
-        room_id: modality.room_id,
+        room_id: chosenRoom, // ✅ only one room per section
         modality_id: modality.modality_id,
         user_id: assignedProctorId ?? parseInt(userId),
         examperiod_id: parseInt(formData.examperiod_id),
@@ -684,10 +694,10 @@ const Scheduler_PlotSchedule: React.FC = () => {
         exam_category: selectedExamPeriod.exam_category,
         exam_period: examPeriodRange,
         exam_date: formData.exam_date,
-      };
+      });
     });
 
-    const { error } = await supabase.from('tbl_examdetails').insert(inserts);
+    const { error } = await supabase.from("tbl_examdetails").insert(inserts);
 
     if (error) {
       toast.error(`Failed to save schedule. ${error.message}`);
@@ -702,6 +712,19 @@ const Scheduler_PlotSchedule: React.FC = () => {
       setExamDetails(updatedExamDetails || []);
     }
   };
+
+  const scheduledRooms =
+  rooms && examDetails && formData.exam_date
+    ? rooms.filter((room) =>
+        examDetails.some(
+          (ed) =>
+            ed.room_id === room.room_id &&
+            new Date(ed.exam_start_time).toDateString() ===
+              new Date(formData.exam_date).toDateString()
+        )
+      )
+    : [];
+
 
   return (
     <div className="colleges-container">
@@ -746,7 +769,7 @@ const Scheduler_PlotSchedule: React.FC = () => {
               <tbody>
                 {filteredExamDetails.length === 0 ? (
                   <tr>
-                    <td colSpan={6}>No schedule found.</td>
+                    <td colSpan={7}>No schedule found.</td>
                   </tr>
                 ) : (
                   filteredExamDetails.map((ed, index) => (
@@ -755,6 +778,9 @@ const Scheduler_PlotSchedule: React.FC = () => {
                       <td>{ed.course_id}</td>
                       <td>{ed.program_id}</td>
                       <td>{ed.room_id}</td>
+                      <td>{new Date(ed.exam_start_time).toLocaleTimeString([], {hour: '2-digit', minute: '2-digit'})} 
+                          – {new Date(ed.exam_end_time).toLocaleTimeString([], {hour: '2-digit', minute: '2-digit'})}
+                      </td>
                       <td>
                         <button type="button"
                           className="icon-button view-button"
@@ -1167,7 +1193,7 @@ const Scheduler_PlotSchedule: React.FC = () => {
               <thead>
                 <tr>
                   <th></th>
-                  <th colSpan={rooms.length} style={{ textAlign: 'center' }}>
+                  <th colSpan={scheduledRooms.length} style={{ textAlign: 'center' }}>
                     {formData.exam_date
                       ? new Date(formData.exam_date).toLocaleDateString('en-US', {
                           weekday: 'long',
@@ -1181,24 +1207,38 @@ const Scheduler_PlotSchedule: React.FC = () => {
 
                 <tr>
                   <th></th>
-                  <th colSpan={rooms.length} style={{ textAlign: 'center' }}>
-                    {rooms[0]?.building?.building_name || 'Unknown'} ({rooms[0]?.building?.building_id || '-'})
-                  </th>
+                  {(() => {
+                    // Group rooms by building
+                    const buildingGroups: Record<string, typeof scheduledRooms> = {};
+                    scheduledRooms.forEach((room) => {
+                      const buildingId = room.building?.building_id || 'unknown';
+                      if (!buildingGroups[buildingId]) buildingGroups[buildingId] = [];
+                      buildingGroups[buildingId].push(room);
+                    });
+
+                    return Object.entries(buildingGroups).map(([buildingId, roomsInBuilding]) => (
+                      <th
+                        key={buildingId}
+                        colSpan={roomsInBuilding.length}
+                        style={{ textAlign: 'center' }}
+                      >
+                        {roomsInBuilding[0].building?.building_name || 'Unknown'} ({buildingId})
+                      </th>
+                    ));
+                  })()}
                 </tr>
 
                 <tr>
                   <th>Time</th>
-                  {rooms.map((room) => (
-                    <th key={room.room_id}>
-                      {room.room_id}
-                    </th>
+                  {scheduledRooms.map((room) => (
+                    <th key={room.room_id}>{room.room_id}</th>
                   ))}
                 </tr>
               </thead>
+
               <tbody>
                 {(() => {
                   const cellOccupied: Record<string, boolean> = {};
-
                   const formatTime12Hour = (date: Date) =>
                     date.toLocaleTimeString('en-US', {
                       hour: 'numeric',
@@ -1207,45 +1247,19 @@ const Scheduler_PlotSchedule: React.FC = () => {
                     });
 
                   const times = [
-                    '07:30',
-                    '08:00',
-                    '08:30',
-                    '09:00',
-                    '09:30',
-                    '10:00',
-                    '10:30',
-                    '11:00',
-                    '11:30',
-                    '12:00',
-                    '12:30',
-                    '13:00',
-                    '13:30',
-                    '14:00',
-                    '14:30',
-                    '15:00',
-                    '15:30',
-                    '16:00',
-                    '16:30',
-                    '17:00',
-                    '17:30',
-                    '18:00',
-                    '18:30',
-                    '19:00',
-                    '19:30',
-                    '20:00',
-                    '20:30',
+                    '07:30','08:00','08:30','09:00','09:30','10:00','10:30','11:00','11:30',
+                    '12:00','12:30','13:00','13:30','14:00','14:30','15:00','15:30','16:00',
+                    '16:30','17:00','17:30','18:00','18:30','19:00','19:30','20:00','20:30'
                   ];
 
                   return times.map((start, rowIdx) => {
                     const currentSlot = new Date(`2023-01-01T${start}:00`);
-                    const end = new Date(currentSlot);
-                    end.setMinutes(end.getMinutes() + 30);
+                    const end = new Date(currentSlot.getTime() + 30 * 60000);
+
                     return (
                       <tr key={rowIdx}>
-                        <td>
-                          {formatTime12Hour(currentSlot)} - {formatTime12Hour(end)}
-                        </td>
-                        {rooms.map((room) => {
+                        <td>{`${formatTime12Hour(currentSlot)} - ${formatTime12Hour(end)}`}</td>
+                        {scheduledRooms.map((room) => {
                           const cellKey = `${room.room_id}-${rowIdx}`;
                           if (cellOccupied[cellKey]) return null;
 
@@ -1254,105 +1268,98 @@ const Scheduler_PlotSchedule: React.FC = () => {
                             return (
                               ed.room_id === room.room_id &&
                               edStart.toTimeString().slice(0, 5) === currentSlot.toTimeString().slice(0, 5) &&
-                              new Date(edStart).toDateString() === new Date(formData.exam_date).toDateString()
+                              edStart.toDateString() === new Date(formData.exam_date).toDateString()
                             );
                           });
 
-                          if (matchingDetails.length > 0) {
-                            const edStart = new Date(matchingDetails[0].exam_start_time);
-                            const edEnd = new Date(matchingDetails[0].exam_end_time);
-                            const durationMinutes = (edEnd.getTime() - edStart.getTime()) / (1000 * 60);
-                            const rowSpan = Math.ceil(durationMinutes / 30);
+                          if (matchingDetails.length === 0) return <td key={cellKey} />;
 
-                            for (let i = 1; i < rowSpan; i++) {
-                              cellOccupied[`${room.room_id}-${rowIdx + i}`] = true;
-                            }
+                          const edStart = new Date(matchingDetails[0].exam_start_time);
+                          const edEnd = new Date(matchingDetails[0].exam_end_time);
+                          const durationMinutes = (edEnd.getTime() - edStart.getTime()) / (1000 * 60);
+                          const rowSpan = Math.ceil(durationMinutes / 30);
 
-                            const courseColor = (courseId: string): string => {
-                              const colors = [
-                                '#ffcccc', '#ccffcc', '#ccccff', '#fff0b3', '#d9b3ff',
-                                '#ffb3b3', '#b3e0ff', '#ffd9b3', '#c2f0c2', '#f0b3ff'
-                              ];
-                              const hash = [...courseId].reduce((acc, char) => acc + char.charCodeAt(0), 0);
-                              return colors[hash % colors.length];
-                            };
-
-                            return (
-                              <td
-                                key={cellKey}
-                                rowSpan={rowSpan}
-                                style={{
-                                  verticalAlign: 'top',
-                                  padding: '5px',
-                                  minHeight: `${rowSpan * 28}px`,
-                                  backgroundColor: '#f9f9f9',
-                                  border: '1px solid #ccc',
-                                }}
-                              >
-                                {matchingDetails.map((detail, idx) => {
-                                  return (
-                                    <div
-                                      key={idx}
-                                      style={{
-                                        height: '100%',
-                                        display: 'flex',
-                                        flexDirection: 'column',
-                                        justifyContent: 'space-between',
-                                        backgroundColor: courseColor(detail.course_id),
-                                        border: '1px solid #888',
-                                        padding: '6px',
-                                        fontSize: '12px',
-                                        borderRadius: '6px',
-                                        lineHeight: '1.6',
-                                        color: '#333',
-                                        boxSizing: 'border-box',
-                                      }}
-                                    >
-                                      <div><strong>{detail.course_id}</strong></div>
-                                      <div><strong>{detail.section_name ?? '—'}</strong></div>
-                                      <div><strong>
-                                        Instructor: {getInstructorName(detail.course_id, detail.program_id)}
-                                      </strong></div>
-                                      <div>
-                                        <strong>Proctor:</strong>{' '}
-                                        {isReassigning ? (
-                                          <select
-                                            className="custom-select"
-                                            value={selectedProctors[detail.examdetails_id] || ''}
-                                            onChange={(e) => {
-                                              const selectedUser = e.target.value;
-                                              setSelectedProctors((prev) => ({
-                                                ...prev,
-                                                [detail.examdetails_id]: selectedUser,
-                                              }));
-                                            }}
-                                          >
-                                            {availableProctors.map((proctor) => (
-                                              <option key={proctor.user_id} value={proctor.user_id}>
-                                                {proctor.full_name}
-                                              </option>
-                                            ))}
-                                          </select>
-                                        ) : (
-                                          availableProctors.find(
-                                            (p) => p.user_id.toString() === detail.user_id.toString()
-                                          )?.full_name || 'No proctor'
-                                        )}
-                                      </div>
-                                      <div
-                                        style={{ fontSize: '11px', marginTop: '4px', fontStyle: 'italic' }}
-                                      >
-                                        {formatTime12Hour(new Date(detail.exam_start_time))} -{' '}
-                                        {formatTime12Hour(new Date(detail.exam_end_time))}
-                                      </div>
-                                    </div>
-                                  );
-                                })}
-                              </td>
-                            );
+                          for (let i = 1; i < rowSpan; i++) {
+                            cellOccupied[`${room.room_id}-${rowIdx + i}`] = true;
                           }
 
-                          return <td key={cellKey} />;
+                          const courseColor = (courseId: string) => {
+                            const colors = [
+                              '#ffcccc','#ccffcc','#ccccff','#fff0b3','#d9b3ff',
+                              '#ffb3b3','#b3e0ff','#ffd9b3','#c2f0c2','#f0b3ff'
+                            ];
+                            const hash = [...courseId].reduce((acc, char) => acc + char.charCodeAt(0), 0);
+                            return colors[hash % colors.length];
+                          };
+
+                          return (
+                            <td
+                              key={cellKey}
+                              rowSpan={rowSpan}
+                              style={{
+                                verticalAlign: 'top',
+                                padding: '5px',
+                                minHeight: `${rowSpan * 28}px`,
+                                backgroundColor: '#f9f9f9',
+                                border: '1px solid #ccc',
+                              }}
+                            >
+                              {matchingDetails.map((detail, idx) => (
+                                <div
+                                  key={idx}
+                                  style={{
+                                    height: '100%',
+                                    display: 'flex',
+                                    flexDirection: 'column',
+                                    justifyContent: 'space-between',
+                                    backgroundColor: courseColor(detail.course_id),
+                                    border: '1px solid #888',
+                                    padding: '6px',
+                                    fontSize: '12px',
+                                    borderRadius: '6px',
+                                    lineHeight: '1.6',
+                                    color: '#333',
+                                    boxSizing: 'border-box',
+                                  }}
+                                >
+                                  <div><strong>{detail.course_id}</strong></div>
+                                  <div><strong>{detail.section_name ?? '—'}</strong></div>
+                                  <div><strong>
+                                    Instructor: {getInstructorName(detail.course_id, detail.program_id)}
+                                  </strong></div>
+                                  <div>
+                                    <strong>Proctor:</strong>{' '}
+                                    {isReassigning ? (
+                                      <select
+                                        className="custom-select"
+                                        value={selectedProctors[detail.examdetails_id] || ''}
+                                        onChange={(e) =>
+                                          setSelectedProctors((prev) => ({
+                                            ...prev,
+                                            [detail.examdetails_id]: e.target.value,
+                                          }))
+                                        }
+                                      >
+                                        {availableProctors.map((proctor) => (
+                                          <option key={proctor.user_id} value={proctor.user_id}>
+                                            {proctor.full_name}
+                                          </option>
+                                        ))}
+                                      </select>
+                                    ) : (
+                                      availableProctors.find(
+                                        (p) => p.user_id.toString() === detail.user_id.toString()
+                                      )?.full_name || 'No proctor'
+                                    )}
+                                  </div>
+                                  <div style={{ fontSize: '11px', marginTop: '4px', fontStyle: 'italic' }}>
+                                    {formatTime12Hour(new Date(detail.exam_start_time))} -{' '}
+                                    {formatTime12Hour(new Date(detail.exam_end_time))}
+                                  </div>
+                                </div>
+                              ))}
+                            </td>
+                          );
                         })}
                       </tr>
                     );
