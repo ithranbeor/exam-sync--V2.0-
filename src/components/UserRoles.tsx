@@ -28,17 +28,18 @@ interface Department {
   department_name: string;
 }
 
-interface UserRole {
+type UserRole = {
   user_role_id: number;
   user_id: number;
-  role_id: number;
-  college_id: string | null;
-  department_id: string | null;
+  role_id?: number;
+  college_id?: string | null;
+  department_id?: string | null;
   date_start: string | null;
   date_ended: string | null;
   created_at: string;
   status?: string;
-}
+};
+
 
 const UserRoles = () => {
   const [roles, setRoles] = useState<Role[]>([]);
@@ -55,69 +56,79 @@ const UserRoles = () => {
   const [newRole, setNewRole] = useState<Partial<UserRole>>({});
   const [editingRole, setEditingRole] = useState<UserRole | null>(null);
 
+  const getAllowedFields = (roleId: number | undefined) => {
+    const roleName = roles.find(r => r.role_id === roleId)?.role_name;
+
+    switch (roleName) {
+      case "Bayanihan Leader":
+        return { college: false, department: true };
+      case "Dean":
+        return { college: true, department: false };
+      case "Admin":
+        return { college: false, department: false };
+      case "Scheduler":
+        return { college: true, department: false };
+      case "Proctor":
+        return { college: true, department: true };
+      default:
+        return { college: true, department: true }; // fallback
+    }
+  };
+
   useEffect(() => {
     fetchData();
   }, []);
 
   const fetchData = async () => {
     const [rolesRes, usersRes, collegesRes, departmentsRes, userRolesRes] = await Promise.all([
-      supabase.from('tbl_roles').select(),
-      supabase.from('tbl_users').select('user_id, first_name, last_name, created_at'),
-      supabase.from('tbl_college').select(),
-      supabase.from('tbl_department').select(),
-      supabase.from('tbl_user_role').select('user_role_id, user_id, role_id, college_id, department_id, date_start, date_ended, created_at, status')
+      supabase.from("tbl_roles").select(),
+      supabase.from("tbl_users").select("user_id, first_name, last_name, created_at"),
+      supabase.from("tbl_college").select(),
+      supabase.from("tbl_department").select(),
+      supabase.from("tbl_user_role").select(
+        "user_role_id, user_id, role_id, college_id, department_id, date_start, date_ended, created_at, status"
+      ),
     ]);
 
     if (rolesRes.error || usersRes.error || collegesRes.error || departmentsRes.error || userRolesRes.error) {
-      toast.error('Failed to fetch data');
-    } else {
-      setRoles(rolesRes.data);
-      setUsers(usersRes.data.map((u: any) => ({
-        user_id: u.user_id,
-        full_name: `${u.last_name}, ${u.first_name}`,
-        created_at: u.created_at
-      })));
-      setColleges(collegesRes.data);
-      setDepartments(departmentsRes.data);
-      const rolesData = userRolesRes.data;
+      toast.error("Failed to fetch data");
+      return;
+    }
 
-      const nullStatusRoles = rolesData.filter((r: any) => !r.status);
-      for (const role of nullStatusRoles) {
-        await supabase
-          .from('tbl_user_role')
-          .update({ status: 'Active' })
-          .eq('user_role_id', role.user_role_id);
+    setRoles(rolesRes.data);
+    setUsers(usersRes.data.map((u: any) => ({
+      user_id: u.user_id,
+      full_name: `${u.last_name}, ${u.first_name}`,
+      created_at: u.created_at,
+    })));
+    setColleges(collegesRes.data);
+    setDepartments(departmentsRes.data);
+
+    const today = new Date().toISOString().split("T")[0];
+
+    // ✅ Compute correct status for each role
+    const normalized = userRolesRes.data.map((r: any) => {
+      let computedStatus = r.status ?? "Active";
+      if (r.date_ended && r.date_ended < today) {
+        computedStatus = "Suspended";
       }
+      return { ...r, status: computedStatus };
+    });
 
-      const { data: updatedRoles, error: updatedRolesError } = await supabase
-        .from('tbl_user_role')
-        .select('user_role_id, user_id, role_id, college_id, department_id, date_start, date_ended, created_at, status');
+    setUserRoles(normalized);
 
-      if (!updatedRolesError) {
-        setUserRoles(updatedRoles);
+    // ✅ Find those that need a DB update
+    const rolesToUpdate = normalized.filter(r => {
+      const dbStatus = userRolesRes.data.find(orig => orig.user_role_id === r.user_role_id)?.status ?? "Active";
+      return dbStatus !== r.status;
+    });
 
-        const today = new Date().toISOString().split('T')[0];
-        for (const role of updatedRoles) {
-          if (role.date_ended && role.date_ended < today) {
-            await supabase
-              .from('tbl_users')
-              .update({ status: 'Suspended' })
-              .eq('user_id', role.user_id);
-          }
-        }
-      } else {
-        toast.error('Failed to re-fetch updated user roles');
-      }
-
-      const today = new Date().toISOString().split('T')[0];
-      for (const role of userRolesRes.data) {
-        if (role.date_ended && role.date_ended < today) {
-          await supabase
-            .from('tbl_users')
-            .update({ status: 'Suspended' })
-            .eq('user_id', role.user_id);
-        }
-      }
+    // ✅ Persist changes
+    for (const role of rolesToUpdate) {
+      await supabase
+        .from("tbl_user_role")
+        .update({ status: role.status })
+        .eq("user_role_id", role.user_role_id);
     }
   };
 
@@ -127,18 +138,32 @@ const UserRoles = () => {
       return;
     }
 
-    const { error } = await supabase.from('tbl_user_role').insert([{
+    const { data, error } = await supabase.from('tbl_user_role').insert([{
       user_id: newRole.user_id,
       role_id: newRole.role_id,
       college_id: newRole.college_id || null,
       department_id: newRole.department_id || null,
       date_start: newRole.date_start || null,
-      date_ended: newRole.date_ended || null
-    }]);
+      date_ended: newRole.date_ended || null,
+      status: "Active"
+    }]).select("*").single();
 
     if (error) {
       toast.error('Failed to add role.');
     } else {
+      // 🔥 Insert history record
+      await supabase.from("tbl_user_role_history").insert([{
+        user_role_id: data.user_role_id,
+        user_id: data.user_id,
+        role_id: data.role_id,
+        college_id: data.college_id,
+        department_id: data.department_id,
+        date_start: data.date_start,
+        date_ended: data.date_ended,
+        status: data.status,
+        action: "Created"
+      }]);
+
       toast.success('Role added.');
       setShowAddRoleModal(false);
       fetchData();
@@ -148,14 +173,29 @@ const UserRoles = () => {
   const toggleUserRoleStatus = async (user_role_id: number, currentStatus: string) => {
     const newStatus = currentStatus === 'Suspended' ? 'Active' : 'Suspended';
 
-    const { error } = await supabase
+    const { data, error } = await supabase
       .from('tbl_user_role')
       .update({ status: newStatus })
-      .eq('user_role_id', user_role_id);
+      .eq('user_role_id', user_role_id)
+      .select("*")
+      .single();
 
     if (error) {
       toast.error(`Failed to ${newStatus === 'Active' ? 'reactivate' : 'suspend'} role.`);
     } else {
+      // 🔥 Insert into history
+      await supabase.from("tbl_user_role_history").insert([{
+        user_role_id: data.user_role_id,
+        user_id: data.user_id,
+        role_id: data.role_id,
+        college_id: data.college_id,
+        department_id: data.department_id,
+        date_start: data.date_start,
+        date_ended: data.date_ended,
+        status: data.status,
+        action: newStatus === 'Active' ? "Reactivated" : "Suspended"
+      }]);
+
       toast.success(`Role ${newStatus === 'Active' ? 'reactivated' : 'suspended'}.`);
       fetchData();
     }
@@ -382,16 +422,27 @@ const UserRoles = () => {
                         <button
                           className="icon-button delete-button"
                           onClick={async () => {
-                            if (confirm('Are you sure you want to delete this role? This action cannot be undone.')) {
-                              const { error } = await supabase
+                            if (confirm('Are you sure you want to delete this role?')) {
+                              const { data, error } = await supabase
                                 .from('tbl_user_role')
                                 .delete()
-                                .eq('user_role_id', role.user_role_id);
+                                .eq('user_role_id', role.user_role_id)
+                                .select("*")
+                                .single();
 
-                              if (error) {
-                                toast.error('Failed to delete role.');
-                              } else {
-                                toast.success('Role deleted.');
+                              if (!error && data) {
+                                await supabase.from("tbl_user_role_history").insert([{
+                                  user_role_id: data.user_role_id,
+                                  user_id: data.user_id,
+                                  role_id: data.role_id,
+                                  college_id: data.college_id,
+                                  department_id: data.department_id,
+                                  date_start: data.date_start,
+                                  date_ended: data.date_ended,
+                                  status: data.status,
+                                  action: "Deleted"
+                                }]);
+                                toast.success("Role deleted.");
                                 fetchData();
                               }
                             }
@@ -426,15 +477,26 @@ const UserRoles = () => {
             <div className="input-group">
               <label>Role</label>
               <select
-                value={newRole.role_id || ''}
-                onChange={e => setNewRole(prev => ({ ...prev, role_id: +e.target.value }))}
+                value={newRole.role_id ?? ''}
+                onChange={e => {
+                  const role_id = e.target.value ? Number(e.target.value) : undefined;
+                  const allowed = getAllowedFields(role_id);
+
+                  setNewRole(prev => ({
+                    ...prev,
+                    role_id,
+                    college_id: allowed.college ? prev.college_id : undefined,
+                    department_id: allowed.department ? prev.department_id : undefined,
+                  }));
+                }}
               >
                 <option value="">Select Role</option>
-                {roles.map(r => (
-                  <option key={r.role_id} value={r.role_id}>{r.role_name}</option>
+                {roles.map(role => (
+                  <option key={role.role_id} value={role.role_id}>{role.role_name}</option>
                 ))}
               </select>
             </div>
+            {getAllowedFields(newRole.role_id).college && (
             <div className="input-group">
               <label>College</label>
               <select
@@ -447,6 +509,9 @@ const UserRoles = () => {
                 ))}
               </select>
             </div>
+          )}
+
+          {getAllowedFields(newRole.role_id).department && (
             <div className="input-group">
               <label>Department</label>
               <select
@@ -455,10 +520,11 @@ const UserRoles = () => {
               >
                 <option value="">None</option>
                 {departments.map(d => (
-                  <option key={d.department_id} value={d.department_id}>{d.department_name}</option>
+                  <option key={d.department_id} value={d.department_id}>({d.department_id}) {d.department_name}</option>
                 ))}
               </select>
             </div>
+          )}
             <div className="input-group">
               <label>Start Date</label>
               <div className="date-input-wrapper">
@@ -495,18 +561,30 @@ const UserRoles = () => {
             <div className="input-group">
               <label>Role</label>
               <select
-                value={editingRole.role_id}
-                onChange={e => setEditingRole(prev => prev && { ...prev, role_id: +e.target.value })}
+                value={editingRole?.role_id ?? ''}
+                onChange={e => {
+                  const role_id = e.target.value ? Number(e.target.value) : undefined;
+                  const allowed = getAllowedFields(role_id);
+
+                  setEditingRole(prev => prev && ({
+                    ...prev,
+                    role_id,
+                    college_id: allowed.college ? prev.college_id : undefined,
+                    department_id: allowed.department ? prev.department_id : undefined,
+                  }));
+                }}
               >
-                {roles.map(r => (
-                  <option key={r.role_id} value={r.role_id}>{r.role_name}</option>
+                <option value="">Select Role</option>
+                {roles.map(role => (
+                  <option key={role.role_id} value={role.role_id}>{role.role_name}</option>
                 ))}
               </select>
             </div>
+            {getAllowedFields(editingRole?.role_id).college && (
             <div className="input-group">
               <label>College</label>
               <select
-                value={editingRole.college_id || ''}
+                value={editingRole?.college_id || ''}
                 onChange={e => setEditingRole(prev => prev && { ...prev, college_id: e.target.value || null })}
               >
                 <option value="">None</option>
@@ -515,10 +593,13 @@ const UserRoles = () => {
                 ))}
               </select>
             </div>
+          )}
+
+          {getAllowedFields(editingRole?.role_id).department && (
             <div className="input-group">
               <label>Department</label>
               <select
-                value={editingRole.department_id || ''}
+                value={editingRole?.department_id || ''}
                 onChange={e => setEditingRole(prev => prev && { ...prev, department_id: e.target.value || null })}
               >
                 <option value="">None</option>
@@ -527,6 +608,7 @@ const UserRoles = () => {
                 ))}
               </select>
             </div>
+          )}
             <div className="input-group">
               <label>Start Date</label>
               <div className="date-input-wrapper">
@@ -551,7 +633,7 @@ const UserRoles = () => {
             </div>
             <div className="modal-actions">
               <button className="modal-button save" onClick={async () => {
-                const { error } = await supabase
+                const { data, error } = await supabase
                   .from('tbl_user_role')
                   .update({
                     role_id: editingRole.role_id,
@@ -560,7 +642,23 @@ const UserRoles = () => {
                     date_start: editingRole.date_start,
                     date_ended: editingRole.date_ended
                   })
-                  .eq('user_role_id', editingRole.user_role_id);
+                  .eq('user_role_id', editingRole.user_role_id)
+                  .select("*")
+                  .single();
+
+                if (!error) {
+                  await supabase.from("tbl_user_role_history").insert([{
+                    user_role_id: data.user_role_id,
+                    user_id: data.user_id,
+                    role_id: data.role_id,
+                    college_id: data.college_id,
+                    department_id: data.department_id,
+                    date_start: data.date_start,
+                    date_ended: data.date_ended,
+                    status: data.status,
+                    action: "Updated"
+                  }]);
+                }
 
                 if (error) {
                   toast.error('Failed to update role.');

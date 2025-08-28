@@ -240,3 +240,16 @@ p {
   color: #555;
   pointer-events: none;
 }
+.history-table {
+  width: 100%;
+  border-collapse: collapse;
+  margin-top: 10px;
+}
+.history-table th, .history-table td {
+  border: 1px solid #ddd;
+  padding: 6px 10px;
+  text-align: left;
+}
+.history-table th {
+  background: #f1f1f1;
+}

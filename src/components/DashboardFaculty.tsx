@@ -84,12 +84,20 @@ const DashboardFaculty = () => {
       const { data, error } = await supabase.rpc('get_user_roles_by_first_name', {
         input_first_name: user.first_name
       });
+
       if (!error && data) {
-        setRoles(data.map((r: any) => r.role_name.toLowerCase()).filter((r: string) => r !== 'admin'));
+        // ✅ Only include non-suspended roles
+        const activeRoles = data
+          .filter((r: any) => !r.is_suspended)   // <--- depends on your schema
+          .map((r: any) => r.role_name.toLowerCase())
+          .filter((r: string) => r !== 'admin');
+
+        setRoles(activeRoles);
       }
     };
     fetchUserRoles();
   }, [user]);
+
 
   const mergedSidebarItems = Array.from(
     new Map(
@@ -120,6 +128,7 @@ const DashboardFaculty = () => {
   return (
     <div className="app-container">
       <div className="main-content-wrapper">
+        {roles.length > 0 && (
         <aside
           className={`sidebar ${isSidebarOpen ? 'open' : 'closed'}`}
           onMouseEnter={() => setIsSidebarOpen(true)}
@@ -166,8 +175,9 @@ const DashboardFaculty = () => {
             </ul>
           </nav>
         </aside>
+        )}
 
-        <main className={`main-content ${isSidebarOpen ? 'sidebar-open' : 'sidebar-closed'}`}>
+        <main className={`main-content ${roles.length > 0 && isSidebarOpen ? 'sidebar-open' : 'sidebar-closed'}`}>
           <div className="content-header">
             <h1>{activeMenu.charAt(0).toUpperCase() + activeMenu.slice(1).replace(/-/g, ' ')}</h1>
           </div>
@@ -215,7 +225,7 @@ const DashboardFaculty = () => {
           {activeMenu === 'exam-Schedule' && <ProctorViewExam />}
           {activeMenu === 'notification' && <Notification />}
           {activeMenu === 'set-Modality' && <BayanihanModality user={user} />}
-          {activeMenu === 'plot-Schedule' && <SchedulerPlotSchedule user={user} />}
+          {activeMenu === 'plot-Schedule' && <SchedulerPlotSchedule/>}
           {activeMenu === 'proctor-Availability' && <SchedulerAvailability/>}
         </main>
       </div>

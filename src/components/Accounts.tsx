@@ -336,7 +336,6 @@ export const Accounts: React.FC<AccountsProps> = ({ user }) => {
       {showModal && (
         <div className="modal-overlay">
           <div className="modal">
-            <div className="modal-content">
               <h4 style={{ textAlign: 'center' }}>{isEditMode ? 'Edit Account' : 'Add New Account'}</h4>
               {['user_id', 'first_name', 'last_name', 'middle_name', 'email_address', 'contact_number'].map((field) => (
                 <div key={field} className="input-group">
@@ -371,7 +370,6 @@ export const Accounts: React.FC<AccountsProps> = ({ user }) => {
               </div>
             </div>
           </div>
-        </div>
       )}
 
       {showImport && (

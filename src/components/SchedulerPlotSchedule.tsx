@@ -126,7 +126,6 @@ const Scheduler_PlotSchedule: React.FC = () => {
   const [examEndTime, _setExamEndTime] = useState<string>('');
   const [selectedRoomId, _setSelectedRoom] = useState<number | null>(null);
   
-
   const isRoomAvailable = async (
     roomId: number,
     date: string,
@@ -591,7 +590,6 @@ const Scheduler_PlotSchedule: React.FC = () => {
     const selectedMod = modalities.find(
       (m) => m.modality_id === parseInt(formData.modality_id)
     );
-
     if (!selectedMod) {
       alert('Selected modality is invalid.');
       return;
@@ -600,116 +598,116 @@ const Scheduler_PlotSchedule: React.FC = () => {
     const selectedExamPeriod = examPeriods.find(
       (ep) => ep.examperiod_id === parseInt(formData.examperiod_id)
     );
-
     if (!selectedExamPeriod) {
       alert('❌ Exam period not found.');
       return;
     }
 
-    const initialStartTime = new Date(`${formData.exam_date}T07:30:00`);
-
     const durationMinutes = formData.hours * 60 + formData.minutes;
-
     const pad = (n: number) => String(n).padStart(2, '0');
     const intervalString = `${pad(formData.hours)}:${pad(formData.minutes)}:00`;
+    const examPeriodRange = `${selectedExamPeriod.start_date} – ${selectedExamPeriod.end_date}`;
 
-    const formatDate = (dateStr: string) =>
-      new Date(dateStr).toLocaleDateString('en-US', {
-        month: 'short',
-        day: 'numeric',
-        year: 'numeric',
-      });
+    // fetch all existing schedules for that day (all programs)
+    const { data: existing } = await supabase
+      .from("tbl_examdetails")
+      .select("*")
+      .eq("exam_date", formData.exam_date)
+      .eq("examperiod_id", formData.examperiod_id);
 
-    const examPeriodRange = `${formatDate(selectedExamPeriod.start_date)} – ${formatDate(
-      selectedExamPeriod.end_date
-    )}`;
-
-    const matchingModalities = modalities.filter(
-      (m) =>
-        m.modality_type === selectedMod.modality_type &&
-        m.course_id === selectedMod.course_id &&
-        m.program_id === selectedMod.program_id
-    );
-
-    const existingCheck = await supabase
-      .from('tbl_examdetails')
-      .select('*')
-      .eq('examperiod_id', formData.examperiod_id)
-      .eq('exam_date', formData.exam_date)
-      .eq('course_id', formData.course_id)
-      .eq('program_id', formData.program_id);
-
-    const existingDetails = existingCheck.data ?? [];
-
-    const existingSections = new Set(
-      existingDetails.map((ed) => ed.section_name?.toLowerCase().trim())
-    );
-
-    const newModalities = matchingModalities.filter(
-      (mod) => !existingSections.has(mod.section_name.toLowerCase().trim())
-    );
-
-    if (newModalities.length === 0) {
-      toast.error('Schedule already exists for this course, program, and sections on this date.');
-      return;
-    }
-
-    let proctorIndex = 0;
-    const totalAvailable = availableProctors.length;3
-
-    // Use flatMap instead of map to avoid nested arrays
-    const inserts: any[] = [];
-
-    newModalities.forEach((modality, index) => {
-      const offsetMinutes = index * durationMinutes;
-      const examStartTime = new Date(initialStartTime.getTime() + offsetMinutes * 60000);
-      const examEndTime = new Date(examStartTime.getTime() + durationMinutes * 60000);
-
-      let assignedProctorId: number | null = null;
-      if (formData.proctor_filter === 'available_only' && totalAvailable > 0) {
-        assignedProctorId = availableProctors[proctorIndex % totalAvailable].user_id;
-        proctorIndex++;
-      }
-
-      // ✅ Pick unique room for each section (don’t duplicate)
-      const possibleRooms = modality.possible_rooms || [];
-      const chosenRooms = possibleRooms.slice(0, newModalities.length); 
-      const chosenRoom = chosenRooms[index % chosenRooms.length];
-
-      inserts.push({
-        course_id: modality.course_id,
-        program_id: modality.program_id,
-        room_id: chosenRoom, // ✅ only one room per section
-        modality_id: modality.modality_id,
-        user_id: assignedProctorId ?? parseInt(userId),
-        examperiod_id: parseInt(formData.examperiod_id),
-        exam_duration: intervalString,
-        exam_start_time: examStartTime.toISOString(),
-        exam_end_time: examEndTime.toISOString(),
-        proctor_timein: null,
-        proctor_timeout: null,
-        section_name: modality.section_name,
-        academic_year: selectedExamPeriod.academic_year,
-        semester: selectedExamPeriod.term?.term_name || 'N/A',
-        exam_category: selectedExamPeriod.exam_category,
-        exam_period: examPeriodRange,
-        exam_date: formData.exam_date,
+    // Build the scheduling grid: room -> list of occupied time intervals
+    const scheduleGrid: Record<string, { start: Date; end: Date }[]> = {};
+    (existing || []).forEach((ed) => {
+      if (!scheduleGrid[ed.room_id]) scheduleGrid[ed.room_id] = [];
+      scheduleGrid[ed.room_id].push({
+        start: new Date(ed.exam_start_time),
+        end: new Date(ed.exam_end_time),
       });
     });
 
-    const { error } = await supabase.from("tbl_examdetails").insert(inserts);
+    const isSlotFree = (roomId: string, start: Date, end: Date) => {
+      const roomSchedule = scheduleGrid[roomId] || [];
+      return !roomSchedule.some((slot) => slot.start < end && slot.end > start);
+    };
 
-    if (error) {
-      toast.error(`Failed to save schedule. ${error.message}`);
-    } else {
-      toast.success('Schedule saved successfully!');
+    const startOfDay = new Date(`${formData.exam_date}T07:30:00`);
+    const endOfDay = new Date(`${formData.exam_date}T21:00:00`);
 
-      const { data: updatedExamDetails } = await supabase
-        .from('tbl_examdetails')
-        .select('*')
-        .eq('examperiod_id', formData.examperiod_id);
+    let proctorIndex = 0;
+    const totalAvailable = availableProctors.length;
+    const inserts: any[] = [];
 
-      setExamDetails(updatedExamDetails || []);
+    // Loop through modalities for this course & modality type (ignore program)
+    for (const modality of modalities.filter(
+      (m) =>
+        m.modality_type === selectedMod.modality_type &&
+        m.course_id === selectedMod.course_id
+    )) {
+      let assigned = false;
+
+      for (
+        let slotStart = new Date(startOfDay);
+        slotStart < endOfDay;
+        slotStart = new Date(slotStart.getTime() + durationMinutes * 60000)
+      ) {
+        const slotEnd = new Date(slotStart.getTime() + durationMinutes * 60000);
+
+        for (const roomId of modality.possible_rooms || []) {
+          if (isSlotFree(roomId, slotStart, slotEnd)) {
+            let assignedProctorId: number | null = null;
+            if (formData.proctor_filter === "available_only" && totalAvailable > 0) {
+              assignedProctorId = availableProctors[proctorIndex % totalAvailable].user_id;
+              proctorIndex++;
+            }
+
+            inserts.push({
+              course_id: modality.course_id,
+              program_id: modality.program_id,
+              room_id: roomId,
+              modality_id: modality.modality_id,
+              user_id: assignedProctorId ?? parseInt(userId),
+              examperiod_id: parseInt(formData.examperiod_id),
+              exam_duration: intervalString,
+              exam_start_time: slotStart.toISOString(),
+              exam_end_time: slotEnd.toISOString(),
+              proctor_timein: null,
+              proctor_timeout: null,
+              section_name: modality.section_name,
+              academic_year: selectedExamPeriod.academic_year,
+              semester: selectedExamPeriod.term?.term_name || "N/A",
+              exam_category: selectedExamPeriod.exam_category,
+              exam_period: examPeriodRange,
+              exam_date: formData.exam_date,
+            });
+
+            // Update the grid immediately to mark this slot as occupied
+            if (!scheduleGrid[roomId]) scheduleGrid[roomId] = [];
+            scheduleGrid[roomId].push({ start: slotStart, end: slotEnd });
+
+            assigned = true;
+            break;
+          }
+        }
+        if (assigned) break;
+      }
+
+      if (!assigned) {
+        toast.error(`⚠ No available slot found for section ${modality.section_name}`);
+      }
+    }
+
+    if (inserts.length > 0) {
+      const { error } = await supabase.from("tbl_examdetails").insert(inserts);
+      if (error) {
+        toast.error(`Failed to save schedule. ${error.message}`);
+      } else {
+        toast.success("Schedule saved successfully!");
+        const { data: updatedExamDetails } = await supabase
+          .from("tbl_examdetails")
+          .select("*")
+          .eq("examperiod_id", formData.examperiod_id);
+        setExamDetails(updatedExamDetails || []);
+      }
     }
   };
 
@@ -763,6 +761,7 @@ const Scheduler_PlotSchedule: React.FC = () => {
                   <th>Course ID</th>
                   <th>Program ID</th>
                   <th>Room ID</th>
+                  <th>Time Slot</th>
                   <th>Actions</th>
                 </tr>
               </thead>
