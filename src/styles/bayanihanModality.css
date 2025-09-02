@@ -269,3 +269,16 @@ textarea {
 .react-select__option:hover::after {
   display: block;
 }
+.timeslot-container {
+  display: flex;
+  flex-direction: column;
+}
+
+.timeslot-block {
+  transition: all 0.2s ease;
+}
+
+.room-timeslot-visual {
+  margin-top: 8px;
+  margin-bottom: 12px;
+}

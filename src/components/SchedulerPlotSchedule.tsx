@@ -151,7 +151,6 @@ const Scheduler_PlotSchedule: React.FC = () => {
       const available = await isRoomAvailable(selectedRoomId, examDate, examStartTime, examEndTime);
       if (!available) {
         alert('⚠ This room is already booked for that time. Please adjust date/time.');
-        // Optionally reset date/time here if needed
       }
     };
 
@@ -573,6 +572,16 @@ const Scheduler_PlotSchedule: React.FC = () => {
     }
   };
 
+  // Utility: Fisher-Yates shuffle
+  const shuffleArray = <T,>(arr: T[]): T[] => {
+    const a = [...arr];
+    for (let i = a.length - 1; i > 0; i--) {
+      const j = Math.floor(Math.random() * (i + 1));
+      [a[i], a[j]] = [a[j], a[i]];
+    }
+    return a;
+  };
+
   const handleGenerateSave = async () => {
     if (!userId) return;
 
@@ -583,7 +592,7 @@ const Scheduler_PlotSchedule: React.FC = () => {
       !formData.examperiod_id ||
       !formData.exam_date
     ) {
-      alert('Please complete all required fields before saving.');
+      alert("Please complete all required fields before saving.");
       return;
     }
 
@@ -591,7 +600,7 @@ const Scheduler_PlotSchedule: React.FC = () => {
       (m) => m.modality_id === parseInt(formData.modality_id)
     );
     if (!selectedMod) {
-      alert('Selected modality is invalid.');
+      alert("Selected modality is invalid.");
       return;
     }
 
@@ -599,64 +608,102 @@ const Scheduler_PlotSchedule: React.FC = () => {
       (ep) => ep.examperiod_id === parseInt(formData.examperiod_id)
     );
     if (!selectedExamPeriod) {
-      alert('❌ Exam period not found.');
+      alert("❌ Exam period not found.");
       return;
     }
 
     const durationMinutes = formData.hours * 60 + formData.minutes;
-    const pad = (n: number) => String(n).padStart(2, '0');
-    const intervalString = `${pad(formData.hours)}:${pad(formData.minutes)}:00`;
+    const pad = (n: number) => String(n).padStart(2, "0");
+    const intervalString = `${pad(formData.hours)}:${pad(
+      formData.minutes
+    )}:00`;
     const examPeriodRange = `${selectedExamPeriod.start_date} – ${selectedExamPeriod.end_date}`;
 
-    // fetch all existing schedules for that day (all programs)
+    // Fetch existing schedules for this date
     const { data: existing } = await supabase
       .from("tbl_examdetails")
       .select("*")
-      .eq("exam_date", formData.exam_date)
-      .eq("examperiod_id", formData.examperiod_id);
+      .eq("exam_date", formData.exam_date);
 
     // Build the scheduling grid: room -> list of occupied time intervals
     const scheduleGrid: Record<string, { start: Date; end: Date }[]> = {};
     (existing || []).forEach((ed) => {
-      if (!scheduleGrid[ed.room_id]) scheduleGrid[ed.room_id] = [];
-      scheduleGrid[ed.room_id].push({
+      const roomKey = String(ed.room_id);
+      if (!scheduleGrid[roomKey]) scheduleGrid[roomKey] = [];
+      scheduleGrid[roomKey].push({
         start: new Date(ed.exam_start_time),
         end: new Date(ed.exam_end_time),
       });
     });
 
-    const isSlotFree = (roomId: string, start: Date, end: Date) => {
-      const roomSchedule = scheduleGrid[roomId] || [];
+    // Conflict checker (same room, same slot not allowed)
+    const isSlotFree = (roomId: string | number, start: Date, end: Date) => {
+      const key = String(roomId);
+      const roomSchedule = scheduleGrid[key] || [];
       return !roomSchedule.some((slot) => slot.start < end && slot.end > start);
     };
 
     const startOfDay = new Date(`${formData.exam_date}T07:30:00`);
     const endOfDay = new Date(`${formData.exam_date}T21:00:00`);
 
+    // Generate all possible slots first
+    const allSlots: { start: Date; end: Date }[] = [];
+    for (
+      let slotStart = new Date(startOfDay);
+      slotStart < endOfDay;
+      slotStart = new Date(slotStart.getTime() + durationMinutes * 60000)
+    ) {
+      allSlots.push({
+        start: new Date(slotStart),
+        end: new Date(slotStart.getTime() + durationMinutes * 60000),
+      });
+    }
+
+    // Shuffle slots to avoid predictable order
+    const randomizedSlots = shuffleArray(allSlots);
+
     let proctorIndex = 0;
     const totalAvailable = availableProctors.length;
     const inserts: any[] = [];
 
-    // Loop through modalities for this course & modality type (ignore program)
-    for (const modality of modalities.filter(
-      (m) =>
-        m.modality_type === selectedMod.modality_type &&
-        m.course_id === selectedMod.course_id
-    )) {
+    // Shuffle modalities too
+    const shuffledModalities = shuffleArray(
+      modalities.filter(
+        (m) =>
+          m.modality_type === selectedMod.modality_type &&
+          m.course_id === selectedMod.course_id
+      )
+    );
+
+    for (const modality of shuffledModalities) {
+      // ✅ Check if this section already has a schedule on this exam_date
+      const alreadyScheduled = (existing || []).some(
+        (ed) =>
+          ed.section_name === modality.section_name &&
+          ed.exam_date === formData.exam_date
+      );
+      if (alreadyScheduled) {
+        console.log(
+          `Skipping ${modality.section_name}, already scheduled on ${formData.exam_date}`
+        );
+        continue;
+      }
+
       let assigned = false;
 
-      for (
-        let slotStart = new Date(startOfDay);
-        slotStart < endOfDay;
-        slotStart = new Date(slotStart.getTime() + durationMinutes * 60000)
-      ) {
-        const slotEnd = new Date(slotStart.getTime() + durationMinutes * 60000);
+      // Shuffle possible rooms before trying
+      const randomizedRooms = shuffleArray(modality.possible_rooms || []);
 
-        for (const roomId of modality.possible_rooms || []) {
-          if (isSlotFree(roomId, slotStart, slotEnd)) {
+      for (const slot of randomizedSlots) {
+        for (const roomId of randomizedRooms) {
+          if (isSlotFree(roomId, slot.start, slot.end)) {
             let assignedProctorId: number | null = null;
-            if (formData.proctor_filter === "available_only" && totalAvailable > 0) {
-              assignedProctorId = availableProctors[proctorIndex % totalAvailable].user_id;
+            if (
+              formData.proctor_filter === "available_only" &&
+              totalAvailable > 0
+            ) {
+              assignedProctorId =
+                availableProctors[proctorIndex % totalAvailable].user_id;
               proctorIndex++;
             }
 
@@ -668,8 +715,8 @@ const Scheduler_PlotSchedule: React.FC = () => {
               user_id: assignedProctorId ?? parseInt(userId),
               examperiod_id: parseInt(formData.examperiod_id),
               exam_duration: intervalString,
-              exam_start_time: slotStart.toISOString(),
-              exam_end_time: slotEnd.toISOString(),
+              exam_start_time: slot.start.toISOString(),
+              exam_end_time: slot.end.toISOString(),
               proctor_timein: null,
               proctor_timeout: null,
               section_name: modality.section_name,
@@ -680,9 +727,8 @@ const Scheduler_PlotSchedule: React.FC = () => {
               exam_date: formData.exam_date,
             });
 
-            // Update the grid immediately to mark this slot as occupied
             if (!scheduleGrid[roomId]) scheduleGrid[roomId] = [];
-            scheduleGrid[roomId].push({ start: slotStart, end: slotEnd });
+            scheduleGrid[roomId].push({ start: slot.start, end: slot.end });
 
             assigned = true;
             break;
@@ -692,7 +738,9 @@ const Scheduler_PlotSchedule: React.FC = () => {
       }
 
       if (!assigned) {
-        toast.error(`⚠ No available slot found for section ${modality.section_name}`);
+        toast.error(
+          `⚠ No available slot found for section ${modality.section_name}`
+        );
       }
     }
 
@@ -701,13 +749,15 @@ const Scheduler_PlotSchedule: React.FC = () => {
       if (error) {
         toast.error(`Failed to save schedule. ${error.message}`);
       } else {
-        toast.success("Schedule saved successfully!");
+        toast.success("✅ Schedule saved successfully!");
         const { data: updatedExamDetails } = await supabase
           .from("tbl_examdetails")
           .select("*")
-          .eq("examperiod_id", formData.examperiod_id);
+          .eq("exam_date", formData.exam_date);
         setExamDetails(updatedExamDetails || []);
       }
+    } else {
+      toast.info("Schedule has already been generated for this exam date.");
     }
   };
 
@@ -1207,7 +1257,6 @@ const Scheduler_PlotSchedule: React.FC = () => {
                 <tr>
                   <th></th>
                   {(() => {
-                    // Group rooms by building
                     const buildingGroups: Record<string, typeof scheduledRooms> = {};
                     scheduledRooms.forEach((room) => {
                       const buildingId = room.building?.building_id || 'unknown';
@@ -1271,7 +1320,18 @@ const Scheduler_PlotSchedule: React.FC = () => {
                             );
                           });
 
-                          if (matchingDetails.length === 0) return <td key={cellKey} />;
+                          if (matchingDetails.length === 0) {
+                            return (
+                              <td
+                                key={cellKey}
+                                style={{
+                                  minHeight: '28px',
+                                  border: '1px solid #ccc',
+                                  backgroundColor: '#fff', // fill with white instead of transparent
+                                }}
+                              />
+                            );
+                          }
 
                           const edStart = new Date(matchingDetails[0].exam_start_time);
                           const edEnd = new Date(matchingDetails[0].exam_end_time);
