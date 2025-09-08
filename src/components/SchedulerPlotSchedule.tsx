@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { FaEye, FaSearch } from 'react-icons/fa';
+import { FaEye, FaSearch, FaChevronLeft, FaChevronRight, FaArrowLeft, FaPlayCircle, FaFileExport, FaPaperPlane, FaUserEdit, FaSave, FaTimes } from 'react-icons/fa';
 import { supabase } from '../lib/supabaseClient.ts';
 import '../styles/plotschedule.css';
 import 'react-toastify/dist/ReactToastify.css';
@@ -60,11 +60,6 @@ interface Room {
   };
 }
 
-interface Modality {
-  modality_id: number;
-  modality_type: string;
-}
-
 interface ExamPeriod {
   examperiod_id: number;
   start_date: string;
@@ -79,7 +74,6 @@ interface ExamPeriod {
     college_name: string;
   };
 }
-
 
 interface ExamDetail {
   examdetails_id: string;
@@ -115,7 +109,7 @@ const Scheduler_PlotSchedule: React.FC = () => {
   const [examDetails, setExamDetails] = useState<ExamDetail[]>([]);
   const [searchTerm, setSearchTerm] = useState('');
   const [selectedExam, setSelectedExam] = useState<ExamDetail | null>(null);
-  const [_isExporting, setIsExporting] = useState(false);
+  const [_isExporting, _setIsExporting] = useState(false);
   const [mergedPeriods, setMergedPeriods] = useState<{ label: string; value: string }[]>([]);
   const [examCategories, setExamCategories] = useState<string[]>([]);
   const [instructors, setInstructors] = useState<{ user_id: number; first_name: string; last_name: string }[]>([]);
@@ -125,6 +119,46 @@ const Scheduler_PlotSchedule: React.FC = () => {
   const [examStartTime, _setExamStartTime] = useState<string>('');
   const [examEndTime, _setExamEndTime] = useState<string>('');
   const [selectedRoomId, _setSelectedRoom] = useState<number | null>(null);
+  const [canonicalSlots, setCanonicalSlots] = useState<Record<string, { start: string; end: string }>>({});
+
+  // Helper: infer year level for an exam record (tries modalities first, then sectionCourses)
+  const inferYearLevelFromExamDetail = (ed: any): string => {
+    // try to find a modality that matches this exam detail (modality_id or course+section_name)
+    const byModId = modalities.find((m) => String(m.modality_id) === String(ed.modality_id));
+    if (byModId) return getYearLevelForModality(byModId);
+
+    const byCourseSection = modalities.find(
+      (m) =>
+        m.course_id === ed.course_id &&
+        m.program_id === ed.program_id &&
+        m.section_name === ed.section_name
+    );
+    if (byCourseSection) return getYearLevelForModality(byCourseSection);
+
+    // fallback to sectionCourses (best-effort)
+    const sc = sectionCourses.find(
+      (s) => s.course_id === ed.course_id && s.program_id === ed.program_id
+    );
+    return sc?.year_level ?? "Unknown";
+  };
+
+  useEffect(() => {
+    const map: Record<string, { start: string; end: string }> = {};
+
+    (examDetails || []).forEach((ed) => {
+      const year = inferYearLevelFromExamDetail(ed);
+      const key = `${ed.course_id}||${year}`;
+      if (!map[key]) {
+        // take first encountered exam start/end for that cohort as canonical
+        map[key] = {
+          start: ed.exam_start_time,
+          end: ed.exam_end_time,
+        };
+      }
+    });
+
+    setCanonicalSlots(map);
+  }, [examDetails, modalities, sectionCourses]);
   
   const isRoomAvailable = async (
     roomId: number,
@@ -174,25 +208,40 @@ const Scheduler_PlotSchedule: React.FC = () => {
     ed.examdetails_id?.toString().toLowerCase().includes(searchTerm.toLowerCase())
   );
 
-  const exportAsPDF = async () => {
-    setIsExporting(true);
+  const handleExportPDF = () => {
+    const element = document.createElement("div");
 
-    await new Promise((resolve) => setTimeout(resolve, 100));
+    // Loop through all pages
+    for (let i = 0; i < totalPages; i++) {
+      const pageDiv = document.createElement("div");
+      pageDiv.classList.add("pdf-page");
 
-    const element = document.querySelector('.export-section');
-    if (element) {
-      html2pdf().set({
-        margin: 0.5,
-        filename: 'ExamSchedule.pdf',
-        image: { type: 'jpeg', quality: 0.98 },
-        html2canvas: { scale: 2 },
-        jsPDF: { unit: 'in', format: 'a4', orientation: 'portrait' }
-      }).from(element).save().then(() => {
-        setIsExporting(false);
-      });
-    } else {
-      setIsExporting(false);
+      // Clone the same content but with page = i
+      const tableWrapper = document.getElementById(`schedule-page-${i}`);
+      if (tableWrapper) {
+        pageDiv.appendChild(tableWrapper.cloneNode(true));
+      }
+
+      if (i < totalPages - 1) {
+        const pageBreak = document.createElement("div");
+        pageBreak.classList.add("page-break");
+        pageDiv.appendChild(pageBreak);
+      }
+
+      element.appendChild(pageDiv);
     }
+
+    // Export using html2pdf
+    html2pdf()
+      .set({
+        margin: 10,
+        filename: "Exam_Schedule.pdf",
+        image: { type: "jpeg", quality: 0.98 },
+        html2canvas: { scale: 2 },
+        jsPDF: { unit: "mm", format: "a4", orientation: "landscape" },
+      })
+      .from(element)
+      .save();
   };
 
   const exportAsWord = () => {
@@ -582,6 +631,74 @@ const Scheduler_PlotSchedule: React.FC = () => {
     return a;
   };
 
+  // Try to resolve year_level for a modality using your sectionCourses list
+  const getYearLevelForModality = (m: Modality): string => {
+    if (m.section?.year_level) return m.section.year_level as string;
+
+    // Fallback: infer from tbl_sectioncourse via (course_id, program_id, user_id)
+    const hit = sectionCourses.find(
+      sc =>
+        sc.course_id === m.course_id &&
+        sc.program_id === m.program_id &&
+        String(sc.user_id) === String(m.user_id)
+    );
+    return hit?.year_level ?? "Unknown";
+  };
+
+  // Unique key for alternation rule: Program–Year–Course
+  const cohortKey = (m: Modality) =>
+    `${m.program_id}||${getYearLevelForModality(m)}||${m.course_id}`;
+
+  /**
+   * Round-robin sequence so that consecutive items never share the same cohortKey.
+   * If it becomes impossible (e.g., only one cohort exists), it still emits the rest,
+   * but avoids repeats whenever there is a choice.
+   */
+  const sequenceAlternating = (mods: Modality[]): Modality[] => {
+    // Group by key
+    const buckets = new Map<string, Modality[]>();
+    for (const m of mods) {
+      const k = cohortKey(m);
+      if (!buckets.has(k)) buckets.set(k, []);
+      buckets.get(k)!.push(m);
+    }
+
+    const keys = Array.from(buckets.keys());
+    // Sort keys by bucket size descending (helps spread heavy cohorts)
+    keys.sort((a, b) => (buckets.get(b)!.length - buckets.get(a)!.length));
+
+    const total = mods.length;
+    const out: Modality[] = [];
+    let lastKey = "";
+
+    while (out.length < total) {
+      // Find first non-empty bucket whose key != lastKey
+      let pickedKey = "";
+      for (const k of keys) {
+        if (buckets.get(k)!.length && k !== lastKey) {
+          pickedKey = k;
+          break;
+        }
+      }
+      // If all remaining are the same as lastKey, we must take from it
+      if (!pickedKey) {
+        for (const k of keys) {
+          if (buckets.get(k)!.length) {
+            pickedKey = k;
+            break;
+          }
+        }
+        if (!pickedKey) break; // nothing left
+      }
+
+      const item = buckets.get(pickedKey)!.shift()!;
+      out.push(item);
+      lastKey = pickedKey;
+    }
+
+    return out;
+  };
+
   const handleGenerateSave = async () => {
     if (!userId) return;
 
@@ -614,18 +731,15 @@ const Scheduler_PlotSchedule: React.FC = () => {
 
     const durationMinutes = formData.hours * 60 + formData.minutes;
     const pad = (n: number) => String(n).padStart(2, "0");
-    const intervalString = `${pad(formData.hours)}:${pad(
-      formData.minutes
-    )}:00`;
+    const intervalString = `${pad(formData.hours)}:${pad(formData.minutes)}:00`;
     const examPeriodRange = `${selectedExamPeriod.start_date} – ${selectedExamPeriod.end_date}`;
 
-    // Fetch existing schedules for this date
+    // fetch existing schedules for this date
     const { data: existing } = await supabase
       .from("tbl_examdetails")
       .select("*")
-      .eq("exam_date", formData.exam_date);
 
-    // Build the scheduling grid: room -> list of occupied time intervals
+    // Build scheduleGrid from existing (room -> occupied intervals)
     const scheduleGrid: Record<string, { start: Date; end: Date }[]> = {};
     (existing || []).forEach((ed) => {
       const roomKey = String(ed.room_id);
@@ -636,17 +750,15 @@ const Scheduler_PlotSchedule: React.FC = () => {
       });
     });
 
-    // Conflict checker (same room, same slot not allowed)
     const isSlotFree = (roomId: string | number, start: Date, end: Date) => {
       const key = String(roomId);
       const roomSchedule = scheduleGrid[key] || [];
       return !roomSchedule.some((slot) => slot.start < end && slot.end > start);
     };
 
+    // All possible slots for the day
     const startOfDay = new Date(`${formData.exam_date}T07:30:00`);
     const endOfDay = new Date(`${formData.exam_date}T21:00:00`);
-
-    // Generate all possible slots first
     const allSlots: { start: Date; end: Date }[] = [];
     for (
       let slotStart = new Date(startOfDay);
@@ -658,98 +770,244 @@ const Scheduler_PlotSchedule: React.FC = () => {
         end: new Date(slotStart.getTime() + durationMinutes * 60000),
       });
     }
-
-    // Shuffle slots to avoid predictable order
     const randomizedSlots = shuffleArray(allSlots);
 
+    // proctor & inserts
     let proctorIndex = 0;
     const totalAvailable = availableProctors.length;
     const inserts: any[] = [];
 
-    // Shuffle modalities too
-    const shuffledModalities = shuffleArray(
-      modalities.filter(
-        (m) =>
-          m.modality_type === selectedMod.modality_type &&
-          m.course_id === selectedMod.course_id
-      )
+    // Candidate modalities for the selected course + modality_type
+    const candidateModalities = modalities.filter(
+      (m) =>
+        m.modality_type === selectedMod.modality_type &&
+        m.course_id === selectedMod.course_id
     );
+    const orderedModalities = sequenceAlternating(candidateModalities);
 
-    for (const modality of shuffledModalities) {
-      // ✅ Check if this section already has a schedule on this exam_date
-      const alreadyScheduled = (existing || []).some(
-        (ed) =>
-          ed.section_name === modality.section_name &&
-          ed.exam_date === formData.exam_date
+    // Build local canonical map from EXISTING examDetails (key -> Date)
+    const localCanonical = new Map<string, { start: Date; end: Date }>();
+    (existing || []).forEach((ed: any) => {
+      const year = inferYearLevelFromExamDetail(ed);
+      const key = `${ed.course_id}||${year}`;
+      if (!localCanonical.has(key)) {
+        localCanonical.set(key, {
+          start: new Date(ed.exam_start_time),
+          end: new Date(ed.exam_end_time),
+        });
+      }
+    });
+
+    // Group by course + year_level (cohorts)
+    const groupedByCohort = new Map<string, Modality[]>();
+    for (const m of orderedModalities) {
+      const key = `${m.course_id}||${getYearLevelForModality(m)}`;
+      if (!groupedByCohort.has(key)) groupedByCohort.set(key, []);
+      groupedByCohort.get(key)!.push(m);
+    }
+
+    // For each cohort try to schedule (prefer canonical slot)
+    const targetSectionNames = orderedModalities.map(m => m.section_name);
+
+    // Track which ones we actually insert
+    let insertedCount = 0;
+
+    for (const [key, cohortModalities] of groupedByCohort) {
+      const allScheduled = cohortModalities.every((modality) =>
+        (existing || []).some(
+          (ed) =>
+            ed.course_id === modality.course_id &&
+            ed.section_name === modality.section_name &&
+            ed.modality_id === modality.modality_id && // ensure it's the same modality
+            ed.exam_date === formData.exam_date
+        )
       );
-      if (alreadyScheduled) {
-        console.log(
-          `Skipping ${modality.section_name}, already scheduled on ${formData.exam_date}`
-        );
+
+      if (allScheduled) {
+        continue; // but don't conclude ALL are scheduled yet
+      }
+
+      let chosenSlot: { start: Date; end: Date } | null = null;
+      let assignmentForSlot: Record<string, string | number> | null = null;
+
+      // 1) If we already have a canonical slot for this cohort, try to use it
+      if (localCanonical.has(key)) {
+        const cs = localCanonical.get(key)!;
+
+        // For this canonical slot, build available room lists per modality
+        const possibleRoomsPerMod: Map<string, (string | number)[]> = new Map();
+        const allCandidateRooms = new Set<string | number>();
+        let ok = true;
+
+        for (const mod of cohortModalities) {
+          const roomsList = (mod.possible_rooms || []).filter((r: any) =>
+            isSlotFree(r, cs.start, cs.end)
+          );
+          if (!roomsList.length) {
+            ok = false; // at least one section has no free possible room at canonical slot
+            break;
+          }
+          possibleRoomsPerMod.set(mod.section_name, roomsList);
+          roomsList.forEach((r) => allCandidateRooms.add(r));
+        }
+
+        if (ok && allCandidateRooms.size >= cohortModalities.length) {
+          // attempt greedy distinct assignment (fewest options first)
+          const usedRooms = new Set<string | number>();
+          const tempAssign: Record<string, string | number> = {};
+          const byLeastOptions = [...cohortModalities].sort(
+            (a, b) =>
+              (possibleRoomsPerMod.get(a.section_name)!.length || 0) -
+              (possibleRoomsPerMod.get(b.section_name)!.length || 0)
+          );
+          let failed = false;
+          for (const mod of byLeastOptions) {
+            const options = possibleRoomsPerMod.get(mod.section_name)!;
+            const pick = options.find((r) => !usedRooms.has(String(r)));
+            if (!pick) {
+              failed = true;
+              break;
+            }
+            usedRooms.add(String(pick));
+            tempAssign[mod.section_name] = pick;
+          }
+          if (!failed) {
+            chosenSlot = { start: cs.start, end: cs.end };
+            assignmentForSlot = tempAssign;
+          }
+        }
+        // if canonical exists but can't assign distinct rooms, we will try to find another slot below
+      }
+
+      // 2) If we don't yet have chosenSlot, search the randomizedSlots for one that supports distinct rooms
+      if (!chosenSlot) {
+        slotLoop: for (const slot of randomizedSlots) {
+          const possibleRoomsPerMod: Map<string, (string | number)[]> = new Map();
+          const allCandidateRooms = new Set<string | number>();
+
+          for (const mod of cohortModalities) {
+            const roomsList = (mod.possible_rooms || []).filter((r: any) =>
+              isSlotFree(r, slot.start, slot.end)
+            );
+            if (!roomsList.length) {
+              continue slotLoop; // this slot fails for the cohort
+            }
+            possibleRoomsPerMod.set(mod.section_name, roomsList);
+            roomsList.forEach((r) => allCandidateRooms.add(r));
+          }
+
+          if (allCandidateRooms.size < cohortModalities.length) continue slotLoop;
+
+          // greedy assignment (fewest options first)
+          const usedRooms = new Set<string | number>();
+          const tempAssign: Record<string, string | number> = {};
+          const byLeastOptions = [...cohortModalities].sort(
+            (a, b) =>
+              (possibleRoomsPerMod.get(a.section_name)!.length || 0) -
+              (possibleRoomsPerMod.get(b.section_name)!.length || 0)
+          );
+          let failed = false;
+          for (const mod of byLeastOptions) {
+            const options = possibleRoomsPerMod.get(mod.section_name)!;
+            const pick = options.find((r) => !usedRooms.has(String(r)));
+            if (!pick) {
+              failed = true;
+              break;
+            }
+            usedRooms.add(String(pick));
+            tempAssign[mod.section_name] = pick;
+          }
+          if (!failed) {
+            chosenSlot = slot;
+            assignmentForSlot = tempAssign;
+            // set local canonical for this cohort so future modality clicks align
+            localCanonical.set(key, { start: slot.start, end: slot.end });
+            break slotLoop;
+          }
+        } // end slotLoop
+      }
+
+      if (!chosenSlot || !assignmentForSlot) {
+        toast.error(`⚠ Unable to find a time with distinct rooms for cohort ${key}. Skipping cohort.`);
         continue;
       }
 
-      let assigned = false;
+      // commit the inserts for this cohort using assignmentForSlot
+      for (const modality of cohortModalities) {
+        const alreadyScheduled =
+          (existing || []).some(
+            (ed) =>
+              ed.course_id === modality.course_id &&
+              ed.section_name === modality.section_name &&
+              ed.modality_id === modality.modality_id && // add this check
+              ed.exam_date === formData.exam_date
+          ) ||
+          inserts.some(
+            (ed) =>
+              ed.course_id === modality.course_id &&
+              ed.section_name === modality.section_name &&
+              ed.modality_id === modality.modality_id && // add this too
+              ed.exam_date === formData.exam_date
+          );
 
-      // Shuffle possible rooms before trying
-      const randomizedRooms = shuffleArray(modality.possible_rooms || []);
-
-      for (const slot of randomizedSlots) {
-        for (const roomId of randomizedRooms) {
-          if (isSlotFree(roomId, slot.start, slot.end)) {
-            let assignedProctorId: number | null = null;
-            if (
-              formData.proctor_filter === "available_only" &&
-              totalAvailable > 0
-            ) {
-              assignedProctorId =
-                availableProctors[proctorIndex % totalAvailable].user_id;
-              proctorIndex++;
-            }
-
-            inserts.push({
-              course_id: modality.course_id,
-              program_id: modality.program_id,
-              room_id: roomId,
-              modality_id: modality.modality_id,
-              user_id: assignedProctorId ?? parseInt(userId),
-              examperiod_id: parseInt(formData.examperiod_id),
-              exam_duration: intervalString,
-              exam_start_time: slot.start.toISOString(),
-              exam_end_time: slot.end.toISOString(),
-              proctor_timein: null,
-              proctor_timeout: null,
-              section_name: modality.section_name,
-              academic_year: selectedExamPeriod.academic_year,
-              semester: selectedExamPeriod.term?.term_name || "N/A",
-              exam_category: selectedExamPeriod.exam_category,
-              exam_period: examPeriodRange,
-              exam_date: formData.exam_date,
-            });
-
-            if (!scheduleGrid[roomId]) scheduleGrid[roomId] = [];
-            scheduleGrid[roomId].push({ start: slot.start, end: slot.end });
-
-            assigned = true;
-            break;
-          }
+        if (alreadyScheduled) {
+          console.log(`Skipping ${modality.section_name}, schedule already exists at this exact slot.`);
+          continue;
         }
-        if (assigned) break;
-      }
 
-      if (!assigned) {
-        toast.error(
-          `⚠ No available slot found for section ${modality.section_name}`
-        );
+        const roomId = assignmentForSlot[modality.section_name];
+        if (!roomId) {
+          toast.error(`Unexpected: no room assigned for ${modality.section_name}`);
+          continue;
+        }
+
+        let assignedProctorId: number | null = null;
+        if (formData.proctor_filter === "available_only" && totalAvailable > 0) {
+          assignedProctorId = availableProctors[proctorIndex % totalAvailable].user_id;
+          proctorIndex++;
+        }
+
+        inserts.push({
+          course_id: modality.course_id,
+          program_id: modality.program_id,
+          room_id: roomId,
+          modality_id: modality.modality_id,
+          user_id: assignedProctorId ?? parseInt(userId),
+          examperiod_id: parseInt(formData.examperiod_id),
+          exam_duration: intervalString,
+          exam_start_time: chosenSlot.start.toISOString(),
+          exam_end_time: chosenSlot.end.toISOString(),
+          proctor_timein: null,
+          proctor_timeout: null,
+          section_name: modality.section_name,
+          academic_year: selectedExamPeriod.academic_year,
+          semester: selectedExamPeriod.term?.term_name || "N/A",
+          exam_category: selectedExamPeriod.exam_category,
+          exam_period: examPeriodRange,
+          exam_date: formData.exam_date,
+        });
+
+        insertedCount++;
+        const rk = String(roomId);
+        if (!scheduleGrid[rk]) scheduleGrid[rk] = [];
+        scheduleGrid[rk].push({ start: chosenSlot.start, end: chosenSlot.end });
       }
     }
 
-    if (inserts.length > 0) {
+    // persist canonical to component state so UI uses it immediately
+    const canonicalToSet: Record<string, { start: string; end: string }> = { ...canonicalSlots };
+    localCanonical.forEach((v, k) => {
+      canonicalToSet[k] = { start: v.start.toISOString(), end: v.end.toISOString() };
+    });
+    setCanonicalSlots(canonicalToSet);
+
+    // Persist inserts to DB
+    if (insertedCount > 0) {
       const { error } = await supabase.from("tbl_examdetails").insert(inserts);
       if (error) {
         toast.error(`Failed to save schedule. ${error.message}`);
       } else {
-        toast.success("✅ Schedule saved successfully!");
+        toast.success("Schedule saved successfully!");
         const { data: updatedExamDetails } = await supabase
           .from("tbl_examdetails")
           .select("*")
@@ -757,7 +1015,7 @@ const Scheduler_PlotSchedule: React.FC = () => {
         setExamDetails(updatedExamDetails || []);
       }
     } else {
-      toast.info("Schedule has already been generated for this exam date.");
+      toast.info("No new schedules were created all selected sections already have schedules for this date.");
     }
   };
 
@@ -773,6 +1031,19 @@ const Scheduler_PlotSchedule: React.FC = () => {
       )
     : [];
 
+  // how many room columns per page
+  const columnsPerPage = 5;
+
+  // how many total pages (based on room count)
+  const totalPages = Math.ceil(scheduledRooms.length / columnsPerPage);
+
+  // group rooms into "pages"
+  const roomPages = Array.from({ length: totalPages }, (_, i) =>
+    scheduledRooms.slice(i * columnsPerPage, i * columnsPerPage + columnsPerPage)
+  );
+
+  // track current page
+  const [page, setPage] = useState(0);
 
   return (
     <div className="colleges-container">
@@ -876,7 +1147,16 @@ const Scheduler_PlotSchedule: React.FC = () => {
         </>
       ) : (
         <div className="plot-schedule" style={{ display: 'flex', gap: '20px' }}>
-          <div className="plot-controls" style={{ flex: 1 }}>
+          <div className="plot-controls">
+            <button
+              type="button"
+              onClick={() => setShowPlot(false)}
+              className="back-button"
+            >
+              <FaArrowLeft style={{ marginLeft: "-18px" }} />
+              Back
+            </button>
+
             <h3>Add Schedule</h3>
 
             <div className="form-group">
@@ -1023,7 +1303,7 @@ const Scheduler_PlotSchedule: React.FC = () => {
 
             <div className="form-group"> 
               <label>Proctors</label>
-              <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '4px', fontSize: '14px' }}>
                 <label>
                   <input
                     type="radio"
@@ -1049,59 +1329,6 @@ const Scheduler_PlotSchedule: React.FC = () => {
                   All Proctors (Available or Unavailable)
                 </label>
               </div>
-
-              <div className="d-flex gap-2 mt-2">
-                <button
-                  type="button"
-                  onClick={() => {
-                    setIsReassigning(true);
-                    const initialSelections: Record<string, string> = {};
-                    examDetails.forEach((ed) => {
-                      initialSelections[ed.examdetails_id] = ed.user_id;
-                    });
-                    setSelectedProctors(initialSelections);
-                  }}
-                  className="btn btn-primary"
-                >
-                  Reassign Proctor
-                </button>
-
-                {isReassigning && (
-                  <button
-                    type="button"
-                    className="btn btn-success"
-                    onClick={async () => {
-                      const updates = Object.entries(selectedProctors);
-                      let hasError = false;
-
-                      for (const [examdetails_id, user_id] of updates) {
-                        const { error } = await supabase
-                          .from('tbl_examdetails')
-                          .update({ user_id })
-                          .eq('examdetails_id', examdetails_id);
-
-                        if (error) {
-                          toast.error(`Failed to update examdetails_id ${examdetails_id}`);
-                          hasError = true;
-                        }
-                      }
-
-                      if (!hasError) {
-                        toast.success('All proctors updated!');
-                        setIsReassigning(false);
-
-                        const { data, error } = await supabase.from('tbl_examdetails').select('*');
-                        if (!error && data) {
-                          setExamDetails(data);
-                        }
-                      }
-                    }}
-                  >
-                    Save Changes
-                  </button>
-                )}
-              </div>
-
             </div>
 
             <div className="form-group">
@@ -1115,7 +1342,7 @@ const Scheduler_PlotSchedule: React.FC = () => {
                   min="0"
                   max="5"
                 />
-                hrs
+                hr/s
                 <input
                   type="number"
                   name="minutes"
@@ -1124,7 +1351,7 @@ const Scheduler_PlotSchedule: React.FC = () => {
                   min="0"
                   max="59"
                 />
-                mins
+                min/s
               </div>
 
               {formData.exam_date && (
@@ -1148,284 +1375,439 @@ const Scheduler_PlotSchedule: React.FC = () => {
               )}
             </div>
 
-            <div style={{ marginTop: '20px' }}>
-              <button
-                type="button"
-                onClick={() => setShowPlot(false)}
-                className="action-button"
-                style={{ backgroundColor: '#ccc', color: '#000', marginRight: '10px' }}
-              >
-                Back
+            <div className="footer-actions">
+              {/* Generate Button */}
+              <button type= 'button' className="btn-generate tooltip" data-tooltip="Generate Schedule" onClick={handleGenerateSave}>
+                <FaPlayCircle />
+                <span className="tooltip-text">Generate/Save</span>
               </button>
-              <button type="button" className="action-button" onClick={handleGenerateSave}>
-                Generate / Save
-              </button>
-            </div>
 
-            <div className="plot-footer" style={{ marginTop: '20px', textAlign: 'right', position: 'relative', display: 'inline-block' }}>
-              <div className="dropdown">
-                <button type="button" className="action-button save-changes dropdown-toggle">
-                  Export
+              {/* Other icons in a row */}
+              <div className="footer-icon-buttons">
+                {/* Send to Dean */}
+                <button type= 'button' className="btn-icon-only tooltip" data-tooltip="Send to Dean">
+                  <FaPaperPlane />
+                  <span className="tooltip-text">Send to Dean</span>
                 </button>
-                <div className="dropdown-menu">
-                  <button type="button" className="dropdown-item" onClick={exportAsPDF}>
-                    Export as PDF
+                {/* Reassign Proctor */}
+                <div style={{ position: "relative", display: "inline-block" }}>
+                  {/* Reassign Proctor Button */}
+                  <button
+                    type="button"
+                    className="btn-icon-only tooltip"
+                    onClick={() => setIsReassigning(!isReassigning)}
+                  >
+                    <FaUserEdit className="btn-icon-small" />
+                    <span className="tooltip-text">Reassign Proctor</span>
                   </button>
-                  <button type="button" className="dropdown-item" onClick={exportAsWord}>
-                    Export as Word
+
+                  {/* Dropdown for Save / Cancel */}
+                  {isReassigning && (
+                    <div className="dropdown-menu-reassign">
+                      <button
+                        type="button"
+                        className="btn-icon-only tooltip"
+                        disabled={Object.entries(selectedProctors).every(
+                          ([id, user]) =>
+                            examDetails.find(ed => ed.examdetails_id === id)?.user_id === user
+                        )}
+                        onClick={async () => {
+                          const updates = Object.entries(selectedProctors);
+                          let hasError = false;
+
+                          for (const [examdetails_id, user_id] of updates) {
+                            const { error } = await supabase
+                              .from("tbl_examdetails")
+                              .update({ user_id })
+                              .eq("examdetails_id", examdetails_id);
+
+                            if (error) {
+                              toast.error(`Failed to update examdetails_id ${examdetails_id}`);
+                              hasError = true;
+                            }
+                          }
+
+                          if (!hasError) {
+                            toast.success("All proctors updated!");
+                            setIsReassigning(false);
+
+                            const { data, error } = await supabase.from("tbl_examdetails").select("*");
+                            if (!error && data) setExamDetails(data);
+                          }
+                        }}
+                      >
+                        <FaSave className="btn-icon-small" />
+                        <span className="tooltip-text">Save</span>
+                      </button>
+
+                      <button
+                        type="button"
+                        className="btn-icon-only tooltip"
+                        onClick={() => setIsReassigning(false)}
+                      >
+                        <FaTimes className="btn-icon-small" />
+                        <span className="tooltip-text">Cancel</span>
+                      </button>
+                    </div>
+                  )}
+                </div>
+                 {/* Export */}
+                <div className="dropdown tooltip" data-tooltip="Export Schedule">
+                  <button type= 'button' className="btn-icon-only dropdown-toggle">
+                    <FaFileExport />
+                    <span className="tooltip-text">Export</span>
                   </button>
-                  <button type="button" className="dropdown-item" onClick={exportAsExcel}>
-                    Export as Excel
-                  </button>
+                  <div className="dropdown-menu">
+                    <button type= 'button' className="dropdown-item" onClick={handleExportPDF}>PDF</button>
+                    <button type= 'button' className="dropdown-item" onClick={exportAsWord}>Word</button>
+                    <button type= 'button' className="dropdown-item" onClick={exportAsExcel}>Excel</button>
+                  </div>
                 </div>
               </div>
             </div>
           </div>
-          
-          <div className="plot-grid export-section" style={{ flex: 2 }}>
-            <div style={{ textAlign: 'center', marginBottom: '15px' }}>
-              <img
-                src="/USTPlogo.png"
-                alt="School Logo"
-                style={{ width: '130px', height: '95px', marginBottom: '-8px', fontFamily: 'serif' }}
-              />
-              <div style={{ fontSize: '20px', color: '#333', marginBottom: '-8px', fontFamily: 'serif' }}>
-                University of Science and Technology of Southern Philippines
-              </div>
-              <div style={{ fontSize: '10px', color: '#555', marginBottom: '-8px', fontFamily: 'serif' }}>
-                Alubijid | Balubal |Cagayan de Oro City | Claveria | Jasaan | Oroquieta | Panaon | Villanueva
-              </div>
-              <div style={{ fontSize: '14px', color: '#333', marginBottom: '-8px', fontFamily: 'serif' }}>
-                {(() => {
-                  const selected = examPeriods.find(
-                    (ep) => ep.examperiod_id === parseInt(formData.examperiod_id)
-                  );
-                  if (!selected) return null;
 
-                  const matchingGroup = examPeriods.filter(
-                    (ep) =>
-                      ep.academic_year === selected.academic_year &&
-                      ep.exam_category === selected.exam_category &&
-                      ep.term.term_name === selected.term.term_name &&
-                      ep.college_id === selected.college_id
-                  );
-
-                  const sortedDates = matchingGroup
-                    .map((ep) => ({
-                      start: new Date(ep.start_date),
-                      end: new Date(ep.end_date),
-                    }))
-                    .sort((a, b) => a.start.getTime() - b.start.getTime());
-
-                  const formatShortDate = (date: Date) =>
-                    date.toLocaleDateString('en-US', {
-                      month: 'short',
-                      day: 'numeric',
-                      year: 'numeric',
-                    });
-
-                  const earliest = sortedDates[0];
-                  const latest = sortedDates[sortedDates.length - 1];
-
-                  return (
-                    <>
-                      <div style={{ fontSize: '20px', color: '#333', marginBottom: '-8px' , fontFamily: 'serif' }}>{selected.college?.college_name || 'College Name'}</div>
-                      <div><strong>{selected.exam_category} Examination Schedule | {selected.term?.term_name} S.Y. {selected.academic_year}</strong></div>
-                      <div>{formatShortDate(earliest.start)} – {formatShortDate(latest.end)}</div>
-                    </>
-                  );
-                })()}
-              </div>
-            </div>
-
-            <table>
-              <thead>
-                <tr>
-                  <th></th>
-                  <th colSpan={scheduledRooms.length} style={{ textAlign: 'center' }}>
-                    {formData.exam_date
-                      ? new Date(formData.exam_date).toLocaleDateString('en-US', {
-                          weekday: 'long',
-                          year: 'numeric',
-                          month: 'long',
-                          day: 'numeric',
-                        })
-                      : 'Date: N/A'}
-                  </th>
-                </tr>
-
-                <tr>
-                  <th></th>
+          <div className="plot-bondpaper">
+            <div 
+              id={`schedule-page-${page}`} 
+              className="plot-grid export-section"
+              style={{ flex: 2 }}
+            >
+              <div style={{ textAlign: 'center', marginBottom: '15px' }}>
+                <img
+                  src="/USTPlogo.png"
+                  alt="School Logo"
+                  style={{ width: '130px', height: '95px', marginBottom: '-8px', fontFamily: 'serif' }}
+                />
+                <div style={{ fontSize: '20px', color: '#333', marginBottom: '-8px', fontFamily: 'serif' }}>
+                  University of Science and Technology of Southern Philippines
+                </div>
+                <div style={{ fontSize: '10px', color: '#555', marginBottom: '-8px', fontFamily: 'serif' }}>
+                  Alubijid | Balubal |Cagayan de Oro City | Claveria | Jasaan | Oroquieta | Panaon | Villanueva
+                </div>
+                <div style={{ fontSize: '14px', color: '#333', marginBottom: '-8px', fontFamily: 'serif' }}>
                   {(() => {
-                    const buildingGroups: Record<string, typeof scheduledRooms> = {};
-                    scheduledRooms.forEach((room) => {
-                      const buildingId = room.building?.building_id || 'unknown';
-                      if (!buildingGroups[buildingId]) buildingGroups[buildingId] = [];
-                      buildingGroups[buildingId].push(room);
-                    });
+                    const selected = examPeriods.find(
+                      (ep) => ep.examperiod_id === parseInt(formData.examperiod_id)
+                    );
+                    if (!selected) return null;
 
-                    return Object.entries(buildingGroups).map(([buildingId, roomsInBuilding]) => (
-                      <th
-                        key={buildingId}
-                        colSpan={roomsInBuilding.length}
-                        style={{ textAlign: 'center' }}
-                      >
-                        {roomsInBuilding[0].building?.building_name || 'Unknown'} ({buildingId})
-                      </th>
-                    ));
-                  })()}
-                </tr>
+                    const matchingGroup = examPeriods.filter(
+                      (ep) =>
+                        ep.academic_year === selected.academic_year &&
+                        ep.exam_category === selected.exam_category &&
+                        ep.term.term_name === selected.term.term_name &&
+                        ep.college_id === selected.college_id
+                    );
 
-                <tr>
-                  <th>Time</th>
-                  {scheduledRooms.map((room) => (
-                    <th key={room.room_id}>{room.room_id}</th>
-                  ))}
-                </tr>
-              </thead>
+                    const sortedDates = matchingGroup
+                      .map((ep) => ({
+                        start: new Date(ep.start_date),
+                        end: new Date(ep.end_date),
+                      }))
+                      .sort((a, b) => a.start.getTime() - b.start.getTime());
 
-              <tbody>
-                {(() => {
-                  const cellOccupied: Record<string, boolean> = {};
-                  const formatTime12Hour = (date: Date) =>
-                    date.toLocaleTimeString('en-US', {
-                      hour: 'numeric',
-                      minute: '2-digit',
-                      hour12: true,
-                    });
+                    const formatShortDate = (date: Date) =>
+                      date.toLocaleDateString('en-US', {
+                        month: 'short',
+                        day: 'numeric',
+                        year: 'numeric',
+                      });
 
-                  const times = [
-                    '07:30','08:00','08:30','09:00','09:30','10:00','10:30','11:00','11:30',
-                    '12:00','12:30','13:00','13:30','14:00','14:30','15:00','15:30','16:00',
-                    '16:30','17:00','17:30','18:00','18:30','19:00','19:30','20:00','20:30'
-                  ];
-
-                  return times.map((start, rowIdx) => {
-                    const currentSlot = new Date(`2023-01-01T${start}:00`);
-                    const end = new Date(currentSlot.getTime() + 30 * 60000);
+                    const earliest = sortedDates[0];
+                    const latest = sortedDates[sortedDates.length - 1];
 
                     return (
-                      <tr key={rowIdx}>
-                        <td>{`${formatTime12Hour(currentSlot)} - ${formatTime12Hour(end)}`}</td>
-                        {scheduledRooms.map((room) => {
-                          const cellKey = `${room.room_id}-${rowIdx}`;
-                          if (cellOccupied[cellKey]) return null;
+                      <>
+                        <div style={{ fontSize: '20px', color: '#333', marginBottom: '-8px' , fontFamily: 'serif' }}>{selected.college?.college_name || 'College Name'}</div>
+                        <div><strong>{selected.exam_category} Examination Schedule | {selected.term?.term_name} S.Y. {selected.academic_year}</strong></div>
+                        <div>{formatShortDate(earliest.start)} – {formatShortDate(latest.end)}</div>
+                      </>
+                    );
+                  })()}
+                </div>
+              </div>
 
-                          const matchingDetails = examDetails.filter((ed) => {
-                            const edStart = new Date(ed.exam_start_time);
-                            return (
-                              ed.room_id === room.room_id &&
-                              edStart.toTimeString().slice(0, 5) === currentSlot.toTimeString().slice(0, 5) &&
-                              edStart.toDateString() === new Date(formData.exam_date).toDateString()
-                            );
+              {roomPages.length > 0 && roomPages[page] ? (
+                <>
+                  <table>
+                    <thead>
+                      {/* Exam Date Row */}
+                      <tr>
+                        <th></th>
+                        <th colSpan={roomPages[page].length} style={{ textAlign: 'center' }}>
+                          {formData.exam_date
+                            ? new Date(formData.exam_date).toLocaleDateString('en-US', {
+                                weekday: 'long',
+                                year: 'numeric',
+                                month: 'long',
+                                day: 'numeric',
+                              })
+                            : 'Date: N/A'}
+                        </th>
+                      </tr>
+
+                      {/* Building Groups Row */}
+                      <tr>
+                        <th></th>
+                        {(() => {
+                          const buildingGroups: Record<string, typeof scheduledRooms> = {};
+
+                          // Group rooms by building
+                          roomPages[page].forEach((room) => {
+                            const buildingId = room.building?.building_id || "unknown";
+                            if (!buildingGroups[buildingId]) buildingGroups[buildingId] = [];
+                            buildingGroups[buildingId].push(room);
                           });
 
-                          if (matchingDetails.length === 0) {
-                            return (
-                              <td
-                                key={cellKey}
-                                style={{
-                                  minHeight: '28px',
-                                  border: '1px solid #ccc',
-                                  backgroundColor: '#fff', // fill with white instead of transparent
-                                }}
-                              />
-                            );
-                          }
-
-                          const edStart = new Date(matchingDetails[0].exam_start_time);
-                          const edEnd = new Date(matchingDetails[0].exam_end_time);
-                          const durationMinutes = (edEnd.getTime() - edStart.getTime()) / (1000 * 60);
-                          const rowSpan = Math.ceil(durationMinutes / 30);
-
-                          for (let i = 1; i < rowSpan; i++) {
-                            cellOccupied[`${room.room_id}-${rowIdx + i}`] = true;
-                          }
-
-                          const courseColor = (courseId: string) => {
-                            const colors = [
-                              '#ffcccc','#ccffcc','#ccccff','#fff0b3','#d9b3ff',
-                              '#ffb3b3','#b3e0ff','#ffd9b3','#c2f0c2','#f0b3ff'
-                            ];
-                            const hash = [...courseId].reduce((acc, char) => acc + char.charCodeAt(0), 0);
-                            return colors[hash % colors.length];
+                          // Helper: parse room_id into numeric building + room
+                          const parseRoom = (id: string) => {
+                            const [building, room] = id.split("-").map(Number);
+                            return { building, room };
                           };
 
-                          return (
-                            <td
-                              key={cellKey}
-                              rowSpan={rowSpan}
-                              style={{
-                                verticalAlign: 'top',
-                                padding: '5px',
-                                minHeight: `${rowSpan * 28}px`,
-                                backgroundColor: '#f9f9f9',
-                                border: '1px solid #ccc',
-                              }}
-                            >
-                              {matchingDetails.map((detail, idx) => (
-                                <div
-                                  key={idx}
-                                  style={{
-                                    height: '100%',
-                                    display: 'flex',
-                                    flexDirection: 'column',
-                                    justifyContent: 'space-between',
-                                    backgroundColor: courseColor(detail.course_id),
-                                    border: '1px solid #888',
-                                    padding: '6px',
-                                    fontSize: '12px',
-                                    borderRadius: '6px',
-                                    lineHeight: '1.6',
-                                    color: '#333',
-                                    boxSizing: 'border-box',
-                                  }}
+                          // Sort buildings by building name (optional)
+                          return Object.entries(buildingGroups)
+                            .sort((a, b) => {
+                              const nameA = a[1][0]?.building?.building_name || "";
+                              const nameB = b[1][0]?.building?.building_name || "";
+                              return nameA.localeCompare(nameB);
+                            })
+                            .map(([buildingId, roomsInBuilding]) => {
+                              // Sort rooms numerically
+                              roomsInBuilding.sort((a, b) => {
+                                const A = parseRoom(a.room_id || "0-0");
+                                const B = parseRoom(b.room_id || "0-0");
+                                if (A.building !== B.building) return A.building - B.building;
+                                return A.room - B.room;
+                              });
+
+                              return (
+                                <th
+                                  key={buildingId}
+                                  colSpan={roomsInBuilding.length}
+                                  style={{ textAlign: "center" }}
                                 >
-                                  <div><strong>{detail.course_id}</strong></div>
-                                  <div><strong>{detail.section_name ?? '—'}</strong></div>
-                                  <div><strong>
-                                    Instructor: {getInstructorName(detail.course_id, detail.program_id)}
-                                  </strong></div>
-                                  <div>
-                                    <strong>Proctor:</strong>{' '}
-                                    {isReassigning ? (
-                                      <select
-                                        className="custom-select"
-                                        value={selectedProctors[detail.examdetails_id] || ''}
-                                        onChange={(e) =>
-                                          setSelectedProctors((prev) => ({
-                                            ...prev,
-                                            [detail.examdetails_id]: e.target.value,
-                                          }))
-                                        }
-                                      >
-                                        {availableProctors.map((proctor) => (
-                                          <option key={proctor.user_id} value={proctor.user_id}>
-                                            {proctor.full_name}
-                                          </option>
-                                        ))}
-                                      </select>
-                                    ) : (
-                                      availableProctors.find(
-                                        (p) => p.user_id.toString() === detail.user_id.toString()
-                                      )?.full_name || 'No proctor'
-                                    )}
-                                  </div>
-                                  <div style={{ fontSize: '11px', marginTop: '4px', fontStyle: 'italic' }}>
-                                    {formatTime12Hour(new Date(detail.exam_start_time))} -{' '}
-                                    {formatTime12Hour(new Date(detail.exam_end_time))}
-                                  </div>
-                                </div>
-                              ))}
-                            </td>
-                          );
-                        })}
+                                  {roomsInBuilding[0].building?.building_name || "Unknown"} (
+                                  {buildingId})
+                                </th>
+                              );
+                            });
+                        })()}
                       </tr>
-                    );
-                  });
-                })()}
-              </tbody>
-            </table>
+
+                      {/* Room IDs Row */}
+                      <tr>
+                        <th>Time</th>
+                        {(() => {
+                          // Flatten + sort all rooms on this page
+                          const sortedRooms = [...roomPages[page]].sort((a, b) => {
+                            const parseRoom = (id: string) => {
+                              const [building, room] = id.split("-").map(Number);
+                              return { building, room };
+                            };
+                            const A = parseRoom(a.room_id || "0-0");
+                            const B = parseRoom(b.room_id || "0-0");
+                            if (A.building !== B.building) return A.building - B.building;
+                            return A.room - B.room;
+                          });
+
+                          return sortedRooms.map((room) => (
+                            <th key={room.room_id}>{room.room_id}</th>
+                          ));
+                        })()}
+                      </tr>
+                    </thead>
+
+                    <tbody>
+                      {(() => {
+                        const cellOccupied: Record<string, boolean> = {};
+                        const formatTime12Hour = (date: Date) =>
+                          date.toLocaleTimeString("en-US", {
+                            hour: "numeric",
+                            minute: "2-digit",
+                            hour12: true,
+                          });
+
+                        const times = [
+                          "07:30","08:00","08:30","09:00","09:30","10:00","10:30","11:00","11:30",
+                          "12:00","12:30","13:00","13:30","14:00","14:30","15:00","15:30","16:00",
+                          "16:30","17:00","17:30","18:00","18:30","19:00","19:30","20:00","20:30"
+                        ];
+
+                        // Helper to parse room_id for sorting
+                        const parseRoom = (id: string) => {
+                          const [building, room] = id.split("-").map(Number);
+                          return { building, room };
+                        };
+
+                        // Sort rooms once for this page
+                        const sortedRooms = [...roomPages[page]].sort((a, b) => {
+                          const A = parseRoom(a.room_id || "0-0");
+                          const B = parseRoom(b.room_id || "0-0");
+                          if (A.building !== B.building) return A.building - B.building;
+                          return A.room - B.room;
+                        });
+
+                        return times.map((start, rowIdx) => {
+                          const currentSlot = new Date(`2023-01-01T${start}:00`);
+                          const end = new Date(currentSlot.getTime() + 30 * 60000);
+
+                          return (
+                            <tr key={rowIdx}>
+                              <td>{`${formatTime12Hour(currentSlot)} - ${formatTime12Hour(end)}`}</td>
+                              {sortedRooms.map((room) => {
+                                const cellKey = `${room.room_id}-${rowIdx}`;
+                                if (cellOccupied[cellKey]) return null;
+
+                                const matchingDetails = examDetails.filter((ed) => {
+                                  const edStart = new Date(ed.exam_start_time);
+                                  return (
+                                    ed.room_id === room.room_id &&
+                                    edStart.toTimeString().slice(0, 5) === currentSlot.toTimeString().slice(0, 5) &&
+                                    edStart.toDateString() === new Date(formData.exam_date).toDateString()
+                                  );
+                                });
+
+                                if (matchingDetails.length === 0) {
+                                  return (
+                                    <td
+                                      key={cellKey}
+                                      style={{
+                                        minHeight: "28px",
+                                        border: "1px solid #ccc",
+                                        backgroundColor: "#fff",
+                                      }}
+                                    />
+                                  );
+                                }
+
+                                const edStart = new Date(matchingDetails[0].exam_start_time);
+                                const edEnd = new Date(matchingDetails[0].exam_end_time);
+                                const durationMinutes = (edEnd.getTime() - edStart.getTime()) / (1000 * 60);
+                                const rowSpan = Math.ceil(durationMinutes / 30);
+
+                                for (let i = 1; i < rowSpan; i++) {
+                                  cellOccupied[`${room.room_id}-${rowIdx + i}`] = true;
+                                }
+
+                                const courseColor = (courseId: string) => {
+                                  const colors = [
+                                    "#ffcccc","#ccffcc","#ccccff","#fff0b3","#d9b3ff",
+                                    "#ffb3b3","#b3e0ff","#ffd9b3","#c2f0c2","#f0b3ff"
+                                  ];
+                                  const hash = [...courseId].reduce((acc, char) => acc + char.charCodeAt(0), 0);
+                                  return colors[hash % colors.length];
+                                };
+
+                                return (
+                                  <td
+                                    key={cellKey}
+                                    rowSpan={rowSpan}
+                                    style={{
+                                      verticalAlign: "top",
+                                      padding: "5px",
+                                      minHeight: `${rowSpan * 28}px`,
+                                      backgroundColor: "#f9f9f9",
+                                      border: "1px solid #ccc",
+                                    }}
+                                  >
+                                    {matchingDetails.map((detail, idx) => (
+                                      <div
+                                        key={idx}
+                                        style={{
+                                          height: "100%",
+                                          display: "flex",
+                                          flexDirection: "column",
+                                          justifyContent: "space-between",
+                                          backgroundColor: courseColor(detail.course_id),
+                                          border: "1px solid #888",
+                                          padding: "6px",
+                                          fontSize: "12px",
+                                          borderRadius: "6px",
+                                          lineHeight: "1.6",
+                                          color: "#333",
+                                          boxSizing: "border-box",
+                                        }}
+                                      >
+                                        <div><strong>{detail.course_id}</strong></div>
+                                        <div><strong>{detail.section_name ?? "—"}</strong></div>
+                                        <div><strong>
+                                          Instructor: {getInstructorName(detail.course_id, detail.program_id)}
+                                        </strong></div>
+                                        <div>
+                                          <strong>Proctor:</strong>{" "}
+                                          {isReassigning ? (
+                                            <select
+                                              className="custom-select"
+                                              value={selectedProctors[detail.examdetails_id] || ""}
+                                              onChange={(e) =>
+                                                setSelectedProctors((prev) => ({
+                                                  ...prev,
+                                                  [detail.examdetails_id]: e.target.value,
+                                                }))
+                                              }
+                                            >
+                                              {availableProctors.map((proctor) => (
+                                                <option key={proctor.user_id} value={proctor.user_id}>
+                                                  {proctor.full_name}
+                                                </option>
+                                              ))}
+                                            </select>
+                                          ) : (
+                                            availableProctors.find(
+                                              (p) => p.user_id.toString() === detail.user_id.toString()
+                                            )?.full_name || "No proctor"
+                                          )}
+                                        </div>
+                                        <div style={{ fontSize: "11px", marginTop: "4px", fontStyle: "italic" }}>
+                                          {formatTime12Hour(new Date(detail.exam_start_time))} -{" "}
+                                          {formatTime12Hour(new Date(detail.exam_end_time))}
+                                        </div>
+                                      </div>
+                                    ))}
+                                  </td>
+                                );
+                              })}
+                            </tr>
+                          );
+                        });
+                      })()}
+                    </tbody>
+                  </table>
+                  <div className="pagination-container">
+                    {/* Previous Button */}
+                    <button
+                      type="button"
+                      onClick={() => setPage((p) => Math.max(p - 1, 0))}
+                      disabled={page === 0}
+                      className={`pagination-btn ${page === 0 ? "disabled" : ""}`}
+                    >
+                      <FaChevronLeft className="icon" />
+                    </button>
+
+                    {/* Page Info */}
+                    <span className="pagination-info">
+                      Page {page + 1} of {totalPages}
+                    </span>
+
+                    {/* Next Button */}
+                    <button
+                      type="button"
+                      onClick={() => setPage((p) => Math.min(p + 1, totalPages - 1))}
+                      disabled={page === totalPages - 1}
+                      className={`pagination-btn ${page === totalPages - 1 ? "disabled" : ""}`}
+                    >
+                      <FaChevronRight className="icon" />
+                    </button>
+                  </div>
+                </>
+              ) : (
+                <div style={{ textAlign: "center", marginTop: "20px", color: '#000000ff' }}>
+                  No schedules yet or click days period to load schedules.
+                </div>
+              )}
+            </div>
           </div>
         </div>
       )}

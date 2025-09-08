@@ -183,6 +183,17 @@
 /* Left Side - Form */
 .plot-controls {
   min-width: 300px;
+  height: 1000%;
+  flex: 0;
+  background-color: #fff;
+  padding: 20px;
+  border-radius: 10px;
+  box-shadow: 0 1px 6px rgba(0, 0, 0, 0.1);
+}
+
+.plot-bondpaper {
+  min-width: 50%;
+  min-height: 1100px;
   flex: 1;
   background-color: #fff;
   padding: 20px;
@@ -210,9 +221,18 @@
 }
 
 .form-group select,
-.form-group input[type="date"],
-.form-group input[type="number"] {
+.form-group input[type="date"] {
   width: 100%;
+  padding: 7px;
+  font-size: 14px;
+  border: 2px solid #092C4C;
+  border-radius: 6px;
+  background-color: transparent;
+  color: black;
+}
+
+.form-group input[type="number"] {
+  width: 10%;
   padding: 8px;
   font-size: 14px;
   border: 2px solid #092C4C;
@@ -237,11 +257,14 @@
   display: flex;
   gap: 10px;
   align-items: center;
+  color: #333;
+  margin-top: 5px;
 }
 
 .duration-inputs input {
   width: 60px;
   text-align: center;
+  border: 2px solid #092C4C;
 }
 
 /* Right Side - Grid */
@@ -491,5 +514,191 @@
 .dropdown:hover .dropdown-menu {
   display: block;
 }
+.pagination-container {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 1.5rem; /* spacing between buttons */
+  margin-top: 1.5rem;
+}
 
+.pagination-btn {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  padding: 0.5rem 1rem;
+  border-radius: 0.75rem;
+  background-color: transparent;
+  color: #333333;
+  cursor: pointer;
+  transition: background-color 0.2s ease, transform 0.2s ease;
+  border: none;
+}
 
+.pagination-btn:hover {
+  background-color: transparent;
+  transform: translateY(-1px);
+}
+
+.pagination-btn.disabled {
+  background-color: transparent;
+  color: #9ca3af;
+  cursor: not-allowed;
+  box-shadow: none;
+}
+
+.pagination-info {
+  font-weight: 500;
+  color: #374151;
+}
+
+.icon {
+  font-size: 14px;
+}
+/* examSchedule.css */
+.page-break {
+  page-break-before: always;
+}
+button.btn.btn-primary {
+    background: #ffb800;
+    border: none;
+    color: white;
+    font-size: small;
+}
+button.btn.btn-success {
+    background: rgb(5, 102, 5);
+    border: none;
+    color: white;
+    font-size: small;
+    margin-left: 5px;
+}
+.back-button {
+  display: flex;
+  align-items: center;
+  gap: 2px;
+  background: transparent;
+  border: none;
+  color: #2c3e50;
+  font-size: 0.95rem;
+  font-weight: 600;
+  cursor: pointer;
+  margin-bottom: 1px;
+  transition: color 0.2s ease;
+}
+
+.back-button:hover {
+  color: #ffb800;
+}
+
+.footer-actions {
+  margin-top: auto; /* pushes footer down */
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 12px 0;
+  border-top: 1px solid #ddd;
+}
+
+/* Generate button bigger */
+.btn-generate {
+  background: none;
+  border: none;
+  color: #ffb800;
+  font-size: 60px;
+  cursor: pointer;
+  transition: transform 0.2s ease, color 0.2s ease;
+}
+
+.btn-generate:hover {
+  transform: scale(1.15);
+  color: #e0a800;
+}
+
+/* Small icon buttons lined horizontally */
+.footer-icon-buttons {
+  display: flex;
+  gap: 37px; /* spacing between buttons */
+  align-items: center;
+}
+
+.btn-icon-only {
+  background: none;
+  border: none;
+  font-size: 28px;
+  color: #555;
+  cursor: pointer;
+  padding: 8px;
+  border-radius: 8px;
+  transition: transform 0.2s ease, color 0.2s ease, background 0.2s ease;
+}
+
+.btn-icon-only:hover {
+  transform: scale(1.2);
+  color: #ffb800;
+  background-color:transparent;
+}
+
+/* Tooltips */
+.tooltip .tooltip-text {
+  visibility: hidden;
+  width: max-content;
+  background-color: rgba(50, 50, 50, 0.9);
+  color: #fff;
+  text-align: center;
+  padding: 6px 10px;
+  border-radius: 6px;
+  position: absolute;
+  z-index: 100;
+  bottom: -34%;
+  left: 50%;
+  transform: translateX(-50%);
+  opacity: 0;
+  font-size: 10px;
+  white-space: nowrap;
+  transition: all 0.25s ease;
+}
+
+.tooltip:hover .tooltip-text {
+  visibility: visible;
+  opacity: 1;
+}
+button.btn-generate.tooltip {
+    padding: revert;
+}
+/* Dropdown container */
+.dropdown-menu-reassign {
+  position: absolute;
+  top: 110%; /* slightly below the button */
+  left: 50%;
+  transform: translateX(-50%);
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  background: #fff;
+  border: 1px solid #ddd;
+  border-radius: 8px;
+  padding: 8px;
+  box-shadow: 0 4px 12px rgba(0,0,0,0.1);
+  z-index: 100;
+}
+
+/* Button styling inside dropdown */
+.dropdown-menu-reassign .btn-icon-only {
+  font-size: 24px;
+  color: #555;
+  padding: 6px 10px;
+  background: none;
+  border: none;
+  cursor: pointer;
+  transition: transform 0.2s, color 0.2s;
+}
+
+.dropdown-menu-reassign .btn-icon-only:hover {
+  transform: scale(1.1);
+  color: #ffb800;
+}
+
+/* Optional tooltip inside dropdown */
+.dropdown-menu-reassign .tooltip-text {
+  display: none; /* can hide tooltips if unnecessary */
+}

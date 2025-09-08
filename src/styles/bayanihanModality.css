@@ -211,50 +211,6 @@ textarea {
   color: #333;
   cursor: pointer;
 }
-.building-header {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  font-weight: bold;
-  margin-bottom: 10px;
-}
-
-.building-header button {
-  background: #ddd;
-  border: none;
-  padding: 5px 10px;
-  cursor: pointer;
-}
-
-.room-grid {
-  display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(80px, 1fr));
-  gap: 8px;
-}
-
-.room-box {
-  padding: 10px;
-  text-align: center;
-  border-radius: 6px;
-  font-size: 0.9rem;
-  cursor: pointer;
-  user-select: none;
-}
-
-.room-box.vacant {
-  background-color: #4caf50; /* Green */
-  color: white;
-}
-
-.room-box.occupied {
-  background-color: #9e9e9e; /* Gray */
-  color: white;
-  cursor: not-allowed;
-}
-
-.room-box.selected {
-  outline: 3px solid #ffeb3b;
-}
 .react-select__option[title]::after {
   content: attr(title);
   display: none;
@@ -282,3 +238,278 @@ textarea {
   margin-top: 8px;
   margin-bottom: 12px;
 }
+/* === BUILDING–ROOM STYLES === */
+
+.building-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  font-weight: 600;
+  font-size: 1.05rem;
+  margin: 15px 0 10px;
+  padding: 8px 12px;
+  border-radius: 10px;
+  background: #ffb800;
+  color: white;
+}
+
+.building-header button {
+  background: white;
+  color: #333;
+  border: none;
+  border-radius: 6px;
+  padding: 5px 12px;
+  cursor: pointer;
+  font-size: 0.85rem;
+  font-weight: 500;
+  transition: all 0.2s ease;
+}
+
+.building-header button:hover {
+  background: #f0f0f0;
+}
+
+/* Room grid */
+.room-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(110px, 1fr));
+  gap: 12px;
+  margin-top: 12px;
+}
+
+/* Base room style */
+.room-box {
+  padding: 14px 10px;
+  text-align: center;
+  border-radius: 12px;
+  font-size: 0.9rem;
+  font-weight: 600;
+  background: #ffffff;
+  border: 1px solid #ddd;
+  box-shadow: 0 2px 6px rgba(0,0,0,0.06);
+  cursor: pointer;
+  user-select: none;
+  transition: all 0.2s ease;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+}
+
+/* States */
+.room-box:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 4px 10px rgba(0,0,0,0.1);
+}
+
+.room-box.vacant {
+  background: #e8f9ee;
+  border: 1px solid #4caf50;
+  color: #2e7d32;
+}
+
+.room-box.occupied {
+  background: #f0f0f0;
+  border: 1px solid #bbb;
+  color: #666;
+  cursor: not-allowed;
+}
+
+.room-box.selected {
+  border: 2px solid #ffb800;
+  background: #fff7e0;
+  box-shadow: 0 0 0 3px rgba(255,184,0,0.3);
+}
+
+/* Disabled due to wrong roomType */
+.room-box.disabled {
+  background: #f9f9f9;
+  border: 1px dashed #ccc;
+  color: #aaa;
+  cursor: not-allowed;
+  box-shadow: none;
+}
+
+.room-box.disabled:hover {
+  transform: none;
+  box-shadow: none;
+}
+
+.room-box.disabled .view-occupancy {
+  display: none;
+}
+
+/* Label inside each room */
+.room-label {
+  margin-bottom: 6px;
+  font-size: 0.85rem;
+  font-weight: 500;
+  color: black;
+}
+
+/* View Occupancy button */
+.view-occupancy {
+  background: #ffb800;
+  color: white;
+  border: none;
+  border-radius: 6px;
+  padding: 4px 10px;
+  font-size: 0.75rem;
+  font-weight: 600;
+  cursor: pointer;
+  margin-top: 6px;
+  transition: all 0.2s ease;
+}
+
+.occupancy-box {
+  margin-top: 8px;
+  background: #fafafa;
+  border: 1px solid #ddd;
+  padding: 8px 10px;
+  border-radius: 6px;
+  font-size: 13px;
+  text-align: left;
+}
+
+.occupancy-box ul {
+  margin: 4px 0;
+  padding-left: 18px;
+}
+
+.occupancy-box strong {
+  display: block;
+  margin-top: 6px;
+  font-size: 13px;
+  color: #000;
+}
+
+.modal-contents {
+  background: #ffffff;
+  padding: 2rem;
+  border-radius: 16px;
+  width: 100%;
+  max-width: 720px;
+  max-height: 100%;
+  overflow-y: auto;
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.2);
+  font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+}
+
+/* Timeslot container inside occupancy modal */
+.occupancy-timeslots {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  max-height: 400px;  /* fit nicely inside modal */
+  overflow-y: auto;   /* scroll inside modal */
+  padding: 8px;
+}
+
+/* Each timeslot block */
+.timeslot-entry {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 10px 12px;
+  border-radius: 8px;
+  border-left: 5px solid;
+  background: #fafafa;
+  box-shadow: 0 2px 6px rgba(0,0,0,0.05);
+  transition: all 0.2s ease;
+  font-size: 0.9rem;
+}
+
+/* Occupied / Vacant distinction */
+.timeslot-entry.occupied {
+  border-color: #d32f2f;
+  background-color: #fdecea;
+  color: #b71c1c;
+}
+
+/* Status badge */
+.timeslot-status {
+  font-weight: 600;
+  text-transform: uppercase;
+  font-size: 0.8rem;
+}
+
+/* Time range */
+.timeslot-time {
+  font-size: 0.85rem;
+  color: #333;
+}
+
+.room-box .view-occupancy {
+  font-size: 10px;
+  margin-top: 4px;
+  padding: 2px 4px;
+  border: none;
+  border-radius: 4px;
+  background-color: #1976d2;
+  color: white;
+  cursor: pointer;
+  transition: background 0.2s;
+}
+
+.room-box .view-occupancy:hover {
+  background-color: #115293;
+}
+
+.timeslot-entry.vacant {
+  background-color: #e8f5e9;
+  color: #2e7d32;
+}
+.occupancy-timeslots {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  max-height: 400px;
+  overflow-y: auto;
+  padding: 8px;
+}
+
+.timeslot-entry {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 4px 8px;
+  border-radius: 4px;
+  font-size: 0.9rem;
+  font-family: Arial, sans-serif;
+}
+
+.timeslot-entry.occupied {
+  background-color: #ffcccc; /* light red */
+  border: 1px solid #ff6666;
+}
+
+.timeslot-entry.vacant {
+  background-color: #ccffcc; /* light green */
+  border: 1px dashed #66cc66;
+}
+
+.timeslot-status {
+  font-weight: bold;
+}
+.modal-overlay {
+  position: fixed;      /* stay fixed, not scrolling */
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  background: rgba(0,0,0,0.5);
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  z-index: 1000;
+}
+.no-rooms {
+  text-align: center;
+  color: #999;
+  font-size: 14px;
+  margin-top: 20px;
+  grid-column: 1 / -1;
+}
+
+
+

@@ -26,7 +26,7 @@ const modalityRoomTypeMap: { [key: string]: string } = {
 const BayanihanModality: React.FC<UserProps> = ({ user }) => {
   const [form, setForm] = useState({
     modality: '',
-    rooms: [] as string[], 
+    rooms: [] as string[],
     roomType: '',
     program: '',
     sections: [] as string[],
@@ -36,14 +36,19 @@ const BayanihanModality: React.FC<UserProps> = ({ user }) => {
 
   const [programOptions, setProgramOptions] = useState<{ program_id: string; program_name: string }[]>([]);
   const [courseOptions, setCourseOptions] = useState<{ course_id: string; course_name: string }[]>([]);
-  const [sectionOptions, setSectionOptions] = useState<{
-    course_id: string;
-    program_id: string;
-    section_name: string;
-  }[]>([]);
-  const [roomOptions, setRoomOptions] = useState<{ room_id: string; room_name: string; room_type: string }[]>([]);
+  const [sectionOptions, setSectionOptions] = useState<{ course_id: string; program_id: string; section_name: string }[]>([]);
+  const [roomOptions, setRoomOptions] = useState<{ room_id: string; room_name: string; room_type: string; building_id?: string }[]>([]);
   const [_sectionDropdownOpen, setSectionDropdownOpen] = useState(false);
   const dropdownRef = useRef<HTMLDivElement>(null);
+
+  // Modal states
+  const [showRoomModal, setShowRoomModal] = useState(false);
+  const [selectedBuilding, setSelectedBuilding] = useState<string | null>(null);
+  const [buildingOptions, setBuildingOptions] = useState<{ id: string; name: string }[]>([]);
+  const [occupancyModal, setOccupancyModal] = useState<{ visible: boolean; roomId: string | null }>({
+    visible: false,
+    roomId: null,
+  });
 
   // Room status with occupied times
   const [roomStatus, setRoomStatus] = useState<{
@@ -77,7 +82,7 @@ const BayanihanModality: React.FC<UserProps> = ({ user }) => {
     fetchRoomStatus();
   }, []);
 
-  /** FETCH PROGRAMS, COURSES, SECTIONS, ROOMS BASED ON USER */
+  /** FETCH PROGRAMS, COURSES, SECTIONS, ROOMS, BUILDINGS BASED ON USER */
   useEffect(() => {
     const fetchData = async () => {
       if (!user?.user_id) return;
@@ -128,27 +133,33 @@ const BayanihanModality: React.FC<UserProps> = ({ user }) => {
       // ROOMS
       const { data: rooms } = await supabase
         .from('tbl_rooms')
-        .select('room_id, room_name, room_type');
+        .select('room_id, room_name, room_type, building_id');
 
       setRoomOptions(rooms ?? []);
+
+      // BUILDINGS
+      const { data: buildings } = await supabase
+        .from('tbl_buildings')
+        .select('building_id, building_name');
+
+      setBuildingOptions(buildings?.map(b => ({ id: b.building_id, name: b.building_name })) ?? []);
     };
 
     fetchData();
   }, [user]);
 
-  /** AUTO-SELECT ROOM BASED ON MODALITY TYPE */
+  /** AUTO-SELECT ROOM TYPE BASED ON MODALITY */
   useEffect(() => {
     const requiredRoomType = modalityRoomTypeMap[form.modality];
     if (!requiredRoomType) return;
 
-    const matchingRoom = roomOptions.find(room => room.room_type === requiredRoomType);
-    if (matchingRoom) {
-      setForm(prev => ({ ...prev, rooms: [matchingRoom.room_id], roomType: requiredRoomType }));
-    } else {
-      setForm(prev => ({ ...prev, rooms: [], roomType: requiredRoomType }));
-      toast.warn(`No rooms available for ${requiredRoomType}.`);
+    if (requiredRoomType === "No Room") {
+      setForm(prev => ({ ...prev, rooms: [], roomType: "No Room" }));
+      return;
     }
-  }, [form.modality, roomOptions]);
+
+    setForm(prev => ({ ...prev, roomType: requiredRoomType }));
+  }, [form.modality]);
 
   /** HANDLE FORM CHANGE */
   const handleChange = (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement | HTMLTextAreaElement>) => {
@@ -171,82 +182,133 @@ const BayanihanModality: React.FC<UserProps> = ({ user }) => {
     }
 
     for (const sectionName of form.sections) {
-      const section = sectionOptions.find(s => s.course_id === form.course && s.section_name === sectionName);
+      const section = sectionOptions.find(
+        s => s.course_id === form.course && s.section_name === sectionName
+      );
       if (!section) continue;
 
-      const { error: insertError } = await supabase.from('tbl_modality').insert([{
-        modality_type: form.modality,
-        room_type: form.roomType,
-        modality_remarks: form.remarks,
-        course_id: section.course_id,
-        program_id: section.program_id,
-        section_name: section.section_name,
-        possible_rooms: form.rooms,
-        user_id: user.user_id,
-        created_at: new Date().toISOString(),
-      }]);
+      // ✅ Check for duplicates before insert
+      const { data: existing, error: checkError } = await supabase
+        .from('tbl_modality')
+        .select('modality_id')
+        .eq('course_id', section.course_id)
+        .eq('program_id', section.program_id)
+        .eq('section_name', section.section_name)
+        .eq('modality_type', form.modality)
+        .eq('room_type', form.roomType)
+        .maybeSingle();
+
+      if (checkError) {
+        console.error('Error checking existing record:', checkError.message);
+        toast.error(`Error checking duplicates for ${section.section_name}`);
+        continue;
+      }
+
+      if (existing) {
+        // 🚫 Already exists → prevent redundancy
+        toast.warn(`Already submitted for ${section.section_name}`);
+        continue;
+      }
+
+      // ✅ Insert if no duplicate found
+      const { error: insertError } = await supabase.from('tbl_modality').insert([
+        {
+          modality_type: form.modality,
+          room_type: form.roomType,
+          modality_remarks: form.remarks,
+          course_id: section.course_id,
+          program_id: section.program_id,
+          section_name: section.section_name,
+          possible_rooms: form.rooms,
+          user_id: user.user_id,
+          created_at: new Date().toISOString(),
+        },
+      ]);
 
       if (insertError) toast.error(`Failed to save for ${section.section_name}`);
       else toast.success(`Saved for ${section.section_name}`);
     }
 
-    setForm({ modality: '', rooms: [], roomType: '', program: '', sections: [], course: '', remarks: '' });
+    // Reset form after submit
+    setForm({
+      modality: '',
+      rooms: [],
+      roomType: '',
+      program: '',
+      sections: [],
+      course: '',
+      remarks: '',
+    });
   };
 
-  /** CLICK OUTSIDE DROPDOWN */
-  useEffect(() => {
-    const handleClickOutside = (e: MouseEvent) => {
-      if (dropdownRef.current && !dropdownRef.current.contains(e.target as Node)) {
-        setSectionDropdownOpen(false);
-      }
-    };
-    document.addEventListener('mousedown', handleClickOutside);
-    return () => document.removeEventListener('mousedown', handleClickOutside);
-  }, []);
-
-  /** GET ROOM TIMESLOTS */
+  /** GET ROOM TIMESLOTS WITH 30-MINUTE VACANT INTERVALS */
   const getRoomTimeslots = (roomId: string) => {
-    const dayStart = "07:30";
-    const dayEnd = "18:00";
-    const today = new Date();
-    let current = new Date(today.toDateString() + " " + dayStart);
-    const dayEndDate = new Date(today.toDateString() + " " + dayEnd);
+    const dayStart = new Date();
+    dayStart.setHours(7, 30, 0, 0); // 07:30 AM
+    const dayEnd = new Date();
+    dayEnd.setHours(21, 0, 0, 0); // 09:00 PM
 
-    const status = roomStatus[roomId];
-    if (!status || !status.occupiedTimes.length) return [{ start: current, end: dayEndDate, occupied: false }];
-
-    const occupiedSorted = status.occupiedTimes
-      .map(t => ({ start: new Date(t.start), end: new Date(t.end) }))
-      .sort((a, b) => a.start.getTime() - b.start.getTime());
+    const status = roomStatus[String(roomId)];
+    const occupiedTimes =
+      status?.occupiedTimes
+        .map((t) => ({ start: new Date(t.start), end: new Date(t.end) }))
+        .sort((a, b) => a.start.getTime() - b.start.getTime()) || [];
 
     const timeslots: { start: Date; end: Date; occupied: boolean }[] = [];
-    for (const t of occupiedSorted) {
-      if (current < t.start) timeslots.push({ start: current, end: t.start, occupied: false });
-      timeslots.push({ start: t.start, end: t.end, occupied: true });
-      current = t.end > current ? t.end : current;
+    let cursor = new Date(dayStart);
+
+    for (const slot of occupiedTimes) {
+      // Add one vacant block from cursor → slot.start
+      if (cursor.getTime() < slot.start.getTime()) {
+        timeslots.push({
+          start: new Date(cursor),
+          end: new Date(slot.start),
+          occupied: false,
+        });
+      }
+
+      // Add the occupied slot itself
+      timeslots.push({
+        start: new Date(slot.start),
+        end: new Date(slot.end),
+        occupied: true,
+      });
+
+      // Move cursor forward
+      cursor = new Date(slot.end);
     }
-    if (current < dayEndDate) timeslots.push({ start: current, end: dayEndDate, occupied: false });
+
+    // Add final vacant block from last occupied slot → end of day
+    if (cursor.getTime() < dayEnd.getTime()) {
+      timeslots.push({
+        start: new Date(cursor),
+        end: new Date(dayEnd),
+        occupied: false,
+      });
+    }
+
     return timeslots;
   };
 
-  /** RENDER TIMESLOT VISUALS */
+  /** RENDER TIMESLOT LIST */
   const RoomTimeslots: React.FC<{ roomId: string }> = ({ roomId }) => {
     const slots = getRoomTimeslots(roomId);
+
     return (
-      <div className="timeslot-container">
+      <div className="occupancy-timeslots">
         {slots.map((slot, i) => (
           <div
             key={i}
-            className="timeslot-block"
-            style={{
-              backgroundColor: slot.occupied ? "red" : "green",
-              width: `${((slot.end.getTime() - slot.start.getTime()) / (10.5 * 60 * 60 * 1000)) * 100}%`,
-              height: "16px",
-              marginBottom: "2px",
-              borderRadius: "4px",
-            }}
-            title={`${slot.start.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })} - ${slot.end.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })} ${slot.occupied ? '(Occupied)' : '(Free)'}`}
-          />
+            className={`timeslot-entry ${slot.occupied ? "occupied" : "vacant"}`}
+          >
+            <div className="timeslot-status">
+              {slot.occupied ? "Occupied" : "Available"}
+            </div>
+            <div className="timeslot-time">
+              {slot.start.toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })} -{" "}
+              {slot.end.toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })}
+            </div>
+          </div>
         ))}
       </div>
     );
@@ -282,58 +344,37 @@ const BayanihanModality: React.FC<UserProps> = ({ user }) => {
               {/* BUILDING-ROOM */}
               <div className="form-group">
                 <label>Building-Room</label>
-                <Select
-                  isMulti
-                  isDisabled={!form.roomType}
-                  options={roomOptions
-                    .filter(r => r.room_type === form.roomType)
-                    .map(r => {
-                      const status = roomStatus[r.room_id];
-                      const occupied = status?.occupiedTimes.length > 0;
-                      return {
-                        value: r.room_id,
-                        label: `${r.room_id} - ${r.room_name}`,
-                        occupied
-                      };
-                    })}
-                  value={form.rooms.map(roomId => {
-                    const r = roomOptions.find(x => x.room_id === roomId);
-                    const status = r ? roomStatus[r.room_id] : undefined;
-                    return r ? { value: r.room_id, label: `${r.room_id} - ${r.room_name}`, occupied: status?.occupiedTimes && status.occupiedTimes.length > 0 } : null;
-                  }).filter(Boolean)}
-                  onChange={selected => setForm(prev => ({ ...prev, rooms: selected ? selected.map((s: any) => s.value) : [] }))}
-                  placeholder="Select room(s)..."
-                  formatOptionLabel={(option: any) => (
-                    <div style={{ display: "flex", alignItems: "center", gap: "6px" }}>
-                      <span style={{
-                        width: 10,
-                        height: 10,
-                        borderRadius: "50%",
-                        backgroundColor: option.occupied ? "red" : "green",
-                        display: "inline-block"
-                      }} />
-                      <span>{option.label}</span>
-                    </div>
-                  )}
-                />
+                <button
+                  type="button"
+                  className="open-modal-btn"
+                  disabled={!form.roomType || form.roomType === "No Room"} // 🚫 disabled until modality is chosen
+                  onClick={() => setShowRoomModal(true)}
+                >
+                  Select Room
+                </button>
 
-                {/* VISUAL TIMESLOTS */}
-                {form.rooms.map(roomId => {
-                  const r = roomOptions.find(r => r.room_id === roomId);
-                  if (!r) return null;
-                  return (
-                    <div key={r.room_id} className="room-timeslot-visual">
-                      <label>{r.room_name}</label>
-                      <RoomTimeslots roomId={r.room_id} />
-                    </div>
-                  );
-                })}
+                {/* Show selected rooms */}
+                {form.rooms.length > 0 && (
+                  <div className="selected-rooms">
+                    {form.rooms.map((roomId) => {
+                      const r = roomOptions.find(r => r.room_id === roomId);
+                      return <span key={roomId} className="room-chip">{r?.room_name}</span>;
+                    })}
+                  </div>
+                )}
               </div>
 
               {/* ROOM TYPE */}
               <div className="form-group">
                 <label>Room Type</label>
-                <input type="text" name="roomType" value={form.roomType} readOnly className="custom-select" placeholder="Auto-filled" />
+                <input
+                  type="text"
+                  name="roomType"
+                  value={form.roomType}
+                  readOnly
+                  className="custom-select"
+                  placeholder="Auto-filled"
+                />
               </div>
 
               {/* PROGRAM */}
@@ -369,18 +410,42 @@ const BayanihanModality: React.FC<UserProps> = ({ user }) => {
                 <Select
                   isMulti
                   isDisabled={!form.course}
-                  options={sectionOptions.filter(s => s.course_id === form.course).map(s => ({ value: s.section_name, label: s.section_name }))}
+                  options={sectionOptions
+                    .filter(s => s.course_id === form.course)
+                    .map(s => ({
+                      value: s.section_name,
+                      label: s.section_name,
+                      isDisabled:
+                        form.rooms.length > 0 &&
+                        form.sections.length >= form.rooms.length &&
+                        !form.sections.includes(s.section_name),
+                    }))}
                   value={form.sections.map(sec => ({ value: sec, label: sec }))}
-                  onChange={selected => setForm(prev => ({ ...prev, sections: selected ? selected.map(s => s.value) : [] }))}
-                  placeholder="Select sections..."
+                  onChange={selected => {
+                    const selectedSections = selected ? selected.map(s => s.value) : [];
+                    setForm(prev => ({ ...prev, sections: selectedSections }));
+                  }}
+                  placeholder={`Select up to ${form.rooms.length || 0} section(s)...`}
                   isClearable
                 />
+
+                {/* ✅ Counter */}
+                {form.rooms.length > 0 && (
+                  <small style={{ marginTop: "4px", display: "block", color: "#666" }}>
+                     ⚠️ Number of sections must equal number of rooms! {form.sections.length} of {form.rooms.length} section(s) selected.
+                  </small>
+                )}
               </div>
 
               {/* REMARKS */}
               <div className="form-group">
                 <label>Remarks</label>
-                <textarea name="remarks" value={form.remarks} onChange={handleChange} placeholder="Enter any notes or remarks here..."></textarea>
+                <textarea
+                  name="remarks"
+                  value={form.remarks}
+                  onChange={handleChange}
+                  placeholder="Enter any notes or remarks here..."
+                />
               </div>
 
             </div>
@@ -389,7 +454,109 @@ const BayanihanModality: React.FC<UserProps> = ({ user }) => {
           </form>
         </div>
       </div>
-      <ToastContainer position="top-right" autoClose={3000} hideProgressBar={false} />
+
+       {/* ROOM MODAL */}
+      {showRoomModal && (
+        <div className="modal-overlay">
+          <div className="modal-contents">
+            <h3>Select Room</h3>
+
+            <Select
+              options={buildingOptions.map(b => ({
+                value: b.id,
+                label: `${b.name} (${b.id})`,
+              }))}
+              value={
+                selectedBuilding
+                  ? { value: selectedBuilding, label: `${buildingOptions.find(b => b.id === selectedBuilding)?.name} (${selectedBuilding})` }
+                  : null
+              }
+              onChange={(selected) => setSelectedBuilding(selected?.value || null)}
+              placeholder="-- Select Building --"
+              isClearable
+            />
+
+            <div className="room-grid">
+              {roomOptions
+                .filter(r => !selectedBuilding || r.building_id === selectedBuilding)
+                .sort((a, b) => {
+                  if (a.room_type === form.roomType && b.room_type !== form.roomType) return -1;
+                  if (a.room_type !== form.roomType && b.room_type === form.roomType) return 1;
+                  return a.room_name.localeCompare(b.room_name);
+                })
+                .map(r => {
+                  const isDisabled = r.room_type !== form.roomType;
+                  const isSelected = form.rooms.includes(r.room_id);
+
+                  return (
+                    <div
+                      key={r.room_id}
+                      className={`room-box ${isSelected ? "selected" : ""} ${isDisabled ? "disabled" : ""}`}
+                      onClick={() => {
+                        if (isDisabled) return;
+                        setForm(prev => ({
+                          ...prev,
+                          rooms: isSelected
+                            ? prev.rooms.filter(id => id !== r.room_id)
+                            : [...prev.rooms, r.room_id],
+                        }));
+                      }}
+                    >
+                      <div className="room-label">
+                        {r.room_id} <small>({r.room_type})</small>
+                      </div>
+
+                      {!isDisabled && (
+                        <button
+                          type="button"
+                          className="view-occupancy"
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            setOccupancyModal({ visible: true, roomId: r.room_id });
+                          }}
+                        >
+                          <small>View Vacancy</small>
+                        </button>
+                      )}
+                    </div>
+                  );
+                })}
+
+              {/* ✅ Show message if no rooms match */}
+              {roomOptions.filter(r => !selectedBuilding || r.building_id === selectedBuilding).length === 0 && (
+                <div className="no-rooms">No rooms available</div>
+              )}
+            </div>
+
+            <div className="modal-actions">
+              <button type="button" className="close-modal" onClick={() => setShowRoomModal(false)}>
+                Done
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* OCCUPANCY MODAL */}
+      {occupancyModal.visible && occupancyModal.roomId && (
+        <div className="modal-overlay">
+          <div className="modal-content">
+            <h3>Room Occupancy</h3>
+            <RoomTimeslots roomId={occupancyModal.roomId} />
+            <div className="modal-actions">
+              <button
+                type="button"
+                className="close-modal"
+                onClick={() => setOccupancyModal({ visible: false, roomId: null })}
+              >
+                Close
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      <ToastContainer position="top-right" autoClose={2000} />
     </div>
   );
 };
