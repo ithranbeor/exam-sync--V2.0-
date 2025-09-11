@@ -1,0 +1,366 @@
+.inbox-container {
+  padding: 20px;
+  font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+  background-color: #fefefe;
+  min-height: 100vh;
+  width: 100%;
+  box-shadow: 0 1px 4px rgba(0, 0, 0, 0.05);
+  border-radius: 10px;
+}
+
+.inbox-message {
+  font-size: 15px;
+  margin-bottom: 20px;
+  color: #333;
+}
+
+.inbox-card {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  background-color: #eef3ff;
+  padding: 12px 18px;
+  border-radius: 10px;
+  margin-bottom: 12px;
+  box-shadow: 0 1px 4px rgba(0, 0, 0, 0.05);
+  transition: background-color 0.2s ease;
+  cursor: pointer;
+}
+
+.inbox-card:hover {
+  background-color: #dbe7ff;
+}
+
+.inbox-left {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  font-weight: 600;
+  color: #2c2c2c;
+}
+
+.inbox-icon {
+  font-size: 18px;
+  color: #333;
+}
+
+.inbox-center {
+  flex: 1;
+  margin-left: 20px;
+  color: #555;
+  font-weight: 500;
+}
+
+.inbox-date {
+  font-size: 13px;
+  color: #888;
+}
+
+/* Modal */
+.inbox-modal-overlay {
+  position: fixed;
+  top: 0;
+  left: 0;
+  height: 100vh;
+  width: 100vw;
+  background: rgba(0, 0, 0, 0.45);
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  z-index: 1100;
+  padding: 20px;
+}
+
+.inbox-modal-pane {
+  background: #fff;
+  width: 600px;
+  max-height: 90vh;
+  overflow-y: auto;
+  border-radius: 14px;
+  padding: 25px 30px;
+  box-shadow: 0 5px 25px rgba(0, 0, 0, 0.25);
+  font-family: 'Georgia', 'Times New Roman', serif;
+  color: #222;
+  line-height: 1.6;
+  font-size: 15px;
+  animation: fadeInInbox 0.3s ease-in-out;
+}
+
+.inbox-modal-pane h3 {
+  font-size: 18px;
+  margin-bottom: 5px;
+  color: #1a3d7c;
+}
+
+.inbox-modal-pane h4 {
+  font-size: 16px;
+  color: #444;
+  margin-bottom: 20px;
+}
+
+.inbox-message-body {
+  margin-bottom: 20px;
+}
+
+.inbox-message-body p {
+  margin-bottom: 1em;
+}
+
+.inbox-attachment {
+  margin: 15px 0;
+  font-size: 15px;
+}
+
+.inbox-attachment a {
+  text-decoration: underline;
+  color: #1a3d7c;
+}
+
+.inbox-disclaimer {
+  background-color: #f8f8f8;
+  border-left: 4px solid #1a3d7c;
+  padding: 10px 15px;
+  border-radius: 8px;
+  margin-top: 25px;
+  color: #666;
+  font-size: 11px;
+  font-style: italic;
+}
+
+.inbox-modal-button:hover {
+  background-color: #0f2552;
+}
+
+@keyframes fadeInInbox {
+  from {
+    opacity: 0;
+    transform: translateY(10px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+.inbox-compose-btn {
+  background-color: #1a3d7c;
+  color: white;
+  font-weight: bold;
+  padding: 8px 14px;
+  border-radius: 6px;
+  border: none;
+  margin-bottom: 15px;
+  cursor: pointer;
+  transition: background-color 0.2s;
+}
+
+.inbox-compose-btn:hover {
+  background-color: #0f2552;
+}
+
+.inbox-compose-form {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  margin: 15px 0;
+}
+
+.inbox-compose-form input,
+.inbox-compose-form textarea {
+  padding: 8px;
+  border: 1px solid #ccc;
+  border-radius: 6px;
+  font-size: 14px;
+  font-family: "Segoe UI", Tahoma, sans-serif;
+}
+
+.inbox-compose-form textarea {
+  min-height: 100px;
+  resize: vertical;
+}
+
+.inbox-action-icon:hover {
+  color: #ffcc00;
+}
+
+/* Mark read/unread styling */
+.inbox-card.unread {
+  font-weight: bold;
+  background-color: #eef3ff;
+}
+
+.inbox-card.read {
+  background-color: #f9f9f9;
+  color: #555;
+}
+/* Align banner title + actions */
+.inbox-banner {
+  background-color: #092c4c;
+  color: white;
+  font-weight: bold;
+  padding: 10px 16px;
+  border-radius: 6px;
+  margin-bottom: 15px;
+  font-size: 16px;
+  display: flex;
+  justify-content: space-between; /* ✅ text left, icons right */
+  align-items: center;
+}
+
+.inbox-actions {
+  display: flex;
+  gap: 14px;
+}
+
+.inbox-action-icon {
+  cursor: pointer;
+  font-size: 18px;
+  transition: color 0.2s ease;
+}
+
+/* Compose form */
+.compose-form {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  margin-bottom: 20px;
+}
+
+.compose-form input,
+.compose-form textarea {
+  padding: 10px;
+  border-radius: 6px;
+  border: 1px solid #ccc;
+  font-size: 14px;
+  width: 100%;
+}
+
+.compose-form textarea {
+  min-height: 120px;
+  resize: vertical;
+}
+/* Layout with sidebar */
+.inbox-layout {
+  display: flex;
+  min-height: 100vh;
+  gap: 20px;
+}
+
+.inbox-sidebar {
+  width: 200px;
+  background: #fefefe;
+  color: white;
+  padding: 20px;
+  box-shadow: 0 1px 4px rgba(0, 0, 0, 0.05);
+  border-radius: 10px;
+}
+
+.inbox-sidebar h3 {
+  margin-bottom: 15px;
+  font-size: 18px;
+  color: #092c4c;
+}
+
+.inbox-sidebar ul {
+  list-style: none;
+  padding: 0;
+  color: #092c4c;
+  font-weight: bold;
+}
+
+.inbox-sidebar li {
+  margin: 10px 0;
+  cursor: pointer;
+  font-size: 15px;
+}
+
+/* Delete mode buttons */
+.row-delete-btn,
+.row-restore-btn {
+  background: none;
+  border: none;
+  cursor: pointer;
+  margin-left: 10px;
+  color: #b00;
+}
+
+.row-restore-btn {
+  color: green;
+}
+
+.delete-all-btn {
+  background: #b00;
+  color: white;
+  padding: 5px 10px;
+  border: none;
+  border-radius: 6px;
+  margin-bottom: 10px;
+  cursor: pointer;
+  margin-left: auto;
+  display: block;
+  font-size: small;
+}
+.delete-all-btn:hover {
+  background: #d33;
+}
+
+/* Active delete mode icon */
+.inbox-action-icon.active {
+  color: #ff4444;
+}
+.inbox-modal-actions {
+  display: flex;
+  justify-content: flex-end; /* align to right */
+  gap: 12px; /* spacing between buttons */
+  margin-top: 20px;
+}
+
+.inbox-delete-btn {
+  background: linear-gradient(135deg, #e53935, #b71c1c);
+  color: #fff;
+  font-weight: 600;
+  padding: 8px 16px;
+  border: none;
+  border-radius: 8px;
+  cursor: pointer;
+  transition: transform 0.15s ease, box-shadow 0.15s ease;
+}
+
+.inbox-delete-btn:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 4px 10px rgba(229, 57, 53, 0.3);
+}
+
+.inbox-modal-button {
+  background: #f1f1f1;
+  color: #333;
+  font-weight: 600;
+  padding: 8px 16px;
+  border: none;
+  border-radius: 8px;
+  cursor: pointer;
+  transition: background 0.2s ease, transform 0.15s ease;
+}
+
+.inbox-modal-button:hover {
+  background: #ddd;
+  transform: translateY(-1px);
+}
+.inbox-modal-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 15px;
+}
+
+.inbox-modal-delete-btn {
+  background: transparent;
+  border: none;
+  color: #b00;
+  font-size: 18px;
+  cursor: pointer;
+  transition: color 0.2s ease;
+}
+
+.inbox-modal-delete-btn:hover {
+  color: #e53935;
+}

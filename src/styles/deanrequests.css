@@ -1,0 +1,164 @@
+.deanreq-container {
+  padding: 20px;
+  font-family: "Segoe UI", Tahoma, Geneva, Verdana, sans-serif;
+  background-color: #fafafa;
+  min-height: 100vh;
+}
+
+.deanreq-banner {
+  background-color: #092C4C
+;
+  color: white;
+  font-weight: bold;
+  padding: 10px 16px;
+  border-radius: 6px;
+  margin-bottom: 15px;
+  font-size: 16px;
+}
+
+.deanreq-message {
+  font-size: 15px;
+  margin-bottom: 20px;
+  color: #333;
+}
+
+.deanreq-card {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  background-color: #eeeeee;
+  padding: 12px 18px;
+  border-radius: 10px;
+  margin-bottom: 12px;
+  box-shadow: 0 1px 4px rgba(0, 0, 0, 0.05);
+  transition: background-color 0.2s ease;
+  cursor: pointer;
+}
+
+.deanreq-card:hover {
+  background-color: #e2e2e2;
+}
+
+.deanreq-left {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  font-weight: 600;
+  color: #2c2c2c;
+}
+
+.deanreq-icon {
+  font-size: 18px;
+  color: #333;
+}
+
+.deanreq-center {
+  flex: 1;
+  margin-left: 20px;
+  color: #444;
+  font-weight: 500;
+}
+
+.deanreq-date {
+  font-size: 13px;
+  color: #777;
+}
+
+/* Modal */
+.deanreq-modal-overlay {
+  position: fixed;
+  top: 0;
+  left: 0;
+  height: 100vh;
+  width: 100vw;
+  background: rgba(0, 0, 0, 0.45);
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  z-index: 1000;
+  padding: 20px;
+  box-sizing: border-box;
+}
+
+.deanreq-modal-pane {
+  background: #fff;
+  width: 550px;
+  max-height: 90vh;
+  overflow-y: auto;
+  border-radius: 14px;
+  padding: 25px;
+  box-shadow: 0 5px 25px rgba(0, 0, 0, 0.25);
+  font-family: "Georgia", serif;
+  color: #222;
+  line-height: 1.6;
+  animation: fadeIn 0.3s ease-in-out;
+}
+
+.deanreq-modal-pane h3 {
+  font-size: 18px;
+  margin-bottom: 5px;
+  color: #004d40;
+}
+
+.deanreq-modal-pane h4 {
+  font-size: 16px;
+  color: #555;
+  margin-bottom: 20px;
+}
+
+.deanreq-body {
+  margin-bottom: 20px;
+}
+
+.deanreq-actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 10px;
+}
+
+.deanreq-btn {
+  padding: 8px 16px;
+  border-radius: 8px;
+  border: none;
+  cursor: pointer;
+  font-weight: bold;
+  transition: 0.2s;
+}
+
+.deanreq-btn.cancel {
+  background-color: #555;
+  color: white;
+}
+
+.deanreq-btn.cancel:hover {
+  background-color: #333;
+}
+
+.deanreq-btn.approve {
+  background-color: #2e7d32;
+  color: white;
+}
+
+.deanreq-btn.approve:hover {
+  background-color: #1b5e20;
+}
+
+.deanreq-btn.deny {
+  background-color: #c62828;
+  color: white;
+}
+
+.deanreq-btn.deny:hover {
+  background-color: #8e0000;
+}
+
+@keyframes fadeIn {
+  from {
+    opacity: 0;
+    transform: translateY(10px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}

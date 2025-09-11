@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { FaEye, FaSearch, FaChevronLeft, FaChevronRight, FaArrowLeft, FaPlayCircle, FaFileExport, FaPaperPlane, FaUserEdit, FaSave, FaTimes } from 'react-icons/fa';
+import { FiRefreshCw  } from "react-icons/fi";
 import { supabase } from '../lib/supabaseClient.ts';
 import '../styles/plotschedule.css';
 import 'react-toastify/dist/ReactToastify.css';
@@ -44,6 +45,7 @@ interface SectionCourse {
     term_name: string;
   };
   user_id: number;
+  section_name?: string;
 }
 
 interface Program {
@@ -104,7 +106,7 @@ const Scheduler_PlotSchedule: React.FC = () => {
   const [examPeriods, setExamPeriods] = useState<ExamPeriod[]>([]);
   const [userId, setUserId] = useState<string | null>(null);
   const [sectionCourses, setSectionCourses] = useState<SectionCourse[]>([]);
-  const [selectedModality, setSelectedModality] = useState<Modality | null>(null);
+  const [_selectedModality, setSelectedModality] = useState<Modality | null>(null);
   const [availableProctors, setAvailableProctors] = useState<Proctor[]>([]);
   const [examDetails, setExamDetails] = useState<ExamDetail[]>([]);
   const [searchTerm, setSearchTerm] = useState('');
@@ -120,11 +122,32 @@ const Scheduler_PlotSchedule: React.FC = () => {
   const [examEndTime, _setExamEndTime] = useState<string>('');
   const [selectedRoomId, _setSelectedRoom] = useState<number | null>(null);
   const [canonicalSlots, setCanonicalSlots] = useState<Record<string, { start: string; end: string }>>({});
+  const [selectedDay, setSelectedDay] = useState<string>("");
+  const [showRemarksMap, setShowRemarksMap] = useState<Record<string, boolean>>({});
 
-  // Helper: infer year level for an exam record (tries modalities first, then sectionCourses)
-  const inferYearLevelFromExamDetail = (ed: any): string => {
-    // try to find a modality that matches this exam detail (modality_id or course+section_name)
-    const byModId = modalities.find((m) => String(m.modality_id) === String(ed.modality_id));
+  const schedulesToDisplay = examDetails.filter(
+    (ed) => ed.exam_date === selectedDay
+  );
+
+  <div className="schedule-container">
+    {schedulesToDisplay.length === 0 ? (
+      <p>No schedules for this day.</p>
+    ) : (
+      schedulesToDisplay.map((ed) => (
+        <div
+          key={`${ed.course_id}-${ed.section_name}-${ed.modality_id}`}
+          className="schedule-item"
+        >
+          {ed.course_id} | {ed.section_name} | {ed.room_id} | {ed.exam_start_time} - {ed.exam_end_time}
+        </div>
+      ))
+    )}
+  </div>
+
+  const inferYearLevelFromExamDetail = (ed: ExamDetail): string => {
+    const byModId = modalities.find(
+      (m) => String(m.modality_id) === String(ed.modality_id)
+    );
     if (byModId) return getYearLevelForModality(byModId);
 
     const byCourseSection = modalities.find(
@@ -135,7 +158,6 @@ const Scheduler_PlotSchedule: React.FC = () => {
     );
     if (byCourseSection) return getYearLevelForModality(byCourseSection);
 
-    // fallback to sectionCourses (best-effort)
     const sc = sectionCourses.find(
       (s) => s.course_id === ed.course_id && s.program_id === ed.program_id
     );
@@ -149,7 +171,6 @@ const Scheduler_PlotSchedule: React.FC = () => {
       const year = inferYearLevelFromExamDetail(ed);
       const key = `${ed.course_id}||${year}`;
       if (!map[key]) {
-        // take first encountered exam start/end for that cohort as canonical
         map[key] = {
           start: ed.exam_start_time,
           end: ed.exam_end_time,
@@ -211,12 +232,10 @@ const Scheduler_PlotSchedule: React.FC = () => {
   const handleExportPDF = () => {
     const element = document.createElement("div");
 
-    // Loop through all pages
     for (let i = 0; i < totalPages; i++) {
       const pageDiv = document.createElement("div");
       pageDiv.classList.add("pdf-page");
 
-      // Clone the same content but with page = i
       const tableWrapper = document.getElementById(`schedule-page-${i}`);
       if (tableWrapper) {
         pageDiv.appendChild(tableWrapper.cloneNode(true));
@@ -231,7 +250,6 @@ const Scheduler_PlotSchedule: React.FC = () => {
       element.appendChild(pageDiv);
     }
 
-    // Export using html2pdf
     html2pdf()
       .set({
         margin: 10,
@@ -282,6 +300,8 @@ const Scheduler_PlotSchedule: React.FC = () => {
     proctor_all: true,
     exam_date: '',
     proctor_filter: 'available_only',
+    exam_start_time: '', // NEW
+    exam_end_time: '', 
   });
 
   useEffect(() => {
@@ -349,10 +369,23 @@ const Scheduler_PlotSchedule: React.FC = () => {
         `)
         .eq('status', 'available')
 
-      const availableProctors: Proctor[] = (availabilityData || []).map((entry: any) => ({
-        user_id: entry.user_id,
-        full_name: `${entry.tbl_users.first_name} ${entry.tbl_users.last_name}`,
-      }));
+      const availableProctors = (availabilityData || [])
+        .filter((entry: any) => {
+          // Must be available
+          if (entry.status !== 'available') return false;
+
+          // Must be available on this exam date
+          if (entry.day !== formData.exam_date) return false;
+
+          // Check time slot
+          const [slotStart, slotEnd] = entry.time_slot.split('-'); // assuming "HH:mm-HH:mm"
+          return slotStart <= formData.exam_start_time && slotEnd >= formData.exam_end_time;
+        })
+        .map((entry: any) => ({
+          user_id: entry.user_id,
+          full_name: `${entry.tbl_users.first_name} ${entry.tbl_users.last_name}`,
+        }));
+
 
       setAvailableProctors(availableProctors);
 
@@ -621,7 +654,6 @@ const Scheduler_PlotSchedule: React.FC = () => {
     }
   };
 
-  // Utility: Fisher-Yates shuffle
   const shuffleArray = <T,>(arr: T[]): T[] => {
     const a = [...arr];
     for (let i = a.length - 1; i > 0; i--) {
@@ -631,11 +663,9 @@ const Scheduler_PlotSchedule: React.FC = () => {
     return a;
   };
 
-  // Try to resolve year_level for a modality using your sectionCourses list
   const getYearLevelForModality = (m: Modality): string => {
     if (m.section?.year_level) return m.section.year_level as string;
 
-    // Fallback: infer from tbl_sectioncourse via (course_id, program_id, user_id)
     const hit = sectionCourses.find(
       sc =>
         sc.course_id === m.course_id &&
@@ -645,67 +675,12 @@ const Scheduler_PlotSchedule: React.FC = () => {
     return hit?.year_level ?? "Unknown";
   };
 
-  // Unique key for alternation rule: Program–Year–Course
-  const cohortKey = (m: Modality) =>
-    `${m.program_id}||${getYearLevelForModality(m)}||${m.course_id}`;
-
-  /**
-   * Round-robin sequence so that consecutive items never share the same cohortKey.
-   * If it becomes impossible (e.g., only one cohort exists), it still emits the rest,
-   * but avoids repeats whenever there is a choice.
-   */
-  const sequenceAlternating = (mods: Modality[]): Modality[] => {
-    // Group by key
-    const buckets = new Map<string, Modality[]>();
-    for (const m of mods) {
-      const k = cohortKey(m);
-      if (!buckets.has(k)) buckets.set(k, []);
-      buckets.get(k)!.push(m);
-    }
-
-    const keys = Array.from(buckets.keys());
-    // Sort keys by bucket size descending (helps spread heavy cohorts)
-    keys.sort((a, b) => (buckets.get(b)!.length - buckets.get(a)!.length));
-
-    const total = mods.length;
-    const out: Modality[] = [];
-    let lastKey = "";
-
-    while (out.length < total) {
-      // Find first non-empty bucket whose key != lastKey
-      let pickedKey = "";
-      for (const k of keys) {
-        if (buckets.get(k)!.length && k !== lastKey) {
-          pickedKey = k;
-          break;
-        }
-      }
-      // If all remaining are the same as lastKey, we must take from it
-      if (!pickedKey) {
-        for (const k of keys) {
-          if (buckets.get(k)!.length) {
-            pickedKey = k;
-            break;
-          }
-        }
-        if (!pickedKey) break; // nothing left
-      }
-
-      const item = buckets.get(pickedKey)!.shift()!;
-      out.push(item);
-      lastKey = pickedKey;
-    }
-
-    return out;
-  };
-
   const handleGenerateSave = async () => {
     if (!userId) return;
 
     if (
       !formData.course_id ||
       !formData.program_id ||
-      !formData.modality_id ||
       !formData.examperiod_id ||
       !formData.exam_date
     ) {
@@ -713,11 +688,12 @@ const Scheduler_PlotSchedule: React.FC = () => {
       return;
     }
 
-    const selectedMod = modalities.find(
-      (m) => m.modality_id === parseInt(formData.modality_id)
+    const courseModalities = modalities.filter(
+      (m) => m.course_id === formData.course_id
     );
-    if (!selectedMod) {
-      alert("Selected modality is invalid.");
+
+    if (courseModalities.length === 0) {
+      alert("No modalities found for this course.");
       return;
     }
 
@@ -779,10 +755,9 @@ const Scheduler_PlotSchedule: React.FC = () => {
 
     // Candidate modalities for the selected course + modality_type
     const candidateModalities = modalities.filter(
-      (m) =>
-        m.modality_type === selectedMod.modality_type &&
-        m.course_id === selectedMod.course_id
+      (m) => m.course_id === formData.course_id
     );
+
     const orderedModalities = sequenceAlternating(candidateModalities);
 
     // Build local canonical map from EXISTING examDetails (key -> Date)
@@ -807,7 +782,76 @@ const Scheduler_PlotSchedule: React.FC = () => {
     }
 
     // For each cohort try to schedule (prefer canonical slot)
-    const targetSectionNames = orderedModalities.map(m => m.section_name);
+    function getProgramKey(modality: any): string {
+      return modality.program_id?.toString() || "unknown";
+    }
+
+    function getSectionInstructorId(
+      modality: Modality,
+      sectionCourses: SectionCourse[]
+    ): number | null {
+      const normalizedModalitySection = modality.section_name.trim().toLowerCase();
+
+      const match = sectionCourses.find((s: SectionCourse) => {
+        const normalizedCourseSection = s.section_name?.trim().toLowerCase();
+        return (
+          s.course_id === modality.course_id &&
+          s.program_id === modality.program_id &&
+          normalizedCourseSection === normalizedModalitySection
+        );
+      });
+
+      if (!match) {
+        console.warn(`⚠️ No match found for section ${modality.section_name}`);
+      }
+
+      return match?.user_id ?? null;
+    }
+
+    function mapTimeSlotToRange(slot: string) {
+      switch (slot.trim()) {
+        case "7 AM - 12 NN":
+          return { start: "07:00", end: "12:00" };
+        case "1 PM - 5 PM":
+          return { start: "13:00", end: "17:00" };
+        case "5 PM - 9 PM":
+          return { start: "17:00", end: "21:00" };
+        default:
+          return null;
+      }
+    }
+
+    function sequenceAlternating(modalities: any[]): any[] {
+      const result: any[] = [];
+      const pool = [...modalities];
+
+      while (pool.length > 0) {
+        if (result.length === 0) {
+          result.push(pool.shift()!);
+          continue;
+        }
+
+        const last = result[result.length - 1];
+        const lastYear = getYearLevelForModality(last);
+        const lastProgram = getProgramKey(last);
+
+        // pick the next modality that is NOT same year+program
+        let idx = pool.findIndex(m => {
+          const year = getYearLevelForModality(m);
+          const prog = getProgramKey(m);
+          return !(year === lastYear && prog === lastProgram);
+        });
+
+        if (idx === -1) {
+          // fallback: no choice, allow same-year+program
+          idx = 0;
+        }
+
+        result.push(pool.splice(idx, 1)[0]);
+      }
+
+      return result;
+    }
 
     // Track which ones we actually insert
     let insertedCount = 0;
@@ -879,7 +923,6 @@ const Scheduler_PlotSchedule: React.FC = () => {
         // if canonical exists but can't assign distinct rooms, we will try to find another slot below
       }
 
-      // 2) If we don't yet have chosenSlot, search the randomizedSlots for one that supports distinct rooms
       if (!chosenSlot) {
         slotLoop: for (const slot of randomizedSlots) {
           const possibleRoomsPerMod: Map<string, (string | number)[]> = new Map();
@@ -962,9 +1005,45 @@ const Scheduler_PlotSchedule: React.FC = () => {
         }
 
         let assignedProctorId: number | null = null;
-        if (formData.proctor_filter === "available_only" && totalAvailable > 0) {
-          assignedProctorId = availableProctors[proctorIndex % totalAvailable].user_id;
+
+        // 🔹 Step 1: Get all instructors for the same course & program
+        const candidateInstructors = instructors.filter((instr) =>
+          sectionCourses.some(
+            (s) =>
+              s.course_id === modality.course_id &&
+              s.program_id === modality.program_id &&
+              s.user_id === instr.user_id
+          )
+        );
+
+        const sectionInstructorId = getSectionInstructorId(modality, sectionCourses);
+
+        // 🔹 Step 2: Exclude the instructor of THIS section
+        const alternativeInstructors = candidateInstructors.filter(
+          (instr) => Number(instr.user_id) !== Number(sectionInstructorId)
+        );
+        // 🔍 Debug logs
+        console.log(`Modality: ${modality.section_name}`);
+        console.log("Resolved Section Instructor:", sectionInstructorId);
+        console.log("Candidate Instructors:", candidateInstructors.map(i => i.user_id));
+        console.log("Alternative Instructors:", alternativeInstructors.map(i => i.user_id));
+
+        if (alternativeInstructors.length > 0) {
+          // ✅ Always pick alternatives first (round-robin between them)
+          assignedProctorId =
+            alternativeInstructors[proctorIndex % alternativeInstructors.length].user_id;
           proctorIndex++;
+        } else if (candidateInstructors.length === 1 && sectionInstructorId) {
+          // ⚠️ Only fallback to instructor if they’re the ONLY one
+          assignedProctorId = sectionInstructorId;
+        } else {
+          // 🚫 No eligible proctor found
+          assignedProctorId = null;
+        }
+
+        // Final sanity check
+        if (assignedProctorId === sectionInstructorId && alternativeInstructors.length > 0) {
+          console.error("❌ Incorrect fallback — section instructor assigned despite alternatives");
         }
 
         inserts.push({
@@ -972,7 +1051,7 @@ const Scheduler_PlotSchedule: React.FC = () => {
           program_id: modality.program_id,
           room_id: roomId,
           modality_id: modality.modality_id,
-          user_id: assignedProctorId ?? parseInt(userId),
+          user_id: assignedProctorId, // leave as null if no eligible proctor
           examperiod_id: parseInt(formData.examperiod_id),
           exam_duration: intervalString,
           exam_start_time: chosenSlot.start.toISOString(),
@@ -1003,21 +1082,42 @@ const Scheduler_PlotSchedule: React.FC = () => {
 
     // Persist inserts to DB
     if (insertedCount > 0) {
-      const { error } = await supabase.from("tbl_examdetails").insert(inserts);
+      const { data: insertedData, error } = await supabase
+        .from("tbl_examdetails")
+        .insert(inserts)
+        .select("*"); // get the inserted rows back
+
       if (error) {
         toast.error(`Failed to save schedule. ${error.message}`);
       } else {
         toast.success("Schedule saved successfully!");
-        const { data: updatedExamDetails } = await supabase
-          .from("tbl_examdetails")
-          .select("*")
-          .eq("exam_date", formData.exam_date);
-        setExamDetails(updatedExamDetails || []);
+
+        // Merge inserted schedules with existing ones
+        setExamDetails((prev) => {
+          const merged = [...prev, ...(insertedData || [])];
+
+          // Optionally remove duplicates if somehow they exist
+          const seen = new Set();
+          return merged.filter((ed) => {
+            const key = `${ed.course_id}||${ed.section_name}||${ed.modality_id}||${ed.exam_date}`;
+            if (seen.has(key)) return false;
+            seen.add(key);
+            return true;
+          });
+        });
       }
     } else {
-      toast.info("No new schedules were created all selected sections already have schedules for this date.");
+      toast.info("No new schedules were created — all selected sections already have schedules for this date.");
     }
   };
+
+  useEffect(() => {
+    setFormData((prev) => ({
+      ...prev,
+      academic_term: prev.academic_term || mergedPeriods?.[0]?.value || '',
+      exam_category: prev.exam_category || examCategories?.[0] || '',
+    }));
+  }, [mergedPeriods, examCategories]);
 
   const scheduledRooms =
   rooms && examDetails && formData.exam_date
@@ -1158,7 +1258,6 @@ const Scheduler_PlotSchedule: React.FC = () => {
             </button>
 
             <h3>Add Schedule</h3>
-
             <div className="form-group">
               <label>School Year & Semester</label>
               <select
@@ -1166,7 +1265,6 @@ const Scheduler_PlotSchedule: React.FC = () => {
                 value={formData.academic_term}
                 onChange={handleChange}
               >
-                <option value="">-- Select --</option>
                 {mergedPeriods.map((p, i) => (
                   <option key={i} value={p.value}>
                     {p.label}
@@ -1182,7 +1280,6 @@ const Scheduler_PlotSchedule: React.FC = () => {
                 value={formData.exam_category}
                 onChange={handleChange}
               >
-                <option value="">-- Select --</option>
                 {examCategories.map((cat, i) => (
                   <option key={i} value={cat}>
                     {cat}
@@ -1195,23 +1292,20 @@ const Scheduler_PlotSchedule: React.FC = () => {
               <label>Days Period</label>
               <select
                 name="days_period_id"
-                value={formData.days_period_id}
+                value={selectedDay}
                 onChange={(e) => {
-                const selected = daysPeriods.find((p) => p.value === e.target.value);
-                const _match = examPeriods.find(
-                  (ep) => ep.examperiod_id === Number(selected?.examperiod_id)
-                );
-
-                setFormData((prev) => ({
-                  ...prev,
-                  days_period_id: e.target.value,
-                  examperiod_id: selected?.examperiod_id.toString() || '',
-                  exam_date: selected?.value || '',
-                }));
-              }}
+                  const selected = daysPeriods.find((p) => p.value === e.target.value);
+                  setSelectedDay(e.target.value);
+                  setFormData((prev) => ({
+                    ...prev,
+                    days_period_id: e.target.value,
+                    examperiod_id: selected?.examperiod_id.toString() || "",
+                    exam_date: selected?.value || "",
+                  }));
+                }}
                 disabled={daysPeriods.length === 0}
               >
-                <option value="">-- Select Days Period --</option>
+                {daysPeriods.length === 0 && <option>-- No days periods available --</option>}
                 {daysPeriods.map((p, i) => (
                   <option key={i} value={p.value}>
                     {p.label}
@@ -1220,84 +1314,177 @@ const Scheduler_PlotSchedule: React.FC = () => {
               </select>
             </div>
 
+            {/* Program Select */}
             <div className="form-group">
               <label>Program</label>
-              <select name="program_id" value={formData.program_id} onChange={handleChange}>
+              <select
+                name="program_id"
+                value={formData.program_id}
+                onChange={handleChange}
+              >
                 <option value="">-- Select Program --</option>
-                {programs.map((p) => (
-                  <option key={p.program_id} value={p.program_id}>
-                    {p.program_name}
-                  </option>
-                ))}
+                {programs
+                  .slice()
+                  .sort((a, b) => a.program_name.localeCompare(b.program_name))
+                  .map((p) => {
+                    // Count number of courses in this program
+                    const courseCount = sectionCourses.filter(
+                      (sc) => sc.program_id === p.program_id
+                    ).length;
+
+                    return (
+                      <option
+                        key={p.program_id}
+                        value={p.program_id}
+                        disabled={courseCount === 0} // Disable programs with no courses
+                      >
+                        ({p.program_id}) | {p.program_name} ({courseCount} course
+                        {courseCount !== 1 ? "s" : ""})
+                      </option>
+                    );
+                  })}
               </select>
             </div>
 
             <div className="form-group">
               <label>Course</label>
-              <select name="course_id" value={formData.course_id} onChange={handleChange}>
+              <select
+                name="course_id"
+                value={formData.course_id} // stays empty initially
+                onChange={handleChange}
+                disabled={!formData.program_id || filteredCourses.length === 0}
+              >
                 <option value="">-- Select Course --</option>
-                {filteredCourses.map((c) => (
-                  <option key={c.course_id} value={c.course_id}>
-                    {c.course_id} | {c.course_name} | {c.year_level}
+                {filteredCourses.length === 0 ? (
+                  <option value="" disabled>
+                    -- No courses available --
                   </option>
-                ))}
+                ) : (
+                  Object.entries(
+                    filteredCourses.reduce(
+                      (acc: Record<string, typeof filteredCourses>, course) => {
+                        const year = course.year_level;
+                        if (!acc[year]) acc[year] = [];
+                        acc[year].push(course);
+                        return acc;
+                      },
+                      {}
+                    )
+                  )
+                    // Sort years numerically
+                    .sort(([yearA], [yearB]) => Number(yearA) - Number(yearB))
+                    .map(([year, courses]) => (
+                      <optgroup key={year} label={`Year ${year}`}>
+                        {courses
+                          .slice()
+                          // Sort courses numerically by ID
+                          .sort((a, b) => Number(a.course_id) - Number(b.course_id))
+                          .map((c) => {
+                            const modalityCount = modalities.filter(
+                              (m) => m.course_id === c.course_id
+                            ).length;
+
+                            return (
+                              <option
+                                key={c.course_id}
+                                value={c.course_id}
+                                disabled={modalityCount === 0} // disable if no modalities
+                              >
+                                {c.course_id} | {c.course_name} ({modalityCount} modality
+                                {modalityCount !== 1 ? "ies" : ""})
+                              </option>
+                            );
+                          })}
+                      </optgroup>
+                    ))
+                )}
               </select>
             </div>
 
             <div className="form-group">
-              <label>Modality Type</label>
-              <select
-                name="modality_id"
-                value={formData.modality_id}
-                onChange={(e) => {
-                  const selectedId = parseInt(e.target.value);
-                  const selected = modalities.find((m) => m.modality_id === selectedId);
-                  setFormData({ ...formData, modality_id: String(selectedId) });
-                  setSelectedModality(selected || null);
-                }}
-                disabled={!formData.course_id}
-              >
-                <option value="">-- Select Modality Type --</option>
-                {Array.from(
-                  new Map(
-                    modalities
-                      .filter((m) => m.course_id === formData.course_id)
-                      .map((m) => [m.modality_type, m])
-                  ).values()
-                ).map((mod) => (
-                  <option key={mod.modality_id} value={mod.modality_id}>
-                    {mod.modality_type}
-                  </option>
-                ))}
-              </select>
-              {selectedModality && (
+              <label>Modalities (Auto-generated)</label>
+
+              {formData.course_id ? (
                 <div className="modality-details">
                   <h3>Modality Details</h3>
                   <div className="modality-list">
                     {modalities
-                      .filter(
-                        (m) =>
-                          m.modality_type === selectedModality.modality_type &&
-                          m.course_id === selectedModality.course_id &&
-                          m.program_id === selectedModality.program_id
-                      )
+                      .filter((m) => m.course_id === formData.course_id)
                       .map((m, idx) => {
-                        const roomName = rooms.find(r => r.room_id === m.room_id)?.room_name || m.room_id;
+                        const isShown = !!showRemarksMap[m.modality_id];
+
                         return (
                           <div key={idx} className="modality-item">
-                            <div className="modality-section">{m.section_name}</div>
+                            {/* Modality type label */}
+                            <div
+                              style={{
+                                fontWeight: "bold",
+                                fontSize: "16px",
+                                marginBottom: "4px",
+                                color: "#092C4C",
+                              }}
+                            >
+                              {m.modality_type || "Unknown Modality"}
+                            </div>
+
+                            {/* Other details */}
                             <div className="modality-info">
-                              <p><span className="label">Room:</span>{m.room_id} {roomName}</p>
-                              <p><span className="label">Room Type:</span> {m.room_type}</p>
-                              <p><span className="label">Course:</span> {m.course_id}</p>
-                              <p><span className="label">Program:</span> {m.program_id}</p>
-                              <p><span className="label">Remarks:</span> {m.modality_remarks || 'None'}</p>
+                              <p>
+                                <span className="label">Room Type:</span> {m.room_type}
+                              </p>
+                              <p>
+                                <span className="label">Course:</span> {m.course_id}
+                              </p>
+                              <p>
+                                <span className="label">Section:</span> {m.section_name}
+                              </p>
+                              <p>
+                                <span className="label">Program:</span> {m.program_id}
+                              </p>
+                              <p style={{ display: "flex", alignItems: "center", gap: "6px" }}>
+                                <span className="label">Remarks:</span>
+                                {m.modality_remarks ? (
+                                  <FaEye
+                                    onClick={() =>
+                                      setShowRemarksMap((prev) => ({
+                                        ...prev,
+                                        [m.modality_id]: !prev[m.modality_id],
+                                      }))
+                                    }
+                                    style={{ cursor: "pointer", color: "#092C4C", fontWeight: "bold" }}
+                                  />
+                                ) : (
+                                  "None"
+                                )}
+                              </p>
+
+                              {/* Remarks box toggled by eye icon */}
+                              {isShown && m.modality_remarks && (
+                                <div
+                                  style={{
+                                    border: "1px solid #092C4C",
+                                    padding: "6px 8px",
+                                    borderRadius: "6px",
+                                    backgroundColor: "#f5f5f5",
+                                    color: "#092C4C",
+                                    marginTop: "4px",
+                                    maxWidth: "400px",
+                                    wordWrap: "break-word",
+                                    fontSize: "13px",
+                                    fontWeight: "semibold",
+                                  }}
+                                >
+                                  {m.modality_remarks}
+                                </div>
+                              )}
                             </div>
                           </div>
                         );
                       })}
                   </div>
                 </div>
+              ) : (
+                <p>Please select a course to load modalities.</p>
               )}
             </div>
 
@@ -1398,7 +1585,7 @@ const Scheduler_PlotSchedule: React.FC = () => {
                     onClick={() => setIsReassigning(!isReassigning)}
                   >
                     <FaUserEdit className="btn-icon-small" />
-                    <span className="tooltip-text">Reassign Proctor</span>
+                    <span className="tooltip-text">Reassign Proctor or Room</span>
                   </button>
 
                   {/* Dropdown for Save / Cancel */}
@@ -1473,6 +1660,49 @@ const Scheduler_PlotSchedule: React.FC = () => {
               className="plot-grid export-section"
               style={{ flex: 2 }}
             >
+              {/* Refresh Button - not included in PDF */}
+              <div className="refresh-container no-export" style={{ textAlign: "right", marginBottom: "10px" }}>
+                <button
+                  type="button"
+                  onClick={async () => {
+                    if (!formData.days_period_id) return;
+
+                    try {
+                      // Fetch schedules for the selected day
+                      const { data: updatedSchedules, error } = await supabase
+                        .from("tbl_examdetails")
+                        .select("*")
+                        .eq("exam_date", formData.days_period_id);
+
+                      if (error) throw error;
+
+                      // Replace schedules for this day only
+                      setExamDetails((prev) => {
+                        const otherDays = prev.filter(
+                          (ed) => ed.exam_date !== formData.days_period_id
+                        );
+                        return [...otherDays, ...(updatedSchedules || [])];
+                      });
+
+                      toast.success("Schedules refreshed!");
+                    } catch (err: any) {
+                      console.error(err);
+                      toast.error(`Failed to refresh schedules. ${err.message}`);
+                    }
+                  }}
+                  style={{
+                    background: "transparent",
+                    border: "none",
+                    cursor: "pointer",
+                    fontSize: "20px",
+                    fontWeight: "bold",   // bold
+                    color: "#092C4C",    // color
+                  }}
+                  title="Refresh"
+                >
+                <FiRefreshCw />
+                </button>
+              </div>
               <div style={{ textAlign: 'center', marginBottom: '15px' }}>
                 <img
                   src="/USTPlogo.png"
@@ -1691,81 +1921,210 @@ const Scheduler_PlotSchedule: React.FC = () => {
                                   cellOccupied[`${room.room_id}-${rowIdx + i}`] = true;
                                 }
 
-                                const courseColor = (courseId: string) => {
-                                  const colors = [
-                                    "#ffcccc","#ccffcc","#ccccff","#fff0b3","#d9b3ff",
-                                    "#ffb3b3","#b3e0ff","#ffd9b3","#c2f0c2","#f0b3ff"
-                                  ];
-                                  const hash = [...courseId].reduce((acc, char) => acc + char.charCodeAt(0), 0);
-                                  return colors[hash % colors.length];
-                                };
-
                                 return (
                                   <td
                                     key={cellKey}
                                     rowSpan={rowSpan}
                                     style={{
                                       verticalAlign: "top",
-                                      padding: "5px",
+                                      padding: "3px",
                                       minHeight: `${rowSpan * 28}px`,
                                       backgroundColor: "#f9f9f9",
                                       border: "1px solid #ccc",
                                     }}
                                   >
-                                    {matchingDetails.map((detail, idx) => (
-                                      <div
-                                        key={idx}
-                                        style={{
-                                          height: "100%",
-                                          display: "flex",
-                                          flexDirection: "column",
-                                          justifyContent: "space-between",
-                                          backgroundColor: courseColor(detail.course_id),
-                                          border: "1px solid #888",
-                                          padding: "6px",
-                                          fontSize: "12px",
-                                          borderRadius: "6px",
-                                          lineHeight: "1.6",
-                                          color: "#333",
-                                          boxSizing: "border-box",
-                                        }}
-                                      >
-                                        <div><strong>{detail.course_id}</strong></div>
-                                        <div><strong>{detail.section_name ?? "—"}</strong></div>
-                                        <div><strong>
-                                          Instructor: {getInstructorName(detail.course_id, detail.program_id)}
-                                        </strong></div>
-                                        <div>
-                                          <strong>Proctor:</strong>{" "}
-                                          {isReassigning ? (
-                                            <select
-                                              className="custom-select"
-                                              value={selectedProctors[detail.examdetails_id] || ""}
-                                              onChange={(e) =>
-                                                setSelectedProctors((prev) => ({
-                                                  ...prev,
-                                                  [detail.examdetails_id]: e.target.value,
-                                                }))
-                                              }
-                                            >
-                                              {availableProctors.map((proctor) => (
-                                                <option key={proctor.user_id} value={proctor.user_id}>
-                                                  {proctor.full_name}
-                                                </option>
-                                              ))}
-                                            </select>
-                                          ) : (
-                                            availableProctors.find(
-                                              (p) => p.user_id.toString() === detail.user_id.toString()
-                                            )?.full_name || "No proctor"
-                                          )}
+                                    {matchingDetails.map((detail, idx) => {
+                                      const edStart = new Date(detail.exam_start_time);
+
+                                      // Compute available rooms dynamically for swapping
+                                      const availableRooms: string[] = examDetails
+                                        .filter((ed) => {
+                                          const sameTime = new Date(ed.exam_start_time).getTime() === edStart.getTime();
+                                          const sameCourse = ed.course_id === detail.course_id;
+                                          const sameProgram = ed.program_id === detail.program_id;
+                                          const sameYear = getYearLevelForModality(ed as any) === getYearLevelForModality(detail as any);
+                                          return sameTime && sameCourse && sameProgram && sameYear && ed.room_id !== detail.room_id;
+                                        })
+                                        .map((ed) => ed.room_id);
+
+                                     const courseColor = (courseId: string) => {
+                                        const colors = [
+                                          "#ffcccc","#ccffcc","#ccccff","#fff0b3","#d9b3ff",
+                                          "#ffb3b3","#b3e0ff","#ffd9b3","#c2f0c2","#f0b3ff",
+                                          "#ffe0cc","#e0ffcc","#cce0ff","#f0fff0","#ffe6f0",
+                                          "#ffd9b3","#b3ffd9","#d9b3ff","#ffb3d9","#b3d9ff",
+                                          "#e6ffe6","#ffe6e6","#e6e6ff","#fff0e6","#f0e6ff",
+                                          "#ccffeb","#ffccf2","#ccf2ff","#f2ffcc","#f2ccff",
+                                          "#e6ffcc","#cce6ff","#ffe6cc","#ccffe6","#e6ccff",
+                                          "#ffd1b3","#b3ffd1","#d1b3ff","#ffb3d1","#b3d1ff",
+                                          "#ffe0b3","#b3ffe0","#e0b3ff","#ffb3e0","#b3e0ff",
+                                          "#f0ffe6","#e6f0ff","#fff0cc","#ccfff0","#f0ccff",
+                                          "#ffe6f0","#f0ffe6","#e6f0ff","#ccffe6","#e6ccff",
+                                          "#ffccb3","#b3ffcc","#ccb3ff","#ffb3cc","#b3ccff",
+                                          "#ffd1cc","#ccd1ff","#ffccd1","#d1ffcc","#ccffd1",
+                                          "#e6ffd9","#d9e6ff","#ffe6d9","#d9ffe6","#e6d9ff",
+                                          "#f0d9ff","#d9fff0","#ffd9f0","#d9f0ff","#f0ffd9",
+                                          "#ccf2d9","#d9ccf2","#f2d9cc","#ccf2f0","#f0ccf2"
+                                        ];
+                                        const hash = [...courseId].reduce((acc, char) => acc + char.charCodeAt(0), 0);
+                                        return colors[hash % colors.length];
+                                      };
+
+                                      return (
+                                        <div
+                                          key={idx}
+                                          style={{
+                                            height: "150px",
+                                            display: "flex",
+                                            flexDirection: "column",
+                                            justifyContent: "space-between",
+                                            backgroundColor: courseColor(detail.course_id),
+                                            border: "1px solid #888",
+                                            padding: "3px",
+                                            fontSize: "12px",
+                                            borderRadius: "6px",
+                                            lineHeight: "1.4",
+                                            color: "#333",
+                                            boxSizing: "border-box",
+                                            marginBottom: "0px",
+                                          }}
+                                        >
+                                          <div>
+                                            <strong></strong>
+                                          </div>
+
+                                          <div>
+                                            {" "}
+                                            {isReassigning ? ( // <-- show dropdown only when reassigning
+                                              <select
+                                                className="custom-select"
+                                                value={detail.room_id}
+                                                onChange={async (e) => {
+                                                  const newRoomId = e.target.value;
+                                                  if (!availableRooms.includes(newRoomId)) return;
+
+                                                  const swapDetail = examDetails.find(
+                                                    (ed) =>
+                                                      ed.room_id === newRoomId &&
+                                                      new Date(ed.exam_start_time).getTime() === new Date(detail.exam_start_time).getTime() &&
+                                                      ed.course_id === detail.course_id &&
+                                                      ed.program_id === detail.program_id &&
+                                                      getYearLevelForModality(ed as any) === getYearLevelForModality(detail as any)
+                                                  );
+                                                  if (!swapDetail) return;
+
+                                                  // Update the local state first
+                                                  setExamDetails((prev) =>
+                                                    prev.map((ed) => {
+                                                      if (ed.examdetails_id === detail.examdetails_id) return { ...ed, room_id: newRoomId };
+                                                      if (ed.examdetails_id === swapDetail.examdetails_id) return { ...ed, room_id: detail.room_id };
+                                                      return ed;
+                                                    })
+                                                  );
+
+                                                  // ✅ Update in Supabase using .update() instead of .upsert()
+                                                  const { error: error1 } = await supabase
+                                                    .from("tbl_examdetails")
+                                                    .update({ room_id: newRoomId })
+                                                    .eq("examdetails_id", detail.examdetails_id);
+
+                                                  const { error: error2 } = await supabase
+                                                    .from("tbl_examdetails")
+                                                    .update({ room_id: detail.room_id })
+                                                    .eq("examdetails_id", swapDetail.examdetails_id);
+
+                                                  if (error1 || error2) toast.error("Failed to swap rooms: " + (error1?.message || error2?.message));
+                                                  else toast.success("Rooms swapped successfully!");
+                                                }}
+                                              >
+                                                <option value={detail.room_id}>{detail.room_id}</option>
+                                                {availableRooms.map((rId: string) => (
+                                                  <option key={rId} value={rId}>{rId}</option>
+                                                ))}
+                                              </select>
+                                            ) : (
+                                              <strong></strong> // show room as text when not reassigning
+                                            )}
+                                          </div>
+
+                                          <div><strong>{detail.course_id}</strong></div>
+                                          <div><strong>{detail.section_name ?? "—"}</strong></div>
+                                          <div><strong>Instructor: {getInstructorName(detail.course_id, detail.program_id)}</strong></div>
+
+                                          <div>
+                                            <strong>Proctor:</strong>{" "}
+                                            {isReassigning ? (
+                                              <select
+                                                className="custom-select"
+                                                value={selectedProctors[detail.examdetails_id] || detail.user_id || ""}
+                                                onChange={(e) =>
+                                                  setSelectedProctors((prev) => ({
+                                                    ...prev,
+                                                    [detail.examdetails_id]: e.target.value,
+                                                  }))
+                                                }
+                                              >
+                                                <option value="">Select Proctor</option>
+                                                {(() => {
+                                                  const sectionInstructorId = sectionCourses.find(
+                                                    (s) =>
+                                                      s.course_id === detail.course_id &&
+                                                      s.program_id === detail.program_id &&
+                                                      s.section_name?.trim().toLowerCase() === detail.section_name?.trim().toLowerCase()
+                                                  )?.user_id;
+
+                                                  const candidates = instructors.filter(
+                                                    (instr) =>
+                                                      sectionCourses.some(
+                                                        (s) =>
+                                                          s.course_id === detail.course_id &&
+                                                          s.program_id === detail.program_id &&
+                                                          s.user_id === instr.user_id
+                                                      ) &&
+                                                      instr.user_id !== sectionInstructorId
+                                                  );
+
+                                                  return (
+                                                    <>
+                                                      {candidates.map((instr) => (
+                                                        <option key={instr.user_id} value={instr.user_id}>
+                                                          {instr.first_name} {instr.last_name}
+                                                        </option>
+                                                      ))}
+                                                      {candidates.length === 0 && sectionInstructorId && (
+                                                        <option value={sectionInstructorId}>
+                                                          {instructors.find((i) => i.user_id === sectionInstructorId)?.first_name}{" "}
+                                                          {instructors.find((i) => i.user_id === sectionInstructorId)?.last_name} (Own Section)
+                                                        </option>
+                                                      )}
+                                                    </>
+                                                  );
+                                                })()}
+                                              </select>
+                                            ) : (
+                                              (() => {
+                                                const proctor =
+                                                  instructors.find((p) => String(p.user_id) === String(detail.user_id)) ||
+                                                  instructors.find((instr) =>
+                                                    sectionCourses.some(
+                                                      (s) =>
+                                                        s.course_id === detail.course_id &&
+                                                        s.program_id === detail.program_id &&
+                                                        s.user_id === instr.user_id
+                                                    )
+                                                  );
+                                                return proctor ? `${proctor.first_name} ${proctor.last_name}` : "No proctor";
+                                              })()
+                                            )}
+                                          </div>
+
+                                          <div style={{ fontSize: "11px", marginTop: "4px", fontStyle: "italic" }}>
+                                            {formatTime12Hour(new Date(detail.exam_start_time))} -{" "}
+                                            {formatTime12Hour(new Date(detail.exam_end_time))}
+                                          </div>
                                         </div>
-                                        <div style={{ fontSize: "11px", marginTop: "4px", fontStyle: "italic" }}>
-                                          {formatTime12Hour(new Date(detail.exam_start_time))} -{" "}
-                                          {formatTime12Hour(new Date(detail.exam_end_time))}
-                                        </div>
-                                      </div>
-                                    ))}
+                                      );
+                                    })}
                                   </td>
                                 );
                               })}
@@ -1803,8 +2162,8 @@ const Scheduler_PlotSchedule: React.FC = () => {
                   </div>
                 </>
               ) : (
-                <div style={{ textAlign: "center", marginTop: "20px", color: '#000000ff' }}>
-                  No schedules yet or click days period to load schedules.
+                <div style={{ textAlign: "center", marginTop: "20px", color: '#000000ff'}}>
+                  No schedules available or select a day period to view or generate schedules.
                 </div>
               )}
             </div>
