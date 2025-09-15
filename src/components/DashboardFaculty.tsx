@@ -27,29 +27,35 @@ const roleSidebarMap: Record<string, { key: string, label: string, icon: JSX.Ele
     { key: 'set-Availability', label: 'Set Availability', icon: <FaClock {...iconStyle} /> },
     { key: 'exam-Schedule', label: 'View Exam Schedule', icon: <FaClipboardList {...iconStyle} /> },
     { key: 'notification', label: 'Notification', icon: <FaBell {...iconStyle} /> },
-    { key: 'inbox', label: 'Inbox', icon: <FaInbox {...iconStyle} /> },  // ✅ new
+    { key: 'inbox', label: 'Inbox', icon: <FaInbox {...iconStyle} /> },
   ],
   scheduler: [
     { key: 'plot-Schedule', label: 'Plot Schedule', icon: <FaCalendarPlus {...iconStyle} /> },
     { key: 'exam-Schedule', label: 'View Exam Schedule', icon: <FaClipboardList {...iconStyle} /> },
     { key: 'proctor-Availability', label: 'Available Proctor', icon: <FaUsers {...iconStyle} /> },
     { key: 'notification', label: 'Notification', icon: <FaBell {...iconStyle} /> },
-    { key: 'inbox', label: 'Inbox', icon: <FaInbox {...iconStyle} /> },  // ✅ new
+    { key: 'inbox', label: 'Inbox', icon: <FaInbox {...iconStyle} /> },
   ],
   dean: [
     { key: 'exam-Date', label: 'Exam Date', icon: <FaCalendar {...iconStyle} /> },
     { key: 'notification', label: 'Notification', icon: <FaBell {...iconStyle} /> },
     { key: 'Request', label: 'Requests', icon: <BsFillSendPlusFill {...iconStyle} /> },
-    { key: 'inbox', label: 'Inbox', icon: <FaInbox {...iconStyle} /> },  // ✅ new
+    { key: 'inbox', label: 'Inbox', icon: <FaInbox {...iconStyle} /> },
   ],
   'bayanihan leader': [
     { key: 'set-Modality', label: 'Set Modality', icon: <FaPenAlt {...iconStyle} /> },
     { key: 'exam-Schedule', label: 'View Exam Schedule', icon: <FaClipboardList {...iconStyle} /> },
     { key: 'notification', label: 'Notification', icon: <FaBell {...iconStyle} /> },
-    { key: 'inbox', label: 'Inbox', icon: <FaInbox {...iconStyle} /> },  // ✅ new
+    { key: 'inbox', label: 'Inbox', icon: <FaInbox {...iconStyle} /> },
   ]
 };
 
+interface MessagePayload {
+  message_id: number;
+  receiver_id: number;
+  is_read: boolean;
+  is_deleted: boolean;
+}
 
 const DashboardFaculty = () => {
   const [isSidebarOpen, setIsSidebarOpen] = useState(false);
@@ -57,8 +63,10 @@ const DashboardFaculty = () => {
   const [currentDateTime, setCurrentDateTime] = useState(new Date());
   const [user, setUser] = useState<any>(null);
   const [roles, setRoles] = useState<string[]>([]);
+  const [unreadCount, setUnreadCount] = useState(0);
   const navigate = useNavigate();
 
+  // Load user
   useEffect(() => {
     const loadUser = async () => {
       const stored = JSON.parse(localStorage.getItem('user') || 'null') ||
@@ -80,11 +88,13 @@ const DashboardFaculty = () => {
     loadUser();
   }, [navigate]);
 
+  // Clock
   useEffect(() => {
     const timer = setInterval(() => setCurrentDateTime(new Date()), 1000);
     return () => clearInterval(timer);
   }, []);
 
+  // Fetch roles
   useEffect(() => {
     const fetchUserRoles = async () => {
       if (!user?.first_name) return;
@@ -94,7 +104,7 @@ const DashboardFaculty = () => {
 
       if (!error && data) {
         const activeRoles = data
-          .filter((r: any) => !r.is_suspended) 
+          .filter((r: any) => !r.is_suspended)
           .map((r: any) => r.role_name.toLowerCase())
           .filter((r: string) => r !== 'admin');
 
@@ -104,11 +114,55 @@ const DashboardFaculty = () => {
     fetchUserRoles();
   }, [user]);
 
+  // Fetch unread messages count
+  useEffect(() => {
+    if (!user) return;
+
+    const fetchUnreadCount = async () => {
+      const { data, error } = await supabase
+        .from('tbl_inbox')
+        .select('message_id')
+        .eq('receiver_id', user.user_id)
+        .eq('is_read', false)
+        .eq('is_deleted', false);
+
+      if (!error && data) setUnreadCount(data.length);
+    };
+
+    fetchUnreadCount();
+
+    // Polling every 10 seconds
+    const interval = setInterval(fetchUnreadCount, 10000);
+
+    // Realtime subscription
+    const channel = supabase
+      .channel(`inbox-${user.user_id}`)
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'tbl_inbox' }, (payload: any) => {
+        if (payload.new.receiver_id === user.user_id) {
+          fetchUnreadCount();
+        }
+      })
+      .subscribe();
+
+    return () => {
+      clearInterval(interval);
+      supabase.removeChannel(channel);
+    };
+  }, [user]);
 
   const mergedSidebarItems = Array.from(
     new Map(
       roles
         .flatMap(role => roleSidebarMap[role] || [])
+        .map(item => {
+          if (item.key === 'inbox') {
+            return {
+              ...item,
+              label: unreadCount > 0 ? <span style={{ color: '##F2994' }}>{`${item.label} (${unreadCount})`}</span> : item.label
+            };
+          }
+          return item;
+        })
         .map(item => [item.key, item])
     ).values()
   );

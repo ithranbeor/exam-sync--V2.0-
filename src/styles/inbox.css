@@ -19,7 +19,7 @@
   justify-content: space-between;
   align-items: center;
   background-color: #eef3ff;
-  padding: 12px 18px;
+  padding: 10px 18px;
   border-radius: 10px;
   margin-bottom: 12px;
   box-shadow: 0 1px 4px rgba(0, 0, 0, 0.05);
@@ -47,8 +47,8 @@
 .inbox-center {
   flex: 1;
   margin-left: 20px;
-  color: #555;
-  font-weight: 500;
+  color: #092c4c;
+  font-weight: 100px;
 }
 
 .inbox-date {
@@ -364,3 +364,800 @@
 .inbox-modal-delete-btn:hover {
   color: #e53935;
 }
+/* Overlay */
+.modal-overlay {
+  position: fixed;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  background: rgba(0,0,0,0.35);
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  z-index: 1000;
+}
+
+/* Modal Pane */
+.modal-pane {
+  background: #fff;
+  width: 600px;
+  max-width: 95%;
+  border-radius: 8px;
+  box-shadow: 0 5px 20px rgba(0,0,0,0.3);
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+}
+
+/* Header */
+.modal-header {
+  padding: 12px 16px;
+  background: #f5f5f5;
+  border-bottom: 1px solid #ddd;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+
+.sender-info {
+  display: flex;
+  flex-direction: column;
+  font-size: 14px;
+  color: #222;
+}
+
+.sender-info .message-date {
+  font-size: 12px;
+  color: #555;
+  margin-top: 2px;
+}
+
+.subject-title {
+  font-weight: 500;
+  font-size: 20px;
+  margin-left: 0px;
+  flex: 1;
+  color: #222;
+}
+
+.delete-btn {
+  background: none;
+  border: none;
+  cursor: pointer;
+  color: #c0392b;
+  font-size: 18px;
+}
+
+/* Message Body */
+.message-body {
+  padding: 16px;
+  background: #fff;
+  font-size: 14px;
+  line-height: 1.5;
+  color: #222;
+}
+
+.attachment {
+  margin-top: 8px;
+  font-size: 14px;
+  color: #1a73e8;
+}
+
+/* Actions */
+.modal-actions {
+  padding: 12px 16px;
+  background: #f5f5f5;
+  border-top: 1px solid #ddd;
+  display: flex;
+  justify-content: flex-end;
+  gap: 8px;
+}
+
+.modal-actions button {
+  padding: 6px 14px;
+  border: none;
+  border-radius: 4px;
+  cursor: pointer;
+  font-weight: 500;
+}
+
+.reply-btn {
+  background: #3498db;
+  color: #fff;
+}
+
+.close-btn {
+  background: #ecf0f1;
+  color: #222;
+}
+
+/* Compose Modal */
+.compose-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 12px 16px;
+  background: #f5f5f5;
+  border-bottom: 1px solid #ddd;
+  font-size: 16px;
+  font-weight: 500;
+}
+
+.compose-header button {
+  border: none;
+  background: none;
+  font-size: 16px;
+  cursor: pointer;
+  color: #555;
+}
+
+.compose-form ul {
+  list-style: none;
+  padding-left: 0;
+  margin: 0;
+  font-size: 13px;
+  color: #222;
+}
+
+/* Messages List */
+.chat-message {
+  padding: 10px 14px;
+  margin-bottom: 6px;
+  border-radius: 8px;
+  max-width: 80%;
+  font-size: 14px;
+  line-height: 1.4;
+}
+
+/* Inline Reply Container */
+.inline-reply {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  padding: 10px 0;
+}
+
+.reply-labels {
+  font-size: 13px;
+  color: #555;
+  font-weight: 500;
+}
+
+.attachment-icon:hover {
+  color: #1a73e8;
+}
+
+.chat-message.sent {
+  background-color: #e1f5fe;
+  align-self: flex-end;
+}
+
+.chat-message.received {
+  background-color: #f0f0f0;
+  align-self: flex-start;
+}
+
+.chat-header {
+  font-size: 12px;
+  color: #555;
+  margin-bottom: 4px;
+}
+
+.chat-body p {
+  margin: 0;
+}
+
+.chat-attachment {
+  margin-top: 4px;
+  font-size: 13px;
+  color: #3498db;
+}
+
+/* Inline Reply */
+.inline-reply textarea {
+  width: 100%;
+  min-height: 100px;
+  padding: 8px;
+  border-radius: 6px;
+  border: 1px solid #ccc;
+  font-size: 14px;
+}
+
+.reply-actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 10px;
+  margin-top: 5px;
+}
+
+.attachment-icon {
+  cursor: pointer;
+  font-size: 20px;
+  color: #3498db;
+}
+
+.send-reply-btn {
+  background-color: #3498db;
+  color: white;
+  padding: 6px 14px;
+  border-radius: 6px;
+  border: none;
+  cursor: pointer;
+  font-weight: 500;
+}
+
+.send-reply-btn:hover {
+  background-color: #1a73e8;
+}
+/* Main container styling for the message viewer */
+.modal-pane {
+  background-color: #f5f5f5; /* Light gray background to mimic the app canvas */
+  border-radius: 12px;
+  overflow: hidden;
+  box-shadow: 0 4px 20px rgba(0, 0, 0, 0.1);
+  display: flex;
+  flex-direction: column;
+}
+
+/* Header for the entire view */
+.modal-header {
+  background-color: #fff;
+  padding: 16px 24px;
+  border-bottom: 1px solid #ddd;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+
+.subject-title {
+  font-size: 20px;
+  font-weight: 600;
+  color: #333;
+}
+
+.sender-info {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+}
+
+.sender-info strong {
+  font-size: 14px;
+  font-weight: 500;
+  color: #666;
+}
+
+.message-date {
+  font-size: 12px;
+  color: #999;
+}
+
+.delete-btn {
+  background: none;
+  border: none;
+  color: #999;
+  font-size: 18px;
+  cursor: pointer;
+  padding: 8px;
+  transition: color 0.2s ease;
+}
+
+.delete-btn:hover {
+  color: #e74c3c;
+}
+
+/* The primary message body container */
+.chat-message.received,
+.chat-message.sent {
+  background-color: #fff; /* White background for all message cards */
+  border: 1px solid #eee; /* Subtle border for separation */
+  border-radius: 8px;
+  padding: 16px;
+  margin: 16px 24px 0; /* Margin top and side to create space */
+  max-width: 90%;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.05);
+  align-self: flex-start; /* Default alignment */
+  word-wrap: break-word;
+}
+
+/* Adjustments for the original message to fit the image */
+.chat-message.received {
+  margin-top: 24px;
+}
+
+/* Header for each message card */
+.chat-header {
+  font-size: 14px;
+  font-weight: 600;
+  color: #333;
+  margin-bottom: 4px;
+}
+
+.chat-header span {
+  font-size: 12px;
+  font-weight: 400;
+  color: #999;
+  margin-left: 8px;
+}
+
+.chat-body p {
+  margin: 0;
+  color: #444;
+  line-height: 1.5;
+}
+
+.chat-attachment {
+  margin-top: 10px;
+  font-size: 14px;
+  color: #3498db;
+}
+
+.chat-attachment a {
+  text-decoration: none;
+  color: #3498db;
+}
+
+.chat-attachment a:hover {
+  text-decoration: underline;
+}
+
+/* Replies styling to match the sent message card in the image */
+.chat-message.sent {
+  background-color: #e1f5fe; /* Light blue background for sent messages */
+  align-self: flex-end; /* Align to the right for "You" */
+  border-color: #e1f5fe;
+}
+
+/* Input text area at the bottom */
+.input-text-container {
+  padding: 16px 24px;
+  background-color: #fff;
+  border-top: 1px solid #ddd;
+  display: flex;
+  align-items: center;
+}
+
+.input-text {
+  flex-grow: 1;
+  border: 1px solid #ccc;
+  border-radius: 20px;
+  padding: 10px 16px;
+  font-size: 14px;
+  resize: none;
+  overflow: hidden;
+  box-shadow: inset 0 1px 2px rgba(0, 0, 0, 0.05);
+}
+
+.input-text:focus {
+  outline: none;
+  border-color: #3498db;
+  box-shadow: 0 0 0 3px rgba(52, 152, 219, 0.2);
+}
+
+.send-button {
+  background: none;
+  border: none;
+  cursor: pointer;
+  color: #3498db;
+  font-size: 24px;
+  margin-left: 10px;
+}
+
+.send-button:hover {
+  color: #1a73e8;
+}
+.compose-modal-overlay {
+  position: fixed;
+  top: 0; left: 0;
+  width: 100vw; height: 100vh;
+  background: rgba(0,0,0,0.5);
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  z-index: 1000;
+  padding: 16px;
+}
+
+.compose-modal-pane {
+  background: #f5f5f5;
+  border-radius: 12px;
+  width: 100%;
+  max-width: 600px;
+  height: 90%;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden; /* main modal does not scroll */
+}
+
+.compose-modal-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 16px;
+  background: #fff;
+  border-bottom: 1px solid #ddd;
+}
+
+.compose-modal-header h3 {
+  margin: 0;
+  font-size: 18px;
+  color: #333;
+}
+
+.compose-modal-header button {
+  border: none;
+  background: none;
+  font-size: 18px;
+  cursor: pointer;
+  color: #555;
+}
+
+.compose-modal-body {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  padding: 16px;
+  gap: 10px;
+  overflow: hidden; /* prevents full modal scrolling */
+}
+
+.compose-modal-input {
+  padding: 10px 12px;
+  border-radius: 15px;
+  border: 2px solid #ccc;
+  font-size: 14px;
+  outline: none;
+  width: 95%;
+  background-color: white;
+  color: #222;
+}
+
+.compose-modal-textarea-container {
+  position: relative;
+  display: flex;
+  align-items: center;
+}
+
+/* Attachments preview with horizontal scroll only */
+.compose-modal-attachments-preview {
+  display: flex;
+  overflow-x: auto;
+  gap: 8px;
+  padding: 4px 0;
+  scrollbar-width: thin; /* Firefox */
+  scrollbar-color: #092c4c #f0f0f0; /* Firefox */
+}
+
+/* Chrome, Edge, Safari */
+.compose-modal-attachments-preview::-webkit-scrollbar {
+  height: 8px;
+}
+
+.compose-modal-attachments-preview::-webkit-scrollbar-track {
+  background: #f0f0f0;
+  border-radius: 4px;
+}
+
+.compose-modal-attachments-preview::-webkit-scrollbar-thumb {
+  background-color: #092c4c;
+  border-radius: 4px;
+}
+
+.compose-modal-attachment-item {
+  display: flex;
+  align-items: center;
+  flex: 0 0 auto;
+  padding: 6px 10px;
+  border: 1px solid #ccc;
+  border-radius: 6px;
+  background: #f4f4f4;
+  font-size: 0.85rem;
+  max-width: 180px;
+  overflow: hidden;
+}
+
+.compose-modal-attachment-remove {
+  margin-left: 4px;
+  background: transparent;
+  border: none;
+  cursor: pointer;
+  color: red;
+}
+
+
+
+.compose-modal-textarea-wrapper {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.compose-modal-textarea {
+  width: 100%;
+  min-height: 80px;
+  max-height: 150px;
+  padding: 10px 36px 460px 40px; /* bottom padding to make room for attachments */
+  border-radius: 20px;
+  border: 2px solid #ccc;
+  resize: none;
+  font-family: "Segoe UI", Tahoma, Geneva, Verdana, sans-serif;
+  background: white;
+  color: black;
+  box-sizing: border-box;
+}
+
+.compose-modal-attachment-label {
+  position: absolute;
+  left: 12px;
+  bottom: 10px;
+  cursor: pointer;
+  font-size: 1rem;
+  color: #092c4c;
+}
+
+.compose-modal-send-button {
+  position: absolute;
+  right: 10px;
+  bottom: -5px;
+  border: none;
+  background: transparent;
+  cursor: pointer;
+  font-size: 1.2rem;
+  color: #092c4c;
+}
+
+.compose-modal-attachments-preview-inside {
+  position: absolute;
+  left: 40px;
+  right: 50px;
+  bottom: 40px;
+  display: flex;
+  overflow-x: auto;
+  gap: 6px;
+  padding: 4px 0;
+}
+
+.compose-modal-attachments-preview-inside::-webkit-scrollbar {
+  height: 6px;
+}
+
+.compose-modal-attachments-preview-inside::-webkit-scrollbar-track {
+  background: #f0f0f0;
+  border-radius: 3px;
+}
+
+.compose-modal-attachments-preview-inside::-webkit-scrollbar-thumb {
+  background-color: #092c4c;
+  border-radius: 3px;
+}
+
+.compose-modal-attachment-item-small {
+  display: flex;
+  align-items: center;
+  flex: 0 0 auto;
+  padding: 4px 6px;
+  border: 1px solid #ccc;
+  border-radius: 6px;
+  background: #f4f4f4;
+  font-size: 0.75rem;
+  max-width: 120px;
+  overflow: hidden;
+  color: #222;
+}
+/* Modal Overlay */
+.my-compose-modal-overlay {
+  position: fixed;
+  top: 0; left: 0;
+  width: 100vw; height: 100vh;
+  background: rgba(0,0,0,0.5);
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  z-index: 1000;
+  padding: 16px;
+}
+
+/* Modal Pane */
+.my-compose-modal-pane {
+  background: #f5f5f5;
+  border-radius: 12px;
+  width: 100%;
+  max-width: 600px;
+  height: 90%;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+}
+
+/* Header */
+.my-compose-modal-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 16px;
+  background: #fff;
+  border-bottom: 1px solid #ddd;
+}
+.my-compose-modal-header h3 {
+  margin: 0;
+  font-size: 18px;
+  color: #333;
+}
+.my-compose-modal-header button {
+  border: none;
+  background: none;
+  font-size: 18px;
+  cursor: pointer;
+  color: #555;
+}
+
+/* Body */
+.my-compose-modal-body {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  padding: 16px;
+  gap: 10px;
+}
+
+/* Messages Area (Vertical Scroll) */
+.my-compose-modal-messages {
+  flex: 1;
+  overflow-y: auto;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  padding-right: 8px;
+  scrollbar-width: thin;
+  scrollbar-color: #092c4c #f0f0f0;
+}
+.my-compose-modal-messages::-webkit-scrollbar {
+  width: 8px;
+}
+.my-compose-modal-messages::-webkit-scrollbar-track {
+  background: #f0f0f0;
+  border-radius: 4px;
+}
+.my-compose-modal-messages::-webkit-scrollbar-thumb {
+  background-color: #092c4c;
+  border-radius: 4px;
+}
+
+/* Chat Messages */
+.chat-message.received {
+  background: #fff;
+  border: 1px solid #eee;
+  border-radius: 8px;
+  padding: 12px;
+  max-width: 90%;
+  align-self: flex-start;
+}
+.chat-message.sent {
+  background: #e1f5fe;
+  border: 1px solid #e1f5fe;
+  padding: 12px;
+  max-width: 90%;
+  align-self: flex-end;
+}
+.chat-header {
+  font-weight: 600;
+  font-size: 14px;
+  margin-bottom: 4px;
+  color: #333;
+}
+.chat-header span {
+  font-weight: 400;
+  font-size: 12px;
+  color: #999;
+  margin-left: 8px;
+}
+.chat-body {
+  font-size: 14px;
+  color: #444;
+  line-height: 1.4;
+}
+.chat-attachment a {
+  color: #3498db;
+  text-decoration: none;
+  font-size: 13px;
+  display: block;
+  margin-top: 4px;
+}
+.chat-attachment a:hover {
+  text-decoration: underline;
+}
+
+/* Textarea Container */
+.my-compose-textarea-container {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+/* Textarea */
+.my-compose-textarea {
+  flex-grow: 1;
+  min-height: 60px;
+  max-height: 150px;
+  width: 100%;
+  resize: none;
+  border-radius: 20px;
+  padding: 10px 40px 40px 12px; /* bottom padding for buttons & attachments */
+  border: 2px solid #ccc;
+  font-family: "Segoe UI", Tahoma, Geneva, Verdana, sans-serif;
+  background: white;
+  color: black;
+  overflow-y: auto;
+}
+
+/* Attachment Button */
+.my-compose-attachment-label {
+  position: absolute;
+  left: 12px;
+  bottom: 10px;
+  cursor: pointer;
+  font-size: 1rem;
+  color: #092c4c;
+}
+
+/* Send Button */
+.my-compose-send-button {
+  position: absolute;
+  right: 10px;
+  bottom: 10px;
+  border: none;
+  background: transparent;
+  cursor: pointer;
+  font-size: 1.2rem;
+  color: #092c4c;
+}
+
+/* Horizontal Attachments Preview inside Textarea */
+.my-compose-attachments-preview {
+  display: flex;
+  overflow-x: auto;
+  gap: 6px;
+  position: absolute;
+  bottom: 40px; /* above buttons */
+  left: 12px;
+  right: 12px;
+  padding: 4px 0;
+  scrollbar-width: thin;
+  scrollbar-color: #092c4c #f0f0f0;
+}
+.my-compose-attachments-preview::-webkit-scrollbar {
+  height: 6px;
+}
+.my-compose-attachments-preview::-webkit-scrollbar-track {
+  background: #f0f0f0;
+  border-radius: 4px;
+}
+.my-compose-attachments-preview::-webkit-scrollbar-thumb {
+  background-color: #092c4c;
+  border-radius: 4px;
+}
+
+/* Individual Attachment Item */
+.my-compose-attachment-item {
+  display: flex;
+  align-items: center;
+  padding: 4px 6px;
+  border: 1px solid #ccc;
+  border-radius: 6px;
+  background: #f4f4f4;
+  font-size: 0.75rem;
+  max-width: 120px;
+  overflow: hidden;
+}
+.my-compose-attachment-remove {
+  margin-left: 4px;
+  background: transparent;
+  border: none;
+  cursor: pointer;
+  color: red;
+  font-size: 0.85rem;
+}
+
