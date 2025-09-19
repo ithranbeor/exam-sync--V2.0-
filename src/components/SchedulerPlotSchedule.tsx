@@ -124,6 +124,116 @@ const Scheduler_PlotSchedule: React.FC = () => {
   const [canonicalSlots, setCanonicalSlots] = useState<Record<string, { start: string; end: string }>>({});
   const [selectedDay, setSelectedDay] = useState<string>("");
   const [showRemarksMap, setShowRemarksMap] = useState<Record<string, boolean>>({});
+  const [showDeanModal, setShowDeanModal] = useState(false);
+  const [deanName, setDeanName] = useState("");
+  const [_deanRole, setDeanRole] = useState("");
+  const [pdfFile, setPdfFile] = useState<File | null>(null);
+  const [deanRemarks, setDeanRemarks] = useState<string>("");
+  const [deanUserId, setDeanUserId] = useState<number | null>(null);
+  const [deanCollegeId, setDeanCollegeId] = useState<number | null>(null);
+
+  const handleSubmitToDean = async () => {
+    if (!pdfFile) {
+      toast.error("Please upload a PDF");
+      return;
+    }
+    if (!userId) {
+      toast.error("User not logged in");
+      return;
+    }
+    if (!deanUserId || !deanCollegeId) {
+      toast.error("Dean not selected");
+      return;
+    }
+
+    try {
+      const fileName = `${Date.now()}_${pdfFile.name}`;
+      const { data: uploadData, error: uploadErr } = await supabase.storage
+        .from("schedule-pdfs")
+        .upload(fileName, pdfFile);
+
+      if (uploadErr || !uploadData) {
+        console.error(uploadErr);
+        toast.error("Upload failed");
+        return;
+      }
+
+      const { error: insertErr } = await supabase
+        .from("tbl_scheduleapproval")
+        .insert({
+          request_id: crypto.randomUUID(),
+          dean_user_id: deanUserId,
+          dean_college: deanCollegeId,          
+          submitted_by: Number(userId),         
+          submitted_at: new Date().toISOString(),
+          status: "pending",
+          remarks: deanRemarks,
+          created_at: new Date().toISOString(),
+          file_url: uploadData.path,          
+        });
+
+      if (insertErr) {
+        console.error("Supabase insert error:", insertErr);
+        toast.error(`Failed to save schedule: ${insertErr.message}`);
+        return;
+      }
+
+      toast.success("Sent to Dean!");
+      setShowDeanModal(false);
+      setPdfFile(null);
+      setDeanRemarks("");
+    } catch (err) {
+      console.error(err);
+      toast.error("Unexpected error");
+    }
+  };
+
+  const handleSendToDeanClick = async () => {
+    if (!userId) return;
+
+    const { data: schedulerRole } = await supabase
+      .from("tbl_user_role")
+      .select("college_id")
+      .eq("user_id", userId)
+      .eq("role_id", 3)
+      .single();
+
+    if (!schedulerRole) {
+      toast.error("No scheduler role found");
+      return;
+    }
+
+    const collegeId = schedulerRole.college_id;
+
+    const { data: deanRoleData } = await supabase
+      .from('tbl_user_role')
+      .select('user_id, college_id') 
+      .eq('college_id', collegeId)
+      .eq('role_id', 1) 
+      .single();
+
+    if (!deanRoleData) {
+      toast.error("No dean found for this college");
+      return;
+    }
+
+    const deanId = deanRoleData.user_id;  // integer
+    setDeanUserId(deanId);
+    setDeanCollegeId(deanRoleData.college_id); 
+
+    // now get dean name for display
+    const { data: deanUser } = await supabase
+      .from('tbl_users')
+      .select('first_name,last_name')
+      .eq('user_id', deanId)
+      .single();
+
+    if (deanUser) {
+      setDeanName(`${deanUser.first_name} ${deanUser.last_name}`);
+      setDeanRole("Dean");
+      setShowDeanModal(true);
+    }
+  };
 
   const schedulesToDisplay = examDetails.filter(
     (ed) => ed.exam_date === selectedDay
@@ -230,24 +340,42 @@ const Scheduler_PlotSchedule: React.FC = () => {
   );
 
   const handleExportPDF = () => {
+    const orientation = globalThis.confirm("Click OK for Landscape, Cancel for Portrait")
+      ? "landscape"
+      : "portrait";
+
     const element = document.createElement("div");
 
     for (let i = 0; i < totalPages; i++) {
+      // create the page container first
       const pageDiv = document.createElement("div");
       pageDiv.classList.add("pdf-page");
-
-      const tableWrapper = document.getElementById(`schedule-page-${i}`);
-      if (tableWrapper) {
-        pageDiv.appendChild(tableWrapper.cloneNode(true));
+      if (orientation === "landscape") {
+        pageDiv.classList.add("landscape");
       }
 
+      // prevent breaking inside page container
+      (pageDiv.style as any).breakInside = "avoid";
+
+      // find the schedule content
+      const tableWrapper = document.getElementById(`schedule-page-${i}`);
+      if (tableWrapper) {
+        // clone it
+        const clone = tableWrapper.cloneNode(true) as HTMLElement;
+        // prevent breaking inside clone
+        (clone.style as any).breakInside = "avoid";
+        pageDiv.appendChild(clone);
+      }
+
+      // append the page to element
+      element.appendChild(pageDiv);
+
+      // add a page break after every page except the last
       if (i < totalPages - 1) {
         const pageBreak = document.createElement("div");
         pageBreak.classList.add("page-break");
-        pageDiv.appendChild(pageBreak);
+        element.appendChild(pageBreak);
       }
-
-      element.appendChild(pageDiv);
     }
 
     html2pdf()
@@ -255,8 +383,8 @@ const Scheduler_PlotSchedule: React.FC = () => {
         margin: 10,
         filename: "Exam_Schedule.pdf",
         image: { type: "jpeg", quality: 0.98 },
-        html2canvas: { scale: 2 },
-        jsPDF: { unit: "mm", format: "a4", orientation: "landscape" },
+        html2canvas: { scale: 2, useCORS: true },
+        jsPDF: { unit: "mm", format: "a4", orientation },
       })
       .from(element)
       .save();
@@ -1572,10 +1700,45 @@ const Scheduler_PlotSchedule: React.FC = () => {
               {/* Other icons in a row */}
               <div className="footer-icon-buttons">
                 {/* Send to Dean */}
-                <button type= 'button' className="btn-icon-only tooltip" data-tooltip="Send to Dean">
+                <button
+                  type='button'
+                  className="btn-icon-only tooltip"
+                  data-tooltip="Send to Dean"
+                  onClick={handleSendToDeanClick}
+                >
                   <FaPaperPlane />
                   <span className="tooltip-text">Send to Dean</span>
                 </button>
+
+                {showDeanModal && (
+                  <div className="modal-overlay">
+                    <div className="modal-content">
+                      <h3>Send Schedule to Dean</h3>
+                      <p>Dean: <strong>{deanName}</strong></p>
+
+                      <input
+                        type="file"
+                        accept="application/pdf"
+                        onChange={(e) => setPdfFile(e.target.files?.[0] || null)}
+                      />
+
+                      <textarea
+                        placeholder="Remarks (optional)"
+                        value={deanRemarks}
+                        onChange={(e) => setDeanRemarks(e.target.value)}
+                      />
+
+                      <div className="modal-actions">
+                        <button type='button' onClick={() => setShowDeanModal(false)} className="btn-cancel">
+                          <FaTimes /> Cancel
+                        </button>
+                        <button type='button' onClick={handleSubmitToDean} className="btn-send">
+                          <FaPaperPlane /> Send
+                        </button>
+                      </div>
+                    </div>
+                  </div>
+                )}
                 {/* Reassign Proctor */}
                 <div style={{ position: "relative", display: "inline-block" }}>
                   {/* Reassign Proctor Button */}

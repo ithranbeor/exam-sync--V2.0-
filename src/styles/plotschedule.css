@@ -701,3 +701,22 @@ button.btn-generate.tooltip {
 .dropdown-menu-reassign .tooltip-text {
   display: none; /* can hide tooltips if unnecessary */
 }
+/* Only avoid breaking inside the outer page wrapper */
+.pdf-page {
+  page-break-inside: avoid;
+  break-inside: avoid;
+  /* optional spacing */
+  padding: 6mm;
+  box-sizing: border-box;
+  justify-content: flex-start;
+}
+
+.page-break {
+  page-break-after: always;
+  break-after: page;
+}
+
+.time-box {
+  page-break-inside: avoid;
+  break-inside: avoid;
+}

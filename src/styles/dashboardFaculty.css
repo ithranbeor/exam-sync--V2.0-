@@ -436,8 +436,9 @@ button.view-button {
   background-color: #f5f7fa;
   color:#F2994A; 
   font-weight: bold;
-  border-radius: 100px;
-  width: 1000%;
+  border-top-left-radius: 100px;
+  border-bottom-left-radius: 100px;
+  width: 100%;
 }
 
 .sidebar-nav ul li button:hover {
