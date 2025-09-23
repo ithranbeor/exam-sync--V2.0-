@@ -391,8 +391,11 @@
 }
 
 .modal-content {
-  background: #ffffff;
-  padding: 2rem;
+  display: flex;
+  flex-direction: column; /* Stack items vertically */
+  gap: 1.5rem; /* Space between main sections */
+  background: #ffffff; /* Keep your existing background */
+  padding: 3rem;
   border-radius: 16px;
   width: 90%;
   max-width: 720px;
@@ -400,6 +403,95 @@
   overflow-y: auto;
   box-shadow: 0 8px 24px rgba(0, 0, 0, 0.2);
   font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+}
+
+/* Container for "Send Schedule to Dean" and the Dean's name */
+.header-section {
+  display: flex;
+  align-items: center;
+  gap: 2rem; 
+}
+
+.send-schedule-text {
+  font-size: 1.2rem; 
+  font-weight: bold;
+  color: #333; 
+}
+
+.dean-info {
+  display: flex;
+  flex-direction: column; 
+  font-size: 1rem;
+  color: #555;
+}
+
+/* Container for the file input and "No file chosen" */
+.file-input-section {
+  display: flex;
+  align-items: center; /* Vertically align items in the center */
+  gap: 10px; /* Space between button and text */
+}
+
+.file-input-section input[type="file"] {
+  /* Hide the default input, we'll style the button instead */
+  display: none;
+}
+
+.custom-file-upload {
+  display: inline-block;
+  padding: 8px 15px;
+  cursor: pointer;
+  background-color: #007bff; /* Blue button */
+  color: white;
+  border: none;
+  border-radius: 5px;
+  font-size: 0.9rem;
+  transition: background-color 0.2s ease;
+}
+
+.custom-file-upload:hover {
+  background-color: #0056b3; /* Darker blue on hover */
+}
+
+.file-chosen-text {
+  font-size: 0.9rem;
+  color: #777;
+}
+
+/* Container for Cancel and Send buttons */
+.action-buttons {
+  display: flex;
+  justify-content: flex-end; /* Align buttons to the right */
+  gap: 15px; /* Space between buttons */
+  margin-top: auto; /* Push buttons to the bottom if modal content is short */
+}
+
+.action-buttons .cancel-btn,
+.action-buttons .send-btn {
+  padding: 10px 20px;
+  border: none;
+  border-radius: 5px;
+  font-size: 1rem;
+  cursor: pointer;
+  transition: background-color 0.2s ease;
+}
+
+.action-buttons .cancel-btn {
+  background-color: #dc3545; /* Red for Cancel */
+  color: white;
+}
+
+.action-buttons .cancel-btn:hover {
+  background-color: #c82333;
+}
+
+.action-buttons .send-btn {
+  background-color: #28a745; /* Green for Send */
+  color: white;
+}
+
+.action-buttons .send-btn:hover {
+  background-color: #218838;
 }
 
 .profile-header {
