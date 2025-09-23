@@ -482,4 +482,10 @@
   cursor: not-allowed;
   background-color: #ffffff;
 }
+.calendar-day.allowed {
+  background-color: #ffdd00; /* light green */
+  font-weight: bold;
+  color: #ffffff;
+  border-radius: 10%;
+}
 

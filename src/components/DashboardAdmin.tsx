@@ -32,6 +32,7 @@ const DashboardAdmin = () => {
   const [user, setUser] = useState<any>(null);
   const [roles, setRoles] = useState<string[]>([]);
   const navigate = useNavigate();
+  const [showLogoutModal, setShowLogoutModal] = useState(false);
 
   useEffect(() => {
     const loadUser = async () => {
@@ -211,14 +212,40 @@ const DashboardAdmin = () => {
                 </button>
               </li>
               <li>
-                <button onClick={handleLogout}>
-                  <FaSignOutAlt {...iconStyle} />
-                  {isSidebarOpen && <span>Logout</span>}
-                </button>
-              </li>
-            </ul>
-          </nav>
-        </aside>
+              <button onClick={() => setShowLogoutModal(true)}>
+                <FaSignOutAlt />
+                {isSidebarOpen && <span>Logout</span>}
+              </button>
+            </li>
+          </ul>
+        </nav>
+      </aside>
+
+      {/* Modal outside sidebar */}
+      {showLogoutModal && (
+        <div className="myModal-overlay">
+          <div className="myModal-box">
+            <h3 className="myModal-title">Are you sure you want to logout?</h3>
+            <div className="myModal-actions">
+              <button
+                onClick={() => {
+                  setShowLogoutModal(false);
+                  handleLogout();
+                }}
+                className="myModal-btn myModal-btn-confirm"
+              >
+                Logout
+              </button>
+              <button
+                onClick={() => setShowLogoutModal(false)}
+                className="myModal-btn myModal-btn-cancel"
+              >
+                Cancel
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
 
         <main className={`main-content ${isSidebarOpen ? 'sidebar-open' : 'sidebar-closed'}`}>
           <div className="content-header">

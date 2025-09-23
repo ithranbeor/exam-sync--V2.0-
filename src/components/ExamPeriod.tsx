@@ -1,12 +1,13 @@
 // deno-lint-ignore-file no-explicit-any
 import React, { useEffect, useState } from 'react';
-import { FaTrash, FaEdit, FaDownload, FaSearch, FaCalendarAlt } from 'react-icons/fa';
+import { FaTrash, FaEdit, FaDownload, FaSearch } from 'react-icons/fa';
 import { supabase } from '../lib/supabaseClient.ts';
 import * as XLSX from 'xlsx';
 import { ToastContainer, toast } from 'react-toastify';
 import 'react-toastify/dist/ReactToastify.css';
 import '../styles/colleges.css';
 import Select from 'react-select';
+import Calendar from 'react-calendar';
 
 interface ExamPeriod {
   examperiod_id?: number;
@@ -19,7 +20,6 @@ interface ExamPeriod {
   college_id?: string | null;
 }
 
-
 interface Term { term_id: number; term_name: string; }
 interface Department { department_id: string; department_name: string; }
 interface College { college_id: string; college_name: string; }
@@ -27,7 +27,7 @@ interface College { college_id: string; college_name: string; }
 const academicYears = ['2024-2025', '2025-2026', '2026-2027', '2027-2028', '2028-2029'];
 const examCategories = ['Preliminary', 'Midterm', 'Pre-Final', 'Final'];
 
-const ExamPeriod: React.FC = () => {
+const ExamPeriodComponent: React.FC = () => {
   const [examPeriods, setExamPeriods] = useState<ExamPeriod[]>([]);
   const [terms, setTerms] = useState<Term[]>([]);
   const [departments, setDepartments] = useState<Department[]>([]);
@@ -43,6 +43,8 @@ const ExamPeriod: React.FC = () => {
   const [filterDept, setFilterDept] = useState('');
   const [filterCollege, setFilterCollege] = useState('');
   const [showFilters, setShowFilters] = useState(false);
+  // NEW: store selected dates for the calendar
+  const [selectedDates, setSelectedDates] = useState<Date[]>([]);
 
   const [newExam, setNewExam] = useState<ExamPeriod>({
     start_date: '',
@@ -51,7 +53,7 @@ const ExamPeriod: React.FC = () => {
     exam_category: '',
     term_id: 0,
     department_id: '',
-    college_id: '',
+    college_id: null,
   });
 
   useEffect(() => {
@@ -71,30 +73,44 @@ const ExamPeriod: React.FC = () => {
     if (collegeRes.data) setColleges(collegeRes.data);
   };
 
-  const handleSubmit = async () => {
-    const { start_date, end_date, academic_year, exam_category, term_id, department_id, college_id } = newExam;
+  // keep newExam start/end in sync with selectedDates
+  useEffect(() => {
+    if (selectedDates.length === 1) {
+      setNewExam(prev => ({
+        ...prev,
+        start_date: toLocalDateString(selectedDates[0]),
+        end_date: toLocalDateString(selectedDates[0]),
+      }));
+    } else if (selectedDates.length > 1) {
+      const sorted = [...selectedDates].sort((a, b) => a.getTime() - b.getTime());
+      setNewExam(prev => ({
+        ...prev,
+        start_date: toLocalDateString(sorted[0]),
+        end_date: toLocalDateString(sorted[sorted.length - 1]),
+      }));
+    } else {
+      setNewExam(prev => ({ ...prev, start_date: '', end_date: '' }));
+    }
+  }, [selectedDates]);
 
-    if (!start_date || !end_date || !academic_year || !exam_category || !term_id) {
-      toast.error('Please fill in all required fields');
+  const handleSubmit = async () => {
+    const { academic_year, exam_category, term_id, department_id, college_id } = newExam;
+
+    if (!academic_year || !exam_category || !term_id || selectedDates.length === 0) {
+      toast.error('Please fill in all required fields and select at least one date');
       return;
     }
 
     setIsSubmitting(true);
 
-    const start = new Date(start_date);
-    const end = new Date(end_date);
-    const dates: string[] = [];
+    // use exactly the selected dates
+    const dates: string[] = selectedDates
+      .map(d => toLocalDateString(d))  // 👈 local date string
+      .sort();
 
-    // Generate all dates from start_date to end_date
-    while (start <= end) {
-      dates.push(new Date(start).toISOString());
-      start.setDate(start.getDate() + 1);
-    }
-
-    // Build and insert payloads for each date
-    const payloads = dates.map((date) => ({
-      start_date: date,
-      end_date: date,
+    const payloads = selectedDates.sort((a,b)=>a.getTime()-b.getTime()).map(d => ({
+      start_date: toLocalDateString(d),
+      end_date: toLocalDateString(d),
       academic_year,
       exam_category,
       term_id,
@@ -105,7 +121,6 @@ const ExamPeriod: React.FC = () => {
     let error = null;
 
     if (editMode && newExam.examperiod_id) {
-      // Only support editing one record in edit mode
       const { error: updateError } = await supabase
         .from('tbl_examperiod')
         .update(payloads[0])
@@ -127,6 +142,7 @@ const ExamPeriod: React.FC = () => {
 
     setShowModal(false);
     setIsSubmitting(false);
+    setSelectedDates([]);
   };
 
   const handleDelete = async (id: number) => {
@@ -149,8 +165,8 @@ const ExamPeriod: React.FC = () => {
       for (const row of data) {
         const term = terms.find(t => t.term_name === row['Term Name']);
         const dept = departments.find(d => d.department_id === row['Department ID']);
-        const college = colleges.find(c => c.college_id === row['College ID']);  
-        if (!term || !dept || !college) continue;
+        const college = colleges.find(c => c.college_id === row['College ID']);
+        if (!term) continue;
 
         const payload = {
           start_date: new Date(row['Start Date']).toISOString(),
@@ -191,6 +207,12 @@ const ExamPeriod: React.FC = () => {
     (!filterCollege || e.college_id === filterCollege) &&
     (e.start_date)
   );
+
+  function toLocalDateString(d: Date): string {
+    // Pad month/day
+    const pad = (n: number) => n.toString().padStart(2, '0');
+    return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`;
+  }
 
   return (
     <div className="colleges-container">
@@ -248,8 +270,9 @@ const ExamPeriod: React.FC = () => {
             exam_category: '',
             term_id: 0,
             department_id: '',
-            college_id: '',
+            college_id: null,
           });
+          setSelectedDates([]);
           setShowModal(true);
         }}>Add New Period</button>
 
@@ -289,6 +312,9 @@ const ExamPeriod: React.FC = () => {
                   <button type='button' className="icon-button edit-button" onClick={() => {
                     setEditMode(true);
                     setNewExam(e);
+                    setSelectedDates([
+                      new Date(e.start_date)
+                    ]);
                     setShowModal(true);
                   }}><FaEdit /></button>
                   <button type='button' className="icon-button delete-button" onClick={() => handleDelete(e.examperiod_id!)}><FaTrash /></button>
@@ -301,108 +327,143 @@ const ExamPeriod: React.FC = () => {
       </div>
 
       {showModal && (
-        <div className="modal-overlay">
-          <div className="modal">
-            <h3 style={{ textAlign: 'center' }}>{editMode ? 'Edit Exam Period' : 'Add Exam Period'}</h3>
-            <div className="input-group">
-            <label>Start Date</label>
-            <div className="date-input-wrapper">
-              <input
-                type="date"
-                value={newExam.start_date}
-                onChange={(e) => setNewExam({ ...newExam, start_date: e.target.value })}
-              />
-              <FaCalendarAlt className="calendar-icon-right" />
-            </div>
-          </div>
+        <div className="examperiod-overlay">
+          <div className="examperiod-modal">
+            <h3 className="examperiod-title">
+              {editMode ? 'Edit Exam Period' : 'Set Exam Period'}
+            </h3>
 
-          <div className="input-group">
-            <label>End Date</label>
-            <div className="date-input-wrapper">
-              <input
-                type="date"
-                value={newExam.end_date}
-                onChange={(e) => setNewExam({ ...newExam, end_date: e.target.value })}
-              />
-              <FaCalendarAlt className="calendar-icon-right" />
-            </div>
-          </div>
-            <div className="input-group">
-              <label>Academic Year</label>
-              <select value={newExam.academic_year} onChange={(e) => setNewExam({ ...newExam, academic_year: e.target.value })}>
-                <option value="">Select Year</option>
-                {academicYears.map(y => <option key={y} value={y}>{y}</option>)}
-              </select>
-            </div>
-            <div className="input-group">
-              <label>Exam Category</label>
-              <select value={newExam.exam_category} onChange={(e) => setNewExam({ ...newExam, exam_category: e.target.value })}>
-                <option value="">Select Category</option>
-                {examCategories.map(c => <option key={c} value={c}>{c}</option>)}
-              </select>
-            </div>
-            <div className="input-group">
-              <label>Term</label>
-              <Select
-                className="react-select"
-                classNamePrefix="select"
-                options={terms
-                  .sort((a, b) => a.term_name.localeCompare(b.term_name))
-                  .map(t => ({ value: t.term_id, label: t.term_name }))}
-                value={newExam.term_id
-                  ? { value: newExam.term_id, label: terms.find(t => t.term_id === newExam.term_id)?.term_name || '' }
-                  : null}
-                onChange={opt =>
-                  setNewExam({ ...newExam, term_id: opt?.value ?? 0 })
-                }
-                placeholder="Select Term"
-                isClearable
-              />
+            <div className="examperiod-body">
+              {/* Left side - Calendar */}
+              <div className="examperiod-calendar-section">
+                <label className="examperiod-label">Select Exam Duration</label>
+                <Calendar
+                  calendarType="gregory"    // 👈 forces Sunday as first day
+                  value={undefined}
+                  onClickDay={(date) => {
+                    const exists = selectedDates.some(d =>
+                      toLocalDateString(d) === toLocalDateString(date)
+                    );
+                    if (exists) {
+                      setSelectedDates(prev =>
+                        prev.filter(d => toLocalDateString(d) !== toLocalDateString(date))
+                      );
+                    } else {
+                      setSelectedDates(prev => [...prev, date]);
+                    }
+                  }}
+                  tileClassName={({ date }) =>
+                    selectedDates.some(d => toLocalDateString(d) === toLocalDateString(date))
+                      ? 'examperiod-selected-day'
+                      : undefined
+                  }
+                />
+              </div>
+
+              {/* Right side - Inputs */}
+              <div className="examperiod-inputs-section">
+                <div className="examperiod-input-group">
+                  <label className="examperiod-label">Academic Year</label>
+                  <Select
+                    className="examperiod-select"
+                    classNamePrefix="examperiod"
+                    // build options array from academicYears
+                    options={academicYears.map(y => ({ value: y, label: y }))}
+                    // current value must be an object {value,label} or null
+                    value={newExam.academic_year 
+                      ? { value: newExam.academic_year, label: newExam.academic_year }
+                      : null}
+                    onChange={opt =>
+                      setNewExam({ ...newExam, academic_year: opt?.value ?? '' })
+                    }
+                    placeholder="Select Year"
+                    isClearable
+                  />
+                </div>
+
+                {/* Exam Category */}
+                <div className="examperiod-input-group">
+                  <label className="examperiod-label">Exam Term</label>
+                  <Select
+                    className="examperiod-select"
+                    classNamePrefix="examperiod"
+                    options={examCategories.map(c => ({ value: c, label: c }))}
+                    value={newExam.exam_category
+                      ? { value: newExam.exam_category, label: newExam.exam_category }
+                      : null}
+                    onChange={opt =>
+                      setNewExam({ ...newExam, exam_category: opt?.value ?? '' })
+                    }
+                    placeholder="Select Exam Term"
+                    isClearable
+                  />
+                </div>
+
+                <div className="examperiod-input-group">
+                  <label className="examperiod-label">Semester</label>
+                  <Select
+                    className="examperiod-select"
+                    classNamePrefix="examperiod"
+                    options={terms
+                      .sort((a, b) => a.term_name.localeCompare(b.term_name))
+                      .map(t => ({ value: t.term_id, label: t.term_name }))}
+                    value={newExam.term_id
+                      ? { value: newExam.term_id, label: terms.find(t => t.term_id === newExam.term_id)?.term_name || '' }
+                      : null}
+                    onChange={opt =>
+                      setNewExam({ ...newExam, term_id: opt?.value ?? 0 })
+                    }
+                    placeholder="Select Semester"
+                    isClearable
+                  />
+                </div>
+
+                <div className="examperiod-input-group">
+                  <label className="examperiod-label">Department</label>
+                  <Select
+                    className="examperiod-select"
+                    classNamePrefix="examperiod"
+                    options={departments
+                      .sort((a, b) => a.department_name.localeCompare(b.department_name))
+                      .map(d => ({ value: d.department_id, label: d.department_name }))}
+                    value={newExam.department_id
+                      ? { value: newExam.department_id, label: departments.find(d => d.department_id === newExam.department_id)?.department_name || '' }
+                      : null}
+                    onChange={opt =>
+                      setNewExam({ ...newExam, department_id: opt?.value || null })
+                    }
+                    placeholder="Optional"
+                    isClearable
+                  />
+                </div>
+
+                <div className="examperiod-input-group">
+                  <label className="examperiod-label">College</label>
+                  <Select
+                    className="examperiod-select"
+                    classNamePrefix="examperiod"
+                    options={colleges
+                      .sort((a, b) => a.college_name.localeCompare(b.college_name))
+                      .map(c => ({ value: c.college_id, label: c.college_name }))}
+                    value={newExam.college_id
+                      ? { value: newExam.college_id, label: colleges.find(c => c.college_id === newExam.college_id)?.college_name || '' }
+                      : null}
+                    onChange={opt =>
+                      setNewExam({ ...newExam, college_id: opt?.value || null })
+                    }
+                    placeholder="Optional"
+                    isClearable
+                    menuPlacement="top"
+                  />
+                </div>
+              </div>
             </div>
 
-            <div className="input-group">
-              <label>Department</label>
-              <Select
-                className="react-select"
-                classNamePrefix="select"
-                options={departments
-                  .sort((a, b) => a.department_name.localeCompare(b.department_name))
-                  .map(d => ({ value: d.department_id, label: d.department_name }))}
-                value={newExam.department_id
-                  ? { value: newExam.department_id, label: departments.find(d => d.department_id === newExam.department_id)?.department_name || '' }
-                  : null}
-                onChange={opt =>
-                  setNewExam({ ...newExam, department_id: opt?.value || null })
-                }
-                placeholder="Select Department"
-                isClearable
-              />
-            </div>
-
-            <div className="input-group">
-              <label>College</label>
-              <Select
-                className="react-select"
-                classNamePrefix="select"
-                options={colleges
-                  .sort((a, b) => a.college_name.localeCompare(b.college_name))
-                  .map(c => ({ value: c.college_id, label: c.college_name }))}
-                value={newExam.college_id
-                  ? { value: newExam.college_id, label: colleges.find(c => c.college_id === newExam.college_id)?.college_name || '' }
-                  : null}
-                onChange={opt =>
-                  setNewExam({ ...newExam, college_id: opt?.value || null })
-                }
-                placeholder="Select College"
-                isClearable
-                menuPlacement="top"
-              />
-            </div>
-            <div className="modal-actions">
-              <button type='button' onClick={handleSubmit} disabled={isSubmitting}>
+            <div className="examperiod-actions">
+              <button type="button" onClick={handleSubmit} disabled={isSubmitting}>
                 {isSubmitting ? 'Saving...' : 'Save'}
               </button>
-              <button type='button' onClick={() => setShowModal(false)}>Cancel</button>
+              <button type="button" onClick={() => setShowModal(false)}>Cancel</button>
             </div>
           </div>
         </div>
@@ -411,19 +472,16 @@ const ExamPeriod: React.FC = () => {
       {showImport && (
         <div className="modal-overlay">
           <div className="modal">
-            <h3 style={{ textAlign: 'center' }}>Import Exam Periods</h3>
-            <input type="file" accept=".xlsx,.xls" onChange={handleImport} />
-            <div className="modal-actions">
-              <button type='button' onClick={() => setShowImport(false)}>Done</button>
-              <button type='button' onClick={() => setShowImport(false)}>Cancel</button>
-            </div>
+            <h3>Import Exam Periods</h3>
+            <input type="file" accept=".xlsx, .xls" onChange={handleImport} />
+            <button type='button' onClick={() => setShowImport(false)}>Close</button>
           </div>
         </div>
       )}
 
-      <ToastContainer position="top-right" autoClose={3000} />
+      <ToastContainer />
     </div>
   );
 };
 
-export default ExamPeriod;
+export default ExamPeriodComponent;

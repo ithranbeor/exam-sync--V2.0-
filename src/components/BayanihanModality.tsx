@@ -3,7 +3,7 @@ import { supabase } from '../lib/supabaseClient.ts';
 import '../styles/bayanihanModality.css';
 import { ToastContainer, toast } from 'react-toastify';
 import 'react-toastify/dist/ReactToastify.css';
-import Select from 'react-select';
+import Select, { components } from 'react-select';
 
 interface UserProps {
   user: {
@@ -38,8 +38,10 @@ const BayanihanModality: React.FC<UserProps> = ({ user }) => {
   const [courseOptions, setCourseOptions] = useState<{ course_id: string; course_name: string }[]>([]);
   const [sectionOptions, setSectionOptions] = useState<{ course_id: string; program_id: string; section_name: string }[]>([]);
   const [roomOptions, setRoomOptions] = useState<{ room_id: string; room_name: string; room_type: string; building_id?: string }[]>([]);
-  const [_sectionDropdownOpen, setSectionDropdownOpen] = useState(false);
-  const dropdownRef = useRef<HTMLDivElement>(null);
+  const [_sectionDropdownOpen, _setSectionDropdownOpen] = useState(false);
+  const [isSubmitting, setIsSubmitting] = useState(false); // add this at the top with other state
+
+  const _dropdownRef = useRef<HTMLDivElement>(null);
 
   // Modal states
   const [showRoomModal, setShowRoomModal] = useState(false);
@@ -54,6 +56,20 @@ const BayanihanModality: React.FC<UserProps> = ({ user }) => {
   const [roomStatus, setRoomStatus] = useState<{
     [key: string]: { occupiedTimes: { start: string; end: string }[] }
   }>({});
+
+    const CheckboxOption = (props: any) => {
+    return (
+      <components.Option {...props}>
+        <input
+          type="checkbox"
+          checked={props.isSelected}
+          readOnly
+          style={{ marginRight: 8 }}
+        />
+        {props.label}
+      </components.Option>
+    );
+  };
 
   /** FETCH ROOM STATUS BASED ON EXAMDETAILS */
   useEffect(() => {
@@ -174,12 +190,14 @@ const BayanihanModality: React.FC<UserProps> = ({ user }) => {
   /** HANDLE FORM SUBMIT */
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-
+    if (isSubmitting) return; // prevent double submit
     if (!user?.user_id) return;
     if (!form.sections.length) {
       toast.warn('Please select at least one section.');
       return;
     }
+
+    setIsSubmitting(true); // start loading
 
     for (const sectionName of form.sections) {
       const section = sectionOptions.find(
@@ -187,7 +205,6 @@ const BayanihanModality: React.FC<UserProps> = ({ user }) => {
       );
       if (!section) continue;
 
-      // ✅ Check for duplicates before insert
       const { data: existing, error: checkError } = await supabase
         .from('tbl_modality')
         .select('modality_id')
@@ -205,12 +222,10 @@ const BayanihanModality: React.FC<UserProps> = ({ user }) => {
       }
 
       if (existing) {
-        // 🚫 Already exists → prevent redundancy
         toast.warn(`Already submitted for ${section.section_name}`);
         continue;
       }
 
-      // ✅ Insert if no duplicate found
       const { error: insertError } = await supabase.from('tbl_modality').insert([
         {
           modality_type: form.modality,
@@ -228,6 +243,8 @@ const BayanihanModality: React.FC<UserProps> = ({ user }) => {
       if (insertError) toast.error(`Failed to save for ${section.section_name}`);
       else toast.success(`Saved for ${section.section_name}`);
     }
+
+    setIsSubmitting(false); // end loading
 
     // Reset form after submit
     setForm({
@@ -407,36 +424,53 @@ const BayanihanModality: React.FC<UserProps> = ({ user }) => {
               {/* SECTIONS */}
               <div className="form-group full-width">
                 <label>Sections</label>
-                <Select
-                  isMulti
-                  isDisabled={!form.course}
-                  options={sectionOptions
-                    .filter(s => s.course_id === form.course)
-                    .map(s => ({
-                      value: s.section_name,
-                      label: s.section_name,
-                      isDisabled:
-                        form.rooms.length > 0 &&
-                        form.sections.length >= form.rooms.length &&
-                        !form.sections.includes(s.section_name),
-                    }))}
-                  value={form.sections.map(sec => ({ value: sec, label: sec }))}
-                  onChange={selected => {
-                    const selectedSections = selected ? selected.map(s => s.value) : [];
-                    setForm(prev => ({ ...prev, sections: selectedSections }));
-                  }}
-                  placeholder={`Select up to ${form.rooms.length || 0} section(s)...`}
-                  isClearable
-                />
 
-                {/* ✅ Counter */}
+                {form.course ? (
+                  <Select
+                    isMulti
+                    closeMenuOnSelect={false}
+                    hideSelectedOptions={false}
+                    components={{ Option: CheckboxOption }}
+                    options={[
+                      { value: 'select_all', label: 'Select All Sections' },
+                      ...sectionOptions
+                        .filter(s => s.course_id === form.course)
+                        .map(s => ({ value: s.section_name, label: s.section_name }))
+                    ]}
+                    value={form.sections.map(sec => ({ value: sec, label: sec }))}
+                    onChange={(selected) => {
+                      if (!selected) {
+                        setForm(prev => ({ ...prev, sections: [] }));
+                        return;
+                      }
+
+                      const allSectionNames = sectionOptions
+                        .filter(s => s.course_id === form.course)
+                        .map(s => s.section_name);
+
+                      const selectAllClicked = selected.find(s => s.value === 'select_all');
+
+                      if (selectAllClicked) {
+                        // If select all clicked, select all sections
+                        setForm(prev => ({ ...prev, sections: allSectionNames }));
+                      } else {
+                        const selectedSections = selected.map(s => s.value);
+                        setForm(prev => ({ ...prev, sections: selectedSections }));
+                      }
+                    }}
+                    placeholder="Select sections..."
+                  />
+                ) : (
+                  <p style={{ color: "#888" }}>Select a course first</p>
+                )}
+
+                {/* Counter */}
                 {form.rooms.length > 0 && (
                   <small style={{ marginTop: "4px", display: "block", color: "#666" }}>
-                     ⚠️ Number of sections must equal number of rooms! {form.sections.length} of {form.rooms.length} section(s) selected.
+                    ⚠️ Number of sections must equal number of rooms! {form.sections.length} of {form.rooms.length} section(s) selected.
                   </small>
                 )}
               </div>
-
               {/* REMARKS */}
               <div className="form-group">
                 <label>Remarks</label>
@@ -450,7 +484,13 @@ const BayanihanModality: React.FC<UserProps> = ({ user }) => {
 
             </div>
 
-            <button type="submit" className="submit-button">Submit</button>
+            <button type="submit" className="submit-button" disabled={isSubmitting}>
+              {isSubmitting ? (
+                <span className="spinner"></span> // you can style this with CSS
+              ) : (
+                'Submit'
+              )}
+            </button>
           </form>
         </div>
       </div>

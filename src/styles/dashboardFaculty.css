@@ -398,21 +398,23 @@ button.view-button {
   display: grid;
   grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
   gap: 20px;
+  margin-top: 1rem;
+  height: 80vh;
 }
 
 .try-thing-card {
   display: flex;
   flex-direction: column;
-  justify-content: space-between;
+  justify-content: flex-start; /* let content stack naturally */
   align-items: stretch;
   text-align: center;
   padding: 15px;
-  background-color: var(--card-bg);
+  background-color: transparent; 
   border-radius: 15px;
-  box-shadow: var(--shadow);
   height: 100%;
-  position: relative;
+  overflow: hidden; /* make sure inner content doesn’t overflow */
 }
+
 
 .try-thing-footer {
   margin-top: auto;
@@ -471,4 +473,84 @@ button.view-button {
 .sidebar-footer button:hover {
     background-color: var(--menu-hover-bg); 
     padding-left: 5px;
+}
+/* Backdrop */
+.myModal-overlay {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background-color: rgba(0, 0, 0, 0.4);
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  z-index: 9999;
+}
+
+/* Modal card */
+.myModal-box {
+  background-color: #ffffff;
+  border-radius: 12px;
+  padding: 1.5rem 2rem;
+  max-width: 400px;
+  width: 90%;
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.15);
+  text-align: center;
+  animation: modalFadeIn 0.3s ease-out;
+}
+
+.myModal-title {
+  font-size: 1.2rem;
+  margin-bottom: 1rem;
+  font-weight: 600;
+  color: #222;
+}
+
+/* Button row */
+.myModal-actions {
+  display: flex;
+  justify-content: center;
+  gap: 1rem;
+  margin-top: 1rem;
+}
+
+/* Generic button style */
+.myModal-btn {
+  padding: 0.5rem 1.25rem;
+  border: none;
+  border-radius: 6px;
+  font-size: 0.95rem;
+  cursor: pointer;
+  transition: background-color 0.2s ease, color 0.2s ease;
+}
+
+/* Confirm button — e.g. Logout */
+.myModal-btn-confirm {
+  background-color: #F2994A; /* green */
+  color: #fff;
+}
+.myModal-btn-confirm:hover {
+  background-color: #e47514; /* darker green on hover */
+}
+
+/* Cancel button */
+.myModal-btn-cancel {
+  background-color: #f0f0f0; /* light grey */
+  color: #333;
+}
+.myModal-btn-cancel:hover {
+  background-color: #e0e0e0; /* darker grey on hover */
+}
+
+/* Animation */
+@keyframes modalFadeIn {
+  from {
+    opacity: 0;
+    transform: translateY(-15px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
 }

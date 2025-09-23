@@ -8,12 +8,13 @@ type ExamPeriod = {
   examperiod_id: number;
   start_date: string;
   end_date: string;
-  college_id: string;
-  department_id: string;
+  college_id: string | null;        // <-- allow null
+  department_id: string | null;     // <-- allow null
   academic_year: string;
   exam_category: string;
   term_id: number;
 };
+
 
 type Term = {
   term_id: number;
@@ -40,30 +41,27 @@ const ProctorExamDate = () => {
     const fetchExamPeriods = async () => {
       const { data, error } = await supabase
         .from('tbl_examperiod')
-        .select('examperiod_id, start_date, end_date, college_id, department_id, academic_year, exam_category, term_id');
-
-      if (error) {
-        console.error('Error fetching exam periods:', error);
-      } else {
-        setExamPeriods(data);
-      }
+        .select('*');
+      if (!error) setExamPeriods(data);
 
       const { data: terms, error: termError } = await supabase
         .from('tbl_term')
-        .select('term_id, term_name');
-
-      if (termError) {
-        console.error('Error fetching terms:', termError);
-      } else {
+        .select('*');
+      if (!termError) {
         const map: Record<string, string> = {};
-        terms.forEach((term: Term) => {
-          map[String(term.term_id)] = term.term_name;
-        });
+        terms.forEach((t: Term) => (map[t.term_id] = t.term_name));
         setTermMap(map);
       }
     };
 
+    // initial fetch
     fetchExamPeriods();
+
+    // set up polling every 2s
+    const intervalId = setInterval(fetchExamPeriods, 2000);
+
+    // cleanup
+    return () => clearInterval(intervalId);
   }, []);
 
   const isBetween = (target: Date, start: Date, end: Date) => {
@@ -141,15 +139,17 @@ const ProctorExamDate = () => {
     let content = null;
 
     if (events.length > 0) {
-      const uniqueColleges = Array.from(new Set(events.map(e => e.college_id)));
+      const uniqueColleges = Array.from(new Set(events.map(e => e.college_id || '')));
 
       content = (
         <div className="event-details">
-          {uniqueColleges.map((college, idx) => (
-            <div key={idx} className={`college-badge ${college.toLowerCase()}`}>
-              {college}
-            </div>
-          ))}
+          {uniqueColleges
+            .filter(college => college) // skip null/empty
+            .map((college, idx) => (
+              <div key={idx} className={`college-badge ${college.toLowerCase()}`}>
+                {college}
+              </div>
+            ))}
           <div className="semester">{termMap[String(events[0].term_id)] || 'Unknown Term'}</div>
           <div className="semester">{events[0].academic_year}</div>
           <div className="exam">{events[0].exam_category}</div>

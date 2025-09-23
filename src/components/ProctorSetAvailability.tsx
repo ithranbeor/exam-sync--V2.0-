@@ -2,6 +2,8 @@ import React, { useState, useEffect } from 'react';
 import '../styles/proctorSetAvailability.css';
 import { FaChevronLeft, FaChevronRight } from 'react-icons/fa';
 import { supabase } from '../lib/supabaseClient.ts';
+import { ToastContainer, toast } from 'react-toastify';
+import 'react-toastify/dist/ReactToastify.css';
 
 type ProctorSetAvailabilityProps = {
   user: {
@@ -10,10 +12,16 @@ type ProctorSetAvailabilityProps = {
   };
 };
 
-const ProctorSetAvailability: React.FC<ProctorSetAvailabilityProps> = ({ user }) => {
+enum AvailabilityTimeSlot {
+  Morning = '7 AM - 1 PM (Morning)',
+  Afternoon = '1 PM - 6 PM (Afternoon)',
+  Evening = '6 PM - 9 PM (Evening)',
+}
 
+
+const ProctorSetAvailability: React.FC<ProctorSetAvailabilityProps> = ({ user }) => {
   const [selectedDate, setSelectedDate] = useState('');
-  const [selectedTimeSlot, setSelectedTimeSlot] = useState('7 AM - 12 NN (Morning)');
+  const [selectedTimeSlot, setSelectedTimeSlot] = useState<AvailabilityTimeSlot>(AvailabilityTimeSlot.Morning);
   const [availabilityStatus, setAvailabilityStatus] = useState('available');
   const [remarks, setRemarks] = useState('');
   const [changeStatus, setChangeStatus] = useState('unavailable');
@@ -21,70 +29,117 @@ const ProctorSetAvailability: React.FC<ProctorSetAvailabilityProps> = ({ user })
   const [showDatePicker, setShowDatePicker] = useState(false);
   const [currentMonth, setCurrentMonth] = useState(new Date());
   const [allowedDates, setAllowedDates] = useState<string[]>([]);
-
+  const [_collegeName, setCollegeName] = useState('');
+  const [collegeId, setCollegeId] = useState<number | null>(null);
+  const [hasSubmitted, setHasSubmitted] = useState(false); // new
+  const [isSubmitting, setIsSubmitting] = useState(false); // prevent duplicate submits
   const today = new Date();
-
+  
   useEffect(() => {
-    const localToday = new Date();
-    localToday.setHours(12, 0, 0, 0);
-    setSelectedDate(localToday.toISOString().split('T')[0]);
-    setCurrentMonth(new Date(localToday.getFullYear(), localToday.getMonth(), 1));
-  }, []);
+    const checkExistingSubmission = async () => {
+      if (!user?.user_id) return;
 
-  useEffect(() => {
-    const fetchExamPeriods = async () => {
-      const { data: roleData, error: roleError } = await supabase
-        .from('tbl_user_role')
-        .select('college_id, department_id')
+      const { data, error } = await supabase
+        .from('tbl_availability')
+        .select('*')
         .eq('user_id', user.user_id)
         .limit(1)
         .single();
 
-      if (roleError || !roleData) {
-        console.error('Error fetching user role:', roleError?.message);
+      if (!error && data) {
+        setHasSubmitted(true); // user already submitted
+      } else {
+        setHasSubmitted(false);
+      }
+    };
+
+    checkExistingSubmission();
+  }, [user.user_id]);
+
+  // set month to current
+  useEffect(() => {
+    const localToday = new Date();
+    localToday.setHours(12, 0, 0, 0);
+    setCurrentMonth(new Date(localToday.getFullYear(), localToday.getMonth(), 1));
+  }, []);
+
+  useEffect(() => {
+    const fetchUserRoleAndSchedule = async () => {
+      // fetch roles of user
+      const { data: roles, error: rolesError } = await supabase
+        .from('tbl_user_role')
+        .select('role_id, college_id')
+        .eq('user_id', user.user_id);
+
+      if (rolesError || !roles) {
+        console.error('Error fetching user roles:', rolesError?.message);
         return;
       }
 
-      const { college_id, department_id } = roleData;
+      // find Proctor role
+      const proctorRole = roles.find(r => r.role_id === 5);
+      if (!proctorRole) {
+        console.log('User is not a Proctor');
+        setCollegeName('');
+        setCollegeId(null);
+        setAllowedDates([]);
+        return;
+      }
 
+      const college_id = proctorRole.college_id;
+      setCollegeId(college_id); // store college_id
+
+      // fetch college name
+      const { data: college, error: collegeError } = await supabase
+        .from('tbl_college')
+        .select('name')
+        .eq('college_id', college_id)
+        .single();
+
+      if (!collegeError && college?.name) {
+        setCollegeName(college.name);
+      }
+
+      // fetch exam periods for this college
       const { data: periods, error: examError } = await supabase
         .from('tbl_examperiod')
         .select('start_date, end_date')
-        .or(`college_id.eq.${college_id},department_id.eq.${department_id}`);
+        .eq('college_id', college_id);
 
       if (examError || !periods) {
         console.error('Error fetching exam periods:', examError?.message);
+        setAllowedDates([]);
         return;
       }
 
+      // build allowed date list
       const generatedDates: string[] = [];
-
-      for (const period of periods) {
-        if (!period.start_date || !period.end_date) continue;
-
+      periods.forEach(period => {
+        if (!period.start_date || !period.end_date) return;
         const start = new Date(period.start_date);
         const end = new Date(period.end_date);
-
-        if (isNaN(start.getTime()) || isNaN(end.getTime())) continue;
-
-        for (const i = new Date(start); i <= end; i.setDate(i.getDate() + 1)) {
-          const dateCopy = new Date(i);
-          generatedDates.push(dateCopy.toISOString().split('T')[0]);
+        for (let d = new Date(start); d <= end; d.setDate(d.getDate() + 1)) {
+          generatedDates.push(new Date(d).toISOString().split('T')[0]);
         }
-      }
+      });
 
       generatedDates.sort();
       setAllowedDates(generatedDates);
 
+      // select today if allowed
       const todayStr = new Date().toISOString().split('T')[0];
-      setSelectedDate(generatedDates.includes(todayStr) ? todayStr : generatedDates[0] || '');
-
-      const today = new Date();
-      setCurrentMonth(new Date(today.getFullYear(), today.getMonth(), 1));
+      setSelectedDate(generatedDates.includes(todayStr) ? todayStr : '');
+      setCurrentMonth(new Date());
     };
 
-    fetchExamPeriods();
-  }, []);
+    // call immediately
+    fetchUserRoleAndSchedule();
+
+    // set interval to refresh every 2 seconds
+    const interval = setInterval(fetchUserRoleAndSchedule, 2000);
+
+    return () => clearInterval(interval); // cleanup on unmount
+  }, [user.user_id]);
 
   const daysInMonth = (year: number, month: number) => new Date(year, month + 1, 0).getDate();
   const firstDayOfMonth = (year: number, month: number) => new Date(year, month, 1).getDay();
@@ -121,53 +176,104 @@ const ProctorSetAvailability: React.FC<ProctorSetAvailabilityProps> = ({ user })
     setCurrentMonth(prev => new Date(prev.getFullYear(), prev.getMonth() + 1, 1));
   };
 
+  // jump to today but only select if allowed
   const goToToday = () => {
-    const today = new Date();
-    today.setHours(12, 0, 0, 0);
-    setCurrentMonth(new Date(today.getFullYear(), today.getMonth(), 1));
-    setSelectedDate(today.toISOString().split('T')[0]);
+    const now = new Date();
+    now.setHours(12, 0, 0, 0);
+    setCurrentMonth(new Date(now.getFullYear(), now.getMonth(), 1));
+    const todayStr = now.toISOString().split('T')[0];
+    if (allowedDates.includes(todayStr)) {
+      setSelectedDate(todayStr);
+    } else {
+      setSelectedDate('');
+    }
   };
-
-  const timeSlots = [
-    '7 AM - 12 NN (Morning)',
-    '1 PM - 5 PM (Afternoon)',
-    '5 PM - 9 PM (Evening)',
-  ];
 
   const availabilityOptions = ['available', 'unavailable'];
 
   const handleSubmitAvailability = async (e: React.FormEvent) => {
     e.preventDefault();
 
+    if (hasSubmitted) {
+      toast.info('You have already submitted your availability. Delete previous entry to submit again.');
+      return;
+    }
+
+    if (isSubmitting) return;
+    setIsSubmitting(true);
+
     const userId = user?.user_id;
     if (!userId) {
-      alert('User is not logged in.');
+      toast.info('User is not logged in.');
+      setIsSubmitting(false);
+      return;
+    }
+
+    // Default date to first allowed date if none selected
+    let submitDate = selectedDate;
+    if (!submitDate) {
+      if (allowedDates.length === 0) {
+        toast.info('No available dates to submit.');
+        setIsSubmitting(false);
+        return;
+      }
+      submitDate = allowedDates[0];
+      setSelectedDate(submitDate);
+    }
+
+    // Default time slot and status
+    const submitTimeSlot = selectedTimeSlot || AvailabilityTimeSlot.Morning;
+    const submitStatus = availabilityStatus || 'available';
+
+    // Check if the user already has a record
+    const { data: existing, error: checkError } = await supabase
+      .from('tbl_availability')
+      .select('availability_id')
+      .eq('user_id', userId)
+      .maybeSingle(); // <- important fix
+
+    if (checkError) {
+      console.error('Error checking existing availability:', checkError);
+      toast.info('Failed to check existing availability.');
+      setIsSubmitting(false);
+      return;
+    }
+
+    if (existing) {
+      alert('You have already submitted your availability. Delete previous entry to submit again.');
+      setHasSubmitted(true);
+      setIsSubmitting(false);
       return;
     }
 
     const data = {
-      day: selectedDate,
-      time_slot: selectedTimeSlot,
-      status: availabilityStatus,
-      remarks,
+      day: submitDate,
+      time_slot: submitTimeSlot,
+      status: submitStatus,
+      remarks: remarks || null,
       user_id: userId,
     };
 
-    const { error } = await supabase.from('tbl_availability').insert(data);
+    const { error: insertError } = await supabase
+      .from('tbl_availability')
+      .insert([data]);
 
-    if (error) {
-      console.error('Error submitting availability:', error.message);
-      alert('Failed to submit availability.');
+    if (insertError) {
+      console.error('Supabase insert error:', insertError);
+      toast.error(`Failed to submit availability: ${insertError.message}`);
     } else {
-      alert('Availability set successfully!');
+      toast.success('Availability set successfully!');
+      setHasSubmitted(true);
       setRemarks('');
     }
+
+    setIsSubmitting(false);
   };
 
   const handleSubmitChangeRequest = (e: React.FormEvent) => {
     e.preventDefault();
     console.log('Change request:', { changeStatus, reason });
-    alert('Change request submitted!');
+    toast.success('Change request submitted!');
   };
 
   return (
@@ -175,20 +281,42 @@ const ProctorSetAvailability: React.FC<ProctorSetAvailabilityProps> = ({ user })
       <div className="availability-sections">
         <div className="availability-card">
           <div className="card-header-set">Set Availability</div>
-          <div className="subtitle">(This will allow the proctor to choose his/her availability for the exam schedule. Scroll down to Request Change of Availability)</div>
+          <div className="subtitle">(Choose your availability for the exam schedule. Scroll down to request changes.)</div>
           <form onSubmit={handleSubmitAvailability} className="availability-form">
+            {/* Day Picker */}
             <div className="form-group">
               <label htmlFor="day">Day</label>
               <div className="custom-select-wrapper">
                 <input
                   type="text"
                   id="day"
-                  value={new Date(selectedDate).toLocaleDateString('en-US', { month: 'long', day: 'numeric', year: 'numeric' })}
+                  value={
+                    allowedDates.length > 0
+                      ? selectedDate
+                        ? new Date(selectedDate).toLocaleDateString('en-US', {
+                            month: 'long',
+                            day: 'numeric',
+                            year: 'numeric',
+                          })
+                        : new Date(allowedDates[allowedDates.length - 1]).toLocaleDateString('en-US', {
+                            month: 'long',
+                            day: 'numeric',
+                            year: 'numeric',
+                          })
+                      : `No date schedule available for ${collegeId ?? 'N/A'}`
+                  }
                   readOnly
-                  onClick={() => setShowDatePicker(!showDatePicker)}
+                  onClick={() => (allowedDates.length > 0 && !(hasSubmitted || isSubmitting)) && setShowDatePicker(!showDatePicker)}
                   className="date-input-field"
+                  style={{ cursor: hasSubmitted || isSubmitting ? 'not-allowed' : 'pointer' }}
                 />
-                <span className="dropdown-arrow" onClick={() => setShowDatePicker(!showDatePicker)}>&#9660;</span>
+                <span
+                  className="dropdown-arrow"
+                  onClick={() => (allowedDates.length > 0 && !(hasSubmitted || isSubmitting)) && setShowDatePicker(!showDatePicker)}
+                >
+                  &#9660;
+                </span>
+
                 {showDatePicker && (
                   <div className="date-picker">
                     <div className="date-picker-header">
@@ -201,26 +329,27 @@ const ProctorSetAvailability: React.FC<ProctorSetAvailabilityProps> = ({ user })
                         <div key={i} className="day-name">{d}</div>
                       ))}
                       {getCalendarDays().map((day, index) => {
-                      const dayDate = day
-                        ? new Date(currentMonth.getFullYear(), currentMonth.getMonth(), day, 12)
-                        : null;
+                        const dayDate = day ? new Date(currentMonth.getFullYear(), currentMonth.getMonth(), day, 12) : null;
+                        const isoDate = dayDate ? dayDate.toISOString().split('T')[0] : '';
+                        const isAllowed = allowedDates.includes(isoDate) && !(hasSubmitted || isSubmitting);
+                        const isSelected = isoDate === selectedDate;
+                        const isToday = dayDate && dayDate.toDateString() === today.toDateString();
 
-                      const isoDate = dayDate ? dayDate.toISOString().split('T')[0] : '';
-                      const isAllowed = allowedDates.includes(isoDate);
-                      const isSelected = isoDate === selectedDate;
-                      const isToday = dayDate && dayDate.toDateString() === today.toDateString();
-
-                      return (
-                        <div
-                          key={index}
-                          className={`calendar-day ${day ? 'selectable' : ''} ${isSelected ? 'selected' : ''} ${isToday && !isSelected ? 'today' : ''} ${isAllowed ? '' : 'disabled'}`}
-                          onClick={() => isAllowed && handleDateSelect(day)}
-                          style={{ pointerEvents: isAllowed ? 'auto' : 'none', opacity: isAllowed ? 1 : 0.3 }}
-                        >
-                          {day}
-                        </div>
-                      );
-                    })}
+                        return (
+                          <div
+                            key={index}
+                            className={`calendar-day 
+                              ${day ? 'selectable' : ''} 
+                              ${isSelected ? 'selected' : ''} 
+                              ${isToday && !isSelected ? 'today' : ''} 
+                              ${isAllowed ? 'allowed' : 'disabled'}`}
+                            onClick={() => isAllowed && handleDateSelect(day)}
+                            style={{ pointerEvents: isAllowed ? 'auto' : 'none', opacity: isAllowed ? 1 : 0.3 }}
+                          >
+                            {day}
+                          </div>
+                        );
+                      })}
                     </div>
                     <div className="date-picker-footer">
                       <button type="button" onClick={goToToday}>Now</button>
@@ -231,16 +360,17 @@ const ProctorSetAvailability: React.FC<ProctorSetAvailabilityProps> = ({ user })
               </div>
             </div>
 
+            {/* Time Slot */}
             <div className="form-group">
               <label htmlFor="timeSlot">Time Slot</label>
               <div className="custom-select-wrapper">
                 <select
                   id="timeSlot"
                   value={selectedTimeSlot}
-                  onChange={(e) => setSelectedTimeSlot(e.target.value)}
-                  className="custom-select"
+                  onChange={(e) => setSelectedTimeSlot(e.target.value as AvailabilityTimeSlot)}
+                  disabled={hasSubmitted || isSubmitting}
                 >
-                  {timeSlots.map(slot => (
+                  {Object.values(AvailabilityTimeSlot).map(slot => (
                     <option key={slot} value={slot}>{slot}</option>
                   ))}
                 </select>
@@ -248,6 +378,7 @@ const ProctorSetAvailability: React.FC<ProctorSetAvailabilityProps> = ({ user })
               </div>
             </div>
 
+            {/* Status */}
             <div className="form-group">
               <label htmlFor="status">Status</label>
               <div className="custom-select-wrapper">
@@ -255,6 +386,7 @@ const ProctorSetAvailability: React.FC<ProctorSetAvailabilityProps> = ({ user })
                   id="status"
                   value={availabilityStatus}
                   onChange={(e) => setAvailabilityStatus(e.target.value)}
+                  disabled={hasSubmitted || isSubmitting}
                   className="custom-select"
                 >
                   {availabilityOptions.map(option => (
@@ -265,6 +397,7 @@ const ProctorSetAvailability: React.FC<ProctorSetAvailabilityProps> = ({ user })
               </div>
             </div>
 
+            {/* Remarks */}
             <div className="form-group">
               <label htmlFor="remarks">Remarks</label>
               <textarea
@@ -272,10 +405,28 @@ const ProctorSetAvailability: React.FC<ProctorSetAvailabilityProps> = ({ user })
                 value={remarks}
                 onChange={(e) => setRemarks(e.target.value)}
                 placeholder="Type here..."
+                disabled={hasSubmitted || isSubmitting}
               ></textarea>
             </div>
 
-            <button type="submit" className="submit-button">Submit</button>
+            {/* Centered Submit Button */}
+            <div style={{ textAlign: 'center', marginTop: '20px' }}>
+              <button
+                type="submit"
+                className="submit-button"
+                disabled={hasSubmitted || isSubmitting}
+                style={{ minWidth: '150px' }}
+              >
+                {isSubmitting ? 'Submitting...' : 'Submit'}
+              </button>
+            </div>
+
+            {/* Info message if already submitted */}
+            {hasSubmitted && (
+              <p className="info-text" style={{ textAlign: 'center', marginTop: '10px' }}>
+                You have already submitted your availability. You can only submit again if your previous entry is deleted.
+              </p>
+            )}
           </form>
         </div>
 
@@ -314,6 +465,7 @@ const ProctorSetAvailability: React.FC<ProctorSetAvailabilityProps> = ({ user })
           </form>
         </div>
       </div>
+        <ToastContainer position="top-right" autoClose={3000} hideProgressBar />
     </div>
   );
 };

@@ -30,6 +30,7 @@ const roleSidebarMap: Record<string, { key: string, label: string, icon: JSX.Ele
     { key: 'inbox', label: 'Inbox', icon: <FaInbox {...iconStyle} /> },
   ],
   scheduler: [
+    { key: 'exam-Date', label: 'Exam Date', icon: <FaCalendar {...iconStyle} /> },
     { key: 'plot-Schedule', label: 'Plot Schedule', icon: <FaCalendarPlus {...iconStyle} /> },
     { key: 'exam-Schedule', label: 'View Exam Schedule', icon: <FaClipboardList {...iconStyle} /> },
     { key: 'proctor-Availability', label: 'Available Proctor', icon: <FaUsers {...iconStyle} /> },
@@ -43,6 +44,7 @@ const roleSidebarMap: Record<string, { key: string, label: string, icon: JSX.Ele
     { key: 'inbox', label: 'Inbox', icon: <FaInbox {...iconStyle} /> },
   ],
   'bayanihan leader': [
+    { key: 'exam-Date', label: 'Exam Date', icon: <FaCalendar {...iconStyle} /> },
     { key: 'set-Modality', label: 'Set Modality', icon: <FaPenAlt {...iconStyle} /> },
     { key: 'exam-Schedule', label: 'View Exam Schedule', icon: <FaClipboardList {...iconStyle} /> },
     { key: 'notification', label: 'Notification', icon: <FaBell {...iconStyle} /> },
@@ -65,6 +67,7 @@ const DashboardFaculty = () => {
   const [roles, setRoles] = useState<string[]>([]);
   const [unreadCount, setUnreadCount] = useState(0);
   const navigate = useNavigate();
+  const [showLogoutModal, setShowLogoutModal] = useState(false);
 
   // Load user
   useEffect(() => {
@@ -173,6 +176,12 @@ const DashboardFaculty = () => {
     navigate('/');
   };
 
+  const handleLogoutConfirm = () => {
+    localStorage.removeItem('user');
+    sessionStorage.removeItem('user');
+    navigate('/');
+  };
+
   const timeString = currentDateTime.toLocaleTimeString('en-US', {
     hour: '2-digit',
     minute: '2-digit',
@@ -226,14 +235,38 @@ const DashboardFaculty = () => {
                   {isSidebarOpen && <span>Profile</span>}
                 </button>
               </li>
+
               <li>
-                <button onClick={handleLogout}>
-                  <FaSignOutAlt {...iconStyle} />
+                <button onClick={() => setShowLogoutModal(true)}>
+                  <FaSignOutAlt />
                   {isSidebarOpen && <span>Logout</span>}
                 </button>
               </li>
             </ul>
           </nav>
+
+          {/* Modal overlay, rendered at end of aside so not inside .sidebar-nav */}
+          {showLogoutModal && (
+            <div className="myModal-overlay">
+              <div className="myModal-box">
+                <h3 className="myModal-title">Are you sure you want to logout?</h3>
+                <div className="myModal-actions">
+                  <button
+                    onClick={handleLogoutConfirm}
+                    className="myModal-btn myModal-btn-confirm"
+                  >
+                    Logout
+                  </button>
+                  <button
+                    onClick={() => setShowLogoutModal(false)}
+                    className="myModal-btn myModal-btn-cancel"
+                  >
+                    Cancel
+                  </button>
+                </div>
+              </div>
+            </div>
+          )}
         </aside>
         )}
 
@@ -272,8 +305,8 @@ const DashboardFaculty = () => {
               <div className="full-width-section">
                 <h2>Shortcut</h2>
                 <div className="try-things-grid">
-                  <div className="card try-thing-card"><ProctorExamDate /></div>
-                  <div className="card try-thing-card"><ProctorViewExam /></div>
+                  <div className="try-thing-card"><ProctorExamDate /></div>
+                  <div className="try-thing-card"><ProctorViewExam /></div>
                 </div>
               </div>
             </div>
