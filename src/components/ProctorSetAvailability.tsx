@@ -34,6 +34,12 @@ const ProctorSetAvailability: React.FC<ProctorSetAvailabilityProps> = ({ user })
   const [hasSubmitted, setHasSubmitted] = useState(false); // new
   const [isSubmitting, setIsSubmitting] = useState(false); // prevent duplicate submits
   const today = new Date();
+  const [availabilityInfo, setAvailabilityInfo] = useState<{
+    name: string;
+    date: string;
+    timeSlot: string;
+  } | null>(null);
+  const [showModal, setShowModal] = useState(false);
   
   useEffect(() => {
     const checkExistingSubmission = async () => {
@@ -41,15 +47,31 @@ const ProctorSetAvailability: React.FC<ProctorSetAvailabilityProps> = ({ user })
 
       const { data, error } = await supabase
         .from('tbl_availability')
-        .select('*')
+        .select('day, time_slot')
         .eq('user_id', user.user_id)
         .limit(1)
         .single();
 
       if (!error && data) {
-        setHasSubmitted(true); // user already submitted
-      } else {
-        setHasSubmitted(false);
+        setHasSubmitted(true);
+
+        const formattedDate = new Date(data.day).toLocaleDateString('en-US', {
+          month: 'long',
+          day: 'numeric',
+          year: 'numeric',
+        });
+
+        const firstName = (user as any).first_name ?? '';
+        const lastName  = (user as any).last_name  ?? '';
+        const fullName  = (firstName || lastName)
+          ? `${firstName} ${lastName}`.trim()
+          : (user as any).name ?? 'Unknown User';
+
+        setAvailabilityInfo({
+          name: fullName,
+          date: formattedDate,
+          timeSlot: data.time_slot,
+        });
       }
     };
 
@@ -424,11 +446,39 @@ const ProctorSetAvailability: React.FC<ProctorSetAvailabilityProps> = ({ user })
             {/* Info message if already submitted */}
             {hasSubmitted && (
               <p className="info-text" style={{ textAlign: 'center', marginTop: '10px' }}>
-                You have already submitted your availability. You can only submit again if your previous entry is deleted.
+                You have already submitted your availability.{' '}
+                <span
+                  style={{ color: 'blue', textDecoration: 'underline', cursor: 'pointer' }}
+                  onClick={() => setShowModal(true)}
+                >
+                  Click here to "view"
+                </span>. You can only submit again if your previous entry is deleted.
               </p>
             )}
           </form>
         </div>
+        {showModal &&
+          <div className="availability-modal-overlay">
+            <div className="availability-modal-box">
+              <h2 className="availability-modal-title">Availability Details</h2>
+              {availabilityInfo ? (
+                <div className="availability-modal-body">
+                  <p><strong>Name:</strong> {availabilityInfo.name}</p>
+                  <p><strong>Date:</strong> {availabilityInfo.date}</p>
+                  <p><strong>Time Slot:</strong> {availabilityInfo.timeSlot}</p>
+                </div>
+              ) : (
+                <p className="availability-modal-body">No availability info found.</p>
+              )}
+              <button type="button" 
+                onClick={() => setShowModal(false)} 
+                className="availability-modal-close-btn"
+              >
+                Close
+              </button>
+            </div>
+          </div>
+        }
 
         <div className="availability-card">
           <div className="card-header-request">Request Change of Availability</div>

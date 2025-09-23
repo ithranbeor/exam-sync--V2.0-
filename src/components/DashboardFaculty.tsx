@@ -33,7 +33,7 @@ const roleSidebarMap: Record<string, { key: string, label: string, icon: JSX.Ele
     { key: 'exam-Date', label: 'Exam Date', icon: <FaCalendar {...iconStyle} /> },
     { key: 'plot-Schedule', label: 'Plot Schedule', icon: <FaCalendarPlus {...iconStyle} /> },
     { key: 'exam-Schedule', label: 'View Exam Schedule', icon: <FaClipboardList {...iconStyle} /> },
-    { key: 'proctor-Availability', label: 'Available Proctor', icon: <FaUsers {...iconStyle} /> },
+    { key: 'proctors-Availability', label: 'Available Proctor', icon: <FaUsers {...iconStyle} /> },
     { key: 'notification', label: 'Notification', icon: <FaBell {...iconStyle} /> },
     { key: 'inbox', label: 'Inbox', icon: <FaInbox {...iconStyle} /> },
   ],
@@ -319,7 +319,7 @@ const DashboardFaculty = () => {
           {activeMenu === 'notification' && <Notification />}
           {activeMenu === 'set-Modality' && <BayanihanModality user={user} />}
           {activeMenu === 'plot-Schedule' && <SchedulerPlotSchedule/>}
-          {activeMenu === 'proctor-Availability' && <SchedulerAvailability/>}
+          {activeMenu === 'proctors-Availability' && <SchedulerAvailability user={user}/>}
           {activeMenu === 'inbox' && <Inbox user={user}/>}
           {activeMenu === 'Request' && <DeanRequests/>}
         </main>

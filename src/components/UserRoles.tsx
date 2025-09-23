@@ -678,8 +678,7 @@ const UserRoles = () => {
 
       {showImportModal && (
         <div className="modal-overlay">
-          <div className="modal">
-            <div className="modal-content import-modal">
+            <div className="modal-contents import-modal">
               <h4 style={{ textAlign: 'center' }}>Import Roles from Excel</h4>
               <div className="input-group">
                 <label>Upload Excel File</label>
@@ -691,7 +690,6 @@ const UserRoles = () => {
                 <button type="button" className="modal-button cancel" onClick={() => setShowImportModal(false)}>Cancel</button>
               </div>
             </div>
-          </div>
         </div>
       )}
 

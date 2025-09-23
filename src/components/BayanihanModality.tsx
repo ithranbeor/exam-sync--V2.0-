@@ -498,7 +498,7 @@ const BayanihanModality: React.FC<UserProps> = ({ user }) => {
        {/* ROOM MODAL */}
       {showRoomModal && (
         <div className="modal-overlay">
-          <div className="modal-contents">
+          <div className="modal-contents-modality">
             <h3>Select Room</h3>
 
             <Select
@@ -580,7 +580,7 @@ const BayanihanModality: React.FC<UserProps> = ({ user }) => {
       {/* OCCUPANCY MODAL */}
       {occupancyModal.visible && occupancyModal.roomId && (
         <div className="modal-overlay">
-          <div className="modal-content">
+          <div className="modal-contents-modality">
             <h3>Room Occupancy</h3>
             <RoomTimeslots roomId={occupancyModal.roomId} />
             <div className="modal-actions">
