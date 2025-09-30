@@ -1402,7 +1402,7 @@ const Scheduler_PlotSchedule: React.FC = () => {
             </div>
 
             <div className="form-group">
-              <label>Exam Category</label>
+              <label>Exam Term</label>
               <select
                 name="exam_category"
                 value={formData.exam_category}
@@ -1866,6 +1866,7 @@ const Scheduler_PlotSchedule: React.FC = () => {
                 <FiRefreshCw />
                 </button>
               </div>
+              
               <div style={{ textAlign: 'center', marginBottom: '15px' }}>
                 <img
                   src="/USTPlogo.png"

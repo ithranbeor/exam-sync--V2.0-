@@ -1,0 +1,117 @@
+/* SchedulerPlottingSchedule.css */
+
+/* Container / card */
+.scheduler-container {
+  max-width: 700px;
+  margin: 24px auto;
+  padding: 20px;
+  background: #ffffff;
+  border-radius: 10px;
+  box-shadow: 0 6px 18px rgba(0,0,0,0.06);
+  font-family: Inter, system-ui, -apple-system, "Segoe UI", Roboto, "Helvetica Neue", Arial;
+  color: #0f172a;
+}
+
+/* Header/title */
+.scheduler-header {
+  font-size: 20px;
+  font-weight: 700;
+  margin-bottom: 12px;
+  letter-spacing: -0.2px;
+}
+
+/* Row / field wrapper */
+.field {
+  display: block;
+  margin-bottom: 12px;
+}
+
+/* Inputs and selects */
+.input,
+.select,
+.textarea {
+  width: 100%;
+  box-sizing: border-box;
+  padding: 10px 12px;
+  border: 1px solid #d1d5db;
+  border-radius: 8px;
+  font-size: 14px;
+  outline: none;
+  transition: border-color 0.12s ease, box-shadow 0.12s ease;
+  background: #fff;
+  color: inherit;
+}
+
+.input:focus,
+.select:focus,
+.textarea:focus {
+  border-color: #2563eb;
+  box-shadow: 0 0 0 4px rgba(37,99,235,0.08);
+}
+
+/* Date input tweaks for consistent height */
+.input[type="date"] {
+  padding: 9px 12px;
+}
+
+/* Label (optional) */
+.label {
+  display: block;
+  margin-bottom: 6px;
+  font-size: 13px;
+  color: #374151;
+}
+
+/* Small helper / note text */
+.helper {
+  font-size: 12px;
+  color: #6b7280;
+  margin-top: 6px;
+}
+
+/* Button */
+.btn-save {
+  width: 100%;
+  padding: 11px 14px;
+  border-radius: 8px;
+  border: none;
+  background: #2563eb;
+  color: #fff;
+  font-weight: 600;
+  font-size: 15px;
+  cursor: pointer;
+  transition: transform 0.08s ease, box-shadow 0.12s ease;
+}
+
+.btn-save:hover {
+  transform: translateY(-1px);
+  box-shadow: 0 8px 20px rgba(37,99,235,0.12);
+}
+
+.btn-save:active {
+  transform: translateY(0);
+  box-shadow: none;
+}
+
+/* Small responsive behavior */
+@media (max-width: 480px) {
+  .scheduler-container {
+    margin: 12px;
+    padding: 16px;
+  }
+
+  .scheduler-header {
+    font-size: 18px;
+  }
+}
+/* Force visible text/background for selects and options */
+.select {
+  color: #0f172a;            /* dark text in the select field */
+  background-color: #ffffff; /* white background */
+}
+
+/* also style the dropdown items themselves */
+.select option {
+  color: #0f172a;            /* dark text for options */
+  background-color: #ffffff; /* white background for options */
+}

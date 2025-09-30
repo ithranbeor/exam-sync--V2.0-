@@ -33,6 +33,7 @@ const LoginFaculty: React.FC = () => {
   const [userProfile, setUserProfile] = useState<any>(null);
   const [awaitingRoleSelection, setAwaitingRoleSelection] = useState(false);
   const navigate = useNavigate();
+  const [loading, setLoading] = useState(false);
 
   useEffect(() => {
     const interval = setInterval(() => {
@@ -44,6 +45,7 @@ const LoginFaculty: React.FC = () => {
   const handleLogin = async (e: React.FormEvent) => {
     e.preventDefault();
     setError('');
+    setLoading(true);           // 👈 start loading
 
     try {
       const { data: userRecord, error: userLookupError } = await supabase
@@ -99,31 +101,29 @@ const LoginFaculty: React.FC = () => {
 
       const rolesExcludingAdmin = activeRoles.filter((role) => role !== 'admin');
 
-      // If only admin
       if (rolesExcludingAdmin.length === 0 && activeRoles.includes('admin')) {
         completeLogin('admin', fullUser);
         return;
       }
 
-      // If only one role (excluding admin), go directly
       if (rolesExcludingAdmin.length === 1) {
         completeLogin(rolesExcludingAdmin[0], fullUser);
         return;
       }
 
-      // If multiple non-admin roles → use merged dashboard
       if (rolesExcludingAdmin.length >= 2) {
-        completeLogin('faculty', fullUser); // faculty-dashboard handles merged roles
+        completeLogin('faculty', fullUser);
         return;
       }
 
-      // Fallback to role selection
       setAvailableRoles(rolesExcludingAdmin);
       setUserProfile(fullUser);
       setAwaitingRoleSelection(true);
     } catch (err) {
       console.error('Unexpected error:', err);
       setError('An unexpected error occurred.');
+    } finally {
+      setLoading(false);        // 👈 always stop loading
     }
   };
 
@@ -241,8 +241,8 @@ const LoginFaculty: React.FC = () => {
                   </option>
                 ))}
               </select>
-              <button type="button" onClick={handleRoleSelection} className="login-button">
-                Continue
+              <button type="submit" className="login-button" disabled={loading}>
+                {loading ? <span className="spinner"></span> : 'Login'}
               </button>
               {error && <p className="error-text">{error}</p>}
             </div>

@@ -141,7 +141,7 @@ const ProctorSetAvailability: React.FC<ProctorSetAvailabilityProps> = ({ user })
         const start = new Date(period.start_date);
         const end = new Date(period.end_date);
         for (let d = new Date(start); d <= end; d.setDate(d.getDate() + 1)) {
-          generatedDates.push(new Date(d).toISOString().split('T')[0]);
+          generatedDates.push(new Date(d).toLocaleDateString("en-CA")); // <-- FIXED
         }
       });
 
@@ -181,8 +181,8 @@ const ProctorSetAvailability: React.FC<ProctorSetAvailabilityProps> = ({ user })
   const handleDateSelect = (day: number | null) => {
     if (!day) return;
 
-    const selected = new Date(currentMonth.getFullYear(), currentMonth.getMonth(), day, 12);
-    const iso = selected.toISOString().split('T')[0];
+    const selected = new Date(currentMonth.getFullYear(), currentMonth.getMonth(), day);
+    const iso = selected.toLocaleDateString("en-CA"); // <-- FIXED
 
     if (allowedDates.includes(iso)) {
       setSelectedDate(iso);

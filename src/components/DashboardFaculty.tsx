@@ -14,7 +14,7 @@ import ProctorSetAvailability from "./ProctorSetAvailability.tsx";
 import ProctorViewExam from "./ProctorViewExam.tsx";
 import Notification from "./Notification.tsx";
 import BayanihanModality from "./BayanihanModality.tsx";
-import SchedulerPlotSchedule from "./SchedulerPlotSchedule.tsx";
+import SchedulerPlotSchedule from "./ScheduleViewer.tsx";
 import SchedulerAvailability from "./SchedulerAvailability.tsx";
 import DeanRequests from "./DeanRequests.tsx";    
 import Inbox from "./facultyInbox.tsx";
@@ -169,12 +169,6 @@ const DashboardFaculty = () => {
         .map(item => [item.key, item])
     ).values()
   );
-
-  const handleLogout = () => {
-    localStorage.removeItem('user');
-    sessionStorage.removeItem('user');
-    navigate('/');
-  };
 
   const handleLogoutConfirm = () => {
     localStorage.removeItem('user');

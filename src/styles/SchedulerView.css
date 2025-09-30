@@ -1,0 +1,81 @@
+.scheduler-view-container {
+  padding: 20px;
+  font-family: Arial, sans-serif;
+}
+
+.header {
+  text-align: center;
+  margin-bottom: 20px;
+}
+
+.logo {
+  width: 100px;
+  height: auto;
+}
+
+.exam-date-section {
+  margin-bottom: 30px;
+}
+
+.exam-table {
+  width: 100%;
+  border-collapse: collapse;
+  border-top-right-radius: 50px;
+  border-top-left-radius: 50px;
+}
+
+.exam-table thead tr:first-child th {
+  font-size: 16px;
+  border-top-right-radius: 50px;
+  border-top-left-radius: 50px;
+  color: #fff;
+  border: white;
+}
+
+.exam-table thead tr:nth-child(2) th {
+  font-size: 15px;
+}
+
+.exam-table thead tr:nth-child(3) th {
+  font-size: 14px;
+}
+
+.exam-table thead th {
+  background-color: #092C4C;
+  color: #fff;
+  font-weight: bold;
+  font-family: serif;
+}
+
+.exam-table th,
+.exam-table td {
+  border: 1px solid #ccc;
+  padding: 5px;
+  text-align: center;
+  vertical-align: top;
+  color: #092C4C;
+  font-weight: bold;
+}
+
+.exam-box {
+  background-color: #79b4f2;
+  padding: 5px;
+  margin-bottom: 2px;
+  border-radius: 4px;
+  color: #fff;
+  font-size: 12px;
+}
+.center-cell {
+  text-align: center;
+  font-weight: bold;
+  font-size: 16px;
+  padding: 10px 0;
+}
+
+.scheduler-view-card {
+  background: #f9f9f9;
+  border-radius: 8px;
+  /* Stronger shadow all around */
+  box-shadow: 0 4px 10px rgba(0, 0, 0, 0.4), 0 0 10px rgba(0, 0, 0, 0.2);
+  padding: 20px;
+}

@@ -158,9 +158,18 @@ const SchedulerAvailability: React.FC<ProctorSetAvailabilityProps> = ({ user }) 
     for (let i = 1; i <= numDays; i++) arr.push(i);
     return arr;
   };
+  // helper to format YYYY-MM-DD in local time
+  const formatDateLocal = (date: Date) => {
+    const year = date.getFullYear();
+    const month = String(date.getMonth() + 1).padStart(2, "0");
+    const day = String(date.getDate()).padStart(2, "0");
+    return `${year}-${month}-${day}`;
+  };
+
   const handleDateSelect = (day: number | null) => {
     if (!day) return;
-    const iso = new Date(currentMonth.getFullYear(), currentMonth.getMonth(), day).toISOString().split('T')[0];
+    const localDate = new Date(currentMonth.getFullYear(), currentMonth.getMonth(), day);
+    const iso = formatDateLocal(localDate); // use local format
     if (allowedDates.includes(iso)) {
       setSelectedDate(iso);
       setShowDatePicker(false);
@@ -382,9 +391,7 @@ const SchedulerAvailability: React.FC<ProctorSetAvailabilityProps> = ({ user }) 
                     ))}
                     {getCalendarDays().map((day, index) => {
                       const isoDate = day
-                        ? new Date(currentMonth.getFullYear(), currentMonth.getMonth(), day)
-                            .toISOString()
-                            .split('T')[0]
+                        ? formatDateLocal(new Date(currentMonth.getFullYear(), currentMonth.getMonth(), day))
                         : '';
                       const isAllowed = allowedDates.includes(isoDate);
                       const isSelected = isoDate === selectedDate;
