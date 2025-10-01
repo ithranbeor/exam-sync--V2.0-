@@ -299,172 +299,224 @@ const SchedulerPlottingSchedule: React.FC = () => {
     };
 
     const assignExamSchedules = async () => {
-      const scheduledExams: any[] = [];
-      const assignedSlots: Record<string, Set<string>> = {}; // roomId -> set of timeslot strings
-      const unscheduledCourses: string[] = [];
+  const scheduledExams: any[] = [];
+  const assignedSlots: Record<string, Set<string>> = {}; // roomId -> set of timeslot strings
+  const unscheduledCourses: string[] = [];
 
-      // Prepare academic year and semester
-      let academicYear: string | null = null;
-      let semester: string | null = null;
-      if (formData.academic_year) {
-        const [yearPart, semPart] = formData.academic_year.split("|").map((s) => s.trim());
-        academicYear = yearPart ?? null;
-        semester = semPart ?? null;
-      }
+  // Prepare academic year and semester
+  let academicYear: string | null = null;
+  let semester: string | null = null;
+  if (formData.academic_year) {
+    const [yearPart, semPart] = formData.academic_year.split("|").map((s) => s.trim());
+    academicYear = yearPart ?? null;
+    semester = semPart ?? null;
+  }
 
-      const sortedDates = [...formData.selectedExamDates].sort();
-      const examPeriod =
-        sortedDates.length > 1
-          ? `${new Date(sortedDates[0]).toLocaleDateString("en-US", { month: "long", day: "numeric", year: "numeric" })} - ${new Date(sortedDates[sortedDates.length - 1]).toLocaleDateString("en-US", { month: "long", day: "numeric", year: "numeric" })}`
-          : new Date(sortedDates[0]).toLocaleDateString("en-US", { month: "long", day: "numeric", year: "numeric" });
+  // Format exam period string
+  const sortedDates = [...formData.selectedExamDates].sort();
+  const examPeriod =
+    sortedDates.length > 1
+      ? `${new Date(sortedDates[0]).toLocaleDateString("en-US", {
+          month: "long",
+          day: "numeric",
+          year: "numeric",
+        })} - ${new Date(sortedDates[sortedDates.length - 1]).toLocaleDateString("en-US", {
+          month: "long",
+          day: "numeric",
+          year: "numeric",
+        })}`
+      : new Date(sortedDates[0]).toLocaleDateString("en-US", {
+          month: "long",
+          day: "numeric",
+          year: "numeric",
+        });
 
-      for (const modalityId of formData.selectedModalities) {
-        const selectedModality = modalities.find(m => m.modality_id === modalityId);
-        if (!selectedModality) continue;
+  // Group sections by course
+  const groupedByCourse: Record<string, any[]> = {};
+  for (const modalityId of formData.selectedModalities) {
+    const selectedModality = modalities.find((m) => m.modality_id === modalityId);
+    if (!selectedModality) continue;
 
-        const programId = selectedModality.program_id;
-        const courseId = selectedModality.course_id;
-        const sectionName = selectedModality.section_name ?? null;
-        const enrolledCount = selectedModality.enrolled_students ?? 0;
-        const possibleRooms = selectedModality.possible_rooms ?? [];
+    const courseId = selectedModality.course_id;
+    if (!groupedByCourse[courseId]) groupedByCourse[courseId] = [];
+    groupedByCourse[courseId].push(selectedModality);
+  }
 
-        let assigned = false;
+  // Process each course
+  for (const [courseId, sections] of Object.entries(groupedByCourse)) {
+    let assigned = false;
 
-        for (const date of sortedDates) {
-          const examDateISO = new Date(date).toISOString().slice(0, 10);
+    for (const date of sortedDates) {
+      if (assigned) break;
 
-          // Find exam period
-          const matchedPeriod = examPeriods.find(p => {
-            const start = new Date(p.start_date);
-            const end = new Date(p.end_date);
-            return new Date(examDateISO) >= start && new Date(examDateISO) <= end;
-          });
-          if (!matchedPeriod) continue;
+      const examDateISO = new Date(date).toISOString().slice(0, 10);
 
-          // Find available proctor
-          const { data: availableProctors } = await supabase
-            .from("tbl_availability")
-            .select("user_id")
-            .eq("day", examDateISO)
-            .eq("status", "available");
-          if (!availableProctors?.length) continue;
-          const proctorId = availableProctors[Math.floor(Math.random() * availableProctors.length)].user_id;
+      // Find matching exam period
+      const matchedPeriod = examPeriods.find((p) => {
+        const start = new Date(p.start_date);
+        const end = new Date(p.end_date);
+        return new Date(examDateISO) >= start && new Date(examDateISO) <= end;
+      });
+      if (!matchedPeriod) continue;
 
-          // Find instructor
-          const section = sectionCourses.find(sc => sc.program_id === programId && sc.course_id === courseId && sc.section_name === sectionName);
-          const instructorId = section?.user_id ?? null;
+      // Find available proctor
+      const { data: availableProctors } = await supabase
+        .from("tbl_availability")
+        .select("user_id")
+        .eq("day", examDateISO)
+        .eq("status", "available");
+      if (!availableProctors?.length) continue;
 
-          // Assign room and timeslot
-          for (const roomId of possibleRooms) {
-            if (!assignedSlots[roomId]) assignedSlots[roomId] = new Set();
+      const proctorId =
+        availableProctors[Math.floor(Math.random() * availableProctors.length)].user_id;
 
-            for (const t of times) {
-              // Compute all 30-min blocks for the exam
-              const totalDurationMinutes = (duration.hours ?? 0) * 60 + (duration.minutes ?? 0);
-              const [startHour, startMinute] = t.split(":").map(Number);
-              const examEndTotalMinutes = startHour * 60 + startMinute + totalDurationMinutes;
-              const slotMinutes: string[] = [];
-              for (let m = 0; m < totalDurationMinutes; m += 30) {
-                const h = startHour + Math.floor((startMinute + m) / 60);
-                const mi = (startMinute + m) % 60;
-                slotMinutes.push(`${String(h).padStart(2,"0")}:${String(mi).padStart(2,"0")}`);
-              }
+      // Try each timeslot (pick one slot for the WHOLE course)
+      for (const t of times) {
+        if (assigned) break;
 
-              // Check room capacity
-              if (examEndTotalMinutes > 21 * 60) continue;
-              if (slotMinutes.some(s => assignedSlots[roomId]?.has(s))) continue;
+        const totalDurationMinutes = (duration.hours ?? 0) * 60 + (duration.minutes ?? 0);
+        const [startHour, startMinute] = t.split(":").map(Number);
 
-                // Check room capacity
-                const { data: roomData } = await supabase
-                  .from("tbl_rooms")
-                  .select("room_capacity")
-                  .eq("room_id", roomId)
-                  .single();
-                if (!roomData || roomData.room_capacity < enrolledCount) continue;
-
-                // Assign all blocks
-                slotMinutes.forEach(s => assignedSlots[roomId].add(s));
-
-              let endHour = startHour;
-              let endMinute = startMinute + totalDurationMinutes;
-
-              // Adjust hour/minute overflow
-              endHour += Math.floor(endMinute / 60);
-              endMinute %= 60;
-
-              // Format times
-              const endTime = `${String(endHour).padStart(2,"0")}:${String(endMinute).padStart(2,"0")}`;
-              const startTimestamp = `${examDateISO}T${t}:00Z`;
-              const endTimestamp = `${examDateISO}T${endTime}:00Z`;
-
-              // Mark all 30-min blocks as assigned
-              if (!assignedSlots[roomId]) assignedSlots[roomId] = new Set();
-              slotMinutes.forEach(s => assignedSlots[roomId].add(s));
-                
-              // Fetch college and building
-              const { data: roomsData } = await supabase.from("tbl_rooms").select("room_id, building_id");
-              const { data: buildings } = await supabase.from("tbl_buildings").select("building_id, building_name");
-              const { data: colleges } = await supabase.from("tbl_college").select("college_id, college_name");
-              const schedulerCollegeId = userCollegeIds[0]; // first college
-              const collegeObj = colleges?.find(c => c.college_id === schedulerCollegeId);
-              const collegeNameForModality = collegeObj?.college_name ?? "Unknown College";
-              const buildingName = roomsData?.find(r => r.room_id === roomId)?.building_id
-                ? buildings?.find(b => b.building_id === roomsData.find(r => r.room_id === roomId)?.building_id)?.building_name
-                : "Unknown Building";
-
-              scheduledExams.push({
-                program_id: programId,
-                course_id: courseId,
-                modality_id: modalityId,
-                room_id: roomId,
-                section_name: sectionName,
-                proctor_id: proctorId,
-                examperiod_id: matchedPeriod.examperiod_id,
-                exam_date: examDateISO,
-                exam_start_time: startTimestamp,
-                exam_end_time: endTimestamp,
-                exam_duration: `${duration.hours ?? 0}h ${duration.minutes ?? 0}m`,
-                proctor_timein: formData.proctor_timein ?? null,
-                proctor_timeout: formData.proctor_timeout ?? null,
-                academic_year: academicYear,
-                semester: semester,
-                exam_category: formData.exam_category ?? null,
-                exam_period: examPeriod,
-                college_name: collegeNameForModality,
-                building_name: `${buildingName} (${roomId})`,
-                instructor_id: instructorId
-              });
-
-              assigned = true;
-              break;
-            }
-            if (assigned) break;
-          }
-          if (assigned) break;
+        // Build slot minutes
+        const slotMinutes: string[] = [];
+        for (let m = 0; m < totalDurationMinutes; m += 30) {
+          const h = startHour + Math.floor((startMinute + m) / 60);
+          const mi = (startMinute + m) % 60;
+          slotMinutes.push(`${String(h).padStart(2, "0")}:${String(mi).padStart(2, "0")}`);
         }
 
-        if (!assigned) unscheduledCourses.push(courseId);
-      }
+        // Collect rooms for all sections of this course
+        const assignedRooms: string[] = [];
+        for (const section of sections) {
+          const possibleRooms = section.possible_rooms ?? [];
+          const enrolledCount = section.enrolled_students ?? 0;
 
-      if (unscheduledCourses.length) {
-        alert("⚠️ Could not schedule these courses due to conflicts or room capacity:\n" + unscheduledCourses.join(", "));
-      }
+          let roomId: string | null = null;
+          for (const r of possibleRooms) {
+            if (!assignedSlots[r]) assignedSlots[r] = new Set();
+            if (slotMinutes.some((s) => assignedSlots[r].has(s))) continue;
 
-      if (!scheduledExams.length) {
-        alert("No valid schedules to save.");
-        return;
-      }
+            const { data: roomData } = await supabase
+              .from("tbl_rooms")
+              .select("room_capacity")
+              .eq("room_id", r)
+              .single();
 
-      const { error } = await supabase.from("tbl_examdetails").insert(scheduledExams);
-      if (error) alert("❌ Error saving schedule: " + error.message);
-      else alert("✅ Schedules saved successfully!");
-    };
+            if (!roomData || roomData.room_capacity < enrolledCount) continue;
+
+            if (!assignedRooms.includes(r)) {
+              roomId = r;
+              break;
+            }
+          }
+
+          if (!roomId) break; // cannot find room for this section
+          assignedRooms.push(roomId);
+        }
+
+        // If not enough rooms for all sections, try next timeslot
+        if (assignedRooms.length < sections.length) continue;
+
+        // Mark slots for all chosen rooms
+        assignedRooms.forEach((roomId) => {
+          slotMinutes.forEach((s) => assignedSlots[roomId].add(s));
+        });
+
+        // Build exam times
+        const endHour = startHour + Math.floor((startMinute + totalDurationMinutes) / 60);
+        const endMinute = (startMinute + totalDurationMinutes) % 60;
+        const endTime = `${String(endHour).padStart(2, "0")}:${String(endMinute).padStart(2, "0")}`;
+        const startTimestamp = `${examDateISO}T${t}:00Z`;
+        const endTimestamp = `${examDateISO}T${endTime}:00Z`;
+
+        // Get room + building + college info
+        const { data: roomsData } = await supabase
+          .from("tbl_rooms")
+          .select("room_id, building_id");
+        const { data: buildings } = await supabase
+          .from("tbl_buildings")
+          .select("building_id, building_name");
+        const { data: colleges } = await supabase
+          .from("tbl_college")
+          .select("college_id, college_name");
+
+        const schedulerCollegeId = userCollegeIds[0];
+        const collegeObj = colleges?.find((c) => c.college_id === schedulerCollegeId);
+        const collegeNameForCourse = collegeObj?.college_name ?? "Unknown College";
+
+        // Schedule each section of the course in its room (same timeslot)
+        sections.forEach((section, idx) => {
+          const sectionRoomId = assignedRooms[idx];
+          const sectionObj = sectionCourses.find(
+            (sc) =>
+              sc.program_id === section.program_id &&
+              sc.course_id === section.course_id &&
+              sc.section_name === section.section_name
+          );
+          const instructorId = sectionObj?.user_id ?? null;
+
+          const buildingId = roomsData?.find((r) => r.room_id === sectionRoomId)?.building_id;
+          const buildingName =
+            buildingId && buildings
+              ? buildings.find((b) => b.building_id === buildingId)?.building_name
+              : "Unknown Building";
+
+          scheduledExams.push({
+            program_id: section.program_id,
+            course_id: section.course_id,
+            modality_id: section.modality_id,
+            room_id: sectionRoomId,
+            section_name: section.section_name,
+            proctor_id: proctorId,
+            examperiod_id: matchedPeriod.examperiod_id,
+            exam_date: examDateISO,
+            exam_start_time: startTimestamp,
+            exam_end_time: endTimestamp,
+            exam_duration: `${duration.hours ?? 0}h ${duration.minutes ?? 0}m`,
+            proctor_timein: formData.proctor_timein ?? null,
+            proctor_timeout: formData.proctor_timeout ?? null,
+            academic_year: academicYear,
+            semester: semester,
+            exam_category: formData.exam_category ?? null,
+            exam_period: examPeriod,
+            college_name: collegeNameForCourse,
+            building_name: `${buildingName} (${sectionRoomId})`,
+            instructor_id: instructorId,
+          });
+        });
+
+        assigned = true; // ✅ done for this course
+      }
+    }
+
+    if (!assigned) unscheduledCourses.push(courseId);
+  }
+
+  // Warnings
+  if (unscheduledCourses.length) {
+    alert(
+      "⚠️ Could not schedule these courses due to conflicts or room capacity:\n" +
+        unscheduledCourses.join(", ")
+    );
+  }
+
+  if (!scheduledExams.length) {
+    alert("No valid schedules to save.");
+    return;
+  }
+
+  // Save to DB
+  const { error } = await supabase.from("tbl_examdetails").insert(scheduledExams);
+  if (error) alert("❌ Error saving schedule: " + error.message);
+  else alert("✅ Schedules saved successfully!");
+};
+
 
   // Only include start times that allow exams to end by 9:00 PM
   const times = [
-    "07:30","08:00","08:30","09:00","09:30","10:00","10:30","11:00","11:30",
-    "12:00","12:30","13:00","13:30","14:00","14:30","15:00","15:30","16:00",
-    "16:30","17:00","17:30","18:00","18:30","19:00","19:30","20:00","20:30"
+    "07:00","07:30","08:00","08:30","09:00","09:30","10:00","10:30","11:00","11:30",
+    "12:00","12:30","13:00","13:30","14:00","14:30","15:00","15:30","16:00","16:30",
+    "17:00","17:30","18:00","18:30","19:00","19:30","20:00","20:30"
   ];
 
   const [duration, setDuration] = useState({ hours: 1, minutes: 0 });
@@ -622,78 +674,101 @@ const SchedulerPlottingSchedule: React.FC = () => {
         />
       </div>
 
-      <div className="field">
-        <label className="label">Modality</label>
-        <Select
-          options={addSelectAllOption(
-            filteredModalitiesBySelection.map(m => ({
-              value: m.modality_id,
-              label: `${m.modality_type}${m.section_name ? ` – ${m.section_name}` : ""}`,
-            }))
-          )}
-          isMulti
-          closeMenuOnSelect={false}
-          hideSelectedOptions={false}
-          components={{ Option: CheckboxOption }}
-          onChange={(selected) => {
-            let selectedValues = (selected as any[]).map(s => s.value);
+      <div className="form-row">
+        {/* Modality */}
+        <div className="form-field">
+          <label className="form-label">Modality</label>
+          <Select
+            options={addSelectAllOption(
+              filteredModalitiesBySelection.map(m => ({
+                value: m.modality_id,
+                label: `${m.modality_type}${m.section_name ? ` – ${m.section_name}` : ""}`,
+              }))
+            )}
+            isMulti
+            closeMenuOnSelect={false}
+            hideSelectedOptions={false}
+            components={{ Option: CheckboxOption }}
+            onChange={(selected) => {
+              let selectedValues = (selected as any[]).map(s => s.value);
 
-            if (selectedValues.includes("__all__")) {
-              const allValues = filteredModalitiesBySelection.map(m => m.modality_id);
-              selectedValues = Array.from(new Set([...selectedValues.filter(v => v !== "__all__"), ...allValues]));
-            }
+              if (selectedValues.includes("__all__")) {
+                const allValues = filteredModalitiesBySelection.map(m => m.modality_id);
+                selectedValues = Array.from(
+                  new Set([...selectedValues.filter(v => v !== "__all__"), ...allValues])
+                );
+              }
 
-            setFormData(prev => ({
-              ...prev,
-              selectedModalities: selectedValues.filter(v => v !== "__all__"),
-            }));
-          }}
-          value={formData.selectedModalities.map(m => {
-            const mod = filteredModalitiesBySelection.find(f => f.modality_id === m);
-            return { value: m, label: mod ? `${mod.modality_type}${mod.section_name ? ` – ${mod.section_name}` : ""}` : String(m) };
-          })}
-        />
-      </div>
-      <div className="field">
-        <label className="label">Exam Duration</label>
-        <div style={{ display: "flex", gap: "10px" }}>
-          <input
-            type="number"
-            min={0}
-            value={duration.hours}
-            onChange={(e) => setDuration(prev => ({ ...prev, hours: Number(e.target.value) }))}
-            placeholder="Hours"
-            className="input"
-          />
-          <input
-            type="number"
-            min={0}
-            max={59}
-            value={duration.minutes}
-            onChange={(e) => setDuration(prev => ({ ...prev, minutes: Number(e.target.value) }))}
-            placeholder="Minutes"
-            className="input"
+              setFormData(prev => ({
+                ...prev,
+                selectedModalities: selectedValues.filter(v => v !== "__all__"),
+              }));
+            }}
+            value={formData.selectedModalities.map(m => {
+              const mod = filteredModalitiesBySelection.find(f => f.modality_id === m);
+              return { 
+                value: m, 
+                label: mod 
+                  ? `${mod.modality_type}${mod.section_name ? ` – ${mod.section_name}` : ""}` 
+                  : String(m) 
+              };
+            })}
+            className="select-input"
           />
         </div>
-      </div>
 
-      <div className="field">
-        <label className="label">Exam Start Time</label>
-        <select
-          value={selectedStartTime}
-          onChange={(e) => setSelectedStartTime(e.target.value)}
-          className="select"
-        >
-          <option value="">Select Start Time</option>
-          {times.map((t) => (
-            <option key={t} value={t}>{t}</option>
-          ))}
-        </select>
-      </div>
+        {/* Exam Duration */}
+        <div className="form-field">
+          <label className="form-label">Duration</label>
+          <div className="duration-inputs">
+            <input
+              type="number"
+              min={0}
+              value={duration.hours}
+              onChange={(e) =>
+                setDuration(prev => ({ ...prev, hours: Number(e.target.value) }))
+              }
+              placeholder="Hours"
+              className="input"
+            />
+            <input
+              type="number"
+              min={0}
+              max={59}
+              value={duration.minutes}
+              onChange={(e) =>
+                setDuration(prev => ({ ...prev, minutes: Number(e.target.value) }))
+              }
+              placeholder="Minutes"
+              className="input"
+            />
+          </div>
+        </div>
 
-      <button type="button" onClick={handleSave} className="btn-save">
-        Save Schedule
-      </button>
+        {/* Start Time */}
+        <div className="form-field">
+          <label className="form-label">Start Time</label>
+          <select
+            value={selectedStartTime}
+            onChange={(e) => setSelectedStartTime(e.target.value)}
+            className="select-input"
+          >
+            <option value="">Select</option>
+            {times.map((t) => (
+              <option key={t} value={t}>
+                {t}
+              </option>
+            ))}
+          </select>
+        </div>
+
+        {/* Save Button */}
+        <div className="form-actions">
+          <button type="button" onClick={handleSave} className="btn-save">
+            Save
+          </button>
+        </div>
+      </div>
     </div>
   );
 };
