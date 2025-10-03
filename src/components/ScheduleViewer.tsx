@@ -2,7 +2,7 @@
 import React, { useEffect, useState } from "react";
 import { supabase } from "../lib/supabaseClient.ts";
 import "../styles/SchedulerView.css";
-import { FaChevronLeft , FaChevronRight, FaUserEdit, FaEnvelope, FaFileDownload, FaPlus  } from "react-icons/fa";
+import { FaChevronLeft , FaChevronRight, FaUserEdit, FaEnvelope, FaFileDownload, FaPlus, FaTrash  } from "react-icons/fa";
 import { MdSwapHoriz } from 'react-icons/md';
 import { ToastContainer, toast } from 'react-toastify';
 import 'react-toastify/dist/ReactToastify.css';
@@ -38,6 +38,36 @@ const SchedulerView: React.FC = () => {
   const [_activeCards, setActiveCards] = useState<Record<string, boolean>>({});
   const [swapMode, setSwapMode] = useState(false);
   const [selectedSwap, setSelectedSwap] = useState<ExamDetail | null>(null);
+
+  useEffect(() => {
+    const fetchData = async () => {
+      // fetch exams
+      const { data: exams, error: examError } = await supabase
+        .from("tbl_examdetails")
+        .select("*");
+
+      if (!examError && exams) {
+        setExamData(exams);
+      }
+
+      // fetch users (if you also want this updated)
+      const { data: userData, error: userError } = await supabase
+        .from("tbl_users")
+        .select("user_id, first_name, last_name");
+
+      if (!userError && userData) {
+        setUsers(userData);
+      }
+    };
+
+    // call once immediately
+    fetchData();
+
+    // auto refresh every 2 seconds
+    const interval = setInterval(fetchData, 2000);
+
+    return () => clearInterval(interval);
+  }, []);
 
   useEffect(() => {
     const fetchUsers = async () => {
@@ -175,12 +205,28 @@ const SchedulerView: React.FC = () => {
   
   const [isModalOpen, setIsModalOpen] = useState(false);
 
+  const handleDeleteAllSchedules = async () => {
+    const confirmDelete = window.confirm("Are you sure you want to delete ALL schedules? This action cannot be undone.");
+    if (!confirmDelete) return;
+
+    const { error } = await supabase.from("tbl_examdetails").delete().neq("examdetails_id", 0);
+
+    if (error) {
+      console.error("Error deleting schedules:", error);
+      toast.error("Failed to delete all schedules!");
+    } else {
+      setExamData([]); // clear locally
+      toast.success("All schedules deleted successfully!");
+    }
+  };
+
   const dynamicIcons = [
     { key: "Add Schedule", icon: <FaPlus style={{ color: "gold" }} />, action: () => setIsModalOpen(true) },
     { key: "Change Proctor", icon: <FaUserEdit /> },
     { key: "Swap Room", icon: <MdSwapHoriz />},
     { key: "Send to Dean", icon: <FaEnvelope />},
     { key: "Export", icon: <FaFileDownload />},
+    { key: "Delete All", icon: <FaTrash style={{ color: "red" }} />, action: handleDeleteAllSchedules }
   ];
 
   return (
@@ -191,7 +237,7 @@ const SchedulerView: React.FC = () => {
           key={key}
           className={`scheduler-icon ${key === "user" && swapMode ? "active" : ""}`}
           onClick={() => {
-            if (key === "user") {
+            if (key === "Swap Room") {
               const newSwapMode = !swapMode;
               setSwapMode(newSwapMode);
               setSelectedSwap(null);
