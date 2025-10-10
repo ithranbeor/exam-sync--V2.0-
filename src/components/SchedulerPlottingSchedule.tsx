@@ -334,18 +334,14 @@ const SchedulerPlottingSchedule: React.FC = () => {
   };
 
 const assignExamSchedules = async () => {
-  const scheduledExams: any[] = [];
-  const assignedSlots: Record<string, Set<string>> = {};
+  // Genetic Algorithm Parameters
+  const POPULATION_SIZE = 60;
+  const GENERATIONS = 150;
+  const MUTATION_RATE = 0.2;
+  const ELITE_SIZE = 8;
+  const TOURNAMENT_SIZE = 5;
+
   const unscheduledCourses: string[] = [];
-
-  // Track year-level + program schedules: date -> time -> Set<"yearLevel-programId">
-  const yearLevelProgramSchedule: Record<string, Record<string, Set<string>>> = {};
-
-  // Track consecutive scheduling: date -> array of { time, yearLevel, programId }
-  const consecutiveSchedule: Record<string, Array<{ time: string; yearLevel: string; programId: string }>> = {};
-
-  // Track proctor assignments: date -> time -> Set<proctorId>
-  const proctorSchedule: Record<string, Record<string, Set<number>>> = {};
 
   // Prepare academic year and semester
   let academicYear: string | null = null;
@@ -430,348 +426,469 @@ const assignExamSchedules = async () => {
   // Helper function to extract year level from section name
   const extractYearLevel = (sectionName: string | null | undefined): string => {
     if (!sectionName) return "Unknown";
-    // Match patterns like IT4R1, CS3A, BSIT-4A, etc.
     const match = sectionName.match(/(\d)/);
     return match ? match[1] : "Unknown";
   };
 
-  // Helper function to check if year level + program has conflict at this time slot
-  const hasYearLevelProgramConflict = (date: string, timeSlots: string[], yearLevel: string, programId: string): boolean => {
-    if (!yearLevelProgramSchedule[date]) return false;
-    
-    const key = `${yearLevel}-${programId}`;
-    for (const slot of timeSlots) {
-      if (yearLevelProgramSchedule[date][slot]?.has(key)) {
-        return true;
-      }
+  // Helper to get time slots for duration
+  const getTimeSlots = (startTime: string): string[] => {
+    const [startHour, startMinute] = startTime.split(":").map(Number);
+    const slotMinutes: string[] = [];
+    for (let m = 0; m < totalDurationMinutes; m += 30) {
+      const h = startHour + Math.floor((startMinute + m) / 60);
+      const mi = (startMinute + m) % 60;
+      slotMinutes.push(`${String(h).padStart(2, "0")}:${String(mi).padStart(2, "0")}`);
     }
-    return false;
+    return slotMinutes;
   };
 
-  // Helper function to check consecutive scheduling for same year level + program
-  const hasConsecutiveConflict = (date: string, startTime: string, yearLevel: string, programId: string): boolean => {
-    if (!consecutiveSchedule[date] || consecutiveSchedule[date].length === 0) return false;
-    
-    const lastEntry = consecutiveSchedule[date][consecutiveSchedule[date].length - 1];
-    if (!lastEntry) return false;
-    
-    // Check if this would be consecutive to the last scheduled exam
-    const lastEndTime = getNextTimeSlot(lastEntry.time);
-    if (lastEndTime === startTime && lastEntry.yearLevel === yearLevel && lastEntry.programId === programId) {
-      return true; // Same year level AND same program = conflict
-    }
-    
-    return false;
-  };
+  // ONLY use selected dates - no extended dates
+  const allAvailableDates = [...sortedDates];
 
-  // Helper to get next time slot
-  const getNextTimeSlot = (currentTime: string): string => {
-    const currentIndex = times.indexOf(currentTime);
-    if (currentIndex === -1 || currentIndex >= times.length - 1) return "";
-    return times[currentIndex + 1];
-  };
-
-  // Helper function to mark year level + program as scheduled
-  const markYearLevelProgramScheduled = (date: string, timeSlots: string[], yearLevel: string, programId: string, startTime: string) => {
-    if (!yearLevelProgramSchedule[date]) yearLevelProgramSchedule[date] = {};
-    if (!consecutiveSchedule[date]) consecutiveSchedule[date] = [];
-    
-    const key = `${yearLevel}-${programId}`;
-    for (const slot of timeSlots) {
-      if (!yearLevelProgramSchedule[date][slot]) yearLevelProgramSchedule[date][slot] = new Set();
-      yearLevelProgramSchedule[date][slot].add(key);
-    }
-    
-    consecutiveSchedule[date].push({ time: startTime, yearLevel, programId });
-  };
-
-  // Helper function to check if proctor is already assigned at this time
-  const isProctorAvailable = (date: string, timeSlots: string[], proctorId: number): boolean => {
-    if (!proctorSchedule[date]) return true;
-    
-    for (const slot of timeSlots) {
-      if (proctorSchedule[date][slot]?.has(proctorId)) {
-        return false;
-      }
-    }
-    return true;
-  };
-
-  // Helper function to mark proctor as assigned
-  const markProctorAssigned = (date: string, timeSlots: string[], proctorId: number) => {
-    if (!proctorSchedule[date]) proctorSchedule[date] = {};
-    
-    for (const slot of timeSlots) {
-      if (!proctorSchedule[date][slot]) proctorSchedule[date][slot] = new Set();
-      proctorSchedule[date][slot].add(proctorId);
-    }
-  };
-
-  // Helper function to get available proctors for time slots
-  const getAvailableProctorsForSlots = (
-    date: string, 
-    timeSlots: string[], 
-    availableProctorIds: number[], 
-    neededCount: number
-  ): number[] => {
-    const availableProctors: number[] = [];
-    
-    for (const proctorId of availableProctorIds) {
-      if (isProctorAvailable(date, timeSlots, proctorId)) {
-        availableProctors.push(proctorId);
-        if (availableProctors.length >= neededCount) break;
-      }
-    }
-    
-    return availableProctors;
-  };
-
-  // Helper function to generate extended dates beyond selected dates
-  const generateExtendedDates = (startDate: string, daysToExtend: number = 30): string[] => {
-    const extendedDates: string[] = [];
-    const start = new Date(startDate);
-    
-    for (let i = 1; i <= daysToExtend; i++) {
-      const nextDate = new Date(start);
-      nextDate.setDate(start.getDate() + i);
-      extendedDates.push(nextDate.toISOString().slice(0, 10));
-    }
-    
-    return extendedDates;
-  };
-
-  // Helper function to shuffle array (Fisher-Yates shuffle)
-  const shuffleArray = <T,>(array: T[]): T[] => {
-    const shuffled = [...array];
-    for (let i = shuffled.length - 1; i > 0; i--) {
-      const j = Math.floor(Math.random() * (i + 1));
-      [shuffled[i], shuffled[j]] = [shuffled[j], shuffled[i]];
-    }
-    return shuffled;
-  };
-
-  // Create extended date pool
-  const lastSelectedDate = sortedDates[sortedDates.length - 1];
-  const extendedDates = generateExtendedDates(lastSelectedDate, 30);
-  
-  // MODIFIED: Shuffle the selected dates for random distribution
-  const shuffledSelectedDates = shuffleArray(sortedDates);
-  const allAvailableDates = [...shuffledSelectedDates, ...extendedDates];
-
-  // Process each course
-  for (const [courseId, sections] of Object.entries(groupedByCourse)) {
-    let assigned = false;
-
-    // Get year level and program ID for all sections of this course
-    const yearLevel = extractYearLevel(sections[0]?.section_name);
-    const programId = sections[0]?.program_id;
-
-    for (const date of allAvailableDates) {
-      if (assigned) break;
-
-      const examDateISO = new Date(date).toISOString().slice(0, 10);
-
-      // Find matching exam period (or extend if needed)
-      let matchedPeriod = examPeriods.find((p) => {
-        const start = new Date(p.start_date);
-        const end = new Date(p.end_date);
-        return new Date(examDateISO) >= start && new Date(examDateISO) <= end;
-      });
-
-      // If no matching period and we're in extended dates, use the last valid period
-      if (!matchedPeriod && extendedDates.includes(date)) {
-        const allowedPeriods = examPeriods.filter((p) =>
-          userCollegeIds.includes(String(p.college_id))
-        );
-        matchedPeriod = allowedPeriods[allowedPeriods.length - 1];
-      }
-
-      if (!matchedPeriod) continue;
-
-      // Get proctors from pre-fetched map or fetch for extended dates
-      let availableProctors = availabilityMap.get(examDateISO) || [];
+  // Pre-calculate suitable rooms per section to speed up generation
+  const suitableRoomsBySection = new Map<number, string[]>();
+  for (const [_, sections] of Object.entries(groupedByCourse)) {
+    for (const section of sections) {
+      const enrolledCount = section.enrolled_students ?? 0;
+      const possibleRooms = section.possible_rooms ?? [];
       
-      // If no proctors for extended date, fetch availability
-      if (!availableProctors.length && extendedDates.includes(date)) {
-        const { data: extendedAvailability } = await supabase
-          .from("tbl_availability")
-          .select("user_id")
-          .eq("status", "available")
-          .eq("day", examDateISO);
+      // Preferred rooms first
+      const preferred = possibleRooms.filter((r: string) => {
+        const capacity = roomCapacityMap.get(r);
+        return capacity && capacity >= enrolledCount;
+      });
+      
+      // All suitable rooms
+      const allSuitable = Array.from(roomCapacityMap.entries())
+        .filter(([_, capacity]) => capacity >= enrolledCount)
+        .map(([id, _]) => id);
+      
+      // Combine: preferred first, then others
+      const combined = [...new Set([...preferred, ...allSuitable])];
+      suitableRoomsBySection.set(section.modality_id, combined);
+    }
+  }
+
+  // Gene: represents a course assignment
+  interface Gene {
+    courseId: string;
+    date: string;
+    timeSlot: string;
+    roomAssignments: string[]; // One room per section
+    proctorAssignments: number[]; // One proctor per section
+  }
+
+  // Chromosome: a complete schedule (array of genes)
+  type Chromosome = Gene[];
+
+  // Generate random chromosome with better logic
+  const generateRandomChromosome = (): Chromosome => {
+    const chromosome: Chromosome = [];
+
+    for (const [courseId, sections] of Object.entries(groupedByCourse)) {
+      // Random date from SELECTED dates only
+      const date = allAvailableDates[Math.floor(Math.random() * allAvailableDates.length)];
+
+      // Random time
+      const timeSlot = times[Math.floor(Math.random() * times.length)];
+
+      // Get available proctors for this date
+      const availableProctors = availabilityMap.get(date) || [];
+      
+      // Assign rooms and proctors for each section
+      const roomAssignments: string[] = [];
+      const proctorAssignments: number[] = [];
+
+      for (const section of sections) {
+        // Get suitable rooms for this section
+        const suitableRooms = suitableRoomsBySection.get(section.modality_id) || [];
         
-        availableProctors = extendedAvailability?.map(a => a.user_id) || [];
+        const roomId = suitableRooms.length > 0
+          ? suitableRooms[Math.floor(Math.random() * suitableRooms.length)]
+          : "";
+
+        // Assign proctor
+        const proctorId = availableProctors.length > 0
+          ? availableProctors[Math.floor(Math.random() * availableProctors.length)]
+          : -1;
+
+        roomAssignments.push(roomId);
+        proctorAssignments.push(proctorId);
       }
 
-      if (!availableProctors.length) continue;
+      chromosome.push({
+        courseId,
+        date,
+        timeSlot,
+        roomAssignments,
+        proctorAssignments
+      });
+    }
 
-      // Try each timeslot
-      for (const t of times) {
-        if (assigned) break;
+    return chromosome;
+  };
 
-        const [startHour, startMinute] = t.split(":").map(Number);
+  // Fitness function (lower is better)
+  const calculateFitness = (chromosome: Chromosome): number => {
+    let penalties = 0;
 
-        // Build slot minutes
-        const slotMinutes: string[] = [];
-        for (let m = 0; m < totalDurationMinutes; m += 30) {
-          const h = startHour + Math.floor((startMinute + m) / 60);
-          const mi = (startMinute + m) % 60;
-          slotMinutes.push(`${String(h).padStart(2, "0")}:${String(mi).padStart(2, "0")}`);
+    // Track conflicts
+    const roomSchedule: Record<string, Record<string, Set<string>>> = {};
+    const proctorSchedule: Record<string, Record<string, Set<number>>> = {};
+    const yearLevelProgramSchedule: Record<string, Record<string, Set<string>>> = {};
+    const consecutiveTracker: Record<string, Map<string, string>> = {}; // date -> "yearLevel-programId" -> lastTimeSlot
+    const dateUsageCount: Record<string, number> = {}; // Track how many courses per date
+
+    for (const gene of chromosome) {
+      const { courseId, date, timeSlot, roomAssignments, proctorAssignments } = gene;
+      const sections = groupedByCourse[courseId];
+      const timeSlots = getTimeSlots(timeSlot);
+
+      const yearLevel = extractYearLevel(sections[0]?.section_name);
+      const programId = sections[0]?.program_id;
+      const key = `${yearLevel}-${programId}`;
+
+      // Track date usage
+      dateUsageCount[date] = (dateUsageCount[date] || 0) + 1;
+
+      // Initialize tracking structures
+      if (!roomSchedule[date]) roomSchedule[date] = {};
+      if (!proctorSchedule[date]) proctorSchedule[date] = {};
+      if (!yearLevelProgramSchedule[date]) yearLevelProgramSchedule[date] = {};
+      if (!consecutiveTracker[date]) consecutiveTracker[date] = new Map();
+
+      // Check year level + program conflicts (students can't have 2 exams at same time)
+      for (const slot of timeSlots) {
+        if (!yearLevelProgramSchedule[date][slot]) {
+          yearLevelProgramSchedule[date][slot] = new Set();
         }
-
-        // MODIFIED: Check year level + program conflicts
-        if (hasYearLevelProgramConflict(examDateISO, slotMinutes, yearLevel, programId)) {
-          continue;
+        if (yearLevelProgramSchedule[date][slot].has(key)) {
+          penalties += 200; // CRITICAL: Student conflict
         }
+        yearLevelProgramSchedule[date][slot].add(key);
+      }
 
-        // MODIFIED: Check consecutive conflicts for same year level + program
-        if (hasConsecutiveConflict(examDateISO, t, yearLevel, programId)) {
-          continue;
+      // Check consecutive conflicts (no back-to-back exams for same year+program)
+      const lastTimeSlot = consecutiveTracker[date].get(key);
+      if (lastTimeSlot) {
+        const lastIndex = times.indexOf(lastTimeSlot);
+        const currentIndex = times.indexOf(timeSlot);
+        const slotsNeeded = Math.ceil(totalDurationMinutes / 30);
+        
+        // Check if current exam starts right after previous exam ends
+        if (currentIndex !== -1 && lastIndex !== -1 && currentIndex === lastIndex + slotsNeeded) {
+          penalties += 80; // Back-to-back penalty
         }
+      }
+      consecutiveTracker[date].set(key, timeSlot);
 
-        // Get available proctors for this time slot (need one per section)
-        const assignedProctors = getAvailableProctorsForSlots(
-          examDateISO, 
-          slotMinutes, 
-          availableProctors, 
-          sections.length
-        );
+      // Check room and proctor conflicts
+      sections.forEach((section: any, idx: number) => {
+        const roomId = roomAssignments[idx];
+        const proctorId = proctorAssignments[idx];
+        const enrolledCount = section.enrolled_students ?? 0;
 
-        // Check if we have enough proctors for all sections
-        if (assignedProctors.length < sections.length) {
-          continue;
-        }
-
-        // Collect rooms for all sections of this course
-        const assignedRooms: string[] = [];
-        let roomAssignmentFailed = false;
-
-        for (const section of sections) {
-          const possibleRooms = section.possible_rooms ?? [];
-          const enrolledCount = section.enrolled_students ?? 0;
-
-          let roomId: string | null = null;
-
-          // First pass: try preferred rooms
-          for (const r of possibleRooms) {
-            if (!assignedSlots[r]) assignedSlots[r] = new Set();
-            if (slotMinutes.some((s) => assignedSlots[r].has(s))) continue;
-
-            const roomCapacity = roomCapacityMap.get(r);
-            if (!roomCapacity || roomCapacity < enrolledCount) continue;
-
-            if (!assignedRooms.includes(r)) {
-              roomId = r;
-              break;
-            }
-          }
-
-          // Second pass: if no preferred room, try ANY available room with sufficient capacity
-          if (!roomId) {
-            for (const [r, capacity] of roomCapacityMap.entries()) {
-              if (!assignedSlots[r]) assignedSlots[r] = new Set();
-              if (slotMinutes.some((s) => assignedSlots[r].has(s))) continue;
-
-              if (capacity >= enrolledCount && !assignedRooms.includes(r)) {
-                roomId = r;
-                break;
-              }
-            }
-          }
-
-          if (!roomId) {
-            roomAssignmentFailed = true;
-            break;
-          }
-
-          assignedRooms.push(roomId);
-        }
-
-        if (roomAssignmentFailed || assignedRooms.length < sections.length) continue;
-
-        // Mark slots for all chosen rooms
-        assignedRooms.forEach((roomId) => {
-          slotMinutes.forEach((s) => assignedSlots[roomId].add(s));
-        });
-
-        // MODIFIED: Mark year level + program as scheduled
-        markYearLevelProgramScheduled(examDateISO, slotMinutes, yearLevel, programId, t);
-
-        // Mark all proctors as assigned for these time slots
-        assignedProctors.forEach(proctorId => {
-          markProctorAssigned(examDateISO, slotMinutes, proctorId);
-        });
-
-        // Build exam times
-        const endHour = startHour + Math.floor((startMinute + totalDurationMinutes) / 60);
-        const endMinute = (startMinute + totalDurationMinutes) % 60;
-        const endTime = `${String(endHour).padStart(2, "0")}:${String(endMinute).padStart(2, "0")}`;
-        const startTimestamp = `${examDateISO}T${t}:00Z`;
-        const endTimestamp = `${examDateISO}T${endTime}:00Z`;
-
-        // Schedule each section with unique proctor
-        sections.forEach((section, idx) => {
-          const sectionRoomId = assignedRooms[idx];
-          const proctorId = assignedProctors[idx];
+        // Room penalties
+        if (!roomId || roomId === "") {
+          penalties += 1500; // CRITICAL: No room assigned
+        } else {
+          const roomCapacity = roomCapacityMap.get(roomId);
           
-          const sectionObj = sectionCourses.find(
-            (sc) =>
-              sc.program_id === section.program_id &&
-              sc.course_id === section.course_id &&
-              sc.section_name === section.section_name
+          if (!roomCapacity || roomCapacity < enrolledCount) {
+            penalties += 300; // Insufficient capacity
+          }
+
+          // Check room time conflicts
+          for (const slot of timeSlots) {
+            if (!roomSchedule[date][slot]) roomSchedule[date][slot] = new Set();
+            if (roomSchedule[date][slot].has(roomId)) {
+              penalties += 200; // Room double-booked
+            }
+            roomSchedule[date][slot].add(roomId);
+          }
+        }
+
+        // Proctor penalties
+        if (proctorId === -1) {
+          penalties += 800; // CRITICAL: No proctor assigned
+        } else {
+          // Check proctor time conflicts
+          for (const slot of timeSlots) {
+            if (!proctorSchedule[date][slot]) proctorSchedule[date][slot] = new Set();
+            if (proctorSchedule[date][slot].has(proctorId)) {
+              penalties += 150; // Proctor double-booked
+            }
+            proctorSchedule[date][slot].add(proctorId);
+          }
+        }
+      });
+    }
+
+    // NEW: Penalize uneven date distribution
+    const totalCourses = chromosome.length;
+    const numDates = allAvailableDates.length;
+    const idealCoursesPerDate = totalCourses / numDates;
+    
+    // Calculate variance in date usage
+    let distributionPenalty = 0;
+    for (const date of allAvailableDates) {
+      const count = dateUsageCount[date] || 0;
+      const deviation = Math.abs(count - idealCoursesPerDate);
+      distributionPenalty += deviation * 30; // Penalize uneven distribution
+    }
+    
+    penalties += distributionPenalty;
+
+    return penalties;
+  };
+
+  // Tournament selection
+  const tournamentSelection = (population: Chromosome[], fitnesses: number[]): Chromosome => {
+    let best = Math.floor(Math.random() * population.length);
+    
+    for (let i = 1; i < TOURNAMENT_SIZE; i++) {
+      const contestant = Math.floor(Math.random() * population.length);
+      if (fitnesses[contestant] < fitnesses[best]) {
+        best = contestant;
+      }
+    }
+    
+    return [...population[best].map(gene => ({ ...gene, roomAssignments: [...gene.roomAssignments], proctorAssignments: [...gene.proctorAssignments] }))];
+  };
+
+  // Crossover (uniform crossover for better mixing)
+  const crossover = (parent1: Chromosome, parent2: Chromosome): [Chromosome, Chromosome] => {
+    const child1: Chromosome = [];
+    const child2: Chromosome = [];
+    
+    for (let i = 0; i < parent1.length; i++) {
+      if (Math.random() < 0.5) {
+        child1.push({ ...parent1[i], roomAssignments: [...parent1[i].roomAssignments], proctorAssignments: [...parent1[i].proctorAssignments] });
+        child2.push({ ...parent2[i], roomAssignments: [...parent2[i].roomAssignments], proctorAssignments: [...parent2[i].proctorAssignments] });
+      } else {
+        child1.push({ ...parent2[i], roomAssignments: [...parent2[i].roomAssignments], proctorAssignments: [...parent2[i].proctorAssignments] });
+        child2.push({ ...parent1[i], roomAssignments: [...parent1[i].roomAssignments], proctorAssignments: [...parent1[i].proctorAssignments] });
+      }
+    }
+    
+    return [child1, child2];
+  };
+
+  // Mutation (improved)
+  const mutate = (chromosome: Chromosome): Chromosome => {
+    return chromosome.map(gene => {
+      if (Math.random() < MUTATION_RATE) {
+        const mutationType = Math.floor(Math.random() * 4);
+        const sections = groupedByCourse[gene.courseId];
+        
+        if (mutationType === 0) {
+          // Mutate date (only from selected dates)
+          const newDate = allAvailableDates[Math.floor(Math.random() * allAvailableDates.length)];
+          
+          // Also reassign proctors for the new date
+          const availableProctors = availabilityMap.get(newDate) || [];
+          const newProctorAssignments = gene.proctorAssignments.map(() => 
+            availableProctors.length > 0 
+              ? availableProctors[Math.floor(Math.random() * availableProctors.length)]
+              : -1
           );
-          const instructorId = sectionObj?.user_id ?? null;
+          
+          return { ...gene, date: newDate, proctorAssignments: newProctorAssignments };
+        } else if (mutationType === 1) {
+          // Mutate time
+          return { ...gene, timeSlot: times[Math.floor(Math.random() * times.length)] };
+        } else if (mutationType === 2) {
+          // Mutate room for a random section
+          const sectionIdx = Math.floor(Math.random() * sections.length);
+          const section = sections[sectionIdx];
+          const suitableRooms = suitableRoomsBySection.get(section.modality_id) || [];
+          
+          if (suitableRooms.length > 0) {
+            const newRoomAssignments = [...gene.roomAssignments];
+            newRoomAssignments[sectionIdx] = suitableRooms[Math.floor(Math.random() * suitableRooms.length)];
+            return { ...gene, roomAssignments: newRoomAssignments };
+          }
+        } else {
+          // Mutate proctor for a random section
+          const sectionIdx = Math.floor(Math.random() * sections.length);
+          const availableProctors = availabilityMap.get(gene.date) || [];
+          
+          if (availableProctors.length > 0) {
+            const newProctorAssignments = [...gene.proctorAssignments];
+            newProctorAssignments[sectionIdx] = availableProctors[Math.floor(Math.random() * availableProctors.length)];
+            return { ...gene, proctorAssignments: newProctorAssignments };
+          }
+        }
+      }
+      return { ...gene, roomAssignments: [...gene.roomAssignments], proctorAssignments: [...gene.proctorAssignments] };
+    });
+  };
 
-          const buildingId = roomToBuildingMap.get(sectionRoomId);
-          const buildingName = buildingId ? buildingMap.get(buildingId) : "Unknown Building";
+  // Initialize population
+  console.log("Initializing population...");
+  let population: Chromosome[] = [];
+  for (let i = 0; i < POPULATION_SIZE; i++) {
+    population.push(generateRandomChromosome());
+  }
 
-          scheduledExams.push({
-            program_id: section.program_id,
-            course_id: section.course_id,
-            modality_id: section.modality_id,
-            room_id: sectionRoomId,
-            section_name: section.section_name,
-            proctor_id: proctorId,
-            examperiod_id: matchedPeriod.examperiod_id,
-            exam_date: examDateISO,
-            exam_start_time: startTimestamp,
-            exam_end_time: endTimestamp,
-            exam_duration: `${duration.hours ?? 0}h ${duration.minutes ?? 0}m`,
-            proctor_timein: formData.proctor_timein ?? null,
-            proctor_timeout: formData.proctor_timeout ?? null,
-            academic_year: academicYear,
-            semester: semester,
-            exam_category: formData.exam_category ?? null,
-            exam_period: examPeriod,
-            college_name: collegeNameForCourse,
-            building_name: `${buildingName} (${buildingId})`,
-            instructor_id: instructorId,
-          });
-        });
+  let bestChromosome: Chromosome | null = null;
+  let bestFitness = Infinity;
 
-        assigned = true;
+  // Evolution loop
+  console.log("Starting evolution...");
+  for (let generation = 0; generation < GENERATIONS; generation++) {
+    // Calculate fitness for all chromosomes
+    const fitnesses = population.map(calculateFitness);
+    
+    // Track best solution
+    const currentBestIdx = fitnesses.indexOf(Math.min(...fitnesses));
+    if (fitnesses[currentBestIdx] < bestFitness) {
+      bestFitness = fitnesses[currentBestIdx];
+      bestChromosome = population[currentBestIdx];
+      console.log(`Generation ${generation + 1}/${GENERATIONS}: Best fitness = ${bestFitness}`);
+    }
+
+    // Stop early if perfect solution found
+    if (bestFitness === 0) {
+      console.log("Perfect solution found!");
+      break;
+    }
+
+    // Create next generation
+    const nextPopulation: Chromosome[] = [];
+
+    // Elitism: keep best solutions
+    const sortedIndices = fitnesses
+      .map((fit, idx) => ({ fit, idx }))
+      .sort((a, b) => a.fit - b.fit)
+      .map(x => x.idx);
+    
+    for (let i = 0; i < ELITE_SIZE; i++) {
+      nextPopulation.push(population[sortedIndices[i]].map(gene => ({ 
+        ...gene, 
+        roomAssignments: [...gene.roomAssignments], 
+        proctorAssignments: [...gene.proctorAssignments] 
+      })));
+    }
+
+    // Generate rest through selection, crossover, and mutation
+    while (nextPopulation.length < POPULATION_SIZE) {
+      const parent1 = tournamentSelection(population, fitnesses);
+      const parent2 = tournamentSelection(population, fitnesses);
+      
+      const [child1, child2] = crossover(parent1, parent2);
+      
+      nextPopulation.push(mutate(child1));
+      if (nextPopulation.length < POPULATION_SIZE) {
+        nextPopulation.push(mutate(child2));
       }
     }
 
-    if (!assigned) unscheduledCourses.push(courseId);
+    population = nextPopulation;
+  }
+
+  console.log(`Evolution complete! Best fitness: ${bestFitness}`);
+
+  // Convert best chromosome to schedule
+  if (!bestChromosome) {
+    alert("Could not find a valid schedule. Please select more exam dates or adjust constraints.");
+    return;
+  }
+
+  const scheduledExams: any[] = [];
+
+  for (const gene of bestChromosome) {
+    const { courseId, date, timeSlot, roomAssignments, proctorAssignments } = gene;
+    const sections = groupedByCourse[courseId];
+
+    // Skip if any assignment is invalid
+    if (roomAssignments.some(r => !r || r === "") || proctorAssignments.some(p => p === -1)) {
+      unscheduledCourses.push(courseId);
+      continue;
+    }
+
+    // Find matching exam period
+    const matchedPeriod = examPeriods.find((p) => {
+      const start = new Date(p.start_date);
+      const end = new Date(p.end_date);
+      return new Date(date) >= start && new Date(date) <= end;
+    });
+
+    if (!matchedPeriod) {
+      unscheduledCourses.push(courseId);
+      continue;
+    }
+
+    // Build exam times
+    const [startHour, startMinute] = timeSlot.split(":").map(Number);
+    const endHour = startHour + Math.floor((startMinute + totalDurationMinutes) / 60);
+    const endMinute = (startMinute + totalDurationMinutes) % 60;
+    const endTime = `${String(endHour).padStart(2, "0")}:${String(endMinute).padStart(2, "0")}`;
+    const startTimestamp = `${date}T${timeSlot}:00Z`;
+    const endTimestamp = `${date}T${endTime}:00Z`;
+
+    // Schedule each section
+    sections.forEach((section: any, idx: number) => {
+      const sectionRoomId = roomAssignments[idx];
+      const proctorId = proctorAssignments[idx];
+      
+      const sectionObj = sectionCourses.find(
+        (sc) =>
+          sc.program_id === section.program_id &&
+          sc.course_id === section.course_id &&
+          sc.section_name === section.section_name
+      );
+      const instructorId = sectionObj?.user_id ?? null;
+
+      const buildingId = roomToBuildingMap.get(sectionRoomId);
+      const buildingName = buildingId ? buildingMap.get(buildingId) : "Unknown Building";
+
+      scheduledExams.push({
+        program_id: section.program_id,
+        course_id: section.course_id,
+        modality_id: section.modality_id,
+        room_id: sectionRoomId,
+        section_name: section.section_name,
+        proctor_id: proctorId,
+        examperiod_id: matchedPeriod.examperiod_id,
+        exam_date: date,
+        exam_start_time: startTimestamp,
+        exam_end_time: endTimestamp,
+        exam_duration: `${duration.hours ?? 0}h ${duration.minutes ?? 0}m`,
+        proctor_timein: formData.proctor_timein ?? null,
+        proctor_timeout: formData.proctor_timeout ?? null,
+        academic_year: academicYear,
+        semester: semester,
+        exam_category: formData.exam_category ?? null,
+        exam_period: examPeriod,
+        college_name: collegeNameForCourse,
+        building_name: `${buildingName} (${buildingId})`,
+        instructor_id: instructorId,
+      });
+    });
   }
 
   // Warnings
   if (unscheduledCourses.length) {
+    const courseNames = unscheduledCourses.map(cId => {
+      const course = courses.find(c => c.course_id === cId);
+      return course ? `${cId} (${course.course_name})` : cId;
+    }).join("\n");
+    
     alert(
-      "⚠️ Could not schedule these courses due to conflicts or room capacity:\n" +
-        unscheduledCourses.join(", ")
+      `Could not schedule ${unscheduledCourses.length} course(s):\n\n${courseNames}\n\nTry: \n- Selecting more exam dates\n- Ensuring enough proctors are available\n- Checking room capacity`
     );
   }
 
   if (!scheduledExams.length) {
-    alert("No valid schedules to save.");
+    alert("No valid schedules to save. Please adjust your selection.");
     return;
   }
 
   // Save to DB
   const { error } = await supabase.from("tbl_examdetails").insert(scheduledExams);
-  if (error) alert("❌ Error saving schedule: " + error.message);
-  else alert(`✅ ${scheduledExams.length} schedules saved successfully!`);
+  if (error) alert("Error saving schedule: " + error.message);
+  else alert(`${scheduledExams.length} schedules saved successfully!`);
 };
 
   const times = [

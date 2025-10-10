@@ -4,6 +4,7 @@ import { FaChevronLeft, FaChevronRight } from 'react-icons/fa';
 import { supabase } from '../lib/supabaseClient.ts';
 import { ToastContainer, toast } from 'react-toastify';
 import 'react-toastify/dist/ReactToastify.css';
+import Select from 'react-select';
 
 type ProctorSetAvailabilityProps = {
   user: {
@@ -31,51 +32,44 @@ const ProctorSetAvailability: React.FC<ProctorSetAvailabilityProps> = ({ user })
   const [allowedDates, setAllowedDates] = useState<string[]>([]);
   const [_collegeName, setCollegeName] = useState('');
   const [collegeId, setCollegeId] = useState<number | null>(null);
-  const [hasSubmitted, setHasSubmitted] = useState(false); // new
   const [isSubmitting, setIsSubmitting] = useState(false); // prevent duplicate submits
   const today = new Date();
-  const [availabilityInfo, setAvailabilityInfo] = useState<{
-    name: string;
-    date: string;
-    timeSlot: string;
-  } | null>(null);
+  const [availabilityList, setAvailabilityList] = useState<
+    { date: string; timeSlot: string; status: string; remarks?: string }[]
+  >([]);
   const [showModal, setShowModal] = useState(false);
   
   useEffect(() => {
-    const checkExistingSubmission = async () => {
+    const fetchAvailability = async () => {
       if (!user?.user_id) return;
 
       const { data, error } = await supabase
         .from('tbl_availability')
-        .select('day, time_slot')
+        .select('day, time_slot, status, remarks')
         .eq('user_id', user.user_id)
-        .limit(1)
-        .single();
+        .order('day', { ascending: true });
 
       if (!error && data) {
-        setHasSubmitted(true);
+        const formatted = data.map((entry: any) => ({
+          date: new Date(entry.day).toLocaleDateString('en-US', {
+            month: 'long',
+            day: 'numeric',
+            year: 'numeric',
+          }),
+          timeSlot: entry.time_slot,
+          status: entry.status,
+          remarks: entry.remarks,
+        }));
 
-        const formattedDate = new Date(data.day).toLocaleDateString('en-US', {
-          month: 'long',
-          day: 'numeric',
-          year: 'numeric',
-        });
-
-        const firstName = (user as any).first_name ?? '';
-        const lastName  = (user as any).last_name  ?? '';
-        const fullName  = (firstName || lastName)
-          ? `${firstName} ${lastName}`.trim()
-          : (user as any).name ?? 'Unknown User';
-
-        setAvailabilityInfo({
-          name: fullName,
-          date: formattedDate,
-          timeSlot: data.time_slot,
-        });
+        setAvailabilityList(formatted);
       }
     };
 
-    checkExistingSubmission();
+    fetchAvailability();
+
+    // optional: refresh every few seconds
+    const interval = setInterval(fetchAvailability, 5000);
+    return () => clearInterval(interval);
   }, [user.user_id]);
 
   // set month to current
@@ -216,11 +210,6 @@ const ProctorSetAvailability: React.FC<ProctorSetAvailabilityProps> = ({ user })
   const handleSubmitAvailability = async (e: React.FormEvent) => {
     e.preventDefault();
 
-    if (hasSubmitted) {
-      toast.info('You have already submitted your availability. Delete previous entry to submit again.');
-      return;
-    }
-
     if (isSubmitting) return;
     setIsSubmitting(true);
 
@@ -231,7 +220,6 @@ const ProctorSetAvailability: React.FC<ProctorSetAvailabilityProps> = ({ user })
       return;
     }
 
-    // Default date to first allowed date if none selected
     let submitDate = selectedDate;
     if (!submitDate) {
       if (allowedDates.length === 0) {
@@ -243,30 +231,8 @@ const ProctorSetAvailability: React.FC<ProctorSetAvailabilityProps> = ({ user })
       setSelectedDate(submitDate);
     }
 
-    // Default time slot and status
     const submitTimeSlot = selectedTimeSlot || AvailabilityTimeSlot.Morning;
     const submitStatus = availabilityStatus || 'available';
-
-    // Check if the user already has a record
-    const { data: existing, error: checkError } = await supabase
-      .from('tbl_availability')
-      .select('availability_id')
-      .eq('user_id', userId)
-      .maybeSingle(); // <- important fix
-
-    if (checkError) {
-      console.error('Error checking existing availability:', checkError);
-      toast.info('Failed to check existing availability.');
-      setIsSubmitting(false);
-      return;
-    }
-
-    if (existing) {
-      alert('You have already submitted your availability. Delete previous entry to submit again.');
-      setHasSubmitted(true);
-      setIsSubmitting(false);
-      return;
-    }
 
     const data = {
       day: submitDate,
@@ -285,8 +251,8 @@ const ProctorSetAvailability: React.FC<ProctorSetAvailabilityProps> = ({ user })
       toast.error(`Failed to submit availability: ${insertError.message}`);
     } else {
       toast.success('Availability set successfully!');
-      setHasSubmitted(true);
       setRemarks('');
+      // Optionally refresh availability info here
     }
 
     setIsSubmitting(false);
@@ -328,13 +294,13 @@ const ProctorSetAvailability: React.FC<ProctorSetAvailabilityProps> = ({ user })
                       : `No date schedule available for ${collegeId ?? 'N/A'}`
                   }
                   readOnly
-                  onClick={() => (allowedDates.length > 0 && !(hasSubmitted || isSubmitting)) && setShowDatePicker(!showDatePicker)}
+                  onClick={() => (allowedDates.length > 0 && !(isSubmitting)) && setShowDatePicker(!showDatePicker)}
                   className="date-input-field"
-                  style={{ cursor: hasSubmitted || isSubmitting ? 'not-allowed' : 'pointer' }}
+                  style={{ cursor: isSubmitting ? 'not-allowed' : 'pointer', color: "black" }}
                 />
                 <span
                   className="dropdown-arrow"
-                  onClick={() => (allowedDates.length > 0 && !(hasSubmitted || isSubmitting)) && setShowDatePicker(!showDatePicker)}
+                  onClick={() => (allowedDates.length > 0 && !(isSubmitting)) && setShowDatePicker(!showDatePicker)}
                 >
                   &#9660;
                 </span>
@@ -353,7 +319,7 @@ const ProctorSetAvailability: React.FC<ProctorSetAvailabilityProps> = ({ user })
                       {getCalendarDays().map((day, index) => {
                         const dayDate = day ? new Date(currentMonth.getFullYear(), currentMonth.getMonth(), day, 12) : null;
                         const isoDate = dayDate ? dayDate.toISOString().split('T')[0] : '';
-                        const isAllowed = allowedDates.includes(isoDate) && !(hasSubmitted || isSubmitting);
+                        const isAllowed = allowedDates.includes(isoDate) && !(isSubmitting);
                         const isSelected = isoDate === selectedDate;
                         const isToday = dayDate && dayDate.toDateString() === today.toDateString();
 
@@ -383,23 +349,19 @@ const ProctorSetAvailability: React.FC<ProctorSetAvailabilityProps> = ({ user })
             </div>
 
             {/* Time Slot */}
-            <div className="form-group">
+           <div className="form-group">
               <label htmlFor="timeSlot">Time Slot</label>
-              <div className="custom-select-wrapper">
-                <select
-                  id="timeSlot"
-                  value={selectedTimeSlot}
-                  onChange={(e) => setSelectedTimeSlot(e.target.value as AvailabilityTimeSlot)}
-                  disabled={hasSubmitted || isSubmitting}
-                >
-                  {Object.values(AvailabilityTimeSlot).map(slot => (
-                    <option key={slot} value={slot}>{slot}</option>
-                  ))}
-                </select>
-                <span className="dropdown-arrow">&#9660;</span>
-              </div>
+              <Select
+                id="timeSlot"
+                value={{ value: selectedTimeSlot, label: selectedTimeSlot }}
+                onChange={(option) => setSelectedTimeSlot(option?.value as AvailabilityTimeSlot)}
+                options={Object.values(AvailabilityTimeSlot).map(slot => ({ value: slot, label: slot }))}
+                isDisabled={isSubmitting}
+                classNamePrefix="react-select"
+                placeholder="Select Time Slot"
+                isSearchable
+              />
             </div>
-
             {/* Status */}
             <div className="form-group">
               <label htmlFor="status">Status</label>
@@ -408,14 +370,15 @@ const ProctorSetAvailability: React.FC<ProctorSetAvailabilityProps> = ({ user })
                   id="status"
                   value={availabilityStatus}
                   onChange={(e) => setAvailabilityStatus(e.target.value)}
-                  disabled={hasSubmitted || isSubmitting}
+                  disabled={isSubmitting}
+                  style={{color: "black"}}
                   className="custom-select"
                 >
                   {availabilityOptions.map(option => (
                     <option key={option} value={option}>{option.charAt(0).toUpperCase() + option.slice(1)}</option>
                   ))}
                 </select>
-                <span className="dropdown-arrow">&#9660;</span>
+                <span className="dropdown-arrow"></span>
               </div>
             </div>
 
@@ -427,7 +390,7 @@ const ProctorSetAvailability: React.FC<ProctorSetAvailabilityProps> = ({ user })
                 value={remarks}
                 onChange={(e) => setRemarks(e.target.value)}
                 placeholder="Type here..."
-                disabled={hasSubmitted || isSubmitting}
+                disabled={isSubmitting}
               ></textarea>
             </div>
 
@@ -436,49 +399,52 @@ const ProctorSetAvailability: React.FC<ProctorSetAvailabilityProps> = ({ user })
               <button
                 type="submit"
                 className="submit-button"
-                disabled={hasSubmitted || isSubmitting}
+                disabled={isSubmitting}
                 style={{ minWidth: '150px' }}
               >
                 {isSubmitting ? 'Submitting...' : 'Submit'}
               </button>
             </div>
+            <div style={{ textAlign: 'center', marginTop: '10px' }}>
+              <span
+                style={{ color: '#092C4C', cursor: 'pointer', textDecoration: 'underline' }}
+                onClick={() => setShowModal(true)}
+              >
+                Click here to "view" all submitted availabilities
+              </span>
+            </div>
 
-            {/* Info message if already submitted */}
-            {hasSubmitted && (
-              <p className="info-text" style={{ textAlign: 'center', marginTop: '10px' }}>
-                You have already submitted your availability.{' '}
-                <span
-                  style={{ color: 'blue', textDecoration: 'underline', cursor: 'pointer' }}
-                  onClick={() => setShowModal(true)}
-                >
-                  Click here to "view"
-                </span>. You can only submit again if your previous entry is deleted.
-              </p>
-            )}
           </form>
         </div>
         {showModal &&
-          <div className="availability-modal-overlay">
-            <div className="availability-modal-box">
-              <h2 className="availability-modal-title">Availability Details</h2>
-              {availabilityInfo ? (
-                <div className="availability-modal-body">
-                  <p><strong>Name:</strong> {availabilityInfo.name}</p>
-                  <p><strong>Date:</strong> {availabilityInfo.date}</p>
-                  <p><strong>Time Slot:</strong> {availabilityInfo.timeSlot}</p>
-                </div>
-              ) : (
-                <p className="availability-modal-body">No availability info found.</p>
-              )}
-              <button type="button" 
-                onClick={() => setShowModal(false)} 
-                className="availability-modal-close-btn"
-              >
-                Close
-              </button>
-            </div>
+        <div className="availability-modal-overlay">
+          <div className="availability-modal-box">
+            <h2 className="availability-modal-title">All Submitted Availabilities</h2>
+            {availabilityList.length > 0 ? (
+              <div className="availability-modal-body">
+                {availabilityList.map((entry, idx) => (
+                  <div key={idx} className="availability-entry">
+                    <p><strong>Date:</strong> {entry.date}</p>
+                    <p><strong>Time Slot:</strong> {entry.timeSlot}</p>
+                    <p><strong>Status:</strong> {entry.status}</p>
+                    {entry.remarks && <p><strong>Remarks:</strong> {entry.remarks}</p>}
+                    <hr />
+                  </div>
+                ))}
+              </div>
+            ) : (
+              <p className="availability-modal-body">No availability info found.</p>
+            )}
+            <button
+              type="button"
+              onClick={() => setShowModal(false)}
+              className="availability-modal-close-btn"
+            >
+              Close
+            </button>
           </div>
-        }
+        </div>
+      }
 
         <div className="availability-card">
           <div className="card-header-request">Request Change of Availability</div>
@@ -490,6 +456,7 @@ const ProctorSetAvailability: React.FC<ProctorSetAvailabilityProps> = ({ user })
                 <select
                   id="changeStatus"
                   value={changeStatus}
+                  style={{color: "black"}}
                   onChange={(e) => setChangeStatus(e.target.value)}
                   className="custom-select"
                 >
@@ -497,7 +464,7 @@ const ProctorSetAvailability: React.FC<ProctorSetAvailabilityProps> = ({ user })
                     <option key={option} value={option}>{option.charAt(0).toUpperCase() + option.slice(1)}</option>
                   ))}
                 </select>
-                <span className="dropdown-arrow">&#9660;</span>
+                <span className="dropdown-arrow"></span>
               </div>
             </div>
 

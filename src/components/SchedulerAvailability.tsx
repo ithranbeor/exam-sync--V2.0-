@@ -3,7 +3,7 @@ import '../styles/proctorSetAvailability.css';
 import { FaChevronLeft, FaChevronRight, FaEye, FaTrash, FaPenAlt } from 'react-icons/fa';
 import { supabase } from '../lib/supabaseClient.ts';
 import { ToastContainer, toast } from 'react-toastify';
-import Select from 'react-select';
+import Select, { components } from 'react-select';
 import 'react-toastify/dist/ReactToastify.css';
 
 type ProctorSetAvailabilityProps = {
@@ -52,11 +52,16 @@ const SchedulerAvailability: React.FC<ProctorSetAvailabilityProps> = ({ user }) 
   const [showDatePicker, setShowDatePicker] = useState(false);
   const [currentMonth, setCurrentMonth] = useState(new Date());
   const [allowedDates, setAllowedDates] = useState<string[]>([]);
-  const [hasSubmitted, setHasSubmitted] = useState(false);
+  const [_hasSubmitted, setHasSubmitted] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [selectedRemarks, setSelectedRemarks] = useState('');
   const [showRemarksModal, setShowRemarksModal] = useState(false);
   const today = new Date();
+
+  const MultiValue = (props: any) => {
+    if (props.data.value === 'all') return null; // hide "Select All" pill
+    return <components.MultiValue {...props} />;
+  };
 
   useEffect(() => {
     fetchAvailability();
@@ -340,7 +345,7 @@ const SchedulerAvailability: React.FC<ProctorSetAvailabilityProps> = ({ user }) 
                     <FaTrash />
                   </button>
                   <button type="button" className="icon-button" onClick={() => openEditModal(entry)}>
-                    <FaPenAlt/>
+                    <FaPenAlt style={{color: "#092C4C"}}/>
                   </button>
                 </td>
               </tr>
@@ -476,6 +481,14 @@ const SchedulerAvailability: React.FC<ProctorSetAvailabilityProps> = ({ user }) 
                   onChange={handleMultiChange}
                   isMulti
                   closeMenuOnSelect={false}
+                  components={{ MultiValue }}
+                  styles={{
+                    valueContainer: (provided) => ({
+                      ...provided,
+                      maxHeight: "120px",
+                      overflowY: "auto",
+                    }),
+                  }}
                 />
               </div>
             )}

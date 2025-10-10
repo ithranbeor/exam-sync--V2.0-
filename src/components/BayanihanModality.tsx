@@ -375,7 +375,11 @@ const BayanihanModality: React.FC<UserProps> = ({ user }) => {
                   <div className="selected-rooms">
                     {form.rooms.map((roomId) => {
                       const r = roomOptions.find(r => r.room_id === roomId);
-                      return <span key={roomId} className="room-chip">{r?.room_name}</span>;
+                      return (
+                        <div key={roomId} className="room-card">
+                          {r?.room_id}
+                        </div>
+                      );
                     })}
                   </div>
                 )}

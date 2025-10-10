@@ -122,7 +122,8 @@ const Rooms: React.FC = () => {
   };
 
   const filtered = rooms.filter(r =>
-    r.room_name.toLowerCase().includes(searchTerm.toLowerCase())
+    r.room_name.toLowerCase().includes(searchTerm.toLowerCase()) ||
+    r.room_id.toString().toLowerCase().includes(searchTerm.toLowerCase())
   );
 
   return (

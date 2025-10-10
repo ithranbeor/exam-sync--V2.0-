@@ -528,5 +528,19 @@ button.open-modal-btn {
     color: white;
     background: #ffb800;
 }
+.selected-rooms {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 5px;
+  margin-top: 10px;
+}
 
-
+.room-card {
+  background-color: #ffffff; /* card color */
+  color: #ffb800;
+  padding: 1px 5px;
+  border-radius: 12px;
+  font-weight: 500;
+  box-shadow: 0 2px 6px rgba(0,0,0,0.15);
+  font-size: small;
+}
