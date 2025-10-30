@@ -391,7 +391,7 @@ class TblRoles(models.Model):
 
 class TblUserRole(models.Model):
     user_role_id = models.AutoField(primary_key=True)
-    role = models.ForeignKey(TblRoles, models.DO_NOTHING)
+    role = models.ForeignKey(TblRoles, models.DO_NOTHING, blank=True, null=True)
     user = models.ForeignKey('TblUsers', models.DO_NOTHING)
     college = models.ForeignKey(TblCollege, models.DO_NOTHING, blank=True, null=True)
     department = models.ForeignKey(TblDepartment, models.DO_NOTHING, blank=True, null=True)

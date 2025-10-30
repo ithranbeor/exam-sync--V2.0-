@@ -57,10 +57,13 @@ def tbl_examdetails_list(request):
         return Response(serializer.data)
 
     elif request.method == 'POST':
-        serializer = TblExamdetailsSerializer(data=request.data)
+        many = isinstance(request.data, list)
+        print("📦 Incoming exam details data:", request.data)  # 👈 add this
+        serializer = TblExamdetailsSerializer(data=request.data, many=many)
         if serializer.is_valid():
             serializer.save()
             return Response(serializer.data, status=status.HTTP_201_CREATED)
+        print("❌ Validation errors:", serializer.errors)  # 👈 add this
         return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
 
 
@@ -152,15 +155,25 @@ def tbl_availability_list(request):
     if request.method == 'GET':
         user_id = request.GET.get('user_id')
         college_id = request.GET.get('college_id')
-        
+        status_param = request.GET.get('status')
+
+        # ✅ Support arrays like day[]=2025-10-20 or day=2025-10-20
+        days = request.GET.getlist('day[]') or request.GET.getlist('day')
+
         availabilities = TblAvailability.objects.all()
-        
+
         if user_id:
             availabilities = availabilities.filter(user__user_id=user_id)
-        
+
         if college_id:
             availabilities = availabilities.filter(user__college_id=college_id)
-        
+
+        if status_param:
+            availabilities = availabilities.filter(status=status_param)
+
+        if days:
+            availabilities = availabilities.filter(day__in=days)
+
         serializer = TblAvailabilitySerializer(availabilities, many=True)
         return Response(serializer.data)
 

@@ -447,6 +447,7 @@ class TblModalitySerializer(serializers.ModelSerializer):
     # Foreign Keys (expanded for read)
     room = TblRoomsSerializer(read_only=True)
     user = TblUsersSerializer(read_only=True)
+    course = CourseSerializer(read_only=True)  # ✅ ADD THIS LINE
     
     # Write-only FKs for POST/PUT
     room_id = serializers.CharField(write_only=True, required=False, allow_null=True, allow_blank=True)
@@ -468,6 +469,7 @@ class TblModalitySerializer(serializers.ModelSerializer):
             'modality_type',
             'room_type',
             'modality_remarks',
+            'course',           # ✅ ADD THIS
             'course_id',
             'program_id',
             'room',
@@ -485,13 +487,10 @@ class TblModalitySerializer(serializers.ModelSerializer):
         user_id = validated_data.pop('user_id', None)
         room_id = validated_data.pop('room_id', None)
         
-        # Get foreign key objects using the models already imported in this file
-        # (TblCourse, TblUsers, TblRooms should be imported at the top of your serializers.py)
         course = TblCourse.objects.get(course_id=course_id)
         user = TblUsers.objects.get(user_id=user_id)
         room = TblRooms.objects.get(room_id=room_id) if room_id else None
         
-        # Create instance
         instance = TblModality.objects.create(
             course=course,
             user=user,
@@ -501,7 +500,6 @@ class TblModalitySerializer(serializers.ModelSerializer):
         return instance
     
     def update(self, instance, validated_data):
-        # Extract write-only fields if present
         course_id = validated_data.pop('course_id', None)
         user_id = validated_data.pop('user_id', None)
         room_id = validated_data.pop('room_id', None)
@@ -513,7 +511,6 @@ class TblModalitySerializer(serializers.ModelSerializer):
         if room_id:
             instance.room = TblRooms.objects.get(room_id=room_id)
         
-        # Update other fields
         for attr, value in validated_data.items():
             setattr(instance, attr, value)
         
