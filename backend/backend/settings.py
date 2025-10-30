@@ -11,7 +11,7 @@ DEBUG = False
 
 BASE_DIR = Path(__file__).resolve().parent.parent
 
-# Set the static root for collectstatic
+# Set the static root for collectstati
 STATIC_ROOT = os.path.join(BASE_DIR, 'staticfiles')
 STATICFILES_STORAGE = "whitenoise.storage.CompressedManifestStaticFilesStorage"
 
