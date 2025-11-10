@@ -1,6 +1,6 @@
 from rest_framework import serializers
 from django.utils import timezone
-from .models import TblUsers, TblRoles, TblExamdetails, TblAvailability, TblModality, TblSectioncourse, TblBuildings, TblUserRoleHistory, TblRooms, TblUserRole, TblCourseUsers, TblCourse, TblProgram, TblExamperiod, TblUserRole, TblInbox, TblTerm, TblCollege, TblDepartment
+from .models import TblScheduleapproval, TblAvailableRooms, TblNotification, TblUsers, TblRoles, TblExamdetails, TblAvailability, TblModality, TblSectioncourse, TblBuildings, TblUserRoleHistory, TblRooms, TblUserRole, TblCourseUsers, TblCourse, TblProgram, TblExamperiod, TblUserRole, TblInbox, TblTerm, TblCollege, TblDepartment
 
 class CourseSerializer(serializers.Serializer):
     # This is a custom serializer (not ModelSerializer) because the db layout uses a join table.
@@ -89,12 +89,15 @@ class CourseSerializer(serializers.Serializer):
         return instance
     
 class TblProgramSerializer(serializers.ModelSerializer):
-    department = serializers.StringRelatedField(read_only=True)
+    department = serializers.SerializerMethodField()
     department_id = serializers.CharField(write_only=True)
 
     class Meta:
         model = TblProgram
         fields = ['program_id', 'program_name', 'department', 'department_id']
+
+    def get_department(self, obj):
+        return obj.department.department_name if obj.department else "N/A"
 
     def create(self, validated_data):
         dept_id = validated_data.pop('department_id')
@@ -406,17 +409,15 @@ class TblCourseUsersSerializer(serializers.ModelSerializer):
         return instance
 
 class TblAvailabilitySerializer(serializers.ModelSerializer):
-    # Nested user data for read
     user = TblUsersSerializer(read_only=True)
-    # Writable FK field - REMOVE the source parameter
     user_id = serializers.IntegerField(write_only=True)
 
     class Meta:
         model = TblAvailability
         fields = [
             'availability_id',
-            'day',
-            'time_slot',
+            'days',
+            'time_slots',
             'status',
             'remarks',
             'user',
@@ -424,19 +425,15 @@ class TblAvailabilitySerializer(serializers.ModelSerializer):
         ]
 
     def create(self, validated_data):
-        # Extract user_id and create the availability
         user_id = validated_data.pop('user_id')
         user = TblUsers.objects.get(user_id=user_id)
-        availability = TblAvailability.objects.create(user=user, **validated_data)
-        return availability
+        return TblAvailability.objects.create(user=user, **validated_data)
 
     def update(self, instance, validated_data):
-        # Extract user_id if present and update
         user_id = validated_data.pop('user_id', None)
         if user_id:
             instance.user = TblUsers.objects.get(user_id=user_id)
         
-        # Update other fields
         for attr, value in validated_data.items():
             setattr(instance, attr, value)
         
@@ -447,6 +444,7 @@ class TblModalitySerializer(serializers.ModelSerializer):
     # Foreign Keys (expanded for read)
     room = TblRoomsSerializer(read_only=True)
     user = TblUsersSerializer(read_only=True)
+    course = CourseSerializer(read_only=True)  # ✅ ADD THIS LINE
     
     # Write-only FKs for POST/PUT
     room_id = serializers.CharField(write_only=True, required=False, allow_null=True, allow_blank=True)
@@ -468,6 +466,7 @@ class TblModalitySerializer(serializers.ModelSerializer):
             'modality_type',
             'room_type',
             'modality_remarks',
+            'course',           # ✅ ADD THIS
             'course_id',
             'program_id',
             'room',
@@ -485,13 +484,10 @@ class TblModalitySerializer(serializers.ModelSerializer):
         user_id = validated_data.pop('user_id', None)
         room_id = validated_data.pop('room_id', None)
         
-        # Get foreign key objects using the models already imported in this file
-        # (TblCourse, TblUsers, TblRooms should be imported at the top of your serializers.py)
         course = TblCourse.objects.get(course_id=course_id)
         user = TblUsers.objects.get(user_id=user_id)
         room = TblRooms.objects.get(room_id=room_id) if room_id else None
         
-        # Create instance
         instance = TblModality.objects.create(
             course=course,
             user=user,
@@ -501,7 +497,6 @@ class TblModalitySerializer(serializers.ModelSerializer):
         return instance
     
     def update(self, instance, validated_data):
-        # Extract write-only fields if present
         course_id = validated_data.pop('course_id', None)
         user_id = validated_data.pop('user_id', None)
         room_id = validated_data.pop('room_id', None)
@@ -513,13 +508,11 @@ class TblModalitySerializer(serializers.ModelSerializer):
         if room_id:
             instance.room = TblRooms.objects.get(room_id=room_id)
         
-        # Update other fields
         for attr, value in validated_data.items():
             setattr(instance, attr, value)
         
         instance.save()
         return instance
-
 
 class TblExamdetailsSerializer(serializers.ModelSerializer):
     # FKs (expanded for reading)
@@ -606,3 +599,150 @@ class TblExamdetailsSerializer(serializers.ModelSerializer):
 
         instance.save()
         return instance
+    
+class TblScheduleapprovalSerializer(serializers.ModelSerializer):
+    submitted_by_name = serializers.SerializerMethodField()
+
+    class Meta:
+        model = TblScheduleapproval
+        fields = [
+            'request_id',
+            'dean_user_id',
+            'submitted_at',
+            'status',
+            'remarks',
+            'created_at',
+            'submitted_by',
+            'submitted_by_name',
+            'schedule_data',
+            'college_name',
+        ]
+
+    def get_submitted_by_name(self, obj):
+        """Return full name if submitted_by is related to TblUsers"""
+        if obj.submitted_by:
+            return f"{obj.submitted_by.first_name} {obj.submitted_by.last_name}"
+        return None
+    
+class ScheduleSendSerializer(serializers.Serializer):
+    college_name = serializers.CharField()
+    exam_period = serializers.CharField()
+    term = serializers.CharField()
+    semester = serializers.CharField()
+    academic_year = serializers.CharField()
+    building = serializers.CharField()
+    remarks = serializers.CharField(allow_blank=True, required=False)
+    schedules = serializers.ListField()
+
+class TblNotificationSerializer(serializers.ModelSerializer):
+    user_id = serializers.IntegerField(write_only=True)
+    sender_id = serializers.IntegerField(write_only=True, required=False, allow_null=True)
+
+    user_full_name = serializers.SerializerMethodField(read_only=True)
+    sender_full_name = serializers.SerializerMethodField(read_only=True)
+
+    class Meta:
+        model = TblNotification
+        fields = [
+            'notification_id',
+            'user',
+            'user_id',
+            'user_full_name',
+            'sender',
+            'sender_id',
+            'sender_full_name',
+            'title',
+            'message',
+            'type',
+            'status',
+            'link_url',
+            'is_seen',
+            'created_at',
+            'read_at',
+            'priority'
+        ]
+        read_only_fields = ['notification_id', 'created_at', 'read_at', 'user', 'sender']
+
+    def get_user_full_name(self, obj):
+        return f"{obj.user.first_name} {obj.user.last_name}" if obj.user else None
+
+    def get_sender_full_name(self, obj):
+        return f"{obj.sender.first_name} {obj.sender.last_name}" if obj.sender else 'System'
+
+    def create(self, validated_data):
+        user_id = validated_data.pop('user_id')
+        sender_id = validated_data.pop('sender_id', None)
+        user = TblUsers.objects.get(user_id=user_id)
+        sender = TblUsers.objects.get(user_id=sender_id) if sender_id else None
+        notification = TblNotification.objects.create(user=user, sender=sender, **validated_data)
+        return notification
+
+    def update(self, instance, validated_data):
+        # Mark as read if is_seen is updated
+        if validated_data.get('is_seen') and not instance.read_at:
+            validated_data['read_at'] = timezone.now()
+        sender_id = validated_data.pop('sender_id', None)
+        if sender_id:
+            instance.sender = TblUsers.objects.get(user_id=sender_id)
+        return super().update(instance, validated_data)
+    
+class EmailNotificationSerializer(serializers.ModelSerializer):
+    user_ids = serializers.ListField(
+        child=serializers.IntegerField(),
+        write_only=True
+    )
+    subject = serializers.CharField(write_only=True)
+    body = serializers.CharField(write_only=True)
+
+    class Meta:
+        model = TblNotification
+        fields = [
+            'user_ids',
+            'subject',
+            'body',
+            'type',
+            'priority',
+        ]
+        extra_kwargs = {
+            'type': {'default': 'email'},
+            'priority': {'default': 1},
+        }
+
+    def create(self, validated_data):
+        notifications = []
+        for uid in validated_data['user_ids']:
+            notifications.append(TblNotification(
+                user_id=uid,
+                title=validated_data['subject'],
+                message=validated_data['body'],
+                type=validated_data.get('type', 'email'),
+                status='unread',
+                is_seen=False,
+                priority=validated_data.get('priority', 1),
+                created_at=timezone.now()
+            ))
+        return TblNotification.objects.bulk_create(notifications)
+
+class TblAvailableRoomsSerializer(serializers.ModelSerializer):
+    room = TblRoomsSerializer(read_only=True)
+    college = TblCollegeSerializer(read_only=True)
+    
+    room_id = serializers.CharField(write_only=True)
+    college_id = serializers.CharField(write_only=True)
+    
+    class Meta:
+        model = TblAvailableRooms
+        fields = ['room_id', 'college_id', 'room', 'college', 'created_at']
+    
+    def create(self, validated_data):
+        room_id = validated_data.pop('room_id')
+        college_id = validated_data.pop('college_id')
+        
+        room = TblRooms.objects.get(room_id=room_id)
+        college = TblCollege.objects.get(college_id=college_id)
+        
+        return TblAvailableRooms.objects.create(
+            room_id=room_id,
+            college_id=college_id,
+            **validated_data
+        )

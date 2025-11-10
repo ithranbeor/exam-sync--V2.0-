@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect, useRef, useCallback, useMemo } from 'react';
 import { api } from '../lib/apiClient.ts';
 import '../styles/bayanihanModality.css';
 import { ToastContainer, toast } from 'react-toastify';
@@ -38,7 +38,12 @@ const BayanihanModality: React.FC<UserProps> = ({ user }) => {
   const [courseOptions, setCourseOptions] = useState<{ course_id: string; course_name: string }[]>([]);
   const [sectionOptions, setSectionOptions] = useState<{ course_id: string; program_id: string; section_name: string }[]>([]);
   const [roomOptions, setRoomOptions] = useState<{ room_id: string; room_name: string; room_type: string; building_id?: string }[]>([]);
+  const [availableRoomIds, setAvailableRoomIds] = useState<string[]>([]);
+  const [_sectionDropdownOpen, _setSectionDropdownOpen] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [loadingRooms, setLoadingRooms] = useState(true);
+
+  const _dropdownRef = useRef<HTMLDivElement>(null);
 
   // Modal states
   const [showRoomModal, setShowRoomModal] = useState(false);
@@ -54,150 +59,188 @@ const BayanihanModality: React.FC<UserProps> = ({ user }) => {
     [key: string]: { occupiedTimes: { start: string; end: string }[] }
   }>({});
 
-  const CheckboxOption = (props: any) => {
-    return (
-      <components.Option {...props}>
-        <input
-          type="checkbox"
-          checked={props.isSelected}
-          readOnly
-          style={{ marginRight: 8 }}
-        />
-        {props.label}
-      </components.Option>
+  const CheckboxOption = (props: any) => (
+    <components.Option {...props}>
+      <input
+        type="checkbox"
+        checked={props.isSelected}
+        readOnly
+        style={{ marginRight: 8 }}
+      />
+      <label>{props.label}</label>
+    </components.Option>
+  );
+
+  /** FETCH ROOM STATUS BASED ON EXAMDETAILS (lazy loaded when viewing occupancy) */
+  const fetchRoomOccupancy = useCallback(async (roomId: string) => {
+    if (roomStatus[roomId]) return; // Already loaded
+
+    try {
+      const { data: exams } = await api.get('/tbl_examdetails', {
+        params: { room_id: roomId }
+      });
+
+      const occupiedTimes = exams.map((e: any) => ({
+        start: e.exam_start_time,
+        end: e.exam_end_time,
+      }));
+
+      setRoomStatus(prev => ({
+        ...prev,
+        [roomId]: { occupiedTimes }
+      }));
+    } catch (error: any) {
+      console.error('Error loading room occupancy:', error);
+    }
+  }, [roomStatus]);
+
+  // Memoize filtered courses based on program
+  const filteredCourseOptions = useMemo(() => {
+    if (!form.program) return [];
+    return courseOptions.filter(c => 
+      sectionOptions.some(s => s.program_id === form.program && s.course_id === c.course_id)
     );
-  };
+  }, [courseOptions, sectionOptions, form.program]);
 
-  /** FETCH ROOM STATUS BASED ON EXAMDETAILS */
-  useEffect(() => {
-    const fetchRoomStatus = async () => {
-      try {
-        const response = await api.get('/tbl_examdetails');
-        const exams = response.data;
+  // Memoize filtered sections based on course
+  const filteredSectionOptions = useMemo(() => {
+    if (!form.course) return [];
+    return sectionOptions
+      .filter(s => s.course_id === form.course)
+      .map(s => ({ value: s.section_name, label: s.section_name }));
+  }, [sectionOptions, form.course]);
 
-        const statusMap: { [key: string]: { occupiedTimes: { start: string; end: string }[] } } = {};
-        exams.forEach((e: any) => {
-          if (!statusMap[e.room_id]) statusMap[e.room_id] = { occupiedTimes: [] };
-          statusMap[e.room_id].occupiedTimes.push({
-            start: e.exam_start_time,
-            end: e.exam_end_time,
-          });
-        });
-        setRoomStatus(statusMap);
-      } catch (error: any) {
-        console.error('Error fetching exams:', error.message);
-      }
-    };
-
-    fetchRoomStatus();
-  }, []);
-
+  /** FETCH PROGRAMS, COURSES, SECTIONS, ROOMS, BUILDINGS, AND AVAILABLE ROOMS */
   useEffect(() => {
     const fetchData = async () => {
       if (!user?.user_id) return;
 
-      try {
-        // 1️⃣ Fetch all user roles
-        const { data: roles } = await api.get(`/tbl_user_role`, {
-          params: { user_id: user.user_id }
-        });
-        console.log("User roles fetched:", roles);
+      setLoadingRooms(true);
 
-        // 2️⃣ Find Bayanihan Leader role (role_id = 4)
-        const bayanihanLeaderRole = roles.find((r: any) => r.role === 4 || r.role_id === 4);
-        if (!bayanihanLeaderRole) {
-          console.warn("User is not a Bayanihan Leader (role_id = 4)");
+      try {
+        // PARALLEL API CALLS - Fetch everything at once
+        const [
+          { data: roles },
+          { data: allPrograms },
+          { data: allCourses },
+          { data: sectionCourses },
+          { data: allDepartments },
+          { data: buildings },
+          { data: availableRooms }
+        ] = await Promise.all([
+          api.get('/tbl_user_role', { params: { user_id: user.user_id } }),
+          api.get('/programs/'),
+          api.get('/courses/'),
+          api.get('/tbl_sectioncourse/'),
+          api.get('/departments/'),
+          api.get('/tbl_buildings'),
+          api.get('/tbl_available_rooms/')
+        ]);
+
+        if (!roles || roles.length === 0) {
+          setLoadingRooms(false);
           return;
         }
 
-        console.log("Bayanihan Leader role found:", bayanihanLeaderRole);
+        // Get leader roles
+        const leaderRoles = roles.filter((r: any) => 
+          r.role === 4 || r.role_id === 4
+        );
 
-        // 3️⃣ Get department from the role
-        const department = bayanihanLeaderRole.department ?? bayanihanLeaderRole.department_id;
-        console.log("Department:", department, "Type:", typeof department);
+        if (!leaderRoles || leaderRoles.length === 0) {
+          toast.warn('You are not assigned as a Bayanihan Leader.');
+          setLoadingRooms(false);
+          return;
+        }
 
-        // 4️⃣ PROGRAMS - Filter by department
-        const programsRes = await api.get('/programs/');
-        console.log("All programs from API:", programsRes.data);
-        console.log("First program structure:", programsRes.data[0]);
-        
-        const programs = department
-          ? programsRes.data.filter((p: any) => {
-              // Extract department ID from the string format "TblDepartment object (DIT)"
-              let progDept = p.department_id || p.department || p.dept_id || p.dept;
-              
-              // If department is in format "TblDepartment object (XXX)", extract XXX
-              if (typeof progDept === 'string' && progDept.includes('(') && progDept.includes(')')) {
-                const match = progDept.match(/\(([^)]+)\)/);
-                if (match) {
-                  progDept = match[1];
-                }
-              }
-              
-              console.log(`Comparing program ${p.program_id}: ${progDept} === ${department}`);
-              return String(progDept).toLowerCase() === String(department).toLowerCase();
-            })
-          : programsRes.data;
-        console.log("Programs loaded after filtering:", programs);
+        const leaderDepartmentIds = leaderRoles
+          .map((r: any) => r.department_id || r.department)
+          .filter(Boolean);
+
+        if (leaderDepartmentIds.length === 0) {
+          toast.warn('No department assigned to your Bayanihan Leader role.');
+          setLoadingRooms(false);
+          return;
+        }
+
+        // Get colleges from departments
+        const departments = allDepartments.filter((d: any) =>
+          leaderDepartmentIds.includes(d.department_id)
+        );
+
+        const collegeIds = departments
+          .map((d: any) => d.college_id || d.college)
+          .filter(Boolean);
+
+        if (collegeIds.length === 0) {
+          toast.warn('No associated college found for your department.');
+          setLoadingRooms(false);
+          return;
+        }
+
+        // Filter programs by department
+        const programs = allPrograms.filter((p: any) => {
+          const progDept = p.department_id || p.department || p.dept_id || p.dept;
+          return leaderDepartmentIds.includes(progDept);
+        });
         setProgramOptions(programs);
 
-        // Get program IDs from filtered programs
-        const programIds = programs.map((p: any) => String(p.program_id));
-        console.log("Program IDs from department:", programIds);
-
-        // 5️⃣ SECTIONS - Get all sections for the department's programs
-        const sectionRes = await api.get('/tbl_sectioncourse/');
-        const allSections = sectionRes.data;
-        console.log("All sections from API:", allSections.length);
-        console.log("First section structure:", allSections[0]);
-        
-        const filteredSections = allSections.filter((sc: any) => {
-          // Extract program_id from nested program object
-          const programId = sc.program?.program_id || sc.program_id;
-          return programIds.includes(String(programId));
+        // Fetch user courses - this still needs to be separate
+        const { data: userCourses } = await api.get('/tbl_course_users/', {
+          params: { user_id: user.user_id, is_bayanihan_leader: true }
         });
-        console.log("Sections filtered by program:", filteredSections.length);
-        
-        // Normalize section data to include direct course_id and program_id
-        const normalizedSections = filteredSections.map((sc: any) => ({
-          ...sc,
-          course_id: sc.course?.course_id || sc.course_id,
-          program_id: sc.program?.program_id || sc.program_id,
-          section_name: sc.section_name
-        }));
-        setSectionOptions(normalizedSections);
 
-        // 6️⃣ COURSES - Get unique course IDs from filtered sections
-        const courseIdsFromSections = [...new Set(
-          normalizedSections.map((s: any) => String(s.course_id))
-        )];
-        console.log("Course IDs from sections:", courseIdsFromSections);
+        const courseIds = userCourses?.map((c: any) => c.course_id) ?? [];
 
-        // 7️⃣ Fetch course details for those course IDs
-        const coursesRes = await api.get('/courses/');
-        const coursesWithNames = coursesRes.data.filter((c: any) =>
-          courseIdsFromSections.includes(String(c.course_id))
+        // Filter courses
+        const coursesWithNames = allCourses.filter((c: any) => 
+          courseIds.includes(c.course_id)
         );
-        console.log("Courses loaded:", coursesWithNames.length);
         setCourseOptions(coursesWithNames);
 
-        // 8️⃣ ROOMS
-        const roomsRes = await api.get('/tbl_rooms');
-        console.log("Rooms loaded:", roomsRes.data.length);
-        setRoomOptions(roomsRes.data);
+        // Filter sections
+        const filteredSections = sectionCourses
+          ?.filter((sc: any) => courseIds.includes(sc.course_id || sc.course?.course_id))
+          .map((sc: any) => ({
+            course_id: sc.course_id || sc.course?.course_id,
+            program_id: sc.program_id || sc.program?.program_id,
+            section_name: sc.section_name
+          })) ?? [];
+        setSectionOptions(filteredSections);
 
-        // 9️⃣ BUILDINGS
-        const buildingsRes = await api.get('/tbl_buildings');
-        const buildings = buildingsRes.data.map((b: any) => ({
-          id: b.building_id,
-          name: b.building_name
-        }));
-        console.log("Buildings loaded:", buildings.length);
-        setBuildingOptions(buildings);
+        // Filter available rooms by college
+        const filteredAvailableRooms = availableRooms.filter((r: any) =>
+          collegeIds.includes(r.college_id || r.college)
+        );
 
+        const availableIds = filteredAvailableRooms?.map((r: any) => r.room_id || r.room) ?? [];
+        setAvailableRoomIds(availableIds);
+
+        // Fetch rooms if available
+        if (availableIds.length > 0) {
+          const { data: allRooms } = await api.get('/tbl_rooms');
+          const filteredRooms = allRooms.filter((r: any) => 
+            availableIds.includes(r.room_id)
+          );
+          setRoomOptions(filteredRooms);
+        } else {
+          setRoomOptions([]);
+        }
+
+        // Set buildings
+        setBuildingOptions(
+          buildings?.map((b: any) => ({ 
+            id: b.building_id, 
+            name: b.building_name 
+          })) ?? []
+        );
+
+        console.log('Available Room IDs:', availableIds);
       } catch (error: any) {
-        console.error('Error loading data:', error.message);
-        toast.error('Failed to load data. Please refresh the page.');
+        console.error('Unexpected error fetching data:', error);
+        toast.error('An unexpected error occurred while loading data');
+      } finally {
+        setLoadingRooms(false);
       }
     };
 
@@ -232,33 +275,44 @@ const BayanihanModality: React.FC<UserProps> = ({ user }) => {
     e.preventDefault();
     if (isSubmitting) return;
     if (!user?.user_id) return;
-
+    
     if (!form.sections.length) {
       toast.warn('Please select at least one section.');
       return;
     }
 
+    if (form.sections.length !== form.rooms.length) {
+      toast.error(`Number of sections must be equal to the number of rooms! (${form.sections.length} of ${form.rooms.length} selected)`);
+      return;
+    }
+
     setIsSubmitting(true);
 
-    for (const sectionName of form.sections) {
+    const submissions = form.sections.map(async (sectionName) => {
       const section = sectionOptions.find(
-        s => String(s.course_id) === String(form.course) && s.section_name === sectionName
+        s => s.course_id === form.course && s.section_name === sectionName
       );
       if (!section) {
-        console.warn(`Section not found: ${sectionName}`);
-        continue;
+        return { status: 'rejected', reason: `Section ${sectionName} not found` };
       }
 
       try {
-        const checkRes = await api.get(
-          `/tbl_modality/?course_id=${section.course_id}&program_id=${section.program_id}&section_name=${section.section_name}&modality_type=${form.modality}&room_type=${form.roomType}`
-        );
+        // Check for existing record
+        const { data: existing } = await api.get('/tbl_modality/', {
+          params: {
+            course_id: section.course_id,
+            program_id: section.program_id,
+            section_name: section.section_name,
+            modality_type: form.modality,
+            room_type: form.roomType
+          }
+        });
 
-        if (checkRes.data.length > 0) {
-          toast.warn(`Already submitted for ${section.section_name}`);
-          continue;
+        if (existing && existing.length > 0) {
+          return { status: 'skipped', section: sectionName };
         }
 
+        // Insert new record
         await api.post('/tbl_modality/', {
           modality_type: form.modality,
           room_type: form.roomType,
@@ -271,14 +325,36 @@ const BayanihanModality: React.FC<UserProps> = ({ user }) => {
           created_at: new Date().toISOString(),
         });
 
-        toast.success(`Saved for ${section.section_name}`);
-      } catch (error: any) {
-        console.error(error);
-        toast.error(`Error saving for ${sectionName}`);
+        return { status: 'success', section: sectionName };
+      } catch (error) {
+        return { status: 'error', section: sectionName, error };
       }
-    }
+    });
+
+    const results = await Promise.allSettled(submissions);
+
+    let successCount = 0;
+    let skippedCount = 0;
+    let errorCount = 0;
+
+    results.forEach((result) => {
+      if (result.status === 'fulfilled') {
+        const value = result.value as any;
+        if (value.status === 'success') successCount++;
+        else if (value.status === 'skipped') skippedCount++;
+        else errorCount++;
+      } else {
+        errorCount++;
+      }
+    });
+
+    if (successCount > 0) toast.success(`Successfully saved ${successCount} section(s)`);
+    if (skippedCount > 0) toast.info(`Skipped ${skippedCount} section(s) (already submitted)`);
+    if (errorCount > 0) toast.error(`Failed to save ${errorCount} section(s)`);
 
     setIsSubmitting(false);
+
+    // Reset form after submit
     setForm({
       modality: '',
       rooms: [],
@@ -291,7 +367,7 @@ const BayanihanModality: React.FC<UserProps> = ({ user }) => {
   };
 
   /** GET ROOM TIMESLOTS WITH 30-MINUTE VACANT INTERVALS */
-  const getRoomTimeslots = (roomId: string) => {
+  const getRoomTimeslots = useCallback((roomId: string) => {
     const dayStart = new Date();
     dayStart.setHours(7, 30, 0, 0);
     const dayEnd = new Date();
@@ -333,11 +409,19 @@ const BayanihanModality: React.FC<UserProps> = ({ user }) => {
     }
 
     return timeslots;
-  };
+  }, [roomStatus]);
 
   /** RENDER TIMESLOT LIST */
   const RoomTimeslots: React.FC<{ roomId: string }> = ({ roomId }) => {
+    useEffect(() => {
+      fetchRoomOccupancy(roomId);
+    }, [roomId]);
+
     const slots = getRoomTimeslots(roomId);
+
+    if (!roomStatus[roomId]) {
+      return <div style={{ textAlign: 'center', padding: '1rem' }}>Loading occupancy...</div>;
+    }
 
     return (
       <div className="occupancy-timeslots">
@@ -359,12 +443,55 @@ const BayanihanModality: React.FC<UserProps> = ({ user }) => {
     );
   };
 
+  // Filter rooms to only show available ones
+  const filteredRoomOptions = useMemo(() => 
+    roomOptions.filter(r => availableRoomIds.includes(r.room_id)),
+    [roomOptions, availableRoomIds]
+  );
+
+  // Memoized sorted and filtered rooms for modal
+  const filteredAndSortedRooms = useMemo(() => {
+    return filteredRoomOptions
+      .filter(r => !selectedBuilding || r.building_id === selectedBuilding)
+      .sort((a, b) => {
+        if (a.room_type === form.roomType && b.room_type !== form.roomType) return -1;
+        if (a.room_type !== form.roomType && b.room_type === form.roomType) return 1;
+        return a.room_name.localeCompare(b.room_name);
+      });
+  }, [filteredRoomOptions, selectedBuilding, form.roomType]);
+
   return (
     <div className="set-availability-container">
       <div className="availability-sections">
         <div className="availability-card">
           <div className="card-header-set">Modality Submission</div>
           <p className="subtitle">Please fill in all fields before submitting.</p>
+          
+          {loadingRooms ? (
+            <div style={{ 
+              backgroundColor: '#e3f2fd', 
+              border: '1px solid #2196F3', 
+              padding: '12px', 
+              borderRadius: '4px', 
+              marginBottom: '20px',
+              color: '#1565C0',
+              textAlign: 'center'
+            }}>
+              Loading available rooms...
+            </div>
+          ) : availableRoomIds.length === 0 ? (
+            <div style={{ 
+              backgroundColor: '#fff3cd', 
+              border: '1px solid #ffc107', 
+              padding: '12px', 
+              borderRadius: '4px', 
+              marginBottom: '20px',
+              color: '#856404'
+            }}>
+              ⚠️ No rooms are currently available for selection. Please contact the administrator to set up available rooms in the Room Management page.
+            </div>
+          ) : null}
+
           <form className="availability-form" onSubmit={handleSubmit}>
             <div className="availability-grid">
 
@@ -392,10 +519,10 @@ const BayanihanModality: React.FC<UserProps> = ({ user }) => {
                 <button
                   type="button"
                   className="open-modal-btn"
-                  disabled={!form.roomType || form.roomType === "No Room"}
+                  disabled={!form.roomType || form.roomType === "No Room" || availableRoomIds.length === 0 || loadingRooms}
                   onClick={() => setShowRoomModal(true)}
                 >
-                  Select Room
+                  {loadingRooms ? 'Loading...' : 'Select Room'}
                 </button>
 
                 {form.rooms.length > 0 && (
@@ -430,10 +557,7 @@ const BayanihanModality: React.FC<UserProps> = ({ user }) => {
                 <label>Program</label>
                 <Select
                   options={programOptions.map(p => ({ value: p.program_id, label: `${p.program_id} - ${p.program_name}` }))}
-                  value={form.program ? (() => {
-                    const prog = programOptions.find(p => p.program_id === form.program);
-                    return prog ? { value: prog.program_id, label: `${prog.program_id} - ${prog.program_name}` } : null;
-                  })() : null}
+                  value={programOptions.filter(p => p.program_id === form.program).map(p => ({ value: p.program_id, label: `${p.program_id} - ${p.program_name}` }))}
                   onChange={selected => setForm(prev => ({ ...prev, program: selected?.value || '', course: '', sections: [] }))}
                   placeholder="Select program..."
                   isClearable
@@ -445,13 +569,14 @@ const BayanihanModality: React.FC<UserProps> = ({ user }) => {
                 <label>Course</label>
                 <Select
                   isDisabled={!form.program}
-                  options={courseOptions
-                    .filter(c => sectionOptions.some(s => s.program_id === form.program && s.course_id === c.course_id))
-                    .map(c => ({ value: c.course_id, label: `${c.course_id} (${c.course_name})` }))}
-                  value={form.course ? (() => {
-                    const course = courseOptions.find(c => c.course_id === form.course);
-                    return course ? { value: course.course_id, label: `${course.course_id} (${course.course_name})` } : null;
-                  })() : null}
+                  options={filteredCourseOptions.map(c => ({ 
+                    value: c.course_id, 
+                    label: `${c.course_id} (${c.course_name})` 
+                  }))}
+                  value={form.course ? { 
+                    value: form.course, 
+                    label: `${filteredCourseOptions.find(c => c.course_id === form.course)?.course_id} (${filteredCourseOptions.find(c => c.course_id === form.course)?.course_name})` 
+                  } : null}
                   onChange={selected => setForm(prev => ({ ...prev, course: selected?.value || '', sections: [] }))}
                   placeholder="Select course..."
                   isClearable
@@ -470,9 +595,7 @@ const BayanihanModality: React.FC<UserProps> = ({ user }) => {
                     components={{ Option: CheckboxOption }}
                     options={[
                       { value: 'select_all', label: 'Select All Sections' },
-                      ...sectionOptions
-                        .filter(s => String(s.course_id) === String(form.course))
-                        .map(s => ({ value: s.section_name, label: s.section_name }))
+                      ...filteredSectionOptions
                     ]}
                     value={form.sections.map(sec => ({ value: sec, label: sec }))}
                     onChange={(selected) => {
@@ -481,18 +604,28 @@ const BayanihanModality: React.FC<UserProps> = ({ user }) => {
                         return;
                       }
 
-                      const allSectionNames = sectionOptions
-                        .filter(s => String(s.course_id) === String(form.course))
-                        .map(s => s.section_name);
+                      const allSections = filteredSectionOptions.map(s => s.value);
+                      const isSelectAll = selected.some(s => s.value === 'select_all');
 
-                      const selectAllClicked = selected.find(s => s.value === 'select_all');
+                      if (isSelectAll) {
+                        if (form.rooms.length === 0) {
+                          toast.warn('Please select rooms first before using "Select All".');
+                          return;
+                        }
 
-                      if (selectAllClicked) {
-                        setForm(prev => ({ ...prev, sections: allSectionNames }));
-                      } else {
-                        const selectedSections = selected.map(s => s.value);
-                        setForm(prev => ({ ...prev, sections: selectedSections }));
+                        const limitedSections = allSections.slice(0, form.rooms.length);
+                        setForm(prev => ({ ...prev, sections: limitedSections }));
+                        toast.info(`Only ${form.rooms.length} section(s) selected.`);
+                        return;
                       }
+
+                      const selectedValues = selected.map(s => s.value);
+                      if (selectedValues.length > form.rooms.length) {
+                        toast.error(`You can only select ${form.rooms.length} section(s) because ${form.rooms.length} room(s) are selected.`);
+                        return;
+                      }
+
+                      setForm(prev => ({ ...prev, sections: selectedValues }));
                     }}
                     placeholder="Select sections..."
                   />
@@ -501,8 +634,8 @@ const BayanihanModality: React.FC<UserProps> = ({ user }) => {
                 )}
 
                 {form.rooms.length > 0 && (
-                  <small style={{ marginTop: "4px", display: "block", color: "#666" }}>
-                    ⚠️ Number of sections must equal number of rooms! {form.sections.length} of {form.rooms.length} section(s) selected.
+                  <small style={{ marginTop: "4px", display: "block", color: form.sections.length !== form.rooms.length ? "red" : "#666" }}>
+                    ⚠️ Number of sections must be equal to the number of rooms! {form.sections.length} of {form.rooms.length} section(s) selected.
                   </small>
                 )}
               </div>
@@ -531,7 +664,7 @@ const BayanihanModality: React.FC<UserProps> = ({ user }) => {
         </div>
       </div>
 
-      {/* ROOM MODAL */}
+       {/* ROOM MODAL */}
       {showRoomModal && (
         <div className="modal-overlay">
           <div className="modal-contents-modality">
@@ -542,63 +675,57 @@ const BayanihanModality: React.FC<UserProps> = ({ user }) => {
                 value: b.id,
                 label: `${b.name} (${b.id})`,
               }))}
-              value={selectedBuilding ? (() => {
-                const building = buildingOptions.find(b => b.id === selectedBuilding);
-                return building ? { value: building.id, label: `${building.name} (${building.id})` } : null;
-              })() : null}
+              value={
+                selectedBuilding
+                  ? { value: selectedBuilding, label: `${buildingOptions.find(b => b.id === selectedBuilding)?.name} (${selectedBuilding})` }
+                  : null
+              }
               onChange={(selected) => setSelectedBuilding(selected?.value || null)}
               placeholder="-- Select Building --"
               isClearable
             />
 
             <div className="room-grid">
-              {roomOptions
-                .filter(r => !selectedBuilding || r.building_id === selectedBuilding)
-                .sort((a, b) => {
-                  if (a.room_type === form.roomType && b.room_type !== form.roomType) return -1;
-                  if (a.room_type !== form.roomType && b.room_type === form.roomType) return 1;
-                  return a.room_name.localeCompare(b.room_name);
-                })
-                .map(r => {
-                  const isDisabled = r.room_type !== form.roomType;
-                  const isSelected = form.rooms.includes(r.room_id);
+              {filteredAndSortedRooms.map(r => {
+                const isDisabled = r.room_type !== form.roomType;
+                const isSelected = form.rooms.includes(r.room_id);
 
-                  return (
-                    <div
-                      key={r.room_id}
-                      className={`room-box ${isSelected ? "selected" : ""} ${isDisabled ? "disabled" : ""}`}
-                      onClick={() => {
-                        if (isDisabled) return;
-                        setForm(prev => ({
-                          ...prev,
-                          rooms: isSelected
-                            ? prev.rooms.filter(id => id !== r.room_id)
-                            : [...prev.rooms, r.room_id],
-                        }));
-                      }}
-                    >
-                      <div className="room-label">
-                        {r.room_id} <small>({r.room_type})</small>
-                      </div>
-
-                      {!isDisabled && (
-                        <button
-                          type="button"
-                          className="view-occupancy"
-                          onClick={(e) => {
-                            e.stopPropagation();
-                            setOccupancyModal({ visible: true, roomId: r.room_id });
-                          }}
-                        >
-                          <small>View Vacancy</small>
-                        </button>
-                      )}
+                return (
+                  <div
+                    key={r.room_id}
+                    className={`room-box ${isSelected ? "selected" : ""} ${isDisabled ? "disabled" : ""}`}
+                    onClick={() => {
+                      if (isDisabled) return;
+                      setForm(prev => ({
+                        ...prev,
+                        rooms: isSelected
+                          ? prev.rooms.filter(id => id !== r.room_id)
+                          : [...prev.rooms, r.room_id],
+                      }));
+                    }}
+                  >
+                    <div className="room-label">
+                      {r.room_id} <small>({r.room_type})</small>
                     </div>
-                  );
-                })}
 
-              {roomOptions.filter(r => !selectedBuilding || r.building_id === selectedBuilding).length === 0 && (
-                <div className="no-rooms">No rooms available</div>
+                    {!isDisabled && (
+                      <button
+                        type="button"
+                        className="view-occupancy"
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          setOccupancyModal({ visible: true, roomId: r.room_id });
+                        }}
+                      >
+                        <small>View Vacancy</small>
+                      </button>
+                    )}
+                  </div>
+                );
+              })}
+
+              {filteredAndSortedRooms.length === 0 && (
+                <div className="no-rooms">No available rooms for this room type</div>
               )}
             </div>
 

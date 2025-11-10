@@ -3,7 +3,7 @@ from rest_framework.decorators import api_view, permission_classes
 from rest_framework.permissions import AllowAny
 from rest_framework.response import Response
 from rest_framework import status
-from .models import TblUsers, TblUserRole, TblExamdetails, TblModality, TblAvailability, TblCourseUsers, TblSectioncourse, TblUserRoleHistory, TblRoles, TblBuildings, TblRooms, TblCourse, TblExamperiod, TblProgram, TblInbox, TblTerm, TblCollege, TblDepartment
+from .models import TblUsers, TblScheduleapproval, TblAvailableRooms, TblNotification, TblUserRole, TblExamdetails, TblModality, TblAvailability, TblCourseUsers, TblSectioncourse, TblUserRoleHistory, TblRoles, TblBuildings, TblRooms, TblCourse, TblExamperiod, TblProgram, TblInbox, TblTerm, TblCollege, TblDepartment
 from .serializers import (
     UserSerializer,
     UserRoleSerializer,
@@ -24,7 +24,12 @@ from .serializers import (
     TblCourseUsersSerializer,
     TblAvailabilitySerializer,
     TblModalitySerializer,
-    TblExamdetailsSerializer
+    TblExamdetailsSerializer,
+    TblScheduleapprovalSerializer,
+    ScheduleSendSerializer,
+    TblNotificationSerializer,
+    EmailNotificationSerializer,
+    TblAvailableRoomsSerializer
 )
 from django.core.mail import send_mail
 from django.contrib.auth.hashers import make_password
@@ -32,12 +37,242 @@ from django.contrib.auth import get_user_model
 from django.conf import settings
 from django.db import transaction
 from django.utils import timezone
+from uuid import uuid4
 
 import secrets
 from django.core.cache import cache
 
 User = get_user_model()
 
+@api_view(['GET', 'POST'])
+@permission_classes([AllowAny])
+def tbl_available_rooms_list(request):
+    if request.method == 'GET':
+        college_id = request.GET.get('college_id')
+        room_id = request.GET.get('room_id')
+        
+        queryset = TblAvailableRooms.objects.all()
+        
+        if college_id:
+            queryset = queryset.filter(college_id=college_id)
+        if room_id:
+            queryset = queryset.filter(room_id=room_id)
+        
+        serializer = TblAvailableRoomsSerializer(queryset, many=True)
+        return Response(serializer.data)
+    
+    elif request.method == 'POST':
+        serializer = TblAvailableRoomsSerializer(data=request.data)
+        if serializer.is_valid():
+            serializer.save()
+            return Response(serializer.data, status=status.HTTP_201_CREATED)
+        return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
+
+@api_view(['DELETE'])
+@permission_classes([AllowAny])
+def tbl_available_rooms_delete(request, room_id, college_id):
+    try:
+        available_room = TblAvailableRooms.objects.get(room_id=room_id, college_id=college_id)
+        available_room.delete()
+        return Response(status=status.HTTP_204_NO_CONTENT)
+    except TblAvailableRooms.DoesNotExist:
+        return Response({'error': 'Available room not found'}, status=status.HTTP_404_NOT_FOUND)
+    
+@api_view(['GET'])
+def proctors_list(request, scheduler_id: int):
+    """
+    Get all proctors under the same college(s) as scheduler.
+    """
+    scheduler_roles = TblUserRole.objects.filter(user_id=scheduler_id, role_id=3)
+    college_ids = [r.college_id for r in scheduler_roles if r.college_id]
+
+    proctor_roles = TblUserRole.objects.filter(college_id__in=college_ids, role_id=5)
+    proctor_ids = [r.user_id for r in proctor_roles]
+
+    proctors = TblUsers.objects.filter(user_id__in=proctor_ids).values(
+        'user_id', 'first_name', 'last_name', 'email_address'
+    )
+    return Response(list(proctors))
+
+@api_view(['POST'])
+def send_email_notification(request):
+    """
+    Send notifications to selected users
+    """
+    serializer = EmailNotificationSerializer(data=request.data)
+    if serializer.is_valid():
+        serializer.save()
+        return Response({"message": f"Email sent to {len(request.data.get('user_ids', []))} user(s)!"}, status=status.HTTP_201_CREATED)
+    return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
+
+@api_view(['GET'])
+def notification_list(request, user_id):
+    """
+    Get all notifications for a user, ordered by priority and created_at
+    """
+    notifications = TblNotification.objects.filter(user_id=user_id).order_by('-priority', '-created_at')
+    serializer = TblNotificationSerializer(notifications, many=True)
+    return Response(serializer.data)
+
+@api_view(['POST'])
+def notification_create(request):
+    """
+    Create a new notification
+    """
+    serializer = TblNotificationSerializer(data=request.data)
+    if serializer.is_valid():
+        serializer.save()
+        return Response(serializer.data, status=status.HTTP_201_CREATED)
+    return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
+
+@api_view(['PATCH'])
+def notification_update(request, pk):
+    """
+    Update a notification (e.g., mark as seen)
+    """
+    try:
+        notification = TblNotification.objects.get(pk=pk)
+    except TblNotification.DoesNotExist:
+        return Response({"error": "Notification not found"}, status=status.HTTP_404_NOT_FOUND)
+
+    serializer = TblNotificationSerializer(notification, data=request.data, partial=True)
+    if serializer.is_valid():
+        serializer.save()
+        return Response(serializer.data)
+    return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
+
+@api_view(['DELETE'])
+def notification_delete(request, pk):
+    """
+    Delete a notification
+    """
+    try:
+        notification = TblNotification.objects.get(pk=pk)
+        notification.delete()
+        return Response({"message": "Notification deleted"}, status=status.HTTP_204_NO_CONTENT)
+    except TblNotification.DoesNotExist:
+        return Response({"error": "Notification not found"}, status=status.HTTP_404_NOT_FOUND)
+    
+@api_view(['POST'])
+def send_schedule_to_dean(request):
+
+    serializer = ScheduleSendSerializer(data=request.data)
+    if not serializer.is_valid():
+        return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
+
+    user_id = request.data.get("user_id")  # from frontend
+    if not user_id:
+        return Response({"error": "Missing user_id"}, status=status.HTTP_400_BAD_REQUEST)
+
+    try:
+        # 1️⃣ Find scheduler's college (role_id = 3)
+        scheduler_role = TblUserRole.objects.filter(user_id=user_id, role_id=3).first()
+        if not scheduler_role:
+            return Response({"error": "User is not a scheduler or has no college"}, status=status.HTTP_404_NOT_FOUND)
+
+        # 2️⃣ Find dean in the same college (role_id = 1)
+        dean_role = TblUserRole.objects.filter(college_id=scheduler_role.college_id, role_id=1).first()
+        if not dean_role:
+            return Response({"error": "No dean found for this college"}, status=status.HTTP_404_NOT_FOUND)
+
+        dean_user = TblUsers.objects.filter(user_id=dean_role.user_id).first()
+        if not dean_user:
+            return Response({"error": "Dean user record not found"}, status=status.HTTP_404_NOT_FOUND)
+
+        # 3️⃣ Create schedule approval record
+        request_id = uuid4()
+        schedule_data = {
+            "college_name": serializer.validated_data["college_name"],
+            "exam_period": serializer.validated_data["exam_period"],
+            "term": serializer.validated_data["term"],
+            "semester": serializer.validated_data["semester"],
+            "academic_year": serializer.validated_data["academic_year"],
+            "building": serializer.validated_data["building"],
+            "total_schedules": len(serializer.validated_data["schedules"]),
+            "schedules": serializer.validated_data["schedules"],
+        }
+
+        TblScheduleapproval.objects.create(
+            request_id=request_id,
+            submitted_by_id=user_id,
+            dean_user_id=dean_role.user_id,
+            college_name=serializer.validated_data["college_name"],
+            schedule_data=schedule_data,
+            remarks=serializer.validated_data.get("remarks", "No remarks"),
+            status="pending",
+            submitted_at=timezone.now(),
+        )
+
+        # 4️⃣ Send dean notification
+        TblNotification.objects.create(
+            user_id=dean_role.user_id,
+            sender_id=user_id,
+            title="New Schedule Approval Request",
+            message=f"Scheduler submitted a schedule for {serializer.validated_data['college_name']}.",
+            type="schedule_approval",
+            status="unread",
+            link_url="/dean-requests",
+            is_seen=False,
+            priority=1,
+            created_at=timezone.now(),
+        )
+
+        return Response(
+            {"message": "Schedule successfully sent to Dean."},
+            status=status.HTTP_201_CREATED
+        )
+
+    except Exception as e:
+        print("Error sending schedule:", e)
+        return Response({"error": str(e)}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+    
+@api_view(['GET', 'POST'])
+@permission_classes([AllowAny])
+def tbl_scheduleapproval_list(request):
+    """
+    GET → List all schedule approvals  
+    POST → Create a new schedule approval (if allowed)
+    """
+    if request.method == 'GET':
+        approvals = TblScheduleapproval.objects.all().order_by('-created_at')
+        serializer = TblScheduleapprovalSerializer(approvals, many=True)
+        return Response(serializer.data)
+
+    elif request.method == 'POST':
+        serializer = TblScheduleapprovalSerializer(data=request.data)
+        if serializer.is_valid():
+            serializer.save()
+            return Response(serializer.data, status=status.HTTP_201_CREATED)
+        return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
+
+@api_view(['GET', 'PUT', 'DELETE'])
+@permission_classes([AllowAny])
+def tbl_scheduleapproval_detail(request, pk):
+    """
+    GET → Retrieve  
+    PUT → Update  
+    DELETE → Delete  
+    """
+    try:
+        approval = TblScheduleapproval.objects.get(pk=pk)
+    except TblScheduleapproval.DoesNotExist:
+        return Response({'error': 'Schedule approval not found'}, status=status.HTTP_404_NOT_FOUND)
+
+    if request.method == 'GET':
+        serializer = TblScheduleapprovalSerializer(approval)
+        return Response(serializer.data)
+
+    elif request.method == 'PUT':
+        serializer = TblScheduleapprovalSerializer(approval, data=request.data, partial=True)
+        if serializer.is_valid():
+            serializer.save()
+            return Response(serializer.data)
+        return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
+
+    elif request.method == 'DELETE':
+        approval.delete()
+        return Response(status=status.HTTP_204_NO_CONTENT)
+    
 @api_view(['GET', 'POST'])
 @permission_classes([AllowAny])
 def tbl_examdetails_list(request):
@@ -57,12 +292,14 @@ def tbl_examdetails_list(request):
         return Response(serializer.data)
 
     elif request.method == 'POST':
-        serializer = TblExamdetailsSerializer(data=request.data)
+        many = isinstance(request.data, list)
+        print("📦 Incoming exam details data:", request.data)  # 👈 add this
+        serializer = TblExamdetailsSerializer(data=request.data, many=many)
         if serializer.is_valid():
             serializer.save()
             return Response(serializer.data, status=status.HTTP_201_CREATED)
+        print("❌ Validation errors:", serializer.errors)  # 👈 add this
         return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
-
 
 @api_view(['GET', 'PUT', 'DELETE'])
 @permission_classes([AllowAny])
@@ -86,7 +323,6 @@ def tbl_examdetails_detail(request, pk):
     elif request.method == 'DELETE':
         instance.delete()
         return Response(status=status.HTTP_204_NO_CONTENT)
-
     
 @api_view(['GET', 'POST'])
 @permission_classes([AllowAny])
@@ -122,7 +358,6 @@ def tbl_modality_list(request):
             return Response(serializer.data, status=status.HTTP_201_CREATED)
         return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
 
-
 @api_view(['GET', 'PUT', 'DELETE'])
 @permission_classes([AllowAny])
 def tbl_modality_detail(request, pk):
@@ -152,22 +387,28 @@ def tbl_availability_list(request):
     if request.method == 'GET':
         user_id = request.GET.get('user_id')
         college_id = request.GET.get('college_id')
-        
+        status_param = request.GET.get('status')
+        days = request.GET.getlist('days[]') or request.GET.getlist('days')
+
         availabilities = TblAvailability.objects.all()
-        
+
         if user_id:
             availabilities = availabilities.filter(user__user_id=user_id)
-        
+
         if college_id:
             availabilities = availabilities.filter(user__college_id=college_id)
-        
+
+        if status_param:
+            availabilities = availabilities.filter(status=status_param)
+
+        if days:
+            availabilities = availabilities.filter(days__overlap=days)  # PostgreSQL ArrayField supports __overlap
+
         serializer = TblAvailabilitySerializer(availabilities, many=True)
         return Response(serializer.data)
 
     elif request.method == 'POST':
         data = request.data
-
-        # ✅ Detect if multiple records are being sent
         if isinstance(data, list):
             serializer = TblAvailabilitySerializer(data=data, many=True)
         else:
@@ -177,6 +418,7 @@ def tbl_availability_list(request):
             serializer.save()
             return Response(serializer.data, status=status.HTTP_201_CREATED)
         return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
+
 
 @api_view(['GET', 'PUT', 'DELETE'])
 @permission_classes([AllowAny])
@@ -216,7 +458,6 @@ def tbl_course_users_list(request):
             return Response(serializer.data, status=status.HTTP_201_CREATED)
         return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
 
-
 @api_view(['GET', 'PUT', 'DELETE'])
 @permission_classes([AllowAny])
 def tbl_course_users_detail(request, course_id, user_id):
@@ -255,7 +496,6 @@ def tbl_sectioncourse_list(request):
             return Response(serializer.data, status=status.HTTP_201_CREATED)
         return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
 
-
 @api_view(['GET', 'PUT', 'DELETE'])
 @permission_classes([AllowAny])
 def tbl_sectioncourse_detail(request, pk):
@@ -293,7 +533,6 @@ def tbl_roles_list(request):
             serializer.save()
             return Response(serializer.data, status=status.HTTP_201_CREATED)
         return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
-
 
 @api_view(['GET', 'PUT', 'DELETE'])
 @permission_classes([AllowAny])
@@ -426,8 +665,7 @@ def tbl_buildings_detail(request, pk):
         building.delete()
         return Response({'message': 'Building deleted'}, status=status.HTTP_204_NO_CONTENT)
 
-
-# 🚪 ROOMS
+# ROOMS
 @api_view(['GET', 'POST'])
 @permission_classes([AllowAny])
 def tbl_rooms_list(request):
@@ -442,7 +680,6 @@ def tbl_rooms_list(request):
             serializer.save()
             return Response(serializer.data, status=status.HTTP_201_CREATED)
         return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
-
 
 @api_view(['GET', 'PUT', 'DELETE'])
 @permission_classes([AllowAny])
@@ -540,7 +777,6 @@ def program_list(request):
             serializer.save()
             return Response(serializer.data, status=status.HTTP_201_CREATED)
         return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
-
 
 @api_view(['GET', 'PATCH', 'DELETE'])
 @permission_classes([AllowAny])
@@ -788,7 +1024,6 @@ def user_roles(request, user_id):
     serializer = UserRoleSerializer(roles, many=True)
     return Response(serializer.data)
 
-
 # ------------------------------
 # Exam periods
 # ------------------------------
@@ -887,7 +1122,6 @@ def tbl_examperiod_list(request):
             serializer.save()
             return Response(serializer.data, status=201)
         return Response(serializer.errors, status=400)
-
 
 @api_view(['GET', 'PUT', 'DELETE'])
 @permission_classes([AllowAny])

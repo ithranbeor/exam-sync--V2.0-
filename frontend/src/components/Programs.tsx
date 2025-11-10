@@ -143,7 +143,7 @@ const Programs: React.FC<ProgramsProps> = ({ user: _user }) => {
   };
 
   const handleDelete = async (id: string) => {
-    if (!window.confirm('Are you sure you want to delete this program?')) return;
+    if (!globalThis.confirm('Are you sure you want to delete this program?')) return;
     try {
       await api.delete(`/programs/${id}/`);
       setPrograms((prev) => prev.filter((p) => p.program_id !== id));

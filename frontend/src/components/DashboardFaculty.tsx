@@ -279,12 +279,12 @@ const DashboardFaculty = () => {
           {activeMenu === 'profile' && <Profile user={user} />}
           {activeMenu === 'set-Availability' && <ProctorSetAvailability user={user} />}
           {activeMenu === 'exam-Schedule' && <ProctorViewExam />}
-          {activeMenu === 'notification' && <Notification />}
+          {activeMenu === 'notification' && <Notification user={user} />}
           {activeMenu === 'set-Modality' && <BayanihanModality user={user} />}
           {activeMenu === 'plot-Schedule' && <SchedulerPlotSchedule user={user}/>}
           {activeMenu === 'proctors-Availability' && <SchedulerAvailability user={user} />}
           {activeMenu === 'inbox' && <Inbox user={user} />}
-          {activeMenu === 'Request' && <DeanRequests />}
+          {activeMenu === 'Request' && <DeanRequests user={user} />}
           {activeMenu === 'Room-Management' && <RoomManagement user={user} />}
         </main>
       </div>

@@ -1,5 +1,3 @@
-
-
 from pathlib import Path
 import os
 
@@ -35,7 +33,6 @@ INSTALLED_APPS = [
     # Add these
     'rest_framework',
     'api', 
-    'cachalot',
 ]
 
 STATIC_URL = '/static/'
@@ -98,7 +95,7 @@ DATABASES = {
         'ENGINE': 'django.db.backends.postgresql',
         'NAME': 'postgres',
         'USER': 'postgres.kfpgokxyjpyupyzsbzcd',
-        'PASSWORD': 'GtmBEDSIgYeRCLws',
+        'PASSWORD': 'ExamSyncAdmin',
         'HOST': 'aws-0-ap-southeast-1.pooler.supabase.com',
         'PORT': '5432',
         'OPTIONS': {
