@@ -52,6 +52,17 @@ urlpatterns = [
     path('api/tbl_modality/<int:pk>/', views.tbl_modality_detail, name='tbl_modality_detail'),
     path('api/tbl_examdetails', views.tbl_examdetails_list, name='tbl_examdetails_list'),
     path('api/tbl_examdetails/<int:pk>/', views.tbl_examdetails_detail, name='tbl_examdetails_detail'),
+    path('api/tbl_scheduleapproval/', views.tbl_scheduleapproval_list, name='tbl_scheduleapproval_list'),
+    path('api/tbl_scheduleapproval/<uuid:pk>/', views.tbl_scheduleapproval_detail, name='tbl_scheduleapproval_detail'),
+    path('api/send_schedule_to_dean/', views.send_schedule_to_dean, name='send_schedule_to_dean'),
+    path('api/notifications/<int:user_id>/', views.notification_list, name='notification_list'),
+    path('api/notifications/create/', views.notification_create, name='notification_create'),
+    path('api/notifications/<int:pk>/update/', views.notification_update, name='notification_update'),
+    path('api/notifications/<int:pk>/delete/', views.notification_delete, name='notification_delete'),
+    path('api/proctors/<int:scheduler_id>/', views.proctors_list, name='proctors_list'),
+    path('api/send-email/', views.send_email_notification, name='send_email_notification'),
+    path('api/tbl_available_rooms/', views.tbl_available_rooms_list, name='tbl_available_rooms_list'),
+    path('api/tbl_available_rooms/<str:room_id>/<str:college_id>/', views.tbl_available_rooms_delete, name='tbl_available_rooms_delete'),
 
     # Redirect frontend routes to React
     re_path(r'^(?!api/).*$', RedirectView.as_view(url='http://localhost:5173/', permanent=False)),

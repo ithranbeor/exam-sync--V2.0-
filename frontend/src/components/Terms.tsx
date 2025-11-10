@@ -1,7 +1,7 @@
 // deno-lint-ignore-file no-explicit-any
 import React, { useState, useEffect } from "react";
 import { FaTrash, FaEdit, FaSearch, FaDownload } from "react-icons/fa";
-import { api } from "../lib/apiClient.ts"; // ✅ using the shared Axios instance
+import { api } from "../lib/apiClient.ts";
 import { ToastContainer, toast } from "react-toastify";
 import * as XLSX from "xlsx";
 import "react-toastify/dist/ReactToastify.css";

@@ -122,18 +122,28 @@ class DjangoSession(models.Model):
         managed = False
         db_table = 'django_session'
 
-
 class TblAvailability(models.Model):
     availability_id = models.AutoField(primary_key=True)
-    day = models.DateField()
-    time_slot = models.TextField()  # This field type is a guess.
-    status = models.TextField()  # This field type is a guess.
+    days = ArrayField(models.DateField(), blank=False)  # array of dates
+    time_slots = ArrayField(models.CharField(max_length=50), blank=False)  # array of time slots
+    status = models.CharField(max_length=20)
     remarks = models.TextField(blank=True, null=True)
-    user = models.ForeignKey('TblUsers', models.DO_NOTHING)
+    user = models.ForeignKey('TblUsers', on_delete=models.CASCADE)  # ✅ fixed
+
+    class Meta:
+        managed = True
+        db_table = 'tbl_availability'
+
+
+class TblAvailableRooms(models.Model):
+    room_id = models.CharField(max_length=50)
+    college_id = models.CharField(max_length=50)
+    created_at = models.DateTimeField(blank=True, null=True)
 
     class Meta:
         managed = False
-        db_table = 'tbl_availability'
+        db_table = 'tbl_available_rooms'
+        unique_together = (('room_id', 'college_id'),)
 
 
 class TblBuildings(models.Model):
@@ -150,8 +160,9 @@ class TblCollege(models.Model):
     college_name = models.CharField(max_length=50)
 
     class Meta:
-        managed = True  # <-- change this to True
+        managed = False
         db_table = 'tbl_college'
+
 
 class TblCourse(models.Model):
     course_id = models.CharField(primary_key=True, max_length=50)
@@ -159,7 +170,7 @@ class TblCourse(models.Model):
     term = models.ForeignKey('TblTerm', models.DO_NOTHING)
 
     class Meta:
-        managed = True
+        managed = False
         db_table = 'tbl_course'
 
 
@@ -181,7 +192,7 @@ class TblDepartment(models.Model):
     college = models.ForeignKey(TblCollege, models.DO_NOTHING, blank=True, null=True)
 
     class Meta:
-        managed = True
+        managed = False
         db_table = 'tbl_department'
 
 
@@ -251,8 +262,8 @@ class TblInbox(models.Model):
 
 class TblModality(models.Model):
     modality_id = models.AutoField(primary_key=True)
-    modality_type = models.TextField()
-    room_type = models.TextField()
+    modality_type = models.TextField()  # This field type is a guess.
+    room_type = models.TextField()  # This field type is a guess.
     modality_remarks = models.TextField(blank=True, null=True)
     course = models.ForeignKey(TblCourse, models.DO_NOTHING)
     program_id = models.TextField()
@@ -260,44 +271,44 @@ class TblModality(models.Model):
     user = models.ForeignKey('TblUsers', models.DO_NOTHING)
     created_at = models.DateTimeField(blank=True, null=True)
     section_name = models.CharField(blank=True, null=True)
-    
-    # FIX: Change from TextField to ArrayField
-    possible_rooms = ArrayField(
-        models.TextField(),
-        blank=True,
-        null=True,
-        default=list
-    )
+    possible_rooms = models.TextField(blank=True, null=True)  # This field type is a guess.
 
     class Meta:
         managed = False
         db_table = 'tbl_modality'
 
 
-class TblNotifications(models.Model):
-    id = models.BigAutoField(primary_key=True)
-    sender = models.ForeignKey('TblUsers', models.DO_NOTHING, blank=True, null=True)
-    sender_name = models.CharField(max_length=150)
-    receiver = models.ForeignKey('TblUsers', models.DO_NOTHING, related_name='tblnotifications_receiver_set', blank=True, null=True)
-    receiver_name = models.CharField(max_length=150)
+class TblNotification(models.Model):
+    notification_id = models.AutoField(primary_key=True)
+    user = models.ForeignKey('TblUsers', on_delete=models.CASCADE)  # ✅ fixed
+    sender = models.ForeignKey(
+        'TblUsers',
+        on_delete=models.SET_NULL,  # allow null sender
+        related_name='tblnotification_sender_set',
+        blank=True,
+        null=True
+    )
+    title = models.CharField(max_length=255, blank=True, null=True)
     message = models.TextField()
-    status = models.TextField(blank=True, null=True)  # This field type is a guess.
-    file_url = models.TextField(blank=True, null=True)
-    request_id = models.UUIDField(blank=True, null=True)
-    created_at = models.DateTimeField(blank=True, null=True)
+    type = models.CharField(max_length=50, blank=True, null=True)
+    status = models.CharField(max_length=20, blank=True, null=True)
+    link_url = models.TextField(blank=True, null=True)
+    is_seen = models.BooleanField(default=False)
+    created_at = models.DateTimeField(auto_now_add=True)
+    read_at = models.DateTimeField(blank=True, null=True)
+    priority = models.SmallIntegerField(default=0)
 
     class Meta:
-        managed = False
-        db_table = 'tbl_notifications'
+        db_table = 'tbl_notification'
 
 
 class TblProgram(models.Model):
     program_id = models.TextField(primary_key=True)
-    program_name = models.TextField()
-    department = models.ForeignKey(TblDepartment, models.DO_NOTHING)
+    program_name = models.CharField()
+    department = models.ForeignKey(TblDepartment, models.DO_NOTHING, blank=True, null=True)
 
     class Meta:
-        managed = True
+        managed = False
         db_table = 'tbl_program'
 
 
@@ -312,6 +323,16 @@ class TblReplies(models.Model):
     class Meta:
         managed = False
         db_table = 'tbl_replies'
+
+
+class TblRoles(models.Model):
+    role_id = models.BigAutoField(primary_key=True)
+    role_name = models.CharField()
+
+    class Meta:
+        managed = False
+        db_table = 'tbl_roles'
+
 
 class TblRooms(models.Model):
     room_id = models.CharField(primary_key=True, max_length=500)
@@ -331,10 +352,10 @@ class TblScheduleapproval(models.Model):
     status = models.TextField(blank=True, null=True)  # This field type is a guess.
     remarks = models.TextField(blank=True, null=True)
     created_at = models.DateTimeField()
-    file_url = models.TextField(blank=True, null=True)
     request_id = models.UUIDField(primary_key=True)
     submitted_by = models.ForeignKey('TblUsers', models.DO_NOTHING, db_column='submitted_by', blank=True, null=True)
-    dean_college = models.TextField(blank=True, null=True)
+    schedule_data = models.JSONField(blank=True, null=True)
+    college_name = models.TextField(blank=True, null=True)
 
     class Meta:
         managed = False
@@ -342,7 +363,6 @@ class TblScheduleapproval(models.Model):
 
 
 class TblSectioncourse(models.Model):
-    id = models.AutoField(primary_key=True) 
     course = models.ForeignKey(TblCourse, models.DO_NOTHING)
     program = models.ForeignKey(TblProgram, models.DO_NOTHING)
     section_name = models.CharField(max_length=50)
@@ -350,6 +370,7 @@ class TblSectioncourse(models.Model):
     year_level = models.TextField()  # This field type is a guess.
     term = models.ForeignKey('TblTerm', models.DO_NOTHING)
     user = models.ForeignKey('TblUsers', models.DO_NOTHING, blank=True, null=True)
+    is_night_class = models.TextField(blank=True, null=True)
 
     class Meta:
         managed = False
@@ -378,16 +399,6 @@ class TblTerm(models.Model):
         managed = False
         db_table = 'tbl_term'
 
-class TblRoles(models.Model):
-    role_id = models.BigAutoField(primary_key=True)
-    role_name = models.CharField(max_length=255) 
-
-    class Meta:
-        managed = True
-        db_table = 'tbl_roles'
-
-    def __str__(self):
-        return self.role_name
 
 class TblUserRole(models.Model):
     user_role_id = models.AutoField(primary_key=True)
@@ -401,7 +412,7 @@ class TblUserRole(models.Model):
     status = models.TextField(blank=True, null=True)  # This field type is a guess.
 
     class Meta:
-        managed = True
+        managed = False
         db_table = 'tbl_user_role'
 
 
@@ -432,9 +443,9 @@ class TblUsers(models.Model):
     contact_number = models.CharField(max_length=20, blank=True, null=True)
     created_at = models.DateTimeField(blank=True, null=True)
     avatar_url = models.CharField(blank=True, null=True)
-    status = models.TextField(blank=True, null=True)
+    status = models.TextField(blank=True, null=True)  # This field type is a guess.
     user_uuid = models.UUIDField(blank=True, null=True)
 
     class Meta:
-        managed = False  # change to True if you want Django to manage it
+        managed = False
         db_table = 'tbl_users'

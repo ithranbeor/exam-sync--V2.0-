@@ -103,8 +103,8 @@ const DashboardAdmin: React.FC = () => {
 
   const renderContent = () => {
     switch (activeMenu) {
-      case 'colleges': return <Colleges user={user} />;
-      case 'departments': return <Departments user={user} />;
+      case 'colleges': return <Colleges/>;
+      case 'departments': return <Departments/>;
       case 'programs': return <Programs user={user} />;
       case 'courses': return <Courses />;
       case 'section-courses': return <SectionCourses />;

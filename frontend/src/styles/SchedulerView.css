@@ -98,13 +98,6 @@
   background-color: white;
 }
 
-.scheduler-icon {
-  cursor: pointer;
-  font-size: 1.5rem;
-  color: #092C4C;
-  position: relative;
-}
-
 .scheduler-icon-card {
   position: absolute;
   top: 2.5rem; /* below the icon */
@@ -117,6 +110,7 @@
   min-width: 200px;
   transition: opacity 0.3s ease;
 }
+
 .proctor-dropdown {
   padding: 6px 10px;
   font-size: 13px;
@@ -140,19 +134,6 @@
   border-color: #092C4C;
   box-shadow: 0 0 4px rgba(9, 44, 76, 0.4);
 }
-.scheduler-icon {
-  position: relative;
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  margin: 0 8px;
-  cursor: pointer;
-  transition: transform 0.2s ease;
-}
-
-.scheduler-icon:hover {
-  transform: translateY(-5px);
-}
 
 .tooltip-text {
   position: absolute;
@@ -172,4 +153,111 @@
 
 .scheduler-icon:hover .tooltip-text {
   opacity: 1;
+}
+.modal-scroll {
+  max-height: 80vh;
+  overflow-y: auto;
+}
+
+/* Webkit browsers (Chrome, Edge, Safari) */
+.modal-scroll::-webkit-scrollbar {
+  width: 8px;
+}
+
+.modal-scroll::-webkit-scrollbar-track {
+  background: rgba(0, 0, 0, 0.05);
+  border-radius: 4px;
+}
+
+.modal-scroll::-webkit-scrollbar-thumb {
+  background: rgba(0, 0, 0, 0.25);
+  border-radius: 4px;
+}
+
+.modal-scroll::-webkit-scrollbar-thumb:hover {
+  background: rgba(0, 0, 0, 0.4);
+}
+
+/* Firefox */
+.modal-scroll {
+  scrollbar-width: thin;
+  scrollbar-color: rgba(0,0,0,0.25) rgba(0,0,0,0.05);
+}
+.envelope-dropdown {
+  position: absolute;
+  top: 40px; /* below the icon */
+  right: 10;
+  background: #ffffff;
+  border-radius: 10px;
+  box-shadow: 0 4px 12px rgba(0,0,0,0.15);
+  padding: 8px 0;
+  display: flex;
+  flex-direction: column;
+  min-width: 100%;
+  z-index: 9999;
+  animation: fadeSlideIn 0.2s ease-out forwards;
+}
+
+@keyframes fadeSlideIn {
+  from {
+    opacity: 0;
+    transform: translateY(-8px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+.dropdown-item {
+  background: none;
+  border: none;
+  color: #092C4C;
+  font-weight: 500;
+  text-align: left;
+  padding: 10px 15px;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  transition: background 0.2s ease, color 0.2s ease;
+}
+
+.dropdown-item svg {
+  font-size: 16px;
+  color: #092C4C;
+  transition: color 0.2s ease;
+}
+
+.dropdown-item:hover {
+  background-color: #092C4C;
+  color: #ffffff;
+  border-radius: 100px;
+}
+
+.dropdown-item:hover svg {
+  color: #ffffff;
+}
+
+.dean-name {
+  font-size: 0.9rem;
+  font-style: italic;
+  color: #555;
+  text-align: center;
+  padding: 4px 10px;
+  border-top: 1px solid #eee;
+}
+
+/* ICON WRAPPER (ENVELOPE) */
+.scheduler-icon {
+  position: relative;
+  margin: 0 5px;
+  cursor: pointer;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  color: #092C4C;
+  font-size: 22px;
+  padding: 8px;
+  transition: background 0.2s ease, transform 0.1s ease;
 }
