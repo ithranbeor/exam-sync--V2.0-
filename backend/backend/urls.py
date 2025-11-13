@@ -67,8 +67,5 @@ urlpatterns = [
     path('api/tbl_available_rooms/<str:room_id>/<str:college_id>/', views.tbl_available_rooms_delete, name='tbl_available_rooms_delete'),
 
     # Redirect frontend routes to React
-    re_path(
-        r'^(?!api/).*$', 
-        RedirectView.as_view(url='https://exam-sync-frontend.onrender.com/', permanent=False)
-    ),
+    re_path(r'^(?!api/).*$', RedirectView.as_view(url='https://exam-sync-frontend.onrender.com/', permanent=False)),
 ]
