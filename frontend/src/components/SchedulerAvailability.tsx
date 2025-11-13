@@ -26,8 +26,8 @@ enum AvailabilityStatus {
 
 interface Availability {
   availability_id: number;
-  days: string[];                  // use 'days' instead of 'day'
-  time_slots: AvailabilityTimeSlot[]; 
+  days: string[];
+  time_slots: AvailabilityTimeSlot[];
   status: AvailabilityStatus;
   remarks: string | null;
   user_id: number;
@@ -45,12 +45,10 @@ const SchedulerAvailability: React.FC<ProctorSetAvailabilityProps> = ({ user }) 
   const [showModal, setShowModal] = useState(false);
   const [editingId, setEditingId] = useState<number | null>(null);
 
-  // instructor selection
   const [instructors, setInstructors] = useState<any[]>([]);
-  const [selectedInstructors, setSelectedInstructors] = useState<any[]>([]); // for add
-  const [selectedInstructorSingle, setSelectedInstructorSingle] = useState<any>(null); // for edit
+  const [selectedInstructors, setSelectedInstructors] = useState<any[]>([]);
+  const [selectedInstructorSingle, setSelectedInstructorSingle] = useState<any>(null);
 
-  // calendar stuff (same as before)
   const [showDatePicker, setShowDatePicker] = useState(false);
   const [currentMonth, setCurrentMonth] = useState(new Date());
   const [allowedDates, setAllowedDates] = useState<string[]>([]);
@@ -60,286 +58,281 @@ const SchedulerAvailability: React.FC<ProctorSetAvailabilityProps> = ({ user }) 
   const [showRemarksModal, setShowRemarksModal] = useState(false);
   const today = new Date();
 
+  // ✅ Cache for user data to avoid redundant API calls
+  const [userCache, setUserCache] = useState<Map<number, any>>(new Map());
+
   const MultiValue = (props: any) => {
-    if (props.data.value === 'all') return null; // hide "Select All" pill
+    if (props.data.value === 'all') return null;
     return <components.MultiValue {...props} />;
   };
 
   useEffect(() => {
-    fetchAvailability();
-    fetchAllowedDates();
-    checkExistingSubmission();
-    fetchInstructors();
+    // ✅ Load all data in parallel on mount
+    Promise.all([
+      fetchInstructorsAndAvailability(),
+      fetchAllowedDates(),
+      checkExistingSubmission()
+    ]);
   }, []);
 
-  const fetchInstructors = async () => {
+  // ✅ Combined function to fetch both instructors and availability in one go
+  const fetchInstructorsAndAvailability = async () => {
     if (!user?.user_id) return;
 
     try {
-      // 1. Get logged-in scheduler's college_id (role_id = 3)
-      const { data: schedulerRoles, error: schedulerError } = await supabase
-        .from('tbl_user_role')
-        .select('college_id')
-        .eq('user_id', user.user_id)
-        .eq('role_id', 3)
-        .single();
+      // Fetch scheduler's college and all proctors in parallel
+      const [schedulerRolesRes, proctorRolesRes] = await Promise.all([
+        api.get(`/tbl_user_role`, { params: { user_id: user.user_id, role_id: 3 } }),
+        api.get(`/tbl_user_role`, { params: { role_id: 5 } })
+      ]);
 
-      if (schedulerError || !schedulerRoles?.college_id) {
-        console.error('Failed to fetch scheduler role info', schedulerError);
+      const schedulerRole = Array.isArray(schedulerRolesRes.data)
+        ? schedulerRolesRes.data.find((r: any) => r.role_id === 3 || r.role === 3)
+        : schedulerRolesRes.data;
+
+      if (!schedulerRole?.college_id && !schedulerRole?.college) {
         toast.error('Failed to fetch scheduler info');
         return;
       }
 
-      const schedulerCollegeId = schedulerRoles.college_id;
+      const schedulerCollegeId = schedulerRole.college_id || schedulerRole.college;
+      const proctorRoles = proctorRolesRes.data;
 
-      console.log('========================================');
-      console.log('Scheduler College ID:', schedulerCollegeId);
-      console.log('========================================');
-
-      // 2. Get all proctors (role_id = 5) with their department info
-      const { data: proctorRoles, error: proctorError } = await supabase
-        .from('tbl_user_role')
-        .select(`
-          user_id,
-          college_id,
-          department_id,
-          tbl_users(first_name, last_name),
-          tbl_department(college_id)
-        `)
-        .eq('role_id', 5);
-
-      if (proctorError || !proctorRoles) {
-        console.error('Failed to fetch proctors', proctorError);
+      if (!proctorRoles || !Array.isArray(proctorRoles)) {
         toast.error('Failed to fetch proctors');
         return;
       }
 
-      // 3. Filter proctors based on college match
-      // A proctor matches if ANY of their role_id=5 entries match the scheduler's college
-      const matchingUserIds = new Set<number>();
+      // Filter valid proctors matching the college
+      const validProctorRoles = proctorRoles.filter(
+        (p: any) => p.user_id != null && p.college_id === schedulerCollegeId
+      );
 
-      proctorRoles.forEach((p: any) => {
-        let matches = false;
+      if (validProctorRoles.length === 0) {
+        setInstructors([]);
+        setEntries([]);
+        return;
+      }
 
-        // Case 1: Both college_id and department_id are filled
-        if (p.college_id && p.department_id) {
-          // Check if college matches directly OR if department belongs to scheduler's college
-          if (p.college_id === schedulerCollegeId || p.tbl_department?.college_id === schedulerCollegeId) {
-            matches = true;
-            console.log(`✓ Match (College & Dept): ${p.tbl_users?.first_name} ${p.tbl_users?.last_name} - College: ${p.college_id}, Dept College: ${p.tbl_department?.college_id}`);
-          }
-        }
-        // Case 2: Only college_id is filled (department_id is null)
-        else if (p.college_id && !p.department_id) {
-          if (p.college_id === schedulerCollegeId) {
-            matches = true;
-            console.log(`✓ Match (College Only): ${p.tbl_users?.first_name} ${p.tbl_users?.last_name} - College: ${p.college_id}`);
-          }
-        }
-        // Case 3: Only department_id is filled (college_id is null)
-        else if (!p.college_id && p.department_id) {
-          if (p.tbl_department?.college_id === schedulerCollegeId) {
-            matches = true;
-            console.log(`✓ Match (Dept Only): ${p.tbl_users?.first_name} ${p.tbl_users?.last_name} - Dept: ${p.department_id}, Dept College: ${p.tbl_department?.college_id}`);
-          }
-        }
+      // Get unique user IDs
+      const uniqueUserIds = [...new Set(validProctorRoles.map((p: any) => p.user_id))];
 
-        if (!matches) {
-          console.log(`✗ No Match: ${p.tbl_users?.first_name} ${p.tbl_users?.last_name} - College: ${p.college_id || 'null'}, Dept: ${p.department_id || 'null'}, Dept College: ${p.tbl_department?.college_id || 'null'}`);
-        }
+      // ✅ Fetch user data and availability for all proctors in parallel
+      const [userDataResults, availabilityResults] = await Promise.all([
+        // Fetch all user data
+        Promise.all(
+          uniqueUserIds.map(async (userId) => {
+            try {
+              const { data } = await api.get(`/users/${userId}/`);
+              return { userId, data };
+            } catch (err) {
+              console.warn(`Failed to fetch user ${userId}`);
+              return { userId, data: null };
+            }
+          })
+        ),
+        // Fetch all availability data
+        Promise.all(
+          uniqueUserIds.map(async (userId) => {
+            try {
+              const { data } = await api.get(`/tbl_availability/`, {
+                params: { user_id: userId }
+              });
+              return Array.isArray(data) ? data : [];
+            } catch (err) {
+              console.warn(`Failed to fetch availability for user ${userId}`);
+              return [];
+            }
+          })
+        )
+      ]);
 
-        if (matches) {
-          matchingUserIds.add(p.user_id);
+      // ✅ Build user cache
+      const newUserCache = new Map();
+      userDataResults.forEach(({ userId, data }) => {
+        if (data) {
+          newUserCache.set(userId, data);
         }
       });
+      setUserCache(newUserCache);
 
-      // 4. Get unique proctors with their user info
-      const uniqueProctors = proctorRoles
-        .filter((p: any) => matchingUserIds.has(p.user_id))
+      // Build instructors list
+      const instructorsList = validProctorRoles
         .reduce((acc: any[], current: any) => {
           const exists = acc.find(item => item.user_id === current.user_id);
           if (!exists) {
             acc.push(current);
           }
           return acc;
-        }, []);
+        }, [])
+        .map((p: any) => {
+          const userData = newUserCache.get(p.user_id);
+          return {
+            value: p.user_id,
+            label: userData 
+              ? `${userData.first_name || ''} ${userData.last_name || ''}`.trim()
+              : `User ${p.user_id}`,
+          };
+        })
+        .filter(i => i.label !== `User ${i.value}`); // Remove entries without valid user data
 
-      setInstructors(
-        uniqueProctors.map((p: any) => ({
-          value: p.user_id,
-          label: `${p.tbl_users?.first_name || ''} ${p.tbl_users?.last_name || ''}`.trim(),
-        }))
-      );
+      setInstructors(instructorsList);
 
-      console.log('Total Matching Proctors:', uniqueProctors.length);
-      console.log('========================================');
+      // Process availability data
+      const allAvailability = availabilityResults.flat();
+      const validAvailability = allAvailability.filter((entry: any) => entry.user_id != null);
+
+      // Map availability with cached user data (no additional API calls!)
+      const mappedAvailability = validAvailability.map((entry: any) => {
+        const userData = newUserCache.get(entry.user_id);
+        return {
+          availability_id: entry.availability_id,
+          days: Array.isArray(entry.days) ? entry.days : [],
+          time_slots: Array.isArray(entry.time_slots) ? entry.time_slots : [],
+          status: entry.status,
+          remarks: entry.remarks,
+          user_id: entry.user_id,
+          user_fullname: userData
+            ? `${userData.first_name || ''} ${userData.last_name || ''}`.trim()
+            : 'Unknown User',
+        };
+      });
+
+      setEntries(mappedAvailability);
+
     } catch (error) {
-      console.error('Error fetching instructors:', error);
-      toast.error('An error occurred while fetching proctors');
+      console.error('Error fetching data:', error);
+      toast.error('An error occurred while fetching data');
     }
   };
 
+  // ✅ Simplified refresh function
   const fetchAvailability = async () => {
-  console.log('🔵 fetchAvailability() called');
-  if (!user?.user_id) return;
+    if (!user?.user_id) return;
 
-  try {
-    // 1. Get scheduler's college_id
-    const { data: schedulerRoles, error: schedulerError } = await supabase
-      .from('tbl_user_role')
-      .select('college_id')
-      .eq('user_id', user.user_id)
-      .eq('role_id', 3)
-      .single();
+    try {
+      const { data: schedulerRoles } = await api.get(`/tbl_user_role`, {
+        params: { user_id: user.user_id, role_id: 3 }
+      });
 
-    if (schedulerError || !schedulerRoles?.college_id) {
-      console.error('Failed to fetch scheduler college', schedulerError);
-      toast.error('Failed to fetch scheduler info');
-      return;
-    }
+      const schedulerRole = Array.isArray(schedulerRoles)
+        ? schedulerRoles.find((r: any) => r.role_id === 3 || r.role === 3)
+        : schedulerRoles;
 
-    const schedulerCollegeId = schedulerRoles.college_id;
-    console.log('🔵 Scheduler College for Availability:', schedulerCollegeId);
+      if (!schedulerRole?.college_id) return;
 
-    // 2. Get all proctors (role_id = 5) with their college/department info
-    const { data: proctorRoles, error: proctorError } = await supabase
-      .from('tbl_user_role')
-      .select(`
-        user_id,
-        college_id,
-        department_id,
-        tbl_department(college_id)
-      `)
-      .eq('role_id', 5);
+      const schedulerCollegeId = schedulerRole.college_id;
 
-    if (proctorError || !proctorRoles) {
-      console.error('Failed to fetch proctors', proctorError);
-      return;
-    }
+      const { data: proctorRoles } = await api.get(`/tbl_user_role`, {
+        params: { role_id: 5, college_id: schedulerCollegeId }
+      });
 
-    console.log('🔵 Total proctors fetched:', proctorRoles.length);
+      if (!proctorRoles || !Array.isArray(proctorRoles)) return;
 
-    // 3. Filter proctors that match the scheduler's college
-    const matchingUserIds = new Set<number>();
+      const validProctorRoles = proctorRoles.filter((p: any) => p.user_id != null);
+      const uniqueUserIds = [...new Set(validProctorRoles.map((p: any) => p.user_id))];
 
-    proctorRoles.forEach((p: any) => {
-      let matches = false;
-
-      // Case 1: Both college_id and department_id are filled
-      if (p.college_id && p.department_id) {
-        if (p.college_id === schedulerCollegeId || p.tbl_department?.college_id === schedulerCollegeId) {
-          matches = true;
-        }
-      }
-      // Case 2: Only college_id is filled
-      else if (p.college_id && !p.department_id) {
-        if (p.college_id === schedulerCollegeId) {
-          matches = true;
-        }
-      }
-      // Case 3: Only department_id is filled
-      else if (!p.college_id && p.department_id) {
-        if (p.tbl_department?.college_id === schedulerCollegeId) {
-          matches = true;
-        }
+      if (uniqueUserIds.length === 0) {
+        setEntries([]);
+        return;
       }
 
-      if (matches) {
-        matchingUserIds.add(p.user_id);
-      }
-    });
+      const availabilityResults = await Promise.all(
+        uniqueUserIds.map(async (userId) => {
+          try {
+            const { data } = await api.get(`/tbl_availability/`, {
+              params: { user_id: userId }
+            });
+            return Array.isArray(data) ? data : [];
+          } catch (err) {
+            return [];
+          }
+        })
+      );
 
-    if (matchingUserIds.size === 0) {
-      console.log('🔵 No matching proctors found for college:', schedulerCollegeId);
-      setEntries([]);
-      return;
+      const allAvailability = availabilityResults.flat();
+      const validAvailability = allAvailability.filter((entry: any) => entry.user_id != null);
+
+      const mappedAvailability = validAvailability.map((entry: any) => {
+        const userData = userCache.get(entry.user_id);
+        return {
+          availability_id: entry.availability_id,
+          days: Array.isArray(entry.days) ? entry.days : [],
+          time_slots: Array.isArray(entry.time_slots) ? entry.time_slots : [],
+          status: entry.status,
+          remarks: entry.remarks,
+          user_id: entry.user_id,
+          user_fullname: userData
+            ? `${userData.first_name || ''} ${userData.last_name || ''}`.trim()
+            : 'Unknown User',
+        };
+      });
+
+      setEntries(mappedAvailability);
+    } catch (error) {
+      console.error('Error fetching availability:', error);
     }
-
-    console.log('🔵 Fetching availability for user IDs:', Array.from(matchingUserIds));
-
-    // 4. Fetch availability ONLY for matching proctors
-    const { data, error } = await supabase
-      .from('tbl_availability')
-      .select(`
-        availability_id,
-        days,
-        time_slots,
-        status,
-        remarks,
-        user_id,
-        tbl_users (first_name, last_name)
-      `)
-      .in('user_id', Array.from(matchingUserIds));
-
-    if (error) {
-      console.error('🔴 Error fetching availability:', error);
-      toast.error('Failed to fetch availability');
-      return;
-    }
-
-    console.log('🔵 Fetched availability records:', data?.length || 0);
-    console.log('🔵 Availability data:', data);
-
-    const mapped = data.map((entry: any) => ({
-      availability_id: entry.availability_id,
-      days: entry.days,
-      time_slots: entry.time_slots,
-      status: entry.status,
-      remarks: entry.remarks,
-      user_id: entry.user_id,
-      user_fullname: `${entry.tbl_users?.first_name || ''} ${entry.tbl_users?.last_name || ''}`,
-    }));
-    
-    console.log('🔵 Setting entries with', mapped.length, 'records');
-    console.log('🔵 Mapped entries:', mapped);
-    setEntries(mapped);
-  } catch (error) {
-    console.error('🔴 Error fetching availability:', error);
-    toast.error('An error occurred while fetching availability');
-  }
-};
+  };
 
   const checkExistingSubmission = async () => {
     if (!user.user_id) return;
-    const { data, error } = await supabase
-      .from('tbl_availability')
-      .select('*')
-      .eq('user_id', user.user_id)
-      .limit(1)
-      .single();
-    if (!error && data) setHasSubmitted(true);
+    try {
+      const { data } = await api.get(`/tbl_availability/`, {
+        params: { user_id: user.user_id }
+      });
+      if (data && Array.isArray(data) && data.length > 0) {
+        setHasSubmitted(true);
+      }
+    } catch (error) {
+      console.error('Error checking existing submission:', error);
+    }
   };
 
   const fetchAllowedDates = async () => {
-    const { data: roles } = await supabase
-      .from('tbl_user_role')
-      .select('college_id, role_id')
-      .eq('user_id', user.user_id);
-    const proctorRole = roles?.find((r) => r.role_id === 3);
-    if (!proctorRole) return;
+    try {
+      const { data: roles } = await api.get(`/tbl_user_role`, {
+        params: { user_id: user.user_id }
+      });
 
-    const { data: periods } = await supabase
-      .from('tbl_examperiod')
-      .select('start_date, end_date')
-      .eq('college_id', proctorRole.college_id);
+      const schedulerRole = Array.isArray(roles)
+        ? roles.find((r: any) => r.role_id === 3 || r.role === 3)
+        : roles;
 
-    const dates: string[] = [];
-    periods?.forEach((period) => {
-      if (!period.start_date || !period.end_date) return;
-      const start = new Date(period.start_date);
-      const end = new Date(period.end_date);
-      for (let d = new Date(start); d <= end; d.setDate(d.getDate() + 1)) {
-        dates.push(new Date(d).toISOString().split('T')[0]);
+      if (!schedulerRole) return;
+
+      const collegeId = schedulerRole.college_id || schedulerRole.college;
+      const { data: allPeriods } = await api.get(`/tbl_examperiod`);
+
+      if (!Array.isArray(allPeriods)) {
+        setAllowedDates([]);
+        return;
       }
-    });
 
-    dates.sort();
-    setAllowedDates(dates);
-    const todayStr = today.toISOString().split('T')[0];
-    setSelectedDate(dates.includes(todayStr) ? [todayStr] : []);
+      const periods = allPeriods.filter(
+        (period: any) => String(period.college_id) === String(collegeId)
+      );
+
+      const dates: string[] = [];
+      periods?.forEach((period: any) => {
+        if (!period.start_date || !period.end_date) return;
+        const start = new Date(period.start_date);
+        const end = new Date(period.end_date);
+        for (let d = new Date(start); d <= end; d.setDate(d.getDate() + 1)) {
+          dates.push(new Date(d).toISOString().split('T')[0]);
+        }
+      });
+
+      dates.sort();
+      setAllowedDates(dates);
+      const todayStr = today.toISOString().split('T')[0];
+      setSelectedDate(dates.includes(todayStr) ? [todayStr] : []);
+    } catch (error) {
+      console.error('Error fetching allowed dates:', error);
+      setAllowedDates([]);
+    }
   };
 
-  // calendar helpers
+  // Calendar helpers
   const daysInMonth = (y: number, m: number) => new Date(y, m + 1, 0).getDate();
   const firstDayOfMonth = (y: number, m: number) => new Date(y, m, 1).getDay();
   const getCalendarDays = () => {
@@ -352,7 +345,7 @@ const SchedulerAvailability: React.FC<ProctorSetAvailabilityProps> = ({ user }) 
     for (let i = 1; i <= numDays; i++) arr.push(i);
     return arr;
   };
-  // helper to format YYYY-MM-DD in local time
+
   const formatDateLocal = (date: Date) => {
     const year = date.getFullYear();
     const month = String(date.getMonth() + 1).padStart(2, "0");
@@ -360,7 +353,6 @@ const SchedulerAvailability: React.FC<ProctorSetAvailabilityProps> = ({ user }) 
     return `${year}-${month}-${day}`;
   };
 
-  // handle multi-select for days
   const handleDateSelect = (day: number | null) => {
     if (!day) return;
     const localDate = new Date(currentMonth.getFullYear(), currentMonth.getMonth(), day);
@@ -368,7 +360,6 @@ const SchedulerAvailability: React.FC<ProctorSetAvailabilityProps> = ({ user }) 
     if (allowedDates.length > 0 && !allowedDates.includes(iso)) return;
 
     setSelectedDate(prev => {
-      // toggle date selection
       if (prev.includes(iso)) return prev.filter(d => d !== iso);
       return [...prev, iso];
     });
@@ -384,7 +375,6 @@ const SchedulerAvailability: React.FC<ProctorSetAvailabilityProps> = ({ user }) 
     setSelectedDate(allowedDates.includes(isoToday) ? [isoToday] : []);
   };
 
-  // open add modal
   const openAddModal = () => {
     setEditingId(null);
     setSelectedInstructors([]);
@@ -392,7 +382,7 @@ const SchedulerAvailability: React.FC<ProctorSetAvailabilityProps> = ({ user }) 
     setRemarks('');
     setShowModal(true);
   };
-  // open edit modal
+
   const openEditModal = (entry: Availability) => {
     setEditingId(entry.availability_id);
     setSelectedDate(entry.days);
@@ -404,112 +394,97 @@ const SchedulerAvailability: React.FC<ProctorSetAvailabilityProps> = ({ user }) 
   };
 
   const handleSubmitAvailability = async () => {
-    if (!selectedDate) {
+    if (!selectedDate || selectedDate.length === 0) {
       toast.error('Select a valid date.');
       return;
     }
     setIsSubmitting(true);
 
-    if (editingId) {
-      // update one record
-      const { error } = await supabase
-        .from('tbl_availability')
-        .update({
-          days: selectedDate,           // <- match DB
+    try {
+      if (editingId) {
+        await api.put(`/tbl_availability/${editingId}/`, {
+          days: selectedDate,
           time_slots: selectedTimeSlot,
           status: availabilityStatus,
-          remarks,
+          remarks: remarks || null,
           user_id: selectedInstructorSingle?.value,
-        })
-        .eq('availability_id', editingId);
-
-      if (error) toast.error(error.message);
-      else {
+        });
         toast.success('Updated!');
-        fetchAvailability();
-        setShowModal(false);
-      }
-    } else {
-      // add for multiple instructors
-      if (selectedInstructors.length === 0) {
-        toast.error('Select at least one instructor.');
-        setIsSubmitting(false);
-        return;
-      }
-      const payload = selectedInstructors.map((inst) => ({
-        days: selectedDate,             // <- match DB
-        time_slots: selectedTimeSlot,
-        status: availabilityStatus,
-        remarks,
-        user_id: inst.value,
-      }));
+      } else {
+        if (selectedInstructors.length === 0) {
+          toast.error('Select at least one instructor.');
+          setIsSubmitting(false);
+          return;
+        }
 
-      const { error } = await supabase.from('tbl_availability').insert(payload);
-      if (error) toast.error(error.message);
-      else {
+        await Promise.all(
+          selectedInstructors.map((inst) =>
+            api.post('/tbl_availability/', {
+              days: selectedDate,
+              time_slots: selectedTimeSlot,
+              status: availabilityStatus,
+              remarks: remarks || null,
+              user_id: inst.value,
+            })
+          )
+        );
         toast.success('Availability submitted!');
-        fetchAvailability();
-        setShowModal(false);
       }
+      
+      setShowModal(false);
+      fetchAvailability(); // Async, doesn't block
+    } catch (error: any) {
+      console.error('API error:', error);
+      toast.error(`Failed to process: ${error?.message || 'Unknown error'}`);
+    } finally {
+      setIsSubmitting(false);
     }
-    setIsSubmitting(false);
   };
 
-  // Add this function inside SchedulerAvailability component
   const handleDeleteAll = async () => {
     if (!user?.user_id) return;
 
     if (!window.confirm('Are you sure you want to delete all availability for your college?')) return;
 
     try {
-      // 1. Get scheduler's college_id
-      const { data: schedulerRoles, error: schedulerError } = await supabase
-        .from('tbl_user_role')
-        .select('college_id')
-        .eq('user_id', user.user_id)
-        .eq('role_id', 3)
-        .single();
+      const { data: schedulerRoles } = await api.get(`/tbl_user_role`, {
+        params: { user_id: user.user_id, role_id: 3 }
+      });
 
-      if (schedulerError || !schedulerRoles?.college_id) {
+      const schedulerRole = Array.isArray(schedulerRoles)
+        ? schedulerRoles.find((r: any) => r.role_id === 3 || r.role === 3)
+        : schedulerRoles;
+
+      if (!schedulerRole?.college_id) {
         toast.error('Failed to get scheduler college.');
         return;
       }
 
-      const schedulerCollegeId = schedulerRoles.college_id;
+      const { data: collegeUsers } = await api.get(`/tbl_user_role`, {
+        params: { college_id: schedulerRole.college_id }
+      });
 
-      // 2. Get user_ids of all users in that college
-      const { data: collegeUsers, error: collegeUsersError } = await supabase
-        .from('tbl_user_role')
-        .select('user_id')
-        .eq('college_id', schedulerCollegeId);
-
-      if (collegeUsersError || !collegeUsers?.length) {
+      if (!collegeUsers || !Array.isArray(collegeUsers) || collegeUsers.length === 0) {
         toast.error('No users found for your college.');
         return;
       }
 
-      const userIdsToDelete = collegeUsers.map(u => u.user_id);
+      const userIdsToDelete = [...new Set(collegeUsers.map((u: any) => u.user_id))];
 
-      // 3. Delete availability for those users only
-      const { error: deleteError } = await supabase
-        .from('tbl_availability')
-        .delete()
-        .in('user_id', userIdsToDelete);
-
-      if (deleteError) {
-        toast.error(deleteError.message);
-      } else {
-        toast.success('All availability for your college has been deleted.');
-        fetchAvailability();
-      }
-
+      await Promise.all(
+        userIdsToDelete.map((userId: number) =>
+          api.delete(`/tbl_availability/`, { params: { user_id: userId } })
+        )
+      );
+      
+      toast.success('All availability for your college has been deleted.');
+      fetchAvailability(); // Async, doesn't block
     } catch (err) {
       console.error(err);
       toast.error('An unexpected error occurred.');
     }
   };
 
-  // handle multi select with "Select All"
   const instructorOptions = [{ label: 'Select All', value: 'all' }, ...instructors];
   const handleMultiChange = (selected: any) => {
     const allOption = selected?.find((s: any) => s.value === 'all');
@@ -522,8 +497,7 @@ const SchedulerAvailability: React.FC<ProctorSetAvailabilityProps> = ({ user }) 
 
   return (
     <div className="colleges-container">
-      <div className="colleges-header">
-      </div>
+      <div className="colleges-header"></div>
 
       <div className="colleges-actions">
         <button type="button" className="action-button add-new" onClick={openAddModal}>
@@ -609,10 +583,15 @@ const SchedulerAvailability: React.FC<ProctorSetAvailabilityProps> = ({ user }) 
                       type="button"
                       className="icon-button delete-button"
                       onClick={async () => {
-                        await supabase.from('tbl_availability').delete().eq('availability_id', entry.availability_id);
-                        toast.success('Deleted');
-                        fetchAvailability();
-                        setHasSubmitted(false);
+                        try {
+                          await api.delete(`/tbl_availability/${entry.availability_id}/`);
+                          toast.success('Deleted');
+                          setHasSubmitted(false);
+                          fetchAvailability(); // Async, doesn't block
+                        } catch (error) {
+                          console.error('Delete error:', error);
+                          toast.error('Failed to delete');
+                        }
                       }}
                     >
                       <FaTrash />
@@ -632,7 +611,6 @@ const SchedulerAvailability: React.FC<ProctorSetAvailabilityProps> = ({ user }) 
           <div className="modal">
             <h3 style={{ textAlign: 'center' }}>{editingId ? 'Edit Availability' : 'Add Availability'}</h3>
 
-            {/* date */}
             <div className="input-group">
               <label>Days</label>
               <input
@@ -654,9 +632,7 @@ const SchedulerAvailability: React.FC<ProctorSetAvailabilityProps> = ({ user }) 
                   </div>
                   <div className="date-picker-grid">
                     {['S', 'M', 'T', 'W', 'T', 'F', 'S'].map((d, i) => (
-                      <div key={i} className="day-name">
-                        {d}
-                      </div>
+                      <div key={i} className="day-name">{d}</div>
                     ))}
                     {getCalendarDays().map((day, index) => {
                       const isoDate = day
@@ -679,18 +655,13 @@ const SchedulerAvailability: React.FC<ProctorSetAvailabilityProps> = ({ user }) 
                     })}
                   </div>
                   <div className="date-picker-footer">
-                    <button type="button" onClick={goToToday}>
-                      Now
-                    </button>
-                    <button type="button" onClick={() => setShowDatePicker(false)}>
-                      Close
-                    </button>
+                    <button type="button" onClick={goToToday}>Now</button>
+                    <button type="button" onClick={() => setShowDatePicker(false)}>Close</button>
                   </div>
                 </div>
               )}
             </div>
 
-            {/* time slot */}
             <div className="input-group">
               <label>Time Slot</label>
               <Select
@@ -710,7 +681,6 @@ const SchedulerAvailability: React.FC<ProctorSetAvailabilityProps> = ({ user }) 
               />
             </div>
 
-            {/* status */}
             <div className="input-group">
               <label>Status</label>
               <select
@@ -718,20 +688,16 @@ const SchedulerAvailability: React.FC<ProctorSetAvailabilityProps> = ({ user }) 
                 onChange={(e) => setAvailabilityStatus(e.target.value as AvailabilityStatus)}
               >
                 {Object.values(AvailabilityStatus).map((status) => (
-                  <option key={status} value={status}>
-                    {status}
-                  </option>
+                  <option key={status} value={status}>{status}</option>
                 ))}
               </select>
             </div>
 
-            {/* remarks */}
             <div className="input-group">
               <label>Remarks</label>
               <textarea value={remarks} onChange={(e) => setRemarks(e.target.value)} />
             </div>
 
-            {/* instructor dropdowns */}
             {editingId ? (
               <div className="input-group">
                 <label>Instructor</label>
@@ -766,9 +732,7 @@ const SchedulerAvailability: React.FC<ProctorSetAvailabilityProps> = ({ user }) 
               <button type="button" onClick={handleSubmitAvailability} disabled={isSubmitting}>
                 {isSubmitting ? 'Saving...' : 'Save'}
               </button>
-              <button type="button" onClick={() => setShowModal(false)}>
-                Cancel
-              </button>
+              <button type="button" onClick={() => setShowModal(false)}>Cancel</button>
             </div>
           </div>
         </div>
@@ -780,9 +744,7 @@ const SchedulerAvailability: React.FC<ProctorSetAvailabilityProps> = ({ user }) 
             <h3>Remarks</h3>
             <div>{selectedRemarks}</div>
             <div className="modal-actions">
-              <button type="button" onClick={() => setShowRemarksModal(false)}>
-                Close
-              </button>
+              <button type="button" onClick={() => setShowRemarksModal(false)}>Close</button>
             </div>
           </div>
         </div>

@@ -128,8 +128,9 @@ const RoomManagement: React.FC<UserProps> = ({ user }) => {
       if (userCollegeId) {
         // Fetch available rooms for this college
         const availableRoomsResponse = await api.get(`/tbl_available_rooms/?college_id=${userCollegeId}`);
-        const roomIds = availableRoomsResponse.data.map((ar: any) => ar.room_id);
-        setSelectedRooms(roomIds);
+        // Handle both nested room object and direct room_id from API response
+        const roomIds = availableRoomsResponse.data.map((ar: any) => ar.room?.room_id || ar.room_id);
+        setSelectedRooms(roomIds.filter((id: string) => id)); // Filter out any undefined values
       }
     } catch (error) {
       console.error('Error fetching selected rooms:', error);
@@ -217,15 +218,52 @@ const RoomManagement: React.FC<UserProps> = ({ user }) => {
       // Delete all available rooms for this college
       const availableRoomsResponse = await api.get(`/tbl_available_rooms/?college_id=${userCollegeId}`);
       
-      for (const room of availableRoomsResponse.data) {
-        await api.delete(`/tbl_available_rooms/${room.room_id}/${userCollegeId}/`);
+      console.log('Available rooms to delete:', availableRoomsResponse.data);
+      
+      let deletedCount = 0;
+      let errorCount = 0;
+      
+      for (const roomData of availableRoomsResponse.data) {
+        // Extract room_id from nested room object or directly
+        let roomId = null;
+        
+        if (roomData.room && typeof roomData.room === 'object') {
+          roomId = roomData.room.room_id;
+        } else if (roomData.room_id) {
+          roomId = roomData.room_id;
+        }
+        
+        console.log('Room data:', roomData);
+        console.log('Attempting to delete room:', roomId, 'for college:', userCollegeId);
+        
+        if (roomId) {
+          try {
+            await api.delete(`/tbl_available_rooms/${roomId}/${userCollegeId}/`);
+            deletedCount++;
+            console.log('Successfully deleted:', roomId);
+          } catch (deleteError: any) {
+            errorCount++;
+            console.error('Failed to delete room:', roomId, deleteError.response?.data || deleteError);
+          }
+        } else {
+          console.error('Could not extract room_id from:', roomData);
+          errorCount++;
+        }
       }
 
       setSelectedRooms([]);
-      toast.success('Your available rooms have been reset.');
+      
+      if (deletedCount > 0) {
+        toast.success(`Successfully reset ${deletedCount} available room(s).`);
+      } else if (errorCount > 0) {
+        toast.error(`Failed to reset rooms. Check console for details.`);
+      } else {
+        toast.info('No rooms to reset.');
+      }
+      
       setShowResetModal(false);
-    } catch (error) {
-      console.error(error);
+    } catch (error: any) {
+      console.error('Reset error:', error.response?.data || error);
       toast.error('An error occurred while resetting rooms.');
     } finally {
       setIsResetting(false);
@@ -258,22 +296,45 @@ const RoomManagement: React.FC<UserProps> = ({ user }) => {
 
       // Delete existing available rooms
       const existingRoomsResponse = await api.get(`/tbl_available_rooms/?college_id=${userCollegeId}`);
-      for (const room of existingRoomsResponse.data) {
-        await api.delete(`/tbl_available_rooms/${room.room_id}/${userCollegeId}/`);
-      }
+      const deletePromises = existingRoomsResponse.data.map(async (roomData: any) => {
+        const roomId = roomData.room?.room_id || roomData.room_id;
+        if (roomId) {
+          try {
+            await api.delete(`/tbl_available_rooms/${roomId}/${userCollegeId}/`);
+          } catch (deleteError) {
+            console.error(`Failed to delete room ${roomId}:`, deleteError);
+          }
+        }
+      });
+      
+      await Promise.all(deletePromises);
 
       // Add new available rooms
+      let successCount = 0;
+      let errorCount = 0;
+      
       for (const roomId of selectedRooms) {
-        await api.post('/tbl_available_rooms/', {
-          room_id: roomId,
-          college_id: userCollegeId,
-        });
+        try {
+          await api.post('/tbl_available_rooms/', {
+            room_id: roomId,
+            college_id: userCollegeId,
+          });
+          successCount++;
+        } catch (postError: any) {
+          errorCount++;
+          console.error('Error posting room:', roomId, postError.response?.data);
+        }
       }
 
-      toast.success('Saved available rooms!');
-    } catch (error) {
-      console.error(error);
-      toast.error('An error occurred while saving');
+      if (successCount > 0) {
+        toast.success(`Saved ${successCount} available room(s)!`);
+      }
+      if (errorCount > 0) {
+        toast.warn(`Failed to save ${errorCount} room(s).`);
+      }
+    } catch (error: any) {
+      console.error('Error in handleSaveRooms:', error.response?.data || error);
+      toast.error(error.response?.data?.error || 'An error occurred while saving');
     } finally {
       setIsSaving(false);
     }

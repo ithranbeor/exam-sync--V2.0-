@@ -1,4 +1,4 @@
-# api/admin.py
+# exam-sync-v2/api/admin.py
 from django.contrib import admin
 from .models import TblUsers, TblUserRole
 

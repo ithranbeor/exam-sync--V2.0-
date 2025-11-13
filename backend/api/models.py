@@ -1,3 +1,5 @@
+# exam-sync-v2/backend/api/models.py
+ 
 # This is an auto-generated Django model module.
 # You'll have to do the following manually to clean this up:
 #   * Rearrange models' order
@@ -141,7 +143,7 @@ class TblAvailableRooms(models.Model):
     created_at = models.DateTimeField(blank=True, null=True)
 
     class Meta:
-        managed = False
+        managed = True
         db_table = 'tbl_available_rooms'
         unique_together = (('room_id', 'college_id'),)
 
@@ -151,7 +153,7 @@ class TblBuildings(models.Model):
     building_name = models.CharField(max_length=500)
 
     class Meta:
-        managed = False
+        managed = True
         db_table = 'tbl_buildings'
 
 
@@ -160,7 +162,7 @@ class TblCollege(models.Model):
     college_name = models.CharField(max_length=50)
 
     class Meta:
-        managed = False
+        managed = True
         db_table = 'tbl_college'
 
 
@@ -170,7 +172,7 @@ class TblCourse(models.Model):
     term = models.ForeignKey('TblTerm', models.DO_NOTHING)
 
     class Meta:
-        managed = False
+        managed = True
         db_table = 'tbl_course'
 
 
@@ -182,7 +184,7 @@ class TblCourseUsers(models.Model):
     is_bayanihan_leader = models.BooleanField(blank=True, null=True)
 
     class Meta:
-        managed = False
+        managed = True
         db_table = 'tbl_course_users'
 
 
@@ -192,7 +194,7 @@ class TblDepartment(models.Model):
     college = models.ForeignKey(TblCollege, models.DO_NOTHING, blank=True, null=True)
 
     class Meta:
-        managed = False
+        managed = True
         db_table = 'tbl_department'
 
 
@@ -220,7 +222,7 @@ class TblExamdetails(models.Model):
     instructor_id = models.IntegerField(blank=True, null=True)
 
     class Meta:
-        managed = False
+        managed = True
         db_table = 'tbl_examdetails'
 
 
@@ -235,30 +237,8 @@ class TblExamperiod(models.Model):
     college = models.ForeignKey(TblCollege, models.DO_NOTHING, blank=True, null=True)
 
     class Meta:
-        managed = False
+        managed = True
         db_table = 'tbl_examperiod'
-
-
-class TblInbox(models.Model):
-    message_id = models.AutoField(primary_key=True)
-    subject = models.TextField(blank=True, null=True)
-    message_body = models.TextField(blank=True, null=True)
-    is_read = models.BooleanField(blank=True, null=True)
-    is_deleted = models.BooleanField(blank=True, null=True)
-    created_at = models.DateTimeField()
-    receiver = models.ForeignKey('TblUsers', models.DO_NOTHING, blank=True, null=True)
-    receiver_role = models.ForeignKey('TblUserRole', models.DO_NOTHING, db_column='receiver_role', blank=True, null=True)
-    sender = models.ForeignKey('TblUsers', models.DO_NOTHING, related_name='tblinbox_sender_set', blank=True, null=True)
-    sender_role = models.ForeignKey('TblUserRole', models.DO_NOTHING, db_column='sender_role', related_name='tblinbox_sender_role_set', blank=True, null=True)
-    updated_at = models.DateTimeField(blank=True, null=True)
-    attachments = models.JSONField(blank=True, null=True)
-    sender_uuid = models.UUIDField(blank=True, null=True)
-    receiver_uuid = models.UUIDField(blank=True, null=True)
-
-    class Meta:
-        managed = False
-        db_table = 'tbl_inbox'
-
 
 class TblModality(models.Model):
     modality_id = models.AutoField(primary_key=True)
@@ -274,7 +254,7 @@ class TblModality(models.Model):
     possible_rooms = models.TextField(blank=True, null=True)  # This field type is a guess.
 
     class Meta:
-        managed = False
+        managed = True
         db_table = 'tbl_modality'
 
 
@@ -299,6 +279,7 @@ class TblNotification(models.Model):
     priority = models.SmallIntegerField(default=0)
 
     class Meta:
+        managed = True
         db_table = 'tbl_notification'
 
 
@@ -308,29 +289,15 @@ class TblProgram(models.Model):
     department = models.ForeignKey(TblDepartment, models.DO_NOTHING, blank=True, null=True)
 
     class Meta:
-        managed = False
+        managed = True
         db_table = 'tbl_program'
-
-
-class TblReplies(models.Model):
-    reply_id = models.BigAutoField(primary_key=True)
-    message = models.ForeignKey(TblInbox, models.DO_NOTHING, blank=True, null=True)
-    sender = models.ForeignKey('TblUsers', models.DO_NOTHING, blank=True, null=True)
-    body = models.TextField(blank=True, null=True)
-    created_at = models.DateTimeField(blank=True, null=True)
-    attachments = models.JSONField(blank=True, null=True)
-
-    class Meta:
-        managed = False
-        db_table = 'tbl_replies'
-
 
 class TblRoles(models.Model):
     role_id = models.BigAutoField(primary_key=True)
     role_name = models.CharField()
 
     class Meta:
-        managed = False
+        managed = True
         db_table = 'tbl_roles'
 
 
@@ -342,7 +309,7 @@ class TblRooms(models.Model):
     building = models.ForeignKey(TblBuildings, models.DO_NOTHING)
 
     class Meta:
-        managed = False
+        managed = True
         db_table = 'tbl_rooms'
 
 
@@ -358,7 +325,7 @@ class TblScheduleapproval(models.Model):
     college_name = models.TextField(blank=True, null=True)
 
     class Meta:
-        managed = False
+        managed = True
         db_table = 'tbl_scheduleapproval'
 
 
@@ -373,30 +340,15 @@ class TblSectioncourse(models.Model):
     is_night_class = models.TextField(blank=True, null=True)
 
     class Meta:
-        managed = False
+        managed = True
         db_table = 'tbl_sectioncourse'
-
-
-class TblSystemNotification(models.Model):
-    notif_id = models.BigAutoField(primary_key=True)
-    target_user = models.ForeignKey('TblUsers', models.DO_NOTHING)
-    sender_user = models.ForeignKey('TblUsers', models.DO_NOTHING, related_name='tblsystemnotification_sender_user_set')
-    examdetails = models.ForeignKey(TblExamdetails, models.DO_NOTHING)
-    message = models.TextField()
-    sms_alert_sent = models.BooleanField(blank=True, null=True)
-    created_at = models.DateTimeField(blank=True, null=True)
-
-    class Meta:
-        managed = False
-        db_table = 'tbl_system_notification'
-
 
 class TblTerm(models.Model):
     term_id = models.AutoField(primary_key=True)
     term_name = models.TextField()  # This field type is a guess.
 
     class Meta:
-        managed = False
+        managed = True
         db_table = 'tbl_term'
 
 
@@ -412,7 +364,7 @@ class TblUserRole(models.Model):
     status = models.TextField(blank=True, null=True)  # This field type is a guess.
 
     class Meta:
-        managed = False
+        managed = True
         db_table = 'tbl_user_role'
 
 
@@ -430,7 +382,7 @@ class TblUserRoleHistory(models.Model):
     changed_at = models.DateTimeField(blank=True, null=True)
 
     class Meta:
-        managed = False
+        managed = True
         db_table = 'tbl_user_role_history'
 
 
@@ -443,9 +395,10 @@ class TblUsers(models.Model):
     contact_number = models.CharField(max_length=20, blank=True, null=True)
     created_at = models.DateTimeField(blank=True, null=True)
     avatar_url = models.CharField(blank=True, null=True)
-    status = models.TextField(blank=True, null=True)  # This field type is a guess.
+    status = models.TextField(blank=True, null=True)
     user_uuid = models.UUIDField(blank=True, null=True)
+    password = models.CharField(max_length=128)  # Add this field for storing hashed passwords
 
     class Meta:
-        managed = False
+        managed = True
         db_table = 'tbl_users'

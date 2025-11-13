@@ -1,6 +1,9 @@
+# exam-sync-v2/backend/api/serializers.py
+
 from rest_framework import serializers
 from django.utils import timezone
-from .models import TblScheduleapproval, TblAvailableRooms, TblNotification, TblUsers, TblRoles, TblExamdetails, TblAvailability, TblModality, TblSectioncourse, TblBuildings, TblUserRoleHistory, TblRooms, TblUserRole, TblCourseUsers, TblCourse, TblProgram, TblExamperiod, TblUserRole, TblInbox, TblTerm, TblCollege, TblDepartment
+from .models import TblScheduleapproval, TblAvailableRooms, TblNotification, TblUsers, TblRoles, TblExamdetails, TblAvailability, TblModality, TblSectioncourse, TblBuildings, TblUserRoleHistory, TblRooms, TblUserRole, TblCourseUsers, TblCourse, TblProgram, TblExamperiod, TblUserRole, TblTerm, TblCollege, TblDepartment
+from django.contrib.auth.hashers import make_password
 
 class CourseSerializer(serializers.Serializer):
     # This is a custom serializer (not ModelSerializer) because the db layout uses a join table.
@@ -194,6 +197,12 @@ class TblUserRoleSerializer(serializers.ModelSerializer):
         required=False
     )
 
+    # ✅ ADD THESE FIELDS
+    user_id = serializers.IntegerField(source='user.user_id', read_only=True)
+    role_id = serializers.IntegerField(source='role.role_id', read_only=True)
+    college_id = serializers.CharField(source='college.college_id', read_only=True, allow_null=True)
+    department_id = serializers.CharField(source='department.department_id', read_only=True, allow_null=True)
+
     # Display (read-only) fields
     role_name = serializers.CharField(source='role.role_name', read_only=True)
     college_name = serializers.CharField(source='college.college_name', read_only=True)
@@ -205,12 +214,16 @@ class TblUserRoleSerializer(serializers.ModelSerializer):
         fields = [
             'user_role_id',
             'user',
+            'user_id',  # ✅ ADD THIS
             'user_full_name',
             'role',
+            'role_id',  # ✅ ADD THIS
             'role_name',
             'college',
+            'college_id',  # ✅ ADD THIS
             'college_name',
             'department',
+            'department_id',  # ✅ ADD THIS
             'department_name',
             'status',
             'created_at',
@@ -227,11 +240,6 @@ class TblUserRoleSerializer(serializers.ModelSerializer):
         if not validated_data.get("created_at"):
             validated_data["created_at"] = timezone.now()
         return super().create(validated_data)
-
-class TblInboxSerializer(serializers.ModelSerializer):
-    class Meta:
-        model = TblInbox
-        fields = '__all__'
 
 class TblTermSerializer(serializers.ModelSerializer):
     class Meta:
@@ -268,6 +276,7 @@ class TblRoomsSerializer(serializers.ModelSerializer):
 class TblUsersSerializer(serializers.ModelSerializer):
     id = serializers.IntegerField(source='user_id', read_only=True)
     full_name = serializers.SerializerMethodField()
+    password = serializers.CharField(write_only=True, required=False)
 
     class Meta:
         model = TblUsers
@@ -282,12 +291,19 @@ class TblUsersSerializer(serializers.ModelSerializer):
             'status',
             'created_at',
             'avatar_url',
-            'full_name'
+            'full_name',
+            'password'
         ]
 
     def get_full_name(self, obj):
         middle = f" {obj.middle_name[0]}." if obj.middle_name else ""
         return f"{obj.first_name}{middle} {obj.last_name}".strip()
+    
+    def create(self, validated_data):
+        if 'password' not in validated_data:
+            # Default password = Last@user_id
+            validated_data['password'] = make_password(f"{validated_data['last_name']}@{validated_data['user_id']}")
+        return super().create(validated_data)
 
 class TblRolesSerializer(serializers.ModelSerializer):
     class Meta:
@@ -410,7 +426,7 @@ class TblCourseUsersSerializer(serializers.ModelSerializer):
 
 class TblAvailabilitySerializer(serializers.ModelSerializer):
     user = TblUsersSerializer(read_only=True)
-    user_id = serializers.IntegerField(write_only=True)
+    user_id = serializers.IntegerField()  # ✅ Changed: removed write_only=True
 
     class Meta:
         model = TblAvailability
@@ -421,7 +437,7 @@ class TblAvailabilitySerializer(serializers.ModelSerializer):
             'status',
             'remarks',
             'user',
-            'user_id',
+            'user_id',  # ✅ Now available for both read and write
         ]
 
     def create(self, validated_data):
@@ -727,22 +743,60 @@ class TblAvailableRoomsSerializer(serializers.ModelSerializer):
     room = TblRoomsSerializer(read_only=True)
     college = TblCollegeSerializer(read_only=True)
     
-    room_id = serializers.CharField(write_only=True)
-    college_id = serializers.CharField(write_only=True)
+    # Remove write_only=True so these are included in GET responses
+    room_id = serializers.CharField()
+    college_id = serializers.CharField()
     
     class Meta:
         model = TblAvailableRooms
         fields = ['room_id', 'college_id', 'room', 'college', 'created_at']
     
-    def create(self, validated_data):
-        room_id = validated_data.pop('room_id')
-        college_id = validated_data.pop('college_id')
+    def to_representation(self, instance):
+        """
+        Ensure room_id and college_id are always included in the response
+        """
+        representation = super().to_representation(instance)
+        # Explicitly add the IDs from the instance
+        representation['room_id'] = instance.room_id
+        representation['college_id'] = instance.college_id
+        return representation
+    
+    def validate(self, attrs):
+        """
+        Validate that room and college exist before creating
+        """
+        room_id = attrs.get('room_id')
+        college_id = attrs.get('college_id')
         
-        room = TblRooms.objects.get(room_id=room_id)
-        college = TblCollege.objects.get(college_id=college_id)
+        # Check if room exists
+        try:
+            TblRooms.objects.get(room_id=room_id)
+        except TblRooms.DoesNotExist:
+            raise serializers.ValidationError({
+                'room_id': f'Room with id {room_id} does not exist'
+            })
+        
+        # Check if college exists
+        try:
+            TblCollege.objects.get(college_id=college_id)
+        except TblCollege.DoesNotExist:
+            raise serializers.ValidationError({
+                'college_id': f'College with id {college_id} does not exist'
+            })
+        
+        # Check if this combination already exists
+        if TblAvailableRooms.objects.filter(room_id=room_id, college_id=college_id).exists():
+            raise serializers.ValidationError({
+                'non_field_errors': f'Room {room_id} is already available for college {college_id}'
+            })
+        
+        return attrs
+    
+    def create(self, validated_data):
+        room_id = validated_data.get('room_id')
+        college_id = validated_data.get('college_id')
         
         return TblAvailableRooms.objects.create(
             room_id=room_id,
             college_id=college_id,
-            **validated_data
         )

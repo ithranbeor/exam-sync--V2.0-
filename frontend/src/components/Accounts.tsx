@@ -1,16 +1,13 @@
 import React, { useEffect, useState } from 'react';
 import { FaSearch, FaPen } from 'react-icons/fa';
-import { api } from '../lib/apiClient.ts'; // <-- Axios instance for Django API
+import { api } from '../lib/apiClient.ts';
 import { ToastContainer, toast } from 'react-toastify';
 import * as XLSX from 'xlsx';
 import 'react-toastify/dist/ReactToastify.css';
 import '../styles/accounts.css';
 
-// -----------------------------
-//  Interfaces
-// -----------------------------
 interface UserAccount {
-  id: number;
+  user_id: number;
   first_name: string;
   last_name: string;
   middle_name?: string;
@@ -28,9 +25,6 @@ interface AccountsProps {
   } | null;
 }
 
-// -----------------------------
-//  Component
-// -----------------------------
 export const Accounts: React.FC<AccountsProps> = ({ user }) => {
   const [accounts, setAccounts] = useState<UserAccount[]>([]);
   const [searchTerm, setSearchTerm] = useState('');
@@ -39,7 +33,7 @@ export const Accounts: React.FC<AccountsProps> = ({ user }) => {
   const [isEditMode, setIsEditMode] = useState(false);
 
   const [newAccount, setNewAccount] = useState<UserAccount>({
-    id: 0,
+    user_id: 0,
     first_name: '',
     last_name: '',
     middle_name: '',
@@ -50,7 +44,7 @@ export const Accounts: React.FC<AccountsProps> = ({ user }) => {
   });
 
   // -----------------------------
-  //  Fetch accounts
+  // Fetch accounts
   // -----------------------------
   const fetchAccounts = async () => {
     try {
@@ -67,19 +61,19 @@ export const Accounts: React.FC<AccountsProps> = ({ user }) => {
   }, []);
 
   // -----------------------------
-  //  Handle Add / Edit
+  // Handle Add / Edit
   // -----------------------------
   const handleSaveAccount = async () => {
-    const { id, first_name, last_name, email_address, contact_number, status, middle_name } = newAccount;
+    const { user_id, first_name, last_name, email_address, contact_number, status, middle_name } = newAccount;
 
-    if (!first_name || !last_name || !email_address || !contact_number) {
-      toast.error('Please fill all required fields');
+    if (!(newAccount.user_id > 0) || !newAccount.first_name || !newAccount.last_name || !newAccount.email_address || !newAccount.contact_number) {
+      toast.error('Please fill all required fields including User ID');
       return;
     }
 
     try {
       if (isEditMode) {
-        await api.put(`/accounts/${id}/`, {
+        await api.put(`/accounts/${user_id}/`, {
           first_name,
           last_name,
           middle_name,
@@ -89,15 +83,19 @@ export const Accounts: React.FC<AccountsProps> = ({ user }) => {
         });
         toast.success('Account updated successfully!');
       } else {
+        const defaultPassword = `${last_name}@${user_id}`;
         await api.post('/accounts/', {
+          user_id: user_id, // ✅ send as user_id, not id
           first_name,
           last_name,
           middle_name,
           email_address,
           contact_number,
           status,
+          password: defaultPassword,
+          created_at: new Date().toISOString(),
         });
-        toast.success('Account created successfully!');
+        toast.success(`Account created successfully! Default password: user_id@Lastname`);
       }
 
       setShowModal(false);
@@ -109,7 +107,7 @@ export const Accounts: React.FC<AccountsProps> = ({ user }) => {
   };
 
   // -----------------------------
-  //  Handle Delete
+  // Handle Delete
   // -----------------------------
   const handleDeleteAccount = async (id: number) => {
     if (!globalThis.confirm('Are you sure you want to delete this account?')) return;
@@ -125,7 +123,7 @@ export const Accounts: React.FC<AccountsProps> = ({ user }) => {
   };
 
   // -----------------------------
-  //  Excel Import
+  // Excel Import
   // -----------------------------
   const handleImport = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
@@ -136,13 +134,38 @@ export const Accounts: React.FC<AccountsProps> = ({ user }) => {
       const data = new Uint8Array(evt.target?.result as ArrayBuffer);
       const wb = XLSX.read(data, { type: 'array' });
       const ws = wb.Sheets[wb.SheetNames[0]];
-      const json: Partial<UserAccount>[] = XLSX.utils.sheet_to_json(ws);
+      const json: any[] = XLSX.utils.sheet_to_json(ws, { defval: '' });
 
       for (const row of json) {
         try {
-          await api.post('/accounts/', row);
-        } catch (err) {
-          console.error('Error importing row:', err);
+          const user_id = Number(row.user_id ?? row.id);
+          const first_name = String(row.first_name ?? '');
+          const last_name = String(row.last_name ?? '');
+          const middle_name = String(row.middle_name ?? '');
+          const email_address = String(row.email_address ?? '');
+          const contact_number = String(row.contact_number ?? '');
+          const status = String(row.status ?? 'Active');
+
+          if (!user_id || !first_name || !last_name || !email_address || !contact_number) {
+            console.warn('Skipping invalid row:', row);
+            continue;
+          }
+
+          const payload = {
+            user_id,
+            first_name,
+            last_name,
+            middle_name,
+            email_address,
+            contact_number,
+            status,
+            password: `${last_name}@${user_id}`,
+            created_at: new Date().toISOString(),
+          };
+
+          await api.post('/accounts/', payload);
+        } catch (err: any) {
+          console.error('Error importing row:', err.response?.data || err.message);
         }
       }
 
@@ -155,28 +178,22 @@ export const Accounts: React.FC<AccountsProps> = ({ user }) => {
   };
 
   // -----------------------------
-  //  Excel Template
+  // Excel Template
   // -----------------------------
   const downloadTemplate = () => {
     const ws = XLSX.utils.aoa_to_sheet([
-      ['first_name', 'last_name', 'middle_name', 'email_address', 'contact_number', 'status'],
-      ['Juan', 'Dela Cruz', 'A.', 'juan@example.com', '09123456789', 'Active'],
+      ['id', 'first_name', 'last_name', 'middle_name', 'email_address', 'contact_number', 'status'],
+      [101, 'Juan', 'Dela Cruz', 'A.', 'juan@example.com', '09123456789', 'Active'],
     ]);
     const wb = XLSX.utils.book_new();
     XLSX.utils.book_append_sheet(wb, ws, 'ImportTemplate');
     XLSX.writeFile(wb, 'Accounts_Import_Template.xlsx');
   };
 
-  // -----------------------------
-  //  Filtered accounts
-  // -----------------------------
   const filtered = accounts.filter(u =>
     `${u.first_name} ${u.last_name} ${u.email_address}`.toLowerCase().includes(searchTerm.toLowerCase())
   );
 
-  // -----------------------------
-  //  Render
-  // -----------------------------
   return (
     <div className="accounts-container">
       <div className="accounts-header">
@@ -199,7 +216,7 @@ export const Accounts: React.FC<AccountsProps> = ({ user }) => {
             setIsEditMode(false);
             setShowModal(true);
             setNewAccount({
-              id: 0,
+              user_id: 0,
               first_name: '',
               last_name: '',
               middle_name: '',
@@ -239,8 +256,8 @@ export const Accounts: React.FC<AccountsProps> = ({ user }) => {
             {filtered.length === 0 ? (
               <tr><td colSpan={7}>No user accounts found.</td></tr>
             ) : filtered.map((u) => (
-              <tr key={u.id}>
-                <td>{u.id}</td>
+              <tr key={u.user_id}>
+                <td>{u.user_id}</td>
                 <td>{u.last_name}, {u.first_name} {u.middle_name ?? ''}</td>
                 <td>{u.email_address}</td>
                 <td>{u.contact_number}</td>
@@ -261,7 +278,7 @@ export const Accounts: React.FC<AccountsProps> = ({ user }) => {
                   <button
                     type="button"
                     className="icon-button delete-button"
-                    onClick={() => handleDeleteAccount(u.id)}
+                    onClick={() => handleDeleteAccount(u.user_id)}
                   >
                     🗑
                   </button>
@@ -272,24 +289,27 @@ export const Accounts: React.FC<AccountsProps> = ({ user }) => {
         </table>
       </div>
 
-      {/* Add/Edit Modal */}
       {showModal && (
         <div className="modal-overlay">
           <div className="modal">
             <h4 style={{ textAlign: 'center' }}>{isEditMode ? 'Edit Account' : 'Add New Account'}</h4>
 
-            {['first_name', 'last_name', 'middle_name', 'email_address', 'contact_number'].map((field) => (
+            {['user_id', 'first_name', 'last_name', 'middle_name', 'email_address', 'contact_number'].map((field) => (
               <div key={field} className="input-group">
-                <label htmlFor={field}>{field.replace('_', ' ').toUpperCase()}</label>
+                <label htmlFor={field}>
+                  {field === 'user_id' ? 'USER ID' : field.replace('_', ' ').toUpperCase()}
+                </label>
                 <input
                   id={field}
+                  type={field === 'user_id' ? 'number' : 'text'}
                   value={(newAccount as any)[field] ?? ''}
                   onChange={(e) =>
                     setNewAccount((prev) => ({
                       ...prev,
-                      [field]: e.target.value,
+                      [field]: field === 'user_id' ? Number(e.target.value) : e.target.value,
                     }))
                   }
+                  disabled={isEditMode && field === 'user_id'}
                 />
               </div>
             ))}
@@ -314,7 +334,6 @@ export const Accounts: React.FC<AccountsProps> = ({ user }) => {
         </div>
       )}
 
-      {/* Import Modal */}
       {showImport && (
         <div className="modal-overlay">
           <div className="modal">
