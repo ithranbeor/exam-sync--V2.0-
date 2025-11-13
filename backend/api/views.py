@@ -1,15 +1,17 @@
+# exam-sync-v2/backend/api/views.py
+
 from django.views.decorators.csrf import csrf_exempt
 from rest_framework.decorators import api_view, permission_classes
 from rest_framework.permissions import AllowAny
 from rest_framework.response import Response
+from rest_framework.authtoken.models import Token
 from rest_framework import status
-from .models import TblUsers, TblScheduleapproval, TblAvailableRooms, TblNotification, TblUserRole, TblExamdetails, TblModality, TblAvailability, TblCourseUsers, TblSectioncourse, TblUserRoleHistory, TblRoles, TblBuildings, TblRooms, TblCourse, TblExamperiod, TblProgram, TblInbox, TblTerm, TblCollege, TblDepartment
+from .models import TblUsers, TblScheduleapproval, TblAvailableRooms, TblNotification, TblUserRole, TblExamdetails, TblModality, TblAvailability, TblCourseUsers, TblSectioncourse, TblUserRoleHistory, TblRoles, TblBuildings, TblRooms, TblCourse, TblExamperiod, TblProgram, TblTerm, TblCollege, TblDepartment
 from .serializers import (
     UserSerializer,
     UserRoleSerializer,
     TblExamperiodSerializer,
     TblUserRoleSerializer,
-    TblInboxSerializer,
     TblTermSerializer,
     TblCollegeSerializer,
     TblDepartmentSerializer,
@@ -32,7 +34,7 @@ from .serializers import (
     TblAvailableRoomsSerializer
 )
 from django.core.mail import send_mail
-from django.contrib.auth.hashers import make_password
+from django.contrib.auth.hashers import make_password, check_password
 from django.contrib.auth import get_user_model
 from django.conf import settings
 from django.db import transaction
@@ -62,10 +64,23 @@ def tbl_available_rooms_list(request):
         return Response(serializer.data)
     
     elif request.method == 'POST':
+        # Log the incoming data for debugging
+        print("📥 Incoming available_rooms POST data:", request.data)
+        
         serializer = TblAvailableRoomsSerializer(data=request.data)
         if serializer.is_valid():
-            serializer.save()
-            return Response(serializer.data, status=status.HTTP_201_CREATED)
+            try:
+                serializer.save()
+                return Response(serializer.data, status=status.HTTP_201_CREATED)
+            except Exception as e:
+                print("❌ Error saving available room:", str(e))
+                return Response({
+                    'error': str(e),
+                    'detail': 'Failed to save available room'
+                }, status=status.HTTP_400_BAD_REQUEST)
+        
+        # Log validation errors
+        print("❌ Validation errors:", serializer.errors)
         return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
 
 @api_view(['DELETE'])
@@ -381,7 +396,7 @@ def tbl_modality_detail(request, pk):
         instance.delete()
         return Response(status=status.HTTP_204_NO_CONTENT)
     
-@api_view(['GET', 'POST'])
+@api_view(['GET', 'POST', 'DELETE'])  # ✅ Add DELETE here
 @permission_classes([AllowAny])
 def tbl_availability_list(request):
     if request.method == 'GET':
@@ -418,6 +433,24 @@ def tbl_availability_list(request):
             serializer.save()
             return Response(serializer.data, status=status.HTTP_201_CREATED)
         return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
+
+    # ✅ ADD THIS DELETE HANDLER
+    elif request.method == 'DELETE':
+        user_id = request.GET.get('user_id')
+        
+        if not user_id:
+            return Response(
+                {'error': 'user_id parameter is required for bulk delete'}, 
+                status=status.HTTP_400_BAD_REQUEST
+            )
+        
+        # Delete all availability records for this user
+        deleted_count, _ = TblAvailability.objects.filter(user__user_id=user_id).delete()
+        
+        return Response(
+            {'message': f'Deleted {deleted_count} availability record(s) for user {user_id}'},
+            status=status.HTTP_200_OK
+        )
 
 
 @api_view(['GET', 'PUT', 'DELETE'])
@@ -963,21 +996,97 @@ def confirm_password_change(request):
 @api_view(['POST'])
 @permission_classes([AllowAny])
 def login_faculty(request):
-    email = request.data.get('email')
-    password = request.data.get('password')  # currently unused
+    user_id = request.data.get('user_id')
+    password = request.data.get('password')
 
-    if not email:
-        return Response({'message': 'Email required'}, status=status.HTTP_400_BAD_REQUEST)
+    if not user_id or not password:
+        return Response({'message': 'User ID and password required'}, status=status.HTTP_400_BAD_REQUEST)
 
     try:
-        user = TblUsers.objects.get(email_address=email)
+        # Find user by user_id
+        user = TblUsers.objects.get(user_id=user_id)
+        
+        # Check if active
+        if user.status and user.status.lower() != 'active':
+            return Response({'message': 'Account is not active'}, status=status.HTTP_401_UNAUTHORIZED)
+        
+        # Verify password
+        if not check_password(password, user.password):
+            return Response({'message': 'Invalid credentials'}, status=status.HTTP_401_UNAUTHORIZED)
 
-        # Simulate successful login since we have no password yet
-        mock_token = f"mock-token-for-{user.user_id}"
-        return Response({'token': mock_token, 'user_id': user.user_id})
+        # Generate custom token
+        token = secrets.token_hex(16)
+
+        # Get user roles
+        user_roles = TblUserRole.objects.filter(user=user, status='active')
+        roles_data = UserRoleSerializer(user_roles, many=True).data
+
+        return Response({
+            'token': token,
+            'user_id': user.user_id,
+            'email': user.email_address,
+            'first_name': user.first_name,
+            'last_name': user.last_name,
+            'roles': roles_data
+        }, status=status.HTTP_200_OK)
 
     except TblUsers.DoesNotExist:
         return Response({'message': 'Invalid credentials'}, status=status.HTTP_401_UNAUTHORIZED)
+    except Exception as e:
+        return Response({'message': f'Server error: {str(e)}'}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+
+@csrf_exempt
+@api_view(["POST"])
+@permission_classes([AllowAny])
+def confirm_password_change(request):
+    uid = request.data.get("uid")
+    token = request.data.get("token")
+    new_password = request.data.get("new_password")
+
+    if not all([uid, token, new_password]):
+        return Response({"error": "Missing fields"}, status=400)
+
+    try:
+        user = TblUsers.objects.get(pk=uid)
+    except TblUsers.DoesNotExist:
+        return Response({"error": "Invalid user"}, status=404)
+
+    cache_key = f"password_reset_{uid}"
+    stored_token = cache.get(cache_key)
+
+    if not stored_token or stored_token != token:
+        return Response({"error": "Invalid or expired link."}, status=400)
+
+    # Hash and save new password using Django's password hashing
+    user.password = make_password(new_password)
+    user.save()
+
+    # Clear the used token
+    cache.delete(cache_key)
+
+    print(f"✅ Password successfully changed for user {user.user_id}")
+    return Response({"message": "Password changed successfully!"}, status=200)
+
+# Add a new endpoint for account creation with password
+@api_view(['POST'])
+@permission_classes([AllowAny])
+def create_account_with_password(request):
+    """
+    Create a new account with user_id and password
+    """
+    serializer = TblUsersSerializer(data=request.data)
+    if serializer.is_valid():
+        password = request.data.get('password')
+        if not password:
+            return Response({'error': 'Password is required'}, status=status.HTTP_400_BAD_REQUEST)
+        
+        # Create user with hashed password
+        user = serializer.save()
+        user.password = make_password(password)
+        user.save()
+        
+        return Response(serializer.data, status=status.HTTP_201_CREATED)
+    return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
 
 # ------------------------------
 # List all users
@@ -1195,29 +1304,6 @@ def tbl_user_role_detail(request, user_role_id):
         instance.delete()
         return Response(status=status.HTTP_204_NO_CONTENT)
     
-# ------------------------------
-# Inbox list
-# ------------------------------
-@csrf_exempt
-@api_view(['GET'])
-@permission_classes([AllowAny])
-def inbox_list(request):
-    """Return inbox messages for a receiver."""
-    receiver_id = request.GET.get('receiver_id')
-    is_read = request.GET.get('is_read')
-    is_deleted = request.GET.get('is_deleted')
-
-    queryset = TblInbox.objects.all()
-    if receiver_id:
-        queryset = queryset.filter(receiver_id=receiver_id)
-    if is_read is not None:
-        queryset = queryset.filter(is_read=is_read.lower() == 'true')
-    if is_deleted is not None:
-        queryset = queryset.filter(is_deleted=is_deleted.lower() == 'true')
-
-    serializer = TblInboxSerializer(queryset, many=True)
-    return Response(serializer.data)
-
 @api_view(['GET', 'POST'])
 @permission_classes([AllowAny])
 def tbl_term_list(request):
@@ -1242,7 +1328,7 @@ def tbl_term_list(request):
             return Response(serializer.data, status=status.HTTP_201_CREATED)
 
         return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
-
+    
 @api_view(['PUT', 'DELETE'])
 @permission_classes([AllowAny])
 def tbl_term_detail(request, pk):

@@ -33,16 +33,9 @@ const LoginAdmin: React.FC = () => {
     setLoading(true);
 
     try {
-      // 1️⃣ Lookup user by ID
-      const { data: userRecord } = await api.get(`/users/${id}/`);
-      if (!userRecord?.email_address || !userRecord?.status) {
-        setError('Invalid user ID or password.');
-        return;
-      }
-
-      // 2️⃣ Authenticate
+      // 1️⃣ Authenticate with user_id and password
       const { data: authData } = await api.post('/login/', {
-        email: userRecord.email_address,
+        user_id: id,  // Changed from email to user_id
         password,
       });
 
@@ -51,12 +44,8 @@ const LoginAdmin: React.FC = () => {
         return;
       }
 
-      // 3️⃣ Fetch user roles
-      const { data: userRoles } = await api.get(`/user-roles/${id}/roles/`, {
-        headers: { Authorization: `Bearer ${authData.token}` },
-      });
-
-      const activeRoles = userRoles
+      // 2️⃣ Check if user has admin role
+      const activeRoles = authData.roles
         .filter((r: any) => r.status?.toLowerCase() === 'active')
         .map((r: any) => r.role_name?.toLowerCase());
 
@@ -65,19 +54,27 @@ const LoginAdmin: React.FC = () => {
         return;
       }
 
-      // 4️⃣ Store user session
-      const profileWithToken = { ...userRecord, token: authData.token, roles: [{ role_name: 'admin' }] };
+      // 3️⃣ Store user session
+      const profileWithToken = { 
+        user_id: authData.user_id,
+        email_address: authData.email,
+        first_name: authData.first_name,
+        last_name: authData.last_name,
+        token: authData.token, 
+        roles: authData.roles 
+      };
+      
       if (rememberMe) {
         localStorage.setItem('user', JSON.stringify(profileWithToken));
       } else {
         sessionStorage.setItem('user', JSON.stringify(profileWithToken));
       }
 
-      // 5️⃣ Navigate to admin dashboard
+      // 4️⃣ Navigate to admin dashboard
       navigate('/admin-dashboard');
     } catch (err: any) {
       console.error('Unexpected error:', err);
-      setError(err.response?.data?.message || 'An unexpected error occurred.');
+      setError(err.response?.data?.message || 'Invalid user ID or password.');
     } finally {
       setLoading(false);
     }

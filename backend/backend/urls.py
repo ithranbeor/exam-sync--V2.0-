@@ -1,3 +1,5 @@
+# exam-sync-v2/backend/backend/url.py
+
 from django.urls import path, re_path
 from django.views.generic import RedirectView
 from api import views
@@ -6,6 +8,7 @@ urlpatterns = [
     # User API
     path('api/login/', views.login_faculty, name='login_faculty'),
     path('api/users/', views.users_list, name='users_list'),
+    path('api/create-account/', views.create_account_with_password, name='create_account_with_password'),
     path('api/users/<int:user_id>/', views.user_detail, name='user_detail'),
     path('api/user-roles/<int:user_id>/roles/', views.user_roles, name='user_roles'),
     path('api/auth/request-password-change/', views.request_password_change, name='request_password_change'),
@@ -21,7 +24,6 @@ urlpatterns = [
     path('api/tbl_user_role', views.tbl_user_role_list, name='tbl_user_role_list'),
     path('api/tbl_user_role/<int:user_role_id>/', views.tbl_user_role_detail, name='tbl_user_role_detail'),
     path('api/tbl_user_role/CRUD/', views.tbl_user_role_list, name='tbl_user_role_list'),
-    path('api/inbox', views.inbox_list),
     path('api/tbl_term', views.tbl_term_list, name='tbl_term_list'),
     path('api/tbl_term/<int:pk>/', views.tbl_term_detail, name='tbl_term_detail'),
     path('api/tbl_college/', views.tbl_college_list),

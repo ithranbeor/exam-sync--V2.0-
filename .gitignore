@@ -7,10 +7,19 @@ yarn-error.log*
 pnpm-debug.log*
 lerna-debug.log*
 
+# Node / Build
 node_modules
 dist
 dist-ssr
 *.local
+
+# Python / Django
+venv/
+.env/
+__pycache__/
+*.pyc
+db.sqlite3
+*.sqlite3
 
 # Editor directories and files
 .vscode/*
@@ -22,6 +31,7 @@ dist-ssr
 *.njsproj
 *.sln
 *.sw?
-.venv/
-__pycache__/
-*.pyc
+
+# Optional: exclude Django migrations if you prefer
+# **/migrations/*.py
+# **/migrations/*.pyc
