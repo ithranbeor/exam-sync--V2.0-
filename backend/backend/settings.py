@@ -1,3 +1,5 @@
+# exam-sync-v2/backend/backend/settings.py
+
 from pathlib import Path
 import os
 from decouple import config
@@ -11,11 +13,7 @@ SECRET_KEY = config('SECRET_KEY')
 DEBUG = config('DEBUG', default=False, cast=bool)
 FRONTEND_URL = config('FRONTEND_URL', default="http://localhost:5173")
 
-ALLOWED_HOSTS = [
-    "localhost",
-    "127.0.0.1",
-    ".onrender.com",  # This allows any subdomain on render.com
-]
+ALLOWED_HOSTS = ["*"]
 
 # ──────────────────────────────────────────────
 # INSTALLED APPS
@@ -61,7 +59,6 @@ CORS_ALLOW_CREDENTIALS = True
 CSRF_TRUSTED_ORIGINS = [
     "http://localhost:5173",
     "http://127.0.0.1:5173",
-    "https://*.onrender.com",  # Add your Render domains
 ]
 
 # ──────────────────────────────────────────────
