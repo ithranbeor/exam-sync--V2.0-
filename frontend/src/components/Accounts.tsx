@@ -73,6 +73,7 @@ export const Accounts: React.FC<AccountsProps> = ({ user }) => {
 
     try {
       if (isEditMode) {
+        // ✅ Update existing account (no password change unless explicitly set)
         await api.put(`/accounts/${user_id}/`, {
           first_name,
           last_name,
@@ -83,9 +84,10 @@ export const Accounts: React.FC<AccountsProps> = ({ user }) => {
         });
         toast.success('Account updated successfully!');
       } else {
+        // ✅ Create new account with default password
         const defaultPassword = `${last_name}@${user_id}`;
-        await api.post('/accounts/', {
-          user_id: user_id, // ✅ send as user_id, not id
+        await api.post('/create-account/', {
+          user_id,
           first_name,
           last_name,
           middle_name,
@@ -95,7 +97,7 @@ export const Accounts: React.FC<AccountsProps> = ({ user }) => {
           password: defaultPassword,
           created_at: new Date().toISOString(),
         });
-        toast.success(`Account created successfully! Default password: user_id@Lastname`);
+        toast.success(`Account created! Default password: ${last_name}@${user_id}`);
       }
 
       setShowModal(false);
@@ -136,21 +138,27 @@ export const Accounts: React.FC<AccountsProps> = ({ user }) => {
       const ws = wb.Sheets[wb.SheetNames[0]];
       const json: any[] = XLSX.utils.sheet_to_json(ws, { defval: '' });
 
+      let successCount = 0;
+      let errorCount = 0;
+
       for (const row of json) {
         try {
           const user_id = Number(row.user_id ?? row.id);
-          const first_name = String(row.first_name ?? '');
-          const last_name = String(row.last_name ?? '');
-          const middle_name = String(row.middle_name ?? '');
-          const email_address = String(row.email_address ?? '');
-          const contact_number = String(row.contact_number ?? '');
+          const first_name = String(row.first_name ?? '').trim();
+          const last_name = String(row.last_name ?? '').trim();
+          const middle_name = String(row.middle_name ?? '').trim();
+          const email_address = String(row.email_address ?? '').trim();
+          const contact_number = String(row.contact_number ?? '').trim();
           const status = String(row.status ?? 'Active');
 
           if (!user_id || !first_name || !last_name || !email_address || !contact_number) {
             console.warn('Skipping invalid row:', row);
+            errorCount++;
             continue;
           }
 
+          const defaultPassword = `${last_name}@${user_id}`;
+          
           const payload = {
             user_id,
             first_name,
@@ -159,17 +167,26 @@ export const Accounts: React.FC<AccountsProps> = ({ user }) => {
             email_address,
             contact_number,
             status,
-            password: `${last_name}@${user_id}`,
+            password: defaultPassword,
             created_at: new Date().toISOString(),
           };
 
-          await api.post('/accounts/', payload);
+          // ✅ Use the correct endpoint that hashes passwords
+          await api.post('/create-account/', payload);
+          successCount++;
         } catch (err: any) {
           console.error('Error importing row:', err.response?.data || err.message);
+          errorCount++;
         }
       }
 
-      toast.success('Import completed');
+      if (successCount > 0) {
+        toast.success(`Successfully imported ${successCount} account(s)`);
+      }
+      if (errorCount > 0) {
+        toast.warning(`Failed to import ${errorCount} account(s)`);
+      }
+      
       fetchAccounts();
       setShowImport(false);
     };
@@ -182,8 +199,9 @@ export const Accounts: React.FC<AccountsProps> = ({ user }) => {
   // -----------------------------
   const downloadTemplate = () => {
     const ws = XLSX.utils.aoa_to_sheet([
-      ['id', 'first_name', 'last_name', 'middle_name', 'email_address', 'contact_number', 'status'],
-      [101, 'Juan', 'Dela Cruz', 'A.', 'juan@example.com', '09123456789', 'Active'],
+      ['user_id', 'first_name', 'last_name', 'middle_name', 'email_address', 'contact_number', 'status'],
+      [2025000001, 'Juan', 'Dela Cruz', 'A.', 'juan@example.com', '09123456789', 'Active'],
+      [2025000002, 'Maria', 'Santos', 'B.', 'maria@example.com', '09987654321', 'Active'],
     ]);
     const wb = XLSX.utils.book_new();
     XLSX.utils.book_append_sheet(wb, ws, 'ImportTemplate');
@@ -326,6 +344,12 @@ export const Accounts: React.FC<AccountsProps> = ({ user }) => {
               </select>
             </div>
 
+            {!isEditMode && (
+              <p style={{ fontSize: '12px', color: '#666', marginTop: '10px' }}>
+                Default password will be: <strong>{newAccount.last_name}@{newAccount.user_id}</strong>
+              </p>
+            )}
+
             <div className="modal-buttons">
               <button type="button" className="modal-button save" onClick={handleSaveAccount}>Save</button>
               <button type="button" className="modal-button cancel" onClick={() => setShowModal(false)}>Cancel</button>
@@ -342,6 +366,9 @@ export const Accounts: React.FC<AccountsProps> = ({ user }) => {
               <label>Upload Excel File</label>
               <input type="file" accept=".xlsx, .xls" onChange={handleImport} />
             </div>
+            <p style={{ fontSize: '12px', color: '#666', marginTop: '10px' }}>
+              Each account will have a default password: <strong>LastName@UserID</strong>
+            </p>
             <div className="modal-buttons">
               <button type="button" className="modal-button download" onClick={downloadTemplate}>📥 Download Template</button>
               <button type="button" className="modal-button cancel" onClick={() => setShowImport(false)}>Close</button>

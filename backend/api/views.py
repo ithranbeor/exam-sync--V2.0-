@@ -629,10 +629,24 @@ def accounts_list(request):
         return Response(serializer.data)
 
     elif request.method == 'POST':
+        # Log incoming data for debugging
+        print("📥 Creating account with data:", request.data)
+        
         serializer = TblUsersSerializer(data=request.data)
         if serializer.is_valid():
-            serializer.save()
-            return Response(serializer.data, status=status.HTTP_201_CREATED)
+            try:
+                # The serializer's create method will handle password hashing
+                user = serializer.save()
+                print(f"✅ Account created: {user.user_id} - {user.first_name} {user.last_name}")
+                return Response(serializer.data, status=status.HTTP_201_CREATED)
+            except Exception as e:
+                print(f"❌ Error creating account: {str(e)}")
+                return Response({
+                    'error': str(e),
+                    'detail': 'Failed to create account'
+                }, status=status.HTTP_400_BAD_REQUEST)
+        
+        print(f"❌ Validation errors: {serializer.errors}")
         return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
 
 
@@ -993,6 +1007,9 @@ def confirm_password_change(request):
 # ------------------------------
 # Mock login (no password check for now)
 # ------------------------------
+# ============================================================
+# LOGIN ENDPOINT
+# ============================================================
 @api_view(['POST'])
 @permission_classes([AllowAny])
 def login_faculty(request):
@@ -1003,23 +1020,27 @@ def login_faculty(request):
         return Response({'message': 'User ID and password required'}, status=status.HTTP_400_BAD_REQUEST)
 
     try:
-        # Find user by user_id
         user = TblUsers.objects.get(user_id=user_id)
-        
-        # Check if active
+        print(f"🔍 Attempting login for {user_id}")
+
+        # Check account status
+        print(f"User status from DB: {user.status}")
         if user.status and user.status.lower() != 'active':
+            print("❌ Account inactive")
             return Response({'message': 'Account is not active'}, status=status.HTTP_401_UNAUTHORIZED)
-        
-        # Verify password
+
+        # Check password hash
         if not check_password(password, user.password):
+            print("❌ Password mismatch")
             return Response({'message': 'Invalid credentials'}, status=status.HTTP_401_UNAUTHORIZED)
 
-        # Generate custom token
+        # Token generation
         token = secrets.token_hex(16)
 
-        # Get user roles
-        user_roles = TblUserRole.objects.filter(user=user, status='active')
+        # Get roles (case-insensitive)
+        user_roles = TblUserRole.objects.filter(user=user, status__iexact='active')
         roles_data = UserRoleSerializer(user_roles, many=True).data
+        print("✅ Roles found:", roles_data)
 
         return Response({
             'token': token,
@@ -1031,10 +1052,16 @@ def login_faculty(request):
         }, status=status.HTTP_200_OK)
 
     except TblUsers.DoesNotExist:
+        print("❌ No such user found")
         return Response({'message': 'Invalid credentials'}, status=status.HTTP_401_UNAUTHORIZED)
+
     except Exception as e:
+        print("💥 Server error:", str(e))
         return Response({'message': f'Server error: {str(e)}'}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
 
+# ============================================================
+# PASSWORD RESET CONFIRMATION
+# ============================================================
 @csrf_exempt
 @api_view(["POST"])
 @permission_classes([AllowAny])
@@ -1044,63 +1071,66 @@ def confirm_password_change(request):
     new_password = request.data.get("new_password")
 
     if not all([uid, token, new_password]):
-        return Response({"error": "Missing fields"}, status=400)
+        return Response({"error": "Missing fields"}, status=status.HTTP_400_BAD_REQUEST)
 
     try:
         user = TblUsers.objects.get(pk=uid)
     except TblUsers.DoesNotExist:
-        return Response({"error": "Invalid user"}, status=404)
+        return Response({"error": "Invalid user"}, status=status.HTTP_404_NOT_FOUND)
 
     cache_key = f"password_reset_{uid}"
     stored_token = cache.get(cache_key)
 
     if not stored_token or stored_token != token:
-        return Response({"error": "Invalid or expired link."}, status=400)
+        return Response({"error": "Invalid or expired link."}, status=status.HTTP_400_BAD_REQUEST)
 
-    # Hash and save new password using Django's password hashing
+    # Hash and save new password
     user.password = make_password(new_password)
     user.save()
 
-    # Clear the used token
     cache.delete(cache_key)
 
     print(f"✅ Password successfully changed for user {user.user_id}")
-    return Response({"message": "Password changed successfully!"}, status=200)
+    return Response({"message": "Password changed successfully!"}, status=status.HTTP_200_OK)
 
-# Add a new endpoint for account creation with password
+
+# ============================================================
+# CREATE ACCOUNT (HASHES PASSWORD)
+# ============================================================
 @api_view(['POST'])
 @permission_classes([AllowAny])
 def create_account_with_password(request):
     """
-    Create a new account with user_id and password
+    Create a new account with hashed password.
     """
     serializer = TblUsersSerializer(data=request.data)
+
+    if not request.data.get('password'):
+        return Response({'error': 'Password is required'}, status=status.HTTP_400_BAD_REQUEST)
+
     if serializer.is_valid():
-        password = request.data.get('password')
-        if not password:
-            return Response({'error': 'Password is required'}, status=status.HTTP_400_BAD_REQUEST)
-        
-        # Create user with hashed password
         user = serializer.save()
-        user.password = make_password(password)
+        user.password = make_password(request.data['password'])
         user.save()
-        
-        return Response(serializer.data, status=status.HTTP_201_CREATED)
+
+        return Response(UserSerializer(user).data, status=status.HTTP_201_CREATED)
     return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
 
-# ------------------------------
-# List all users
-# ------------------------------
+
+# ============================================================
+# USERS LIST
+# ============================================================
 @api_view(['GET'])
 @permission_classes([AllowAny])
 def users_list(request):
     users = TblUsers.objects.all()
     serializer = UserSerializer(users, many=True)
-    return Response(serializer.data)
+    return Response(serializer.data, status=status.HTTP_200_OK)
 
-# ------------------------------
-# Single user detail
-# ------------------------------
+
+# ============================================================
+# SINGLE USER DETAIL
+# ============================================================
 @csrf_exempt
 @api_view(['GET', 'PUT', 'PATCH'])
 @permission_classes([AllowAny])
@@ -1112,17 +1142,19 @@ def user_detail(request, user_id):
 
     if request.method == 'GET':
         serializer = UserSerializer(user)
-        return Response(serializer.data)
+        return Response(serializer.data, status=status.HTTP_200_OK)
 
     elif request.method in ['PUT', 'PATCH']:
-        serializer = UserSerializer(
-            user, data=request.data, partial=(request.method == 'PATCH')
-        )
+        serializer = UserSerializer(user, data=request.data, partial=(request.method == 'PATCH'))
         if serializer.is_valid():
-            serializer.save()
-            return Response(serializer.data)
+            # Handle password hashing if password field is updated
+            password = request.data.get('password')
+            updated_user = serializer.save()
+            if password:
+                updated_user.password = make_password(password)
+                updated_user.save()
+            return Response(UserSerializer(updated_user).data, status=status.HTTP_200_OK)
         return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
-
 # ------------------------------
 # User roles
 # ------------------------------

@@ -300,10 +300,30 @@ class TblUsersSerializer(serializers.ModelSerializer):
         return f"{obj.first_name}{middle} {obj.last_name}".strip()
     
     def create(self, validated_data):
-        if 'password' not in validated_data:
-            # Default password = Last@user_id
-            validated_data['password'] = make_password(f"{validated_data['last_name']}@{validated_data['user_id']}")
+        # Extract password if provided
+        password = validated_data.pop('password', None)
+        
+        # If no password provided, generate default: LastName@user_id
+        if not password:
+            password = f"{validated_data['last_name']}@{validated_data['user_id']}"
+        
+        # Hash the password
+        validated_data['password'] = make_password(password)
+        
         return super().create(validated_data)
+    
+    def update(self, instance, validated_data):
+        # If password is being updated, hash it
+        password = validated_data.pop('password', None)
+        if password:
+            instance.password = make_password(password)
+        
+        # Update other fields
+        for attr, value in validated_data.items():
+            setattr(instance, attr, value)
+        
+        instance.save()
+        return instance
 
 class TblRolesSerializer(serializers.ModelSerializer):
     class Meta:

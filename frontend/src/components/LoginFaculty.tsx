@@ -18,7 +18,7 @@ const roleToDashboardMap: Record<string, string> = {
   scheduler: '/faculty-dashboard',
   'bayanihan leader': '/faculty-dashboard',
   dean: '/faculty-dashboard',
-  admin: '/admin-login',
+  admin: '/admin-dashboard',
 };
 
 const LoginFaculty: React.FC = () => {
@@ -28,10 +28,6 @@ const LoginFaculty: React.FC = () => {
   const [showPassword, setShowPassword] = useState(false);
   const [rememberMe, setRememberMe] = useState(false);
   const [error, setError] = useState('');
-  const [availableRoles, setAvailableRoles] = useState<string[]>([]);
-  const [selectedRole, setSelectedRole] = useState('');
-  const [userProfile, setUserProfile] = useState<any>(null);
-  const [awaitingRoleSelection, setAwaitingRoleSelection] = useState(false);
   const [loading, setLoading] = useState(false);
   const navigate = useNavigate();
 
@@ -46,99 +42,67 @@ const LoginFaculty: React.FC = () => {
     setLoading(true);
 
     try {
-      // 1️⃣ Lookup user by ID
-      const { data: userRecord } = await api.get(`/users/${id}/`);
-      if (!userRecord?.email_address || !userRecord?.status) {
-        setError('Invalid user ID or password.');
-        return;
-      }
-
-      // 2️⃣ Authenticate
+      // ✅ Direct authentication with user_id and password
       const { data: authData } = await api.post('/login/', {
-        email: userRecord.email_address,
+        user_id: id,
         password,
       });
 
       if (!authData?.token) {
-        setError('Invalid user ID or password.');
+        setError('Invalid credentials.');
         return;
       }
 
-      // 3️⃣ Fetch user roles
-      const { data: userRoles } = await api.get(`/user-roles/${id}/roles/`, {
-        headers: { Authorization: `Bearer ${authData.token}` },
-      });
-
-      if (!userRoles || userRoles.length === 0) {
-        setError('No roles found. Unauthorized access.');
-        return;
-      }
-
-      const activeRoles = userRoles
-        .filter((r: any) => r.status?.toLowerCase() === 'active')
-        .map((r: any) => r.role_name?.toLowerCase());
+      // ✅ Check if user has at least one active role (excluding admin for faculty login)
+      const activeRoles = authData.roles
+        ?.filter((r: any) => r.status?.toLowerCase() === 'active')
+        ?.map((r: any) => r.role_name?.toLowerCase()) || [];
 
       if (activeRoles.length === 0) {
         setError('You do not have any active roles.');
         return;
       }
 
-      const rolesExcludingAdmin = activeRoles.filter((role: any) => role !== 'admin');
-
-      const profileWithToken = { ...userRecord, token: authData.token };
-
-      // Handle login based on roles
-      if (rolesExcludingAdmin.length === 0 && activeRoles.includes('admin')) {
-        completeLogin('admin', profileWithToken);
+      // ✅ Block admin from logging in via faculty portal
+      if (activeRoles.includes('admin') && activeRoles.length === 1) {
+        setError('Admin accounts must use the Admin login portal.');
         return;
       }
 
-      if (rolesExcludingAdmin.length === 1) {
-        completeLogin(rolesExcludingAdmin[0], profileWithToken);
+      // ✅ Determine dashboard (prefer non-admin roles for faculty)
+      const facultyRoles = activeRoles.filter((r: string) => r !== 'admin');
+      const assignedRole = facultyRoles.length > 0 ? facultyRoles[0] : activeRoles[0];
+
+      const dashboard = roleToDashboardMap[assignedRole];
+      if (!dashboard) {
+        setError(`No dashboard found for role: ${assignedRole}`);
         return;
       }
 
-      if (rolesExcludingAdmin.length >= 2) {
-        completeLogin('faculty', profileWithToken);
-        return;
+      // ✅ Store session with complete user data
+      const userData = {
+        user_id: authData.user_id,
+        email_address: authData.email,
+        first_name: authData.first_name,
+        last_name: authData.last_name,
+        token: authData.token,
+        roles: authData.roles,
+      };
+
+      if (rememberMe) {
+        localStorage.setItem('user', JSON.stringify(userData));
+      } else {
+        sessionStorage.setItem('user', JSON.stringify(userData));
       }
 
-      // Multiple roles, let user select
-      setAvailableRoles(rolesExcludingAdmin);
-      setUserProfile(profileWithToken);
-      setAwaitingRoleSelection(true);
-
+      // ✅ Navigate to dashboard
+      navigate(dashboard);
     } catch (err: any) {
-      console.error('Unexpected error:', err);
-      setError(err.response?.data?.message || 'An unexpected error occurred.');
+      console.error('Login error:', err);
+      setError(err.response?.data?.message || 'Invalid employee ID or password.');
     } finally {
       setLoading(false);
     }
-  };
-
-  const completeLogin = (role: string, profile: any) => {
-    const payload = { ...profile, roles: [{ role_name: role }] };
-    if (rememberMe) {
-      localStorage.setItem('user', JSON.stringify(payload));
-    } else {
-      sessionStorage.setItem('user', JSON.stringify(payload));
-    }
-
-    const dashboard = roleToDashboardMap[role];
-    if (!dashboard) {
-      setError(`No dashboard assigned for role: ${role}`);
-      return;
-    }
-
-    navigate(dashboard);
-  };
-
-  const handleRoleSelection = () => {
-    if (!selectedRole) {
-      setError('Please select a role.');
-      return;
-    }
-    completeLogin(selectedRole, userProfile);
   };
 
   return (
@@ -163,85 +127,57 @@ const LoginFaculty: React.FC = () => {
             Login as <span className="faculty-text">Faculty</span>
           </h2>
 
-          {!awaitingRoleSelection ? (
-            <form className="login-form" onSubmit={handleLogin}>
-              <div className="input-group">
-                <label htmlFor="ID">Employee ID</label>
+          <form className="login-form" onSubmit={handleLogin}>
+            <div className="input-group">
+              <label htmlFor="ID">Employee ID</label>
+              <input
+                type="text"
+                id="ID"
+                placeholder="ID"
+                value={id}
+                onChange={(e) => setID(e.target.value)}
+                className="login-input"
+                required
+              />
+            </div>
+
+            <div className="input-group password-group">
+              <label htmlFor="password">Password</label>
+              <div className="password-wrapper">
                 <input
-                  type="text"
-                  id="ID"
-                  placeholder="ID"
-                  value={id}
-                  onChange={(e) => setID(e.target.value)}
+                  type={showPassword ? 'text' : 'password'}
+                  id="password"
+                  placeholder="Password"
+                  value={password}
+                  onChange={(e) => setPassword(e.target.value)}
                   className="login-input"
                   required
                 />
+                <span
+                  className="toggle-password"
+                  onClick={() => setShowPassword(!showPassword)}
+                >
+                  {showPassword ? <FaEyeSlash /> : <FaEye />}
+                </span>
               </div>
-
-              <div className="input-group password-group">
-                <label htmlFor="password">Password</label>
-                <div className="password-wrapper">
-                  <input
-                    type={showPassword ? 'text' : 'password'}
-                    id="password"
-                    placeholder="Password"
-                    value={password}
-                    onChange={(e) => setPassword(e.target.value)}
-                    className="login-input"
-                    required
-                  />
-                  <span
-                    className="toggle-password"
-                    onClick={() => setShowPassword(!showPassword)}
-                  >
-                    {showPassword ? <FaEyeSlash /> : <FaEye />}
-                  </span>
-                </div>
-              </div>
-
-              <div className="remember-me-container">
-                <input
-                  type="checkbox"
-                  id="rememberMe"
-                  checked={rememberMe}
-                  onChange={(e) => setRememberMe(e.target.checked)}
-                />
-                <label htmlFor="rememberMe">Remember me</label>
-              </div>
-
-              {error && <p className="error-text">{error}</p>}
-
-              <button type="submit" className="login-button" disabled={loading}>
-                {loading ? <span className="spinner"></span> : 'Login'}
-              </button>
-            </form>
-          ) : (
-            <div className="role-selection">
-              <label htmlFor="role">Select Role</label>
-              <select
-                id="role"
-                value={selectedRole}
-                onChange={(e) => setSelectedRole(e.target.value)}
-                className="login-input"
-              >
-                <option value="">-- Choose Role --</option>
-                {availableRoles.map((role) => (
-                  <option key={role} value={role}>
-                    {role.charAt(0).toUpperCase() + role.slice(1)}
-                  </option>
-                ))}
-              </select>
-              <button
-                type="button"
-                className="login-button"
-                onClick={handleRoleSelection}
-                disabled={loading}
-              >
-                {loading ? <span className="spinner"></span> : 'Login'}
-              </button>
-              {error && <p className="error-text">{error}</p>}
             </div>
-          )}
+
+            <div className="remember-me-container">
+              <input
+                type="checkbox"
+                id="rememberMe"
+                checked={rememberMe}
+                onChange={(e) => setRememberMe(e.target.checked)}
+              />
+              <label htmlFor="rememberMe">Remember me</label>
+            </div>
+
+            {error && <p className="error-text">{error}</p>}
+
+            <button type="submit" className="login-button" disabled={loading}>
+              {loading ? <span className="spinner"></span> : 'Login'}
+            </button>
+          </form>
         </div>
 
         <div className="admin-login-link">
