@@ -42,6 +42,7 @@ const Profile: React.FC<ProfileProps> = ({ user }) => {
   const [preview, setPreview] = useState<string | null>(null);
   const [userRoles, setUserRoles] = useState<UserRoleInfo[]>([]);
   const [loading, setLoading] = useState(true);
+  const [isChangingPassword, setIsChangingPassword] = useState(false);
 
   /** 🔹 Fetch user profile */
   const fetchProfile = useCallback(async () => {
@@ -159,15 +160,21 @@ const Profile: React.FC<ProfileProps> = ({ user }) => {
 
   /** 🔹 Request password change (email-based only) */
   const handlePasswordChange = async () => {
-    if (!profile?.email_address) return toast.error('Missing email address.');
+    if (!profile?.email_address) {
+      toast.error('Missing email address.');
+      return;
+    }
+    setIsChangingPassword(true);
     try {
       await api.post('/auth/request-password-change/', {
         email: profile.email_address,
       });
       toast.success('Password reset email sent! Please check your inbox.');
-    } catch (err) {
+    } catch (err: any) {
       console.error('Password change request error:', err);
       toast.error('Failed to send password reset email.');
+    } finally {
+      setIsChangingPassword(false);
     }
   };
 
@@ -183,7 +190,7 @@ const Profile: React.FC<ProfileProps> = ({ user }) => {
       <div className="profile-section profile-info-card">
         <div className="profile-avatar-wrapper">
           <img
-            src={preview || '../../../backend/static/Images/default-pp.jpg'}
+            src={preview || '../../static/Images/default-pp.jpg'}
             alt="Profile Avatar"
             className="profile-avatar"
           />
@@ -270,10 +277,14 @@ const Profile: React.FC<ProfileProps> = ({ user }) => {
         )}
       </div>
 
-      {/* 🔹 Password Section (Simplified) */}
       <div className="profile-section password-change-card">
-        <button type="button" className="btn change-password-btn" onClick={handlePasswordChange}>
-          Change Password
+        <button
+          type="button"
+          className="btn change-password-btn"
+          onClick={handlePasswordChange}
+          disabled={isChangingPassword}
+        >
+          {isChangingPassword ? 'Sending...' : 'Change Password'}
         </button>
       </div>
 

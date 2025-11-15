@@ -21,6 +21,8 @@ const Terms: React.FC = () => {
   const [editMode, setEditMode] = useState(false);
   const [editingTermId, setEditingTermId] = useState<number | null>(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [loading, setLoading] = useState(true); // new state
+  const [isImporting, setIsImporting] = useState(false);
 
   useEffect(() => {
     fetchTerms();
@@ -28,12 +30,15 @@ const Terms: React.FC = () => {
 
   // ✅ Fetch all terms
   const fetchTerms = async () => {
+    setLoading(true);
     try {
       const res = await api.get("/tbl_term");
       setTerms(res.data);
     } catch (err) {
       console.error("Fetch terms error:", err);
       toast.error("Failed to fetch terms");
+    } finally {
+      setLoading(false);
     }
   };
 
@@ -99,49 +104,55 @@ const Terms: React.FC = () => {
     }
   };
 
-  // ✅ Import terms from Excel
   const handleImportFile = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (!file) return;
 
     const reader = new FileReader();
     reader.onload = async (event: any) => {
-      const data = new Uint8Array(event.target.result);
-      const workbook = XLSX.read(data, { type: "array" });
-      const worksheet = workbook.Sheets[workbook.SheetNames[0]];
-      const json: any[] = XLSX.utils.sheet_to_json(worksheet);
+      setIsImporting(true);
+      try {
+        const data = new Uint8Array(event.target.result);
+        const workbook = XLSX.read(data, { type: "array" });
+        const worksheet = workbook.Sheets[workbook.SheetNames[0]];
+        const json: any[] = XLSX.utils.sheet_to_json(worksheet);
 
-      let successCount = 0;
-      let failCount = 0;
-      let duplicateCount = 0;
+        let successCount = 0;
+        let failCount = 0;
+        let duplicateCount = 0;
 
-      const existingTerms = terms.map((t) => t.term_name.trim().toLowerCase());
+        const existingTerms = terms.map((t) => t.term_name.trim().toLowerCase());
 
-      for (const row of json) {
-        const termName = row["Term Name"]?.trim();
-        if (!termName) {
-          failCount++;
-          continue;
+        for (const row of json) {
+          const termName = row["Term Name"]?.trim();
+          if (!termName) {
+            failCount++;
+            continue;
+          }
+
+          if (existingTerms.includes(termName.toLowerCase())) {
+            duplicateCount++;
+            continue;
+          }
+
+          try {
+            await api.post("/tbl_term", { term_name: termName });
+            successCount++;
+          } catch {
+            failCount++;
+          }
         }
 
-        if (existingTerms.includes(termName.toLowerCase())) {
-          duplicateCount++;
-          continue;
-        }
-
-        try {
-          await api.post("/tbl_term", { term_name: termName });
-          successCount++;
-        } catch {
-          failCount++;
-        }
+        toast.success(
+          `Import completed: ${successCount} added, ${duplicateCount} skipped (duplicates), ${failCount} failed.`
+        );
+        fetchTerms();
+        setShowImport(false);
+      } catch (err) {
+        toast.error("Error reading or importing file");
+      } finally {
+        setIsImporting(false);
       }
-
-      toast.success(
-        `Import completed: ${successCount} added, ${duplicateCount} skipped (duplicates), ${failCount} failed.`
-      );
-      fetchTerms();
-      setShowImport(false);
     };
 
     reader.readAsArrayBuffer(file);
@@ -196,13 +207,6 @@ const Terms: React.FC = () => {
         >
           Import Terms
         </button>
-        <button
-          type="button"
-          className="action-button download"
-          onClick={downloadTemplate}
-        >
-          <FaDownload style={{ marginRight: 5 }} /> Download Template
-        </button>
       </div>
 
       <div className="colleges-table-container">
@@ -215,9 +219,17 @@ const Terms: React.FC = () => {
             </tr>
           </thead>
           <tbody>
-            {filteredTerms.length === 0 ? (
+            {loading ? (
               <tr>
-                <td colSpan={3}>No terms found.</td>
+                <td colSpan={3} style={{ textAlign: 'center', padding: '20px' }}>
+                  Loading colleges...
+                </td>
+              </tr>
+            ) : filteredTerms.length === 0 ? (
+              <tr>
+                <td colSpan={3} style={{ textAlign: 'center', padding: '20px' }}>
+                  No colleges found.
+                </td>
               </tr>
             ) : (
               filteredTerms.map((term, index) => (
@@ -288,13 +300,33 @@ const Terms: React.FC = () => {
         <div className="modal-overlay">
           <div className="modal">
             <h3 style={{ textAlign: "center" }}>Import Terms</h3>
-            <input type="file" accept=".xlsx, .xls" onChange={handleImportFile} />
+            <p style={{ fontSize: '12px', color: '#666', marginBottom: '10px' }}>
+              Each term must have a valid name. Duplicates will be skipped.
+            </p>
+
+            <input
+              type="file"
+              accept=".xlsx, .xls"
+              onChange={handleImportFile}
+              disabled={isImporting}
+            />
+
+            <button
+              type="button"
+              className="modal-button download"
+              onClick={downloadTemplate}
+              disabled={isImporting}
+            >
+              <FaDownload style={{ marginRight: 5 }} /> Download Template
+            </button>
+
             <div className="modal-actions">
-              <button type="button" onClick={() => setShowImport(false)}>
-                Done
-              </button>
-              <button type="button" onClick={() => setShowImport(false)}>
-                Cancel
+              <button
+                type="button"
+                onClick={() => setShowImport(false)}
+                disabled={isImporting}
+              >
+                {isImporting ? "Importing…" : "Close"}
               </button>
             </div>
           </div>

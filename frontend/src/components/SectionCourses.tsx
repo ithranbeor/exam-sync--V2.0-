@@ -57,8 +57,9 @@ const SectionCourses: React.FC = () => {
   const [showImport, setShowImport] = useState(false);
   const [editMode, setEditMode] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
-  const [isLoading, setIsLoading] = useState(true);
+  const [loading, setLoading] = useState(true);
   const [currentPage, setCurrentPage] = useState(1);
+  const [isImporting, setIsImporting] = useState(false);
   const itemsPerPage = 20;
 
   const [newSection, setNewSection] = useState<SectionCourse>({
@@ -108,7 +109,7 @@ const SectionCourses: React.FC = () => {
   }, [courseInstructorsMap, newSection.course_id]);
 
   const fetchAll = useCallback(async () => {
-    setIsLoading(true);
+    setLoading(true);
     try {
       const [secRes, courseRes, progRes, termRes, courseUserRes] = await Promise.all([
         api.get('/tbl_sectioncourse/'),
@@ -155,7 +156,7 @@ const SectionCourses: React.FC = () => {
     } catch (_error) {
       toast.error('Error fetching data.');
     } finally {
-      setIsLoading(false);
+      setLoading(false);
     }
   }, []);
 
@@ -222,19 +223,15 @@ const SectionCourses: React.FC = () => {
     if (!file) return;
 
     const reader = new FileReader();
-
     reader.onload = async (evt: ProgressEvent<FileReader>) => {
+      setIsImporting(true);
       try {
-        const result = evt.target?.result;
-        if (!result) return;
-
-        const data = new Uint8Array(result as ArrayBuffer);
+        const data = new Uint8Array(evt.target?.result as ArrayBuffer);
         const wb = XLSX.read(data, { type: 'array' });
         const sheet = wb.Sheets[wb.SheetNames[0]];
         const rows: Record<string, string | number>[] = XLSX.utils.sheet_to_json(sheet);
 
-        const validRows = [];
-
+        const validRows: SectionCourse[] = [];
         for (const row of rows) {
           const section_name = String(row['Section Name'] || '').trim();
           const number_of_students = parseInt(String(row['Number of Students'] || '0'));
@@ -247,43 +244,31 @@ const SectionCourses: React.FC = () => {
           if (!section_name || !number_of_students || !year_level || !term_name || !course_id || !program_id || !instructor_name)
             continue;
 
-          const term = terms.find((t) => t.term_name === term_name);
-          if (!term) continue;
-
-          const user = (courseInstructorsMap[course_id] || []).find(
-            (u) => u.full_name.toLowerCase() === instructor_name.toLowerCase()
-          );
-          if (!user) continue;
+          const term = terms.find(t => t.term_name === term_name);
+          const user = (courseInstructorsMap[course_id] || []).find(u => u.full_name.toLowerCase() === instructor_name.toLowerCase());
+          if (!term || !user) continue;
 
           validRows.push({
-            course_id,
-            program_id,
-            section_name,
-            number_of_students,
-            year_level,
-            term_id: term.term_id,
-            user_id: user.user_id,
-          });
+            course_id, program_id, section_name, number_of_students, year_level,
+            term_id: term.term_id, user_id: user.user_id
+          } as SectionCourse);
         }
 
-        // Batch insert
         let added = 0;
         const batchSize = 10;
         for (let i = 0; i < validRows.length; i += batchSize) {
           const batch = validRows.slice(i, i + batchSize);
-          const results = await Promise.allSettled(
-            batch.map(payload => api.post('/tbl_sectioncourse/', payload))
-          );
-          added += results.filter(r => r.status === 'fulfilled' && 
-            (r.value.status === 201 || r.value.status === 200)).length;
+          const results = await Promise.allSettled(batch.map(payload => api.post('/tbl_sectioncourse/', payload)));
+          added += results.filter(r => r.status === 'fulfilled' && (r.value.status === 200 || r.value.status === 201)).length;
         }
 
         toast.success(`Import completed: ${added} section(s) added`);
         fetchAll();
-      } catch (_error) {
+      } catch {
         toast.error('Error reading or importing file');
       } finally {
         setShowImport(false);
+        setIsImporting(false);
       }
     };
 
@@ -326,16 +311,6 @@ const SectionCourses: React.FC = () => {
 
   const totalPages = Math.ceil(filtered.length / itemsPerPage);
 
-  if (isLoading) {
-    return (
-      <div className="colleges-container">
-        <div style={{ textAlign: 'center', padding: '50px' }}>
-          <p>Loading section courses...</p>
-        </div>
-      </div>
-    );
-  }
-
   return (
     <div className="colleges-container">
       <div className="colleges-header">
@@ -367,9 +342,6 @@ const SectionCourses: React.FC = () => {
           Add New Section
         </button>
         <button type='button' className="action-button import" onClick={() => setShowImport(true)}>Import Sections</button>
-        <button type='button' className="action-button download" onClick={downloadTemplate}>
-          <FaDownload style={{ marginRight: 5 }} /> Download Template
-        </button>
       </div>
 
       <div className="pagination-controls">
@@ -404,37 +376,58 @@ const SectionCourses: React.FC = () => {
             </tr>
           </thead>
           <tbody>
-            {paginated.map((sc, i) => (
-              <tr key={sc.id || i}>
-                <td>{(currentPage - 1) * itemsPerPage + i + 1}</td>
-                <td>{sc.course?.course_name || sc.course_id}</td>
-                <td>{sc.program?.program_name || sc.program_id}</td>
-                <td>{sc.section_name}</td>
-                <td>{sc.number_of_students}</td>
-                <td>{sc.year_level}</td>
-                <td>{sc.term?.term_name || 'N/A'}</td>
-                <td>{sc.user?.full_name || 'N/A'}</td>
-                <td className="action-buttons">
-                  <button type='button' className="icon-button edit-button" onClick={() => {
-                    setEditMode(true);
-                    setNewSection({
-                      ...sc,
-                      course_id: sc.course?.course_id || sc.course_id,
-                      program_id: sc.program?.program_id || sc.program_id,
-                      term_id: sc.term?.term_id || sc.term_id,
-                      user_id: sc.user?.user_id || sc.user_id
-                    });
-                    setShowModal(true);
-                  }}>
-                    <FaEdit />
-                  </button>
-                  <button type='button' className="icon-button delete-button" onClick={() => handleDelete(sc)}>
-                    <FaTrash />
-                  </button>
+            {loading ? (
+              <tr>
+                <td colSpan={9} style={{ textAlign: 'center', padding: '20px' }}>
+                  Loading sections with courses...
                 </td>
               </tr>
-            ))}
-            {filtered.length === 0 && <tr><td colSpan={9}>No section courses found.</td></tr>}
+            ) : paginated.length === 0 ? (
+              <tr>
+                <td colSpan={9} style={{ textAlign: 'center', padding: '20px' }}>
+                  No sections with courses.
+                </td>
+              </tr>
+            ) : (
+              paginated.map((sc, i) => (
+                <tr key={sc.id || i}>
+                  <td>{(currentPage - 1) * itemsPerPage + i + 1}</td>
+                  <td>{sc.course?.course_name || sc.course_id}</td>
+                  <td>{sc.program?.program_name || sc.program_id}</td>
+                  <td>{sc.section_name}</td>
+                  <td>{sc.number_of_students}</td>
+                  <td>{sc.year_level}</td>
+                  <td>{sc.term?.term_name || 'N/A'}</td>
+                  <td>{sc.user?.full_name || 'N/A'}</td>
+                  <td className="action-buttons">
+                    <button
+                      type="button"
+                      className="icon-button edit-button"
+                      onClick={() => {
+                        setEditMode(true);
+                        setNewSection({
+                          ...sc,
+                          course_id: sc.course?.course_id || sc.course_id,
+                          program_id: sc.program?.program_id || sc.program_id,
+                          term_id: sc.term?.term_id || sc.term_id,
+                          user_id: sc.user?.user_id || sc.user_id,
+                        });
+                        setShowModal(true);
+                      }}
+                    >
+                      <FaEdit />
+                    </button>
+                    <button
+                      type="button"
+                      className="icon-button delete-button"
+                      onClick={() => handleDelete(sc)}
+                    >
+                      <FaTrash />
+                    </button>
+                  </td>
+                </tr>
+              ))
+            )}
           </tbody>
         </table>
       </div>
@@ -601,11 +594,26 @@ const SectionCourses: React.FC = () => {
       {showImport && (
         <div className="modal-overlay">
           <div className="modal">
-            <h3 style={{ textAlign: 'center' }}>Import Section Courses</h3>
-            <input type="file" accept=".xlsx,.xls" onChange={handleImportFile} />
+            <h3 style={{ textAlign: "center" }}>Import Section Courses</h3>
+            <p style={{ fontSize: '12px', color: '#666', marginBottom: '10px' }}>
+              Each section must belong to an existing course, program, term, and have an assigned instructor.
+            </p>
+
+            <input type="file" accept=".xlsx,.xls" onChange={handleImportFile} disabled={isImporting} />
+
+            <button
+              type="button"
+              className="modal-button download"
+              onClick={downloadTemplate}
+              disabled={isImporting}
+            >
+              <FaDownload style={{ marginRight: 5 }} /> Download Template
+            </button>
+
             <div className="modal-actions">
-              <button type='button' onClick={() => setShowImport(false)}>Done</button>
-              <button type='button' onClick={() => setShowImport(false)}>Cancel</button>
+              <button type="button" onClick={() => setShowImport(false)} disabled={isImporting}>
+                {isImporting ? "Importing…" : "Close"}
+              </button>
             </div>
           </div>
         </div>

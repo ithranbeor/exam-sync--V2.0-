@@ -29,6 +29,8 @@ const Buildings: React.FC = () => {
   const [showImport, setShowImport] = useState(false);
   const [showRoomModal, setShowRoomModal] = useState(false);
   const [editMode, setEditMode] = useState(false);
+  const [loading, setLoading] = useState(true); // new state
+  const [isImporting, setIsImporting] = useState(false);
   const [newBuilding, setNewBuilding] = useState<Building>({
     building_id: '',
     building_name: '',
@@ -45,6 +47,7 @@ const Buildings: React.FC = () => {
 
   // ✅ Fetch buildings and rooms using Axios
   const fetchBuildings = async () => {
+    setLoading(true);
     try {
       const { data: buildingData } = await api.get('/tbl_buildings');
       const { data: roomData } = await api.get('/tbl_rooms');
@@ -62,6 +65,8 @@ const Buildings: React.FC = () => {
     } catch (err) {
       console.error(err);
       toast.error('Failed to fetch data');
+    } finally {
+      setLoading(false);
     }
   };
 
@@ -119,28 +124,35 @@ const Buildings: React.FC = () => {
 
     const reader = new FileReader();
     reader.onload = async (evt: any) => {
-      const data = new Uint8Array(evt.target.result);
-      const wb = XLSX.read(data, { type: 'array' });
-      const sheet = wb.Sheets[wb.SheetNames[0]];
-      const rows: any[] = XLSX.utils.sheet_to_json(sheet);
+      setIsImporting(true);
+      try {
+        const data = new Uint8Array(evt.target.result);
+        const wb = XLSX.read(data, { type: 'array' });
+        const sheet = wb.Sheets[wb.SheetNames[0]];
+        const rows: any[] = XLSX.utils.sheet_to_json(sheet);
 
-      let added = 0;
-      for (const row of rows) {
-        const building_id = row['Building ID']?.trim();
-        const building_name = row['Building Name']?.trim();
-        if (!building_id || !building_name) continue;
+        let added = 0;
+        for (const row of rows) {
+          const building_id = row['Building ID']?.trim();
+          const building_name = row['Building Name']?.trim();
+          if (!building_id || !building_name) continue;
 
-        try {
-          await api.post('/tbl_buildings', { building_id, building_name });
-          added++;
-        } catch {
-          // Skip failed rows
+          try {
+            await api.post('/tbl_buildings', { building_id, building_name });
+            added++;
+          } catch {
+            // Skip failed rows
+          }
         }
-      }
 
-      toast.success(`Import completed: ${added} building(s) added`);
-      fetchBuildings();
-      setShowImport(false);
+        toast.success(`Import completed: ${added} building(s) added`);
+        fetchBuildings();
+      } catch {
+        toast.error('Error reading or importing file');
+      } finally {
+        setIsImporting(false);
+        setShowImport(false);
+      }
     };
 
     reader.readAsArrayBuffer(file);
@@ -194,13 +206,6 @@ const Buildings: React.FC = () => {
         >
           Import Buildings
         </button>
-        <button
-          type="button"
-          className="action-button download"
-          onClick={downloadTemplate}
-        >
-          <FaDownload style={{ marginRight: 5 }} /> Download Template
-        </button>
       </div>
 
       <div className="colleges-table-container">
@@ -215,46 +220,55 @@ const Buildings: React.FC = () => {
             </tr>
           </thead>
           <tbody>
-            {filtered.map((b, index) => (
-              <tr key={b.building_id}>
-                <td>{index + 1}</td>
-                <td>{b.building_id}</td>
-                <td>{b.building_name}</td>
-                <td>{roomCounts[b.building_id] || 0}</td>
-                <td className="action-buttons">
-                  <button
-                    type="button"
-                    className="icon-button view-button"
-                    title="View Rooms"
-                    onClick={() => openRoomModal(b.building_id)}
-                  >
-                    <FaEye />
-                  </button>
-                  <button
-                    type="button"
-                    className="icon-button edit-button"
-                    onClick={() => {
-                      setEditMode(true);
-                      setNewBuilding(b);
-                      setShowModal(true);
-                    }}
-                  >
-                    <FaEdit />
-                  </button>
-                  <button
-                    type="button"
-                    className="icon-button delete-button"
-                    onClick={() => handleDelete(b.building_id)}
-                  >
-                    <FaTrash />
-                  </button>
+            {loading ? (
+              <tr>
+                <td colSpan={5} style={{ textAlign: 'center', padding: '20px' }}>
+                  Loading buidlings...
                 </td>
               </tr>
-            ))}
-            {filtered.length === 0 && (
+            ) : filtered.length === 0 ? (
               <tr>
-                <td colSpan={5}>No buildings found.</td>
+                <td colSpan={5} style={{ textAlign: 'center', padding: '20px' }}>
+                  No buildings found.
+                </td>
               </tr>
+            ) : (
+              filtered.map((b, index) => (
+                <tr key={b.building_id}>
+                  <td>{index + 1}</td>
+                  <td>{b.building_id}</td>
+                  <td>{b.building_name}</td>
+                  <td>{roomCounts[b.building_id] || 0}</td>
+                  <td className="action-buttons">
+                    <button
+                      type="button"
+                      className="icon-button view-button"
+                      title="View Rooms"
+                      onClick={() => openRoomModal(b.building_id)}
+                    >
+                      <FaEye />
+                    </button>
+                    <button
+                      type="button"
+                      className="icon-button edit-button"
+                      onClick={() => {
+                        setEditMode(true);
+                        setNewBuilding(b);
+                        setShowModal(true);
+                      }}
+                    >
+                      <FaEdit />
+                    </button>
+                    <button
+                      type="button"
+                      className="icon-button delete-button"
+                      onClick={() => handleDelete(b.building_id)}
+                    >
+                      <FaTrash />
+                    </button>
+                  </td>
+                </tr>
+              ))
             )}
           </tbody>
         </table>
@@ -301,10 +315,22 @@ const Buildings: React.FC = () => {
         <div className="modal-overlay">
           <div className="modal">
             <h3 style={{ textAlign: 'center' }}>Import Buildings</h3>
-            <input type="file" accept=".xlsx,.xls" onChange={handleImportFile} />
+            <p style={{ fontSize: '12px', color: '#666', marginBottom: '10px' }}>
+              Each building must have a unique Building ID and Name.
+            </p>
+            <input type="file" accept=".xlsx,.xls" onChange={handleImportFile} disabled={isImporting} />
             <div className="modal-actions">
-              <button type="button" onClick={() => setShowImport(false)}>Done</button>
-              <button type="button" onClick={() => setShowImport(false)}>Cancel</button>
+              <button
+                type="button"
+                className="modal-button download"
+                onClick={downloadTemplate}
+                disabled={isImporting}
+              >
+                <FaDownload style={{ marginRight: 5 }} /> Download Template
+              </button>
+              <button type="button" onClick={() => setShowImport(false)} disabled={isImporting}>
+                {isImporting ? "Importing…" : "Close"}
+              </button>
             </div>
           </div>
         </div>

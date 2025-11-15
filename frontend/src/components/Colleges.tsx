@@ -22,6 +22,8 @@ const Colleges: React.FC = () => {
   const [editMode, setEditMode] = useState(false);
   const [editingCollegeId, setEditingCollegeId] = useState<string | null>(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [loading, setLoading] = useState(true); // new state
+  const [isImporting, setIsImporting] = useState(false);
 
   // Fetch Colleges on Load
   useEffect(() => {
@@ -29,12 +31,15 @@ const Colleges: React.FC = () => {
   }, []);
 
   const fetchColleges = async () => {
+    setLoading(true);
     try {
       const response = await api.get('/tbl_college/');
       setColleges(response.data);
     } catch (error: any) {
       console.error('Error fetching colleges:', error.message);
       toast.error('Failed to fetch colleges.');
+    } finally {
+      setLoading(false);
     }
   };
 
@@ -108,11 +113,23 @@ const Colleges: React.FC = () => {
 
     const reader = new FileReader();
     reader.onload = async (event: any) => {
+      setIsImporting(true); // start loading
       const data = new Uint8Array(event.target.result);
       const workbook = XLSX.read(data, { type: 'array' });
       const sheetName = workbook.SheetNames[0];
       const worksheet = workbook.Sheets[sheetName];
       const json: any[] = XLSX.utils.sheet_to_json(worksheet);
+
+      // Use built-in template check for missing headers
+      const requiredHeaders = ['College ID', 'College Name'];
+      const missingHeaders = requiredHeaders.filter(
+        (h) => !Object.keys(json[0] || {}).includes(h)
+      );
+      if (missingHeaders.length) {
+        toast.error(`Invalid template. Missing headers: ${missingHeaders.join(', ')}`);
+        setIsImporting(false);
+        return;
+      }
 
       let added = 0;
       for (const row of json) {
@@ -121,10 +138,7 @@ const Colleges: React.FC = () => {
         if (!collegeId || !collegeName) continue;
 
         try {
-          await api.post('/tbl_college/', {
-            college_id: collegeId,
-            college_name: collegeName,
-          });
+          await api.post('/tbl_college/', { college_id: collegeId, college_name: collegeName });
           added++;
         } catch {
           toast.warn(`Skipped existing: ${collegeName}`);
@@ -134,6 +148,7 @@ const Colleges: React.FC = () => {
       toast.success(`Import completed! ${added} college(s) added.`);
       fetchColleges();
       setShowImport(false);
+      setIsImporting(false); // end loading
     };
 
     reader.readAsArrayBuffer(file);
@@ -174,9 +189,6 @@ const Colleges: React.FC = () => {
         <button type='button' className="action-button import" onClick={() => setShowImport(true)}>
           Import Colleges
         </button>
-        <button type='button' className="action-button download" onClick={downloadTemplate}>
-          <FaDownload style={{ marginRight: 5 }} /> Download Template
-        </button>
       </div>
 
       <div className="colleges-table-container">
@@ -190,8 +202,18 @@ const Colleges: React.FC = () => {
             </tr>
           </thead>
           <tbody>
-            {filteredColleges.length === 0 ? (
-              <tr><td colSpan={4}>No colleges found.</td></tr>
+            {loading ? (
+              <tr>
+                <td colSpan={4} style={{ textAlign: 'center', padding: '20px' }}>
+                  Loading colleges...
+                </td>
+              </tr>
+            ) : filteredColleges.length === 0 ? (
+              <tr>
+                <td colSpan={4} style={{ textAlign: 'center', padding: '20px' }}>
+                  No colleges found.
+                </td>
+              </tr>
             ) : (
               filteredColleges.map((college, index) => (
                 <tr key={college.college_id}>
@@ -199,7 +221,8 @@ const Colleges: React.FC = () => {
                   <td>{college.college_id}</td>
                   <td>{college.college_name}</td>
                   <td className="action-buttons">
-                    <button type='button'
+                    <button
+                      type="button"
                       className="icon-button edit-button"
                       onClick={() => {
                         setNewCollegeId(college.college_id);
@@ -211,7 +234,8 @@ const Colleges: React.FC = () => {
                     >
                       <FaEdit />
                     </button>
-                    <button type='button'
+                    <button
+                      type="button"
                       className="icon-button delete-button"
                       onClick={() => handleDelete(college.college_id)}
                     >
@@ -264,9 +288,22 @@ const Colleges: React.FC = () => {
         <div className="modal-overlay">
           <div className="modal">
             <h3>Import Colleges</h3>
-            <input type="file" accept=".xlsx, .xls" onChange={handleImportFile} />
+            <p style={{ fontSize: '12px', color: '#666', marginBottom: '10px' }}>
+              Each college must have a unique College ID. Use the template below.
+            </p>
+            <input type="file" accept=".xlsx, .xls" onChange={handleImportFile} disabled={isImporting} />
+            <button
+              type="button"
+              className="modal-button download"
+              onClick={downloadTemplate}
+              disabled={isImporting}
+            >
+              <FaDownload style={{ marginRight: 5 }} /> Download Template
+            </button>
             <div className="modal-actions">
-              <button type='button' onClick={() => setShowImport(false)}>Done</button>
+              <button type="button" onClick={() => setShowImport(false)} disabled={isImporting}>
+                {isImporting ? 'Importing...' : 'Done'}
+              </button>
             </div>
           </div>
         </div>

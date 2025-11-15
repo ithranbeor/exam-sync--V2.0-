@@ -40,7 +40,8 @@ const Programs: React.FC<ProgramsProps> = ({ user: _user }) => {
   const [editMode, setEditMode] = useState(false);
   const [editingProgId, setEditingProgId] = useState<string | null>(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
-  const [newDeptLabel, setNewDeptLabel] = useState('');
+  const [loading, setLoading] = useState(true); // new state
+  const [isImporting, setIsImporting] = useState(false);
 
   useEffect(() => {
     fetchDepartments();
@@ -48,6 +49,7 @@ const Programs: React.FC<ProgramsProps> = ({ user: _user }) => {
   }, []);
 
   const fetchPrograms = async () => {
+    setLoading(true);
     try {
       const response = await api.get('/programs/');
       const normalized = response.data.map((p: any) => ({
@@ -61,6 +63,8 @@ const Programs: React.FC<ProgramsProps> = ({ user: _user }) => {
     } catch (err: any) {
       console.error('Failed to fetch programs:', err.message);
       toast.error('Failed to fetch programs.');
+    } finally {
+      setLoading(false);
     }
   };
 
@@ -160,6 +164,7 @@ const Programs: React.FC<ProgramsProps> = ({ user: _user }) => {
 
     const reader = new FileReader();
     reader.onload = async (event: any) => {
+      setIsImporting(true);
       const workbook = XLSX.read(new Uint8Array(event.target.result), { type: 'array' });
       const rows: any[] = XLSX.utils.sheet_to_json(workbook.Sheets[workbook.SheetNames[0]]);
 
@@ -196,6 +201,7 @@ const Programs: React.FC<ProgramsProps> = ({ user: _user }) => {
       toast.success(`Import completed: ${successCount} added, ${failureCount} failed.`);
       await fetchPrograms();
       setShowImport(false);
+      setIsImporting(false);
     };
 
     reader.readAsArrayBuffer(file);
@@ -235,9 +241,6 @@ const Programs: React.FC<ProgramsProps> = ({ user: _user }) => {
         <button type="button" onClick={() => setShowImport(true)} className="action-button import">
           Import Programs
         </button>
-        <button type="button" onClick={downloadTemplate} className="action-button download">
-          <FaDownload style={{ marginRight: 5 }} /> Download Template
-        </button>
       </div>
 
       <div className="colleges-table-container">
@@ -252,9 +255,17 @@ const Programs: React.FC<ProgramsProps> = ({ user: _user }) => {
             </tr>
           </thead>
           <tbody>
-            {filteredPrograms.length === 0 ? (
+            {loading ? (
               <tr>
-                <td colSpan={5}>No programs found.</td>
+                <td colSpan={5} style={{ textAlign: 'center', padding: '20px' }}>
+                  Loading programs...
+                </td>
+              </tr>
+            ) : filteredPrograms.length === 0 ? (
+              <tr>
+                <td colSpan={5} style={{ textAlign: 'center', padding: '20px' }}>
+                  No programs found.
+                </td>
               </tr>
             ) : (
               filteredPrograms.map((p, idx) => (
@@ -355,12 +366,26 @@ const Programs: React.FC<ProgramsProps> = ({ user: _user }) => {
         <div className="modal-overlay">
           <div className="modal">
             <h3 style={{ textAlign: 'center' }}>Import Programs</h3>
-            <input type="file" accept=".xlsx,.xls" onChange={handleImportFile} />
+            <p style={{ fontSize: '12px', color: '#666', marginBottom: '10px' }}>
+              Each program must belong to an existing department. Use the template below.
+            </p>
+
+            <input type="file" accept=".xlsx,.xls" onChange={handleImportFile} disabled={isImporting} />
+
+            <button
+              type="button"
+              className="modal-button download"
+              onClick={downloadTemplate}
+              disabled={isImporting}
+            >
+              <FaDownload style={{ marginRight: 5 }} /> Download Template
+            </button>
+
             <div className="modal-actions">
-              <button type="button" onClick={() => setShowImport(false)}>
-                Done
+              <button type="button" onClick={() => setShowImport(false)} disabled={isImporting}>
+                {isImporting ? 'Importing…' : 'Done'}
               </button>
-              <button type="button" onClick={() => setShowImport(false)}>
+              <button type="button" onClick={() => setShowImport(false)} disabled={isImporting}>
                 Cancel
               </button>
             </div>

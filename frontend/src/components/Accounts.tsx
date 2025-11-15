@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from 'react';
-import { FaSearch, FaPen } from 'react-icons/fa';
+import { FaSearch, FaPen, FaTrash } from 'react-icons/fa';
 import { api } from '../lib/apiClient.ts';
 import { ToastContainer, toast } from 'react-toastify';
 import * as XLSX from 'xlsx';
@@ -31,6 +31,7 @@ export const Accounts: React.FC<AccountsProps> = ({ user }) => {
   const [showModal, setShowModal] = useState(false);
   const [showImport, setShowImport] = useState(false);
   const [isEditMode, setIsEditMode] = useState(false);
+  const [loading, setLoading] = useState(true);
 
   const [newAccount, setNewAccount] = useState<UserAccount>({
     user_id: 0,
@@ -47,12 +48,15 @@ export const Accounts: React.FC<AccountsProps> = ({ user }) => {
   // Fetch accounts
   // -----------------------------
   const fetchAccounts = async () => {
+    setLoading(true); // start loading
     try {
       const response = await api.get<UserAccount[]>('/accounts/');
       setAccounts(response.data);
     } catch (err: any) {
       console.error(err);
       toast.error('Error fetching accounts');
+    } finally {
+      setLoading(false); // stop loading
     }
   };
 
@@ -271,38 +275,50 @@ export const Accounts: React.FC<AccountsProps> = ({ user }) => {
             </tr>
           </thead>
           <tbody>
-            {filtered.length === 0 ? (
-              <tr><td colSpan={7}>No user accounts found.</td></tr>
-            ) : filtered.map((u) => (
-              <tr key={u.user_id}>
-                <td>{u.user_id}</td>
-                <td>{u.last_name}, {u.first_name} {u.middle_name ?? ''}</td>
-                <td>{u.email_address}</td>
-                <td>{u.contact_number}</td>
-                <td>{u.status}</td>
-                <td>{new Date(u.created_at).toLocaleDateString()}</td>
-                <td className="action-buttons">
-                  <button
-                    type="button"
-                    className="icon-button edit-button"
-                    onClick={() => {
-                      setNewAccount(u);
-                      setIsEditMode(true);
-                      setShowModal(true);
-                    }}
-                  >
-                    <FaPen />
-                  </button>
-                  <button
-                    type="button"
-                    className="icon-button delete-button"
-                    onClick={() => handleDeleteAccount(u.user_id)}
-                  >
-                    🗑
-                  </button>
+            {loading ? (
+              <tr>
+                <td colSpan={7} style={{ textAlign: "center", padding: "20px" }}>
+                  Loading accounts...
                 </td>
               </tr>
-            ))}
+            ) : filtered.length === 0 ? (
+              <tr>
+                <td colSpan={7} style={{ textAlign: "center", padding: "20px" }}>
+                  No accounts found.
+                </td>
+              </tr>
+            ) : (
+              filtered.map((u) => (
+                <tr key={u.user_id}>
+                  <td>{u.user_id}</td>
+                  <td>{u.last_name}, {u.first_name} {u.middle_name ?? ''}</td>
+                  <td>{u.email_address}</td>
+                  <td>{u.contact_number}</td>
+                  <td>{u.status}</td>
+                  <td>{new Date(u.created_at).toLocaleDateString()}</td>
+                  <td className="action-buttons">
+                    <button
+                      type="button"
+                      className="icon-button edit-button"
+                      onClick={() => {
+                        setNewAccount(u);
+                        setIsEditMode(true);
+                        setShowModal(true);
+                      }}
+                    >
+                      <FaPen />
+                    </button>
+                    <button
+                      type="button"
+                      className="icon-button delete-button"
+                      onClick={() => handleDeleteAccount(u.user_id)}
+                    >
+                      <FaTrash />
+                    </button>
+                  </td>
+                </tr>
+              ))
+            )}
           </tbody>
         </table>
       </div>
