@@ -1,6 +1,6 @@
 // deno-lint-ignore-file no-explicit-any
 import React, { useEffect, useState } from 'react';
-import { FaSearch, FaTrash, FaEdit, FaDownload, FaEye } from 'react-icons/fa';
+import { FaSearch, FaTrash, FaEdit, FaDownload, FaEye, FaPlus, FaFileImport } from 'react-icons/fa';
 import { ToastContainer, toast } from 'react-toastify';
 import * as XLSX from 'xlsx';
 import { api } from '../lib/apiClient.ts'; // <-- Axios instance
@@ -47,7 +47,6 @@ const Buildings: React.FC = () => {
 
   // ✅ Fetch buildings and rooms using Axios
   const fetchBuildings = async () => {
-    setLoading(true);
     try {
       const { data: buildingData } = await api.get('/tbl_buildings');
       const { data: roomData } = await api.get('/tbl_rooms');
@@ -66,7 +65,7 @@ const Buildings: React.FC = () => {
       console.error(err);
       toast.error('Failed to fetch data');
     } finally {
-      setLoading(false);
+      if (loading) setLoading(false); // only hide first load
     }
   };
 
@@ -197,14 +196,14 @@ const Buildings: React.FC = () => {
             setShowModal(true);
           }}
         >
-          Add New Building
+          <FaPlus/>
         </button>
         <button
           type="button"
           className="action-button import"
           onClick={() => setShowImport(true)}
         >
-          Import Buildings
+          <FaFileImport/>
         </button>
       </div>
 

@@ -1,6 +1,6 @@
 // deno-lint-ignore-file no-explicit-any
 import React, { useState, useEffect, useMemo, useCallback } from "react";
-import { FaTrash, FaEdit, FaSearch, FaDownload } from "react-icons/fa";
+import { FaTrash, FaEdit, FaSearch, FaDownload,  FaPlus, FaFileImport } from "react-icons/fa";
 import { api } from "../lib/apiClient.ts";
 import { ToastContainer, toast } from "react-toastify";
 import * as XLSX from "xlsx";
@@ -279,7 +279,7 @@ const Courses: React.FC = () => {
             setShowModal(true);
           }}
         >
-          Add Course
+          <FaPlus/>
         </button>
 
         <button
@@ -287,7 +287,7 @@ const Courses: React.FC = () => {
           className="action-button import"
           onClick={() => setShowImport(true)}
         >
-          Import Courses
+          <FaFileImport/>
         </button>
       </div>
 

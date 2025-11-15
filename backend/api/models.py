@@ -397,7 +397,7 @@ class TblUsers(models.Model):
     avatar_url = models.CharField(blank=True, null=True)
     status = models.TextField(blank=True, null=True)
     user_uuid = models.UUIDField(blank=True, null=True)
-    password = models.CharField(max_length=128)  # Add this field for storing hashed passwords
+    password = models.CharField(max_length=128) 
 
     class Meta:
         managed = True

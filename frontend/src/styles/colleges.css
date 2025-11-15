@@ -78,8 +78,16 @@
 }
 
 .action-button.add-new {
-  background-color: #ffb800; 
+  background-color: #ffb800;
+  font-size: small;
+  border-radius: 50px;
+  padding: 10px;
+
+  display: flex;
+  justify-content: center; 
+  align-items: center;
 }
+
 
 .action-button.add-new:hover {
   background-color: #e6a700;
@@ -87,9 +95,31 @@
 
 .action-button.import {
   background-color: #ffb800;
+  font-size: small;
+  border-radius: 50px;
+  padding: 10px;
+
+  display: flex;
+  justify-content: center; 
+  align-items: center;
 }
 
 .action-button.import:hover {
+  background-color: #e6a700;
+}
+
+.action-button.delete {
+  background-color: #d63e3e;
+  font-size: small;
+  border-radius: 50px;
+  padding: 10px;
+
+  display: flex;
+  justify-content: center; 
+  align-items: center;
+}
+
+.action-button.delete:hover {
   background-color: #e6a700;
 }
 
@@ -405,17 +435,11 @@ h3 {
   pointer-events: none;
   font-size: 16px;
 }
-.search-bar {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 10px;
-  align-items: center;
-}
 
 .search-bar select,
 .search-bar input {
   padding: 6px 10px;
-  border-radius: 5px;
+  border-radius: 20px;
   border: 1px solid #ccc;
 }
 .search-bar-container {
@@ -432,7 +456,7 @@ h3 {
   gap: 8px;
   padding: 6px 10px;
   border: 1px solid #ccc;
-  border-radius: 6px;
+  border-radius: 20px;
   cursor: text;
   background-color: #fff;
 }

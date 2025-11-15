@@ -1,6 +1,6 @@
 // deno-lint-ignore-file no-explicit-any
 import React, { useEffect, useState } from 'react';
-import { FaTrash, FaEdit, FaSearch } from 'react-icons/fa';
+import { FaTrash, FaEdit, FaSearch,  FaPlus, FaFileImport } from 'react-icons/fa';
 import { api } from '../lib/apiClient.ts';
 import * as XLSX from 'xlsx';
 import { ToastContainer, toast } from 'react-toastify';
@@ -308,10 +308,10 @@ const ExamPeriodComponent: React.FC = () => {
           });
           setSelectedDates([]);
           setShowModal(true);
-        }}>Add New Period</button>
+        }}><FaPlus/></button>
         <button
           type='button'
-          className="action-button delete-all"
+          className="action-button delete"
           onClick={async () => {
             if (!globalThis.confirm('Are you sure you want to delete all exam periods?')) return;
             try {
@@ -324,7 +324,7 @@ const ExamPeriodComponent: React.FC = () => {
             }
           }}
         >
-          <FaTrash style={{ marginRight: 5 }} /> Delete All
+          <FaTrash/>
         </button>
       </div>
 

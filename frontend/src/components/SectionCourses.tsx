@@ -1,6 +1,6 @@
 // deno-lint-ignore-file no-explicit-any
 import React, { useState, useEffect, useMemo, useCallback } from 'react';
-import { FaTrash, FaEdit, FaSearch, FaDownload } from 'react-icons/fa';
+import { FaTrash, FaEdit, FaSearch, FaDownload,  FaPlus, FaFileImport } from 'react-icons/fa';
 import { api } from '../lib/apiClient.ts';
 import { ToastContainer, toast } from 'react-toastify';
 import * as XLSX from 'xlsx';
@@ -339,9 +339,9 @@ const SectionCourses: React.FC = () => {
           } as SectionCourse);
           setShowModal(true);
         }}>
-          Add New Section
+          <FaPlus/>
         </button>
-        <button type='button' className="action-button import" onClick={() => setShowImport(true)}>Import Sections</button>
+        <button type='button' className="action-button import" onClick={() => setShowImport(true)}><FaFileImport/></button>
       </div>
 
       <div className="pagination-controls">

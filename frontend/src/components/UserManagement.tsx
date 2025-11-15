@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from 'react';
-import { FaSearch, FaPen, FaTrash, FaCalendarAlt, FaLock, FaLockOpen, FaDownload, FaPlus, FaTimes } from 'react-icons/fa';
+import { FaSearch, FaPen, FaTrash, FaCalendarAlt, FaLock, FaLockOpen, FaDownload,  FaPlus, FaFileImport, FaTimes } from 'react-icons/fa';
 import { api } from '../lib/apiClient.ts';
 import { ToastContainer, toast } from 'react-toastify';
 import * as XLSX from 'xlsx';
@@ -440,7 +440,7 @@ export const UserManagement: React.FC<UserManagementProps> = ({ user }) => {
 
     const reader = new FileReader();
     reader.onload = async evt => {
-      setImportLoading(true); // Start loading
+      setImportLoading(true);
       toast.info('Importing accounts... Please wait.', { autoClose: false, toastId: 'import-progress' });
       
       const data = new Uint8Array(evt.target?.result as ArrayBuffer);
@@ -449,9 +449,14 @@ export const UserManagement: React.FC<UserManagementProps> = ({ user }) => {
       const json: any[] = XLSX.utils.sheet_to_json(ws, { defval: '' });
 
       let successCount = 0;
+      let updatedCount = 0;
       let errorCount = 0;
+      const errors: string[] = [];
 
-      for (const row of json) {
+      for (let rowIndex = 0; rowIndex < json.length; rowIndex++) {
+        const row = json[rowIndex];
+        const rowNumber = rowIndex + 2; // +2 because Excel rows start at 1 and header is row 1
+        
         try {
           const user_id = Number(row.user_id ?? row.id);
           const first_name = String(row.first_name ?? '').trim();
@@ -461,28 +466,66 @@ export const UserManagement: React.FC<UserManagementProps> = ({ user }) => {
           const contact_number = String(row.contact_number ?? '').trim();
           const status = String(row.status ?? 'Active');
 
-          if (!user_id || !first_name || !last_name || !email_address || !contact_number) {
-            console.warn('Skipping invalid row:', row);
+          // Validation
+          if (!user_id) {
+            errors.push(`Row ${rowNumber}: Missing user_id`);
+            errorCount++;
+            continue;
+          }
+          if (!first_name) {
+            errors.push(`Row ${rowNumber}: Missing first_name for user ${user_id}`);
+            errorCount++;
+            continue;
+          }
+          if (!last_name) {
+            errors.push(`Row ${rowNumber}: Missing last_name for user ${user_id}`);
+            errorCount++;
+            continue;
+          }
+          if (!email_address) {
+            errors.push(`Row ${rowNumber}: Missing email_address for user ${user_id}`);
+            errorCount++;
+            continue;
+          }
+          if (!contact_number) {
+            errors.push(`Row ${rowNumber}: Missing contact_number for user ${user_id}`);
             errorCount++;
             continue;
           }
 
+          // Check if account exists
+          const existingAccount = accounts.find(acc => acc.user_id === user_id);
           const defaultPassword = `${last_name}@${user_id}`;
-          
-          // Create account
-          await api.post('/create-account/', {
-            user_id,
-            first_name,
-            last_name,
-            middle_name,
-            email_address,
-            contact_number,
-            status,
-            password: defaultPassword,
-            created_at: new Date().toISOString(),
-          });
 
-          // Parse and add roles (can be multiple, separated by semicolons)
+          if (existingAccount) {
+            // Update existing account - only update fields that are not null/empty in the Excel
+            const updateData: any = {};
+            if (first_name) updateData.first_name = first_name;
+            if (last_name) updateData.last_name = last_name;
+            if (middle_name) updateData.middle_name = middle_name;
+            if (email_address) updateData.email_address = email_address;
+            if (contact_number) updateData.contact_number = contact_number;
+            if (status) updateData.status = status;
+
+            await api.put(`/accounts/${user_id}/`, updateData);
+            updatedCount++;
+          } else {
+            // Create new account
+            await api.post('/create-account/', {
+              user_id,
+              first_name,
+              last_name,
+              middle_name,
+              email_address,
+              contact_number,
+              status,
+              password: defaultPassword,
+              created_at: new Date().toISOString(),
+            });
+            successCount++;
+          }
+
+          // Parse and add/update roles
           const rolesStr = String(row.roles ?? '').trim();
           const collegesStr = String(row.colleges ?? '').trim();
           const departmentsStr = String(row.departments ?? '').trim();
@@ -496,6 +539,12 @@ export const UserManagement: React.FC<UserManagementProps> = ({ user }) => {
             const dateStarts = dateStartsStr.split(';').map(d => excelSerialToDate(d.trim()));
             const dateEndeds = dateEndedsStr.split(';').map(d => excelSerialToDate(d.trim()));
 
+            // Validate role data counts match
+            if (roleIds.length !== collegeIds.length || roleIds.length !== departmentIds.length) {
+              errors.push(`Row ${rowNumber}: Mismatch in role data counts (roles: ${roleIds.length}, colleges: ${collegeIds.length}, departments: ${departmentIds.length})`);
+              continue;
+            }
+
             for (let i = 0; i < roleIds.length; i++) {
               const roleId = roleIds[i];
               const collegeId = collegeIds[i] || null;
@@ -503,41 +552,95 @@ export const UserManagement: React.FC<UserManagementProps> = ({ user }) => {
               const dateStart = dateStarts[i];
               const dateEnded = dateEndeds[i];
 
-              if (!collegeId && !departmentId) {
-                console.warn(`Skipping role ${roleId} - must have college or department`);
+              // Validate role exists
+              const roleExists = roles.find(r => r.role_id === roleId);
+              if (!roleExists) {
+                errors.push(`Row ${rowNumber}: Invalid role ID ${roleId} for user ${user_id}`);
                 continue;
               }
 
-              await api.post("/tbl_user_role/CRUD/", {
-                user: user_id,
-                role: roleId,
-                college: collegeId,
-                department: departmentId,
-                date_start: dateStart,
-                date_ended: dateEnded,
-                status: "Active",
-              });
+              // Validate college or department is provided
+              if (!collegeId && !departmentId) {
+                errors.push(`Row ${rowNumber}: Role ${roleId} for user ${user_id} must have either college or department`);
+                continue;
+              }
+
+              // Validate college exists if provided
+              if (collegeId && !colleges.find(c => c.college_id === collegeId)) {
+                errors.push(`Row ${rowNumber}: Invalid college ID "${collegeId}" for user ${user_id}`);
+                continue;
+              }
+
+              // Validate department exists if provided
+              if (departmentId && !departments.find(d => d.department_id === departmentId)) {
+                errors.push(`Row ${rowNumber}: Invalid department ID "${departmentId}" for user ${user_id}`);
+                continue;
+              }
+
+              // Validate dates
+              if (dateStart && !/^\d{4}-\d{2}-\d{2}$/.test(dateStart)) {
+                errors.push(`Row ${rowNumber}: Invalid date_start format for user ${user_id}, role ${roleId}`);
+                continue;
+              }
+              if (dateEnded && !/^\d{4}-\d{2}-\d{2}$/.test(dateEnded)) {
+                errors.push(`Row ${rowNumber}: Invalid date_ended format for user ${user_id}, role ${roleId}`);
+                continue;
+              }
+
+              try {
+                await api.post("/tbl_user_role/CRUD/", {
+                  user: user_id,
+                  role: roleId,
+                  college: collegeId,
+                  department: departmentId,
+                  date_start: dateStart,
+                  date_ended: dateEnded,
+                  status: "Active",
+                });
+              } catch (roleErr: any) {
+                const errorMsg = roleErr.response?.data?.detail || roleErr.response?.data?.error || roleErr.message || 'Unknown error';
+                errors.push(`Row ${rowNumber}: Failed to add role ${roleId} for user ${user_id} - ${errorMsg}`);
+              }
             }
           }
-
-          successCount++;
         } catch (err: any) {
-          console.error('Error importing row:', err.response?.data || err.message);
+          const errorMsg = err.response?.data?.detail || err.response?.data?.error || err.message || 'Unknown error';
+          errors.push(`Row ${rowNumber}: ${errorMsg}`);
           errorCount++;
         }
       }
 
-      toast.dismiss('import-progress'); // Dismiss loading toast
+      toast.dismiss('import-progress');
 
-      if (successCount > 0) {
-        toast.success(`Successfully imported ${successCount} account(s)`);
+      // Show results
+      const messages: string[] = [];
+      if (successCount > 0) messages.push(`${successCount} new account(s) created`);
+      if (updatedCount > 0) messages.push(`${updatedCount} account(s) updated`);
+      if (errorCount > 0) messages.push(`${errorCount} account(s) failed`);
+
+      if (messages.length > 0) {
+        toast.success(messages.join(', '));
       }
-      if (errorCount > 0) {
-        toast.warning(`Failed to import ${errorCount} account(s)`);
+
+      // Show detailed errors
+      if (errors.length > 0) {
+        console.error('Import errors:', errors);
+        toast.error(
+          <div style={{ maxHeight: '300px', overflowY: 'auto' }}>
+            <strong>Import errors:</strong>
+            <ul style={{ margin: '10px 0', paddingLeft: '20px', fontSize: '12px' }}>
+              {errors.slice(0, 10).map((error, idx) => (
+                <li key={idx}>{error}</li>
+              ))}
+              {errors.length > 10 && <li>... and {errors.length - 10} more errors (check console)</li>}
+            </ul>
+          </div>,
+          { autoClose: 10000 }
+        );
       }
       
       await fetchData();
-      setImportLoading(false); // End loading
+      setImportLoading(false);
       setShowImportAccountsModal(false);
     };
 
@@ -776,7 +879,7 @@ export const UserManagement: React.FC<UserManagementProps> = ({ user }) => {
             }]);
           }}
         >
-          Add New Account
+          <FaPlus/>
         </button>
 
         <button
@@ -784,21 +887,13 @@ export const UserManagement: React.FC<UserManagementProps> = ({ user }) => {
           className="action-button import"
           onClick={() => setShowImportAccountsModal(true)}
         >
-          Import Accounts
-        </button>
-
-        <button
-          type="button"
-          className="action-button import"
-          onClick={() => setShowImportRolesModal(true)}
-        >
-          Import Roles
+          <FaFileImport/>
         </button>
 
         <button
         type="button"
-        className="action-button delete-multiple"
-        style={{ backgroundColor: multiSelectMode ? '#d9534f' : '#f0ad4e', color: 'white' }}
+        className="action-button delete"
+        style={{ backgroundColor: multiSelectMode ? '#d9534f' : '#f0ad4e', color: 'white', justifyContent: 'center', alignContent: 'center', fontSize: 'small', display: 'flex', borderRadius: '50px' }}
         onClick={() => {
             if (multiSelectMode && selectedAccounts.length > 0) {
               // Delete selected accounts
@@ -833,18 +928,18 @@ export const UserManagement: React.FC<UserManagementProps> = ({ user }) => {
 
         <button
             type="button"
-            className="action-button delete-all"
+            className="action-button delete"
             onClick={handleDeleteAllByCollege}
-            style={{ backgroundColor: '#d9534f', color: 'white' }}
+            style={{ backgroundColor: '#d9534f', color: 'white', justifyContent: 'center', alignContent: 'center', fontSize: 'small', display: 'flex', borderRadius: '50px' }}
         >
             Delete All by College
         </button>
         
-        <div className="input-group" style={{ display: 'inline-block', marginRight: '10px', minWidth: '200px' }}>
+        <div className="input-group">
           <select
             value={selectedCollege}
             onChange={(e) => setSelectedCollege(e.target.value)}
-            style={{ color: 'black', padding: '10px', borderRadius: '5px', border: '1px solid #ccc', backgroundColor: 'white' }}
+            style={{backgroundColor: 'white', color: 'black', justifyContent: 'center', padding: '8px', alignContent: 'center', fontSize: 'small', display: 'flex', borderRadius: '50px' }}
           >
             <option value="">All Colleges</option>
             {colleges.map(college => (
@@ -860,6 +955,7 @@ export const UserManagement: React.FC<UserManagementProps> = ({ user }) => {
         <table className="accounts-table">
           <thead>
             <tr>
+              <th>#</th>
               <th>ID</th>
               <th>Full Name</th>
               <th>Email</th>
@@ -873,7 +969,7 @@ export const UserManagement: React.FC<UserManagementProps> = ({ user }) => {
           <tbody>
             {loading ? (
               <tr>
-                <td colSpan={8} style={{ textAlign: "center", padding: "20px" }}>
+                <td colSpan={9} style={{ textAlign: "center", padding: "20px" }}>
                   Loading users...
                 </td>
               </tr>
@@ -884,7 +980,7 @@ export const UserManagement: React.FC<UserManagementProps> = ({ user }) => {
                 </td>
               </tr>
             ) : (
-                filteredAccounts.map(account => {
+                filteredAccounts.map((account, index) => {
                     const accountRoles = getUserRoles(account.user_id);
                     const isSelected = selectedAccounts.includes(account.user_id);
 
@@ -904,6 +1000,7 @@ export const UserManagement: React.FC<UserManagementProps> = ({ user }) => {
                         );
                         }}
                     >
+                        <td>{index + 1}</td>
                         <td>{account.user_id}</td>
                         <td>{account.last_name}, {account.first_name} {account.middle_name ?? ''}</td>
                         <td>{account.email_address}</td>
