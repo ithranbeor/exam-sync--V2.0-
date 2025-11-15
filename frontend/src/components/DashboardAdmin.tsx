@@ -42,7 +42,7 @@ const adminSidebarItems = [
   { key: 'buildings', label: 'Buildings', icon: <PiBuildingsFill {...iconStyle} /> },
   { key: 'rooms', label: 'Rooms', icon: <BiSolidBuildings {...iconStyle} /> },
   { key: 'exam-period', label: 'Exam Period', icon: <IoCalendarSharp {...iconStyle} /> },
-  { key: 'UserManagement', label: 'User Management', icon: <FaUsers {...iconStyle} /> },
+  { key: 'User Management', label: 'User Management', icon: <FaUsers {...iconStyle} /> },
   { key: 'profile', label: 'Profile', icon: <FaUser {...iconStyle} /> },
 ];
 
@@ -110,7 +110,7 @@ const DashboardAdmin: React.FC = () => {
       case 'buildings': return <Buildings />;
       case 'rooms': return <Rooms />;
       case 'exam-period': return <ExamPeriod />;
-      case 'UserManagement': return <UserManagement user={user} />
+      case 'User Management': return <UserManagement user={user} />
       case 'profile': return <Profile user={user} />;
       case 'dashboard':
       default:
