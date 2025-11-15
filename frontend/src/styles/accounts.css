@@ -433,3 +433,255 @@ input {
   background-color: #fbdede;
   color: #c62828;
 }
+/* Modal overlay */
+.modal-overlay {
+  position: fixed;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  background: rgba(0,0,0,0.5);
+  z-index: 998;
+  overflow-y: auto;
+  padding: 40px 20px;
+  display: flex;
+  justify-content: center;
+  align-items: flex-start;
+}
+
+/* Fixed modal container */
+.user-details-modal.fixed-modal {
+  position: relative;
+  top: 0;
+  transform: none;
+  max-height: 90vh;
+  overflow-y: auto;
+  width: 1200px;
+  background-color: #fff;
+  border-radius: 12px;
+  padding: 25px 35px;
+  box-shadow: 0 10px 30px rgba(0,0,0,0.2);
+  z-index: 999;
+  display: flex;
+  flex-direction: column;
+}
+
+/* Modal title */
+.modal-title {
+  font-size: 1.8em;
+  font-weight: 600;
+  color: #110365;
+  margin-bottom: 20px;
+}
+
+/* Account summary card */
+.account-summary-card.horizontal-layout {
+  display: flex;
+  justify-content: space-between;
+  gap: 30px;
+  background: #eef3f9;
+  border-radius: 10px;
+  border-left: 5px solid #110365;
+  padding: 20px 25px;
+  margin-bottom: 20px;
+}
+
+.account-column{
+  color: #110365;
+  font-weight: 300;
+}
+
+.account-summary-card.horizontal-layout .account-column {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
+}
+
+/* Labels */
+.account-label {
+  color: #333d52;
+  font-weight: 100;
+ font-size: 15px;
+}
+
+/* Account status */
+.account-status {
+  font-weight: bold;
+  padding: 2px 6px;
+  border-radius: 8px;
+  font-size: 0.95em;
+}
+
+.account-status.active {
+  color: #155724;
+  background-color: #d4edda;
+}
+
+.account-status.suspended {
+  color: #721c24;
+  background-color: #f8d7da;
+}
+
+/* Account action buttons */
+.account-actions {
+  display: flex;
+  gap: 10px;
+  margin-top: 15px;
+}
+
+.icon-button {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  padding: 6px 12px;
+  font-size: 0.9em;
+  border-radius: 6px;
+  border: none;
+  cursor: pointer;
+  transition: 0.2s all;
+}
+
+.icon-button.edit-button {
+  background-color: #b5c5f0;
+  color: #110365;
+}
+
+.icon-button.edit-button:hover {
+  background-color: #dce2f4;
+}
+
+.icon-button.delete-button {
+  background-color: #fde2e2;
+  color: #721c24;
+}
+
+.icon-button.delete-button:hover {
+  background-color: #f8caca;
+}
+
+.icon-button.reactivate-button {
+  background-color: #fff3cd;
+  color: #856404;
+}
+
+.icon-button.reactivate-button:hover {
+  background-color: #ffeeba;
+}
+
+/* Roles table */
+.accounts-table.user-roles-table {
+  width: 100%;
+  border-collapse: collapse;
+  margin-top: 15px;
+}
+
+.accounts-table th, .accounts-table td {
+  border: 1px solid transparent;
+  padding: 10px 12px;
+  text-align: left;
+}
+
+.accounts-table th {
+  background-color: #333d52;
+  color: white;
+  font-weight: 600;
+}
+
+.role-status {
+  font-weight: bold;
+  padding: 2px 5px;
+  border-radius: 8px;
+  font-size: 0.9em;
+}
+
+.role-status.active {
+  color: #155724;
+  background-color: #d4edda;
+}
+
+.role-status.suspended {
+  color: #721c24;
+  background-color: #f8d7da;
+}
+
+/* Role action buttons */
+.role-actions {
+  display: flex;
+  gap: 5px;
+}
+
+/* Role start/end dates */
+.role-date.start {
+  color: green;
+  font-weight: bold;
+}
+
+.role-date.end {
+  color: red;
+  font-weight: bold;
+}
+
+/* Modal subtitles */
+.modal-subtitle {
+  font-size: 1.3em;
+  font-weight: 600;
+  margin-top: 20px;
+  margin-bottom: 10px;
+  color: #110365;
+}
+
+/* Modal footer */
+.modal-footer {
+  display: flex;
+  justify-content: flex-end;
+  gap: 12px;
+  margin-top: 25px;
+}
+
+/* Footer buttons */
+.modal-button {
+  padding: 8px 18px;
+  font-size: 0.95em;
+  font-weight: 600;
+  border-radius: 8px;
+  border: none;
+  cursor: pointer;
+  transition: 0.2s all;
+}
+
+.modal-button.cancel {
+  background-color: #f0f4ff;
+  color: #110365;
+}
+
+.modal-button.cancel:hover {
+  background-color: #dce2f4;
+}
+
+.modal-button.save {
+  background-color: #110365;
+  color: #fff;
+}
+
+.modal-button.save:hover {
+  background-color: #0d034f;
+}
+
+/* Responsive for smaller screens */
+@media (max-width: 1400px) {
+  .user-details-modal.fixed-modal {
+    width: 95%;
+    padding: 20px;
+  }
+  .account-summary-card.horizontal-layout {
+    flex-direction: column;
+  }
+  .account-actions {
+    justify-content: flex-start;
+  }
+}
+@keyframes spin {
+  0% { transform: rotate(0deg); }
+  100% { transform: rotate(360deg); }
+}

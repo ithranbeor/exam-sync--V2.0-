@@ -4,7 +4,7 @@ import { useNavigate } from 'react-router-dom';
 import { api } from '../lib/apiClient.ts';
 import { 
   FaHome, FaUsers, FaBuilding, FaBook, FaCalendarAlt, 
-  FaUserCog, FaUser, FaSignOutAlt 
+  FaUser, FaSignOutAlt 
 } from 'react-icons/fa';
 import { PiBuildingApartmentFill, PiBuildingsFill  } from "react-icons/pi";
 import { FaBookAtlas, FaBookJournalWhills } from "react-icons/fa6";
@@ -22,8 +22,7 @@ import Terms from '../components/Terms.tsx';
 import Buildings from '../components/Buildings.tsx';
 import Rooms from '../components/Rooms.tsx';
 import ExamPeriod from '../components/ExamPeriod.tsx';
-import Accounts from '../components/Accounts.tsx';
-import Roles from './UserRoles.tsx';
+import UserManagement from '../components/UserManagement.tsx';
 import Profile from '../components/Profile.tsx';
 import ProctorExamDate from "./ProctorExamDate.tsx";
 import ProctorViewExam from "./ProctorViewExam.tsx";
@@ -43,8 +42,7 @@ const adminSidebarItems = [
   { key: 'buildings', label: 'Buildings', icon: <PiBuildingsFill {...iconStyle} /> },
   { key: 'rooms', label: 'Rooms', icon: <BiSolidBuildings {...iconStyle} /> },
   { key: 'exam-period', label: 'Exam Period', icon: <IoCalendarSharp {...iconStyle} /> },
-  { key: 'accounts', label: 'Accounts', icon: <FaUsers {...iconStyle} /> },
-  { key: 'role', label: 'Roles & Permissions', icon: <FaUserCog {...iconStyle} /> },
+  { key: 'UserManagement', label: 'User Management', icon: <FaUsers {...iconStyle} /> },
   { key: 'profile', label: 'Profile', icon: <FaUser {...iconStyle} /> },
 ];
 
@@ -69,14 +67,14 @@ const DashboardAdmin: React.FC = () => {
         setUser({
           ...data,
           full_name: `${data.first_name} ${data.middle_name ?? ''} ${data.last_name}`.trim(),
-          avatar_url: data.avatar_url || '../../../backend/static/Images/default-pp.jpg',
+          avatar_url: data.avatar_url || '../../static/Images/default-pp.jpg',
         });
       } catch (err) {
         console.error(err);
         setUser({
           ...stored,
           full_name: `${stored.first_name} ${stored.middle_name ?? ''} ${stored.last_name}`.trim(),
-          avatar_url: stored.avatar_url || '../../../backend/static/Images/default-pp.jpg',
+          avatar_url: stored.avatar_url || '../../static/Images/default-pp.jpg',
         });
       }
     };
@@ -99,7 +97,7 @@ const DashboardAdmin: React.FC = () => {
   const [hour, minute, ampm] = formattedTime.split(/:| /);
   const dateStr = currentDateTime.toLocaleDateString('en-US', { weekday: 'long', month: 'long', day: 'numeric' });
 
-  if (!user) return <div>Loading Admin Dashboard...</div>;
+  if (!user) return <div style={{ color: "black" }}>Please Wait...</div>;
 
   const renderContent = () => {
     switch (activeMenu) {
@@ -112,8 +110,7 @@ const DashboardAdmin: React.FC = () => {
       case 'buildings': return <Buildings />;
       case 'rooms': return <Rooms />;
       case 'exam-period': return <ExamPeriod />;
-      case 'accounts': return <Accounts user={user} />;
-      case 'role': return <Roles />;
+      case 'UserManagement': return <UserManagement user={user} />
       case 'profile': return <Profile user={user} />;
       case 'dashboard':
       default:
@@ -162,7 +159,7 @@ const DashboardAdmin: React.FC = () => {
           onMouseLeave={() => setIsSidebarOpen(false)}
         >
           <div className="sidebar-header">
-            <img src="../../../backend/static/logo/Exam.png" alt="Logo" className="logo-img" />
+            <img src="../../static/logo/Exam.png" alt="Logo" className="logo-img" />
             {isSidebarOpen && <span className="logo-text">ExamSync</span>}
           </div>
           <nav className="sidebar-nav">

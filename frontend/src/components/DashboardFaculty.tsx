@@ -1,9 +1,10 @@
-import React, { JSX, useEffect, useState } from 'react';
+import { useEffect, useState } from 'react';
+import type { JSX } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { api } from '../lib/apiClient.ts';
 import {
   FaHome, FaCalendar, FaClock, FaClipboardList, FaBell, FaUser,
-  FaSignOutAlt, FaBuilding, FaPenAlt, FaCalendarPlus, FaUsers, FaInbox
+  FaSignOutAlt, FaBuilding, FaPenAlt, FaCalendarPlus, FaUsers
 } from 'react-icons/fa';
 import { BsFillSendPlusFill } from "react-icons/bs";
 import '../styles/dashboardFaculty.css';
@@ -78,7 +79,7 @@ const DashboardFaculty = () => {
         setUser({
           ...data,
           full_name: `${data.first_name} ${data.middle_name ?? ''} ${data.last_name}`.trim(),
-          avatar_url: data.avatar_url || '../../../backend/static/Images/default-pp.jpg',
+          avatar_url: data.avatar_url || '../../static/Images/default-pp.jpg',
         });
       } catch (err) {
         console.error('Error loading user info:', err);
@@ -86,7 +87,7 @@ const DashboardFaculty = () => {
         setUser({
           ...stored,
           full_name: `${stored.first_name} ${stored.middle_name ?? ''} ${stored.last_name}`.trim(),
-          avatar_url: stored.avatar_url || '../../../backend/static/Images/default-pp.jpg',
+          avatar_url: stored.avatar_url || '../../static/Images/default-pp.jpg',
         });
       }
     };
@@ -180,7 +181,7 @@ const DashboardFaculty = () => {
           >
             <div className="sidebar-header">
               <div className="sidebar-logo">
-                <img src="../../../backend/static/logo/Exam.png" alt="Logo" className="logo-img" />
+                <img src="../../static/logo/Exam.png" alt="Logo" className="logo-img" />
                 {isSidebarOpen && <span className="logo-text">ExamSync</span>}
               </div>
             </div>

@@ -47,6 +47,7 @@ const Courses: React.FC = () => {
   const [editMode, setEditMode] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [loading, setLoading] = useState(true);
+  const [isImporting, setIsImporting] = useState(false);
 
   // ✅ Optimized useEffect for faster load
   useEffect(() => {
@@ -180,6 +181,7 @@ const Courses: React.FC = () => {
 
     const reader = new FileReader();
     reader.onload = async (evt) => {
+      setIsImporting(true);
       const bstr = evt.target?.result;
       const wb = XLSX.read(bstr, { type: "binary" });
       const wsname = wb.SheetNames[0];
@@ -226,8 +228,9 @@ const Courses: React.FC = () => {
       }
 
       toast.success(`Import complete: ${successCount} courses added`);
-      fetchCourses();
+      await fetchCourses();
       setShowImport(false);
+      setIsImporting(false);
     };
     reader.readAsBinaryString(file);
   };
@@ -235,18 +238,8 @@ const Courses: React.FC = () => {
   // Download Excel template (unchanged)
   const downloadTemplate = useCallback(() => {
     const ws = XLSX.utils.aoa_to_sheet([
-      [
-        "Course ID",
-        "Course Name",
-        "Term Name (Academic Year)",
-        "Instructor Full Names",
-      ],
-      [
-        "IT112",
-        "Computer Programming 1",
-        "1st Semester (2024-2025)",
-        "Juan Dela Cruz, Maria Santos",
-      ],
+      ["Course ID", "Course Name", "Term Name (Academic Year)", "Instructor Full Names"],
+      ["IT112", "Computer Programming 1", "1st Semester (2024-2025)", "Juan Dela Cruz, Maria Santos"],
     ]);
     const wb = XLSX.utils.book_new();
     XLSX.utils.book_append_sheet(wb, ws, "Template");
@@ -295,14 +288,6 @@ const Courses: React.FC = () => {
           onClick={() => setShowImport(true)}
         >
           Import Courses
-        </button>
-
-        <button
-          type="button"
-          className="action-button download"
-          onClick={downloadTemplate}
-        >
-          <FaDownload /> Download Template
         </button>
       </div>
 
@@ -480,11 +465,25 @@ const Courses: React.FC = () => {
       {showImport && (
         <div className="modal-overlay">
           <div className="modal">
-            <h3>Import Courses</h3>
-            <input type="file" accept=".xlsx,.xls" onChange={handleImport} />
+            <h3 style={{ textAlign: "center" }}>Import Courses</h3>
+            <p style={{ fontSize: '12px', color: '#666', marginBottom: '10px' }}>
+              Each course must belong to an existing term and have at least one instructor.
+            </p>
+
+            <input type="file" accept=".xlsx,.xls" onChange={handleImport} disabled={isImporting} />
+
+            <button
+              type="button"
+              className="modal-button download"
+              onClick={downloadTemplate}
+              disabled={isImporting}
+            >
+              <FaDownload style={{ marginRight: 5 }} /> Download Template
+            </button>
+
             <div className="modal-actions">
-              <button type="button" onClick={() => setShowImport(false)}>
-                Close
+              <button type="button" onClick={() => setShowImport(false)} disabled={isImporting}>
+                {isImporting ? "Importing…" : "Close"}
               </button>
             </div>
           </div>

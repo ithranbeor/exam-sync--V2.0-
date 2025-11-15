@@ -31,36 +31,28 @@ interface Department {
 type UserRole = {
   user_role_id: number;
 
-  // --- User ---
-  user: number;              // Django FK field
-  user_id?: number;          // kept for backward compatibility
-  user_full_name?: string;   // optional name for display
+  user: number;             
+  user_id?: number;          
+  user_full_name?: string;   
 
-  // --- Role ---
   role: number;
   role_id?: number;
   role_name?: string;
 
-  // --- College ---
-  college: string | null;        // Django FK field (college_id)
-  college_id?: string | null;    // backward compatibility
-  college_name?: string | null;  // readable name
+  college: string | null;        
+  college_id?: string | null;    
+  college_name?: string | null; 
 
-  // --- Department ---
-  department: string | null;         // Django FK field (department_id)
-  department_id?: string | null;     // backward compatibility
-  department_name?: string | null;   // readable name
+  department: string | null;         
+  department_id?: string | null;     
+  department_name?: string | null;   
 
-  // --- Dates ---
   created_at: string | null;
   date_start: string | null;
   date_ended: string | null;
 
-  // --- Status ---
   status?: string | null;
 };
-
-
 
 const UserRoles = () => {
   const [roles, setRoles] = useState<Role[]>([]);
@@ -76,6 +68,7 @@ const UserRoles = () => {
   const [showImportModal, setShowImportModal] = useState(false);
   const [newRole, setNewRole] = useState<Partial<UserRole>>({});
   const [editingRole, setEditingRole] = useState<UserRole | null>(null);
+  const [loading, setLoading] = useState(true); // new state
 
   const getAllowedFields = (roleId: number | undefined) => {
     const roleName = roles.find(r => r.role_id === roleId)?.role_name;
@@ -101,6 +94,7 @@ const UserRoles = () => {
   }, []);
 
   const fetchData = async () => {
+    setLoading(true);
     try {
       // Fetch all data in parallel
       const [rolesRes, usersRes, collegesRes, departmentsRes, userRolesRes] = await Promise.all([
@@ -166,6 +160,8 @@ const UserRoles = () => {
     } catch (err) {
       console.error("Fetch data error:", err);
       toast.error("Failed to fetch data");
+    } finally {
+      setLoading(false);
     }
   };
 
@@ -321,9 +317,17 @@ const UserRoles = () => {
             </tr>
           </thead>
           <tbody>
-            {filteredUsers.length === 0 ? (
+            {loading ? (
               <tr>
-                <td colSpan={4}>No users found</td>
+                <td colSpan={4} style={{ textAlign: 'center', padding: '20px' }}>
+                  Loading users with their roles...
+                </td>
+              </tr>
+            ) : filteredUsers.length === 0 ? (
+              <tr>
+                <td colSpan={4} style={{ textAlign: 'center', padding: '20px' }}>
+                  No users with their roles found.
+                </td>
               </tr>
             ) : (
               filteredUsers.map((user) => {

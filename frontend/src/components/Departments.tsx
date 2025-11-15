@@ -30,6 +30,8 @@ const Departments: React.FC = () => {
   const [editMode, setEditMode] = useState(false);
   const [editingDeptId, setEditingDeptId] = useState<string | null>(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [loading, setLoading] = useState(true);
+  const [isImporting, setIsImporting] = useState(false);
 
   useEffect(() => {
     fetchDepartments();
@@ -38,12 +40,15 @@ const Departments: React.FC = () => {
 
   // Fetch all departments
   const fetchDepartments = async () => {
+    setLoading(true);
     try {
       const res = await api.get('/departments/');
       setDepartments(res.data);
     } catch (err) {
       console.error(err);
       toast.error('Failed to fetch departments.');
+    } finally {
+      setLoading(false);
     }
   };
 
@@ -133,6 +138,7 @@ const Departments: React.FC = () => {
 
     const reader = new FileReader();
     reader.onload = async (event: any) => {
+      setIsImporting(true);
       const data = new Uint8Array(event.target.result);
       const workbook = XLSX.read(data, { type: 'array' });
       const sheetName = workbook.SheetNames[0];
@@ -146,7 +152,7 @@ const Departments: React.FC = () => {
         const collegeName = row['College Name']?.toString().trim();
 
         const matchedCollege = colleges.find(
-          c => c.college_name.toLowerCase() === collegeName?.toLowerCase()
+          (c) => c.college_name.toLowerCase() === collegeName?.toLowerCase()
         );
 
         if (!deptId || !deptName || !matchedCollege) {
@@ -169,6 +175,7 @@ const Departments: React.FC = () => {
       toast.success(`Import completed! ${added} department(s) added.`);
       fetchDepartments();
       setShowImport(false);
+      setIsImporting(false);
     };
 
     reader.readAsArrayBuffer(file);
@@ -203,9 +210,6 @@ const Departments: React.FC = () => {
       <div className="colleges-actions">
         <button type="button" className="action-button add-new" onClick={handleAddDepartment}>Add New Department</button>
         <button type="button" className="action-button import" onClick={() => setShowImport(true)}>Import Departments</button>
-        <button type="button" className="action-button download" onClick={downloadTemplate}>
-          <FaDownload style={{ marginRight: 5 }} /> Download Template
-        </button>
       </div>
 
       <div className="colleges-table-container">
@@ -220,8 +224,18 @@ const Departments: React.FC = () => {
             </tr>
           </thead>
           <tbody>
-            {filteredDepartments.length === 0 ? (
-              <tr><td colSpan={5}>No departments found.</td></tr>
+            {loading ? (
+              <tr>
+                <td colSpan={5} style={{ textAlign: 'center', padding: '20px' }}>
+                  Loading departments...
+                </td>
+              </tr>
+            ) : filteredDepartments.length === 0 ? (
+              <tr>
+                <td colSpan={5} style={{ textAlign: 'center', padding: '20px' }}>
+                  No departments found.
+                </td>
+              </tr>
             ) : (
               filteredDepartments.map((dept, index) => (
                 <tr key={dept.department_id}>
@@ -307,10 +321,25 @@ const Departments: React.FC = () => {
         <div className="modal-overlay">
           <div className="modal">
             <h3>Import Departments</h3>
-            <input type="file" accept=".xlsx, .xls" onChange={handleImportFile} />
+            <p style={{ fontSize: '12px', color: '#666', marginBottom: '10px' }}>
+              Each department must belong to an existing college. Use the template below.
+            </p>
+
+            <input type="file" accept=".xlsx, .xls" onChange={handleImportFile} disabled={isImporting} />
+
+            <button
+              type="button"
+              className="modal-button download"
+              onClick={downloadTemplate}
+              disabled={isImporting}
+            >
+              <FaDownload style={{ marginRight: 5 }} /> Download Template
+            </button>
+
             <div className="modal-actions">
-              <button type="button" onClick={() => setShowImport(false)}>Done</button>
-              <button type="button" onClick={() => setShowImport(false)}>Cancel</button>
+              <button type="button" onClick={() => setShowImport(false)} disabled={isImporting}>
+                {isImporting ? 'Importing...' : 'Done'}
+              </button>
             </div>
           </div>
         </div>

@@ -1,6 +1,6 @@
 // deno-lint-ignore-file no-explicit-any
 import React, { useEffect, useState } from 'react';
-import { FaTrash, FaEdit, FaDownload, FaSearch } from 'react-icons/fa';
+import { FaTrash, FaEdit, FaSearch } from 'react-icons/fa';
 import { api } from '../lib/apiClient.ts';
 import * as XLSX from 'xlsx';
 import { ToastContainer, toast } from 'react-toastify';
@@ -43,7 +43,7 @@ const ExamPeriodComponent: React.FC = () => {
   const [filterDept, setFilterDept] = useState('');
   const [filterCollege, setFilterCollege] = useState('');
   const [showFilters, setShowFilters] = useState(false);
-  // NEW: store selected dates for the calendar
+  const [loading, setLoading] = useState(true); // new state
   const [selectedDates, setSelectedDates] = useState<Date[]>([]);
 
   const [newExam, setNewExam] = useState<ExamPeriod>({
@@ -61,6 +61,7 @@ const ExamPeriodComponent: React.FC = () => {
   }, []);
 
   const fetchAll = async () => {
+    setLoading(true);
     try {
       const [examRes, termRes, deptRes, collegeRes] = await Promise.all([
         api.get('/tbl_examperiod'),
@@ -75,6 +76,8 @@ const ExamPeriodComponent: React.FC = () => {
     } catch (err) {
       console.error(err);
       toast.error('Failed to fetch data');
+    } finally {
+      setLoading(false);
     }
   };
 
@@ -229,16 +232,6 @@ const ExamPeriodComponent: React.FC = () => {
     reader.readAsBinaryString(file);
   };
 
-  const downloadTemplate = () => {
-    const ws = XLSX.utils.aoa_to_sheet([
-      ['Start Date', 'End Date', 'Academic Year', 'Exam Category', 'Term Name', 'Department ID', 'College ID'],
-      ['2025-06-01', '2025-06-05', '2025-2026', 'Midterm', '1st Semester', 'DIT', 'CITC']
-    ]);
-    const wb = XLSX.utils.book_new();
-    XLSX.utils.book_append_sheet(wb, ws, 'ExamPeriod Template');
-    XLSX.writeFile(wb, 'examperiod_template.xlsx');
-  };
-
   const filtered = examPeriods.filter(e =>
     (!search || e.academic_year.toLowerCase().includes(search.toLowerCase())) &&
     (!filterYear || e.academic_year === filterYear) &&
@@ -316,10 +309,22 @@ const ExamPeriodComponent: React.FC = () => {
           setSelectedDates([]);
           setShowModal(true);
         }}>Add New Period</button>
-
-        <button type='button' className="action-button import" onClick={() => setShowImport(true)}>Import</button>
-        <button type='button' className="action-button download" onClick={downloadTemplate}>
-          <FaDownload style={{ marginRight: 5 }} />Download Template
+        <button
+          type='button'
+          className="action-button delete-all"
+          onClick={async () => {
+            if (!globalThis.confirm('Are you sure you want to delete all exam periods?')) return;
+            try {
+              await api.delete('/tbl_examperiod');
+              toast.success('All exam periods deleted');
+              fetchAll();
+            } catch (err) {
+              console.error(err);
+              toast.error('Failed to delete all exam periods');
+            }
+          }}
+        >
+          <FaTrash style={{ marginRight: 5 }} /> Delete All
         </button>
       </div>
 
@@ -339,30 +344,43 @@ const ExamPeriodComponent: React.FC = () => {
             </tr>
           </thead>
           <tbody>
-            {filtered.map((e, i) => (
-              <tr key={e.examperiod_id}>
-                <td>{i + 1}</td>
-                <td>{new Date(e.start_date).toLocaleDateString()}</td>
-                <td>{new Date(e.end_date).toLocaleDateString()}</td>
-                <td>{e.academic_year}</td>
-                <td>{e.exam_category}</td>
-                <td>{terms.find(t => t.term_id === e.term_id)?.term_name}</td>
-                <td>{e.department_id}</td>
-                <td>{e.college_id}</td>
-                <td className="action-buttons">
-                  <button type='button' className="icon-button edit-button" onClick={() => {
-                    setEditMode(true);
-                    setNewExam(e);
-                    setSelectedDates([
-                      new Date(e.start_date)
-                    ]);
-                    setShowModal(true);
-                  }}><FaEdit /></button>
-                  <button type='button' className="icon-button delete-button" onClick={() => handleDelete(e.examperiod_id!)}><FaTrash /></button>
+            {loading ? (
+              <tr>
+                <td colSpan={9} style={{ textAlign: 'center', padding: '20px' }}>
+                  Loading exam periods...
                 </td>
               </tr>
-            ))}
-            {filtered.length === 0 && <tr><td colSpan={9}>No exam periods found</td></tr>}
+            ) : filtered.length === 0 ? (
+              <tr>
+                <td colSpan={9} style={{ textAlign: 'center', padding: '20px' }}>
+                  No exam periods found.
+                </td>
+              </tr>
+            ) : (
+              filtered.map((e, i) => (
+                <tr key={e.examperiod_id}>
+                  <td>{i + 1}</td>
+                  <td>{new Date(e.start_date).toLocaleDateString()}</td>
+                  <td>{new Date(e.end_date).toLocaleDateString()}</td>
+                  <td>{e.academic_year}</td>
+                  <td>{e.exam_category}</td>
+                  <td>{terms.find(t => t.term_id === e.term_id)?.term_name}</td>
+                  <td>{e.department_id}</td>
+                  <td>{e.college_id}</td>
+                  <td className="action-buttons">
+                    <button type='button' className="icon-button edit-button" onClick={() => {
+                      setEditMode(true);
+                      setNewExam(e);
+                      setSelectedDates([
+                        new Date(e.start_date)
+                      ]);
+                      setShowModal(true);
+                    }}><FaEdit /></button>
+                    <button type='button' className="icon-button delete-button" onClick={() => handleDelete(e.examperiod_id!)}><FaTrash /></button>
+                  </td>
+                </tr>
+              ))
+            )}
           </tbody>
         </table>
       </div>

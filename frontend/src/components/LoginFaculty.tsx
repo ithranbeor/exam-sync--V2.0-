@@ -118,7 +118,7 @@ const LoginFaculty: React.FC = () => {
             <p className="good-morning">{greeting}</p>
           </div>
           <div className="logo">
-            <img src="../../../backend/static/logo/Exam.png" alt="ExamSync Logo" />
+            <img src="../../static/logo/Exam.png" alt="ExamSync Logo" />
           </div>
         </div>
 
