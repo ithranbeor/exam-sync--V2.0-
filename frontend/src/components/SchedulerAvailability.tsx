@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import '../styles/proctorSetAvailability.css';
-import { FaChevronLeft, FaChevronRight, FaEye, FaTrash, FaPenAlt } from 'react-icons/fa';
+import { FaChevronLeft, FaChevronRight, FaEye, FaTrash, FaPenAlt, FaPlus } from 'react-icons/fa';
 import { api } from '../lib/apiClient.ts';
 import { ToastContainer, toast } from 'react-toastify';
 import Select, { components } from 'react-select';
@@ -13,16 +13,18 @@ type ProctorSetAvailabilityProps = {
   };
 };
 
-enum AvailabilityTimeSlot {
-  Morning = '7 AM - 1 PM (Morning)',
-  Afternoon = '1 PM - 6 PM (Afternoon)',
-  Evening = '6 PM - 9 PM (Evening)',
-}
+export const AvailabilityTimeSlot = {
+  Morning: '7 AM - 1 PM (Morning)',
+  Afternoon: '1 PM - 6 PM (Afternoon)',
+  Evening: '6 PM - 9 PM (Evening)',
+} as const;
+export type AvailabilityTimeSlot = (typeof AvailabilityTimeSlot)[keyof typeof AvailabilityTimeSlot];
 
-enum AvailabilityStatus {
-  Available = 'available',
-  Unavailable = 'unavailable',
-}
+export const AvailabilityStatus = {
+  Available: 'available',
+  Unavailable: 'unavailable',
+} as const;
+export type AvailabilityStatus = (typeof AvailabilityStatus)[keyof typeof AvailabilityStatus];
 
 interface Availability {
   availability_id: number;
@@ -58,7 +60,8 @@ const SchedulerAvailability: React.FC<ProctorSetAvailabilityProps> = ({ user }) 
   const [showRemarksModal, setShowRemarksModal] = useState(false);
   const today = new Date();
 
-  // ✅ Cache for user data to avoid redundant API calls
+  const [loading, setLoading] = useState(false);
+
   const [userCache, setUserCache] = useState<Map<number, any>>(new Map());
 
   const MultiValue = (props: any) => {
@@ -78,7 +81,8 @@ const SchedulerAvailability: React.FC<ProctorSetAvailabilityProps> = ({ user }) 
   // ✅ Combined function to fetch both instructors and availability in one go
   const fetchInstructorsAndAvailability = async () => {
     if (!user?.user_id) return;
-
+    
+    setLoading(true);
     try {
       // Fetch scheduler's college and all proctors in parallel
       const [schedulerRolesRes, proctorRolesRes] = await Promise.all([
@@ -203,13 +207,15 @@ const SchedulerAvailability: React.FC<ProctorSetAvailabilityProps> = ({ user }) 
     } catch (error) {
       console.error('Error fetching data:', error);
       toast.error('An error occurred while fetching data');
+    } finally {
+      setLoading(false); // ✅ stop loading
     }
   };
 
   // ✅ Simplified refresh function
   const fetchAvailability = async () => {
     if (!user?.user_id) return;
-
+    setLoading(true);
     try {
       const { data: schedulerRoles } = await api.get(`/tbl_user_role`, {
         params: { user_id: user.user_id, role_id: 3 }
@@ -271,6 +277,8 @@ const SchedulerAvailability: React.FC<ProctorSetAvailabilityProps> = ({ user }) 
       setEntries(mappedAvailability);
     } catch (error) {
       console.error('Error fetching availability:', error);
+    } finally {
+      setLoading(false); // ✅ stop loading
     }
   };
 
@@ -501,7 +509,7 @@ const SchedulerAvailability: React.FC<ProctorSetAvailabilityProps> = ({ user }) 
 
       <div className="colleges-actions">
         <button type="button" className="action-button add-new" onClick={openAddModal}>
-          Add Proctor Availability
+          <FaPlus />
         </button>
 
         <button
@@ -510,7 +518,7 @@ const SchedulerAvailability: React.FC<ProctorSetAvailabilityProps> = ({ user }) 
           onClick={handleDeleteAll}
           style={{ marginLeft: '10px', backgroundColor: '#e74c3c', color: 'white' }}
         >
-          Delete All
+          <FaTrash />
         </button>
 
         <div className="search-bar" style={{ marginLeft: 'auto' }}>
@@ -525,85 +533,94 @@ const SchedulerAvailability: React.FC<ProctorSetAvailabilityProps> = ({ user }) 
       </div>
 
       <div className="colleges-table-container">
-        <table className="colleges-table">
-          <thead>
-            <tr>
-              <th>#</th>
-              <th>Proctor Name</th>
-              <th>Day</th>
-              <th>Time Slot</th>
-              <th>Status</th>
-              <th>Remarks</th>
-              <th>Actions</th>
-            </tr>
-          </thead>
-          <tbody>
-            {entries
-              .filter((entry) =>
-                (entry.user_fullname || '').toLowerCase().includes(searchTerm.toLowerCase())
-              )
-              .map((entry, idx) => (
-                <tr key={entry.availability_id}>
-                  <td>{idx + 1}</td>
-                  <td>{entry.user_fullname}</td>
-                  <td>{entry.days?.map(d => new Date(d).toLocaleDateString()).join(', ')}</td>
-                  <td>{entry.time_slots?.join(', ')}</td>
-                  <td>
-                    <span
-                      style={{
-                        padding: '4px 8px',
-                        borderRadius: '999px',
-                        color: 'white',
-                        backgroundColor: entry.status === 'available' ? 'green' : 'red',
-                        fontSize: '0.8rem',
-                        textTransform: 'capitalize',
-                      }}
-                    >
-                      {entry.status}
-                    </span>
-                  </td>
-                  <td>
-                    {entry.remarks ? (
-                      <button
-                        type="button"
-                        className="icon-button view-button"
-                        onClick={() => {
-                          setSelectedRemarks(entry.remarks!);
-                          setShowRemarksModal(true);
-                        }}
-                      >
-                        <FaEye />
-                      </button>
-                    ) : (
-                      '—'
-                    )}
-                  </td>
-                  <td>
-                    <button
-                      type="button"
-                      className="icon-button delete-button"
-                      onClick={async () => {
-                        try {
-                          await api.delete(`/tbl_availability/${entry.availability_id}/`);
-                          toast.success('Deleted');
-                          setHasSubmitted(false);
-                          fetchAvailability(); // Async, doesn't block
-                        } catch (error) {
-                          console.error('Delete error:', error);
-                          toast.error('Failed to delete');
-                        }
-                      }}
-                    >
-                      <FaTrash />
-                    </button>
-                    <button type="button" className="icon-button" onClick={() => openEditModal(entry)}>
-                      <FaPenAlt style={{color: "#092C4C"}}/>
-                    </button>
+          <table className="colleges-table">
+            <thead>
+              <tr>
+                <th>#</th>
+                <th>Proctor Name</th>
+                <th>Day</th>
+                <th>Time Slot</th>
+                <th>Status</th>
+                <th>Remarks</th>
+                <th>Actions</th>
+              </tr>
+            </thead>
+            <tbody>
+              {entries.length === 0 && !isSubmitting ? (
+                <tr>
+                  <td colSpan={7} style={{ textAlign: 'center', padding: '20px' }}>
+                    {loading ? 'Loading availability...' : 'No availability found.'}
                   </td>
                 </tr>
-              ))}
-          </tbody>
-        </table>
+              ) : (
+                entries
+                  .filter((entry) =>
+                    (entry.user_fullname || '').toLowerCase().includes(searchTerm.toLowerCase())
+                  )
+                  .map((entry, idx) => (
+                    <tr key={entry.availability_id}>
+                      <td>{idx + 1}</td>
+                      <td>{entry.user_fullname}</td>
+                      <td>{entry.days?.map(d => new Date(d).toLocaleDateString()).join(', ')}</td>
+                      <td>{entry.time_slots?.join(', ')}</td>
+                      <td>
+                        <span
+                          style={{
+                            padding: '4px 8px',
+                            borderRadius: '999px',
+                            color: 'white',
+                            backgroundColor: entry.status === 'available' ? 'green' : 'red',
+                            fontSize: '0.8rem',
+                            textTransform: 'capitalize',
+                          }}
+                        >
+                          {entry.status}
+                        </span>
+                      </td>
+                      <td>
+                        {entry.remarks ? (
+                          <button
+                            type="button"
+                            className="icon-button view-button"
+                            onClick={() => {
+                              setSelectedRemarks(entry.remarks!);
+                              setShowRemarksModal(true);
+                            }}
+                          >
+                            <FaEye />
+                          </button>
+                        ) : (
+                          '—'
+                        )}
+                      </td>
+                      <td>
+                        <button
+                          type="button"
+                          className="icon-button delete-button"
+                          onClick={async () => {
+                            try {
+                              setIsSubmitting(true);
+                              await api.delete(`/tbl_availability/${entry.availability_id}/`);
+                              toast.success('Deleted');
+                              fetchAvailability();
+                            } catch (error) {
+                              toast.error('Failed to delete');
+                            } finally {
+                              setIsSubmitting(false);
+                            }
+                          }}
+                        >
+                          <FaTrash />
+                        </button>
+                        <button type="button" className="icon-button" onClick={() => openEditModal(entry)}>
+                          <FaPenAlt style={{ color: "#092C4C" }} />
+                        </button>
+                      </td>
+                    </tr>
+                  ))
+              )}
+            </tbody>
+          </table>
       </div>
 
       {showModal && (

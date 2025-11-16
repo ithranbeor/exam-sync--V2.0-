@@ -153,7 +153,7 @@ const DashboardFaculty = () => {
     weekday: 'long', month: 'long', day: 'numeric',
   });
 
-  if (!user) return <div>Loading...</div>;
+  if (!user) return <div style={{ color: 'black' }}>Loading...</div>;
 
   return (
     <div className="app-container">

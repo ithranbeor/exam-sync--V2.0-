@@ -226,27 +226,131 @@ const SectionCourses: React.FC = () => {
         const rows: Record<string, string | number>[] = XLSX.utils.sheet_to_json(sheet);
 
         const validRows: SectionCourse[] = [];
-        for (const row of rows) {
+        const errors: string[] = [];
+        
+        for (let idx = 0; idx < rows.length; idx++) {
+          const row = rows[idx];
+          const rowNum = idx + 2; // +2 because Excel is 1-indexed and we have a header row
+          
           const section_name = String(row['Section Name'] || '').trim();
           const number_of_students = parseInt(String(row['Number of Students'] || '0'));
           const year_level = String(row['Year Level'] || '').trim();
-          const is_night_class = String(row['Night Class'] || '').trim().toUpperCase() === "YES" ? "YES" : ""; // Changed from empty to ""
+          const is_night_class = String(row['Night Class'] || '').trim().toUpperCase() === "YES" ? "YES" : "";
           const term_name = String(row['Term Name'] || '').trim();
           const course_id = String(row['Course ID'] || '').trim();
           const program_id = String(row['Program ID'] || '').trim();
-          const instructor_name = String(row['Instructor Name'] || '').trim();
+          const instructor_names_raw = String(row['Instructor Name'] || '').trim();
 
-          if (!section_name || !number_of_students || !year_level || !term_name || !course_id || !program_id || !instructor_name)
+          // Check for missing fields
+          if (!section_name) {
+            errors.push(`Row ${rowNum}: Missing Section Name`);
             continue;
+          }
+          if (!number_of_students) {
+            errors.push(`Row ${rowNum}: Missing or invalid Number of Students`);
+            continue;
+          }
+          if (!year_level) {
+            errors.push(`Row ${rowNum}: Missing Year Level`);
+            continue;
+          }
+          if (!term_name) {
+            errors.push(`Row ${rowNum}: Missing Term Name`);
+            continue;
+          }
+          if (!course_id) {
+            errors.push(`Row ${rowNum}: Missing Course ID`);
+            continue;
+          }
+          if (!program_id) {
+            errors.push(`Row ${rowNum}: Missing Program ID`);
+            continue;
+          }
 
+          // Validate course exists
+          const courseExists = courses.find(c => c.course_id === course_id);
+          if (!courseExists) {
+            errors.push(`Row ${rowNum}: Course ID "${course_id}" not found`);
+            continue;
+          }
+
+          // Validate program exists
+          const programExists = programs.find(p => p.program_id === program_id);
+          if (!programExists) {
+            errors.push(`Row ${rowNum}: Program ID "${program_id}" not found`);
+            continue;
+          }
+
+          // Validate term exists
           const term = terms.find(t => t.term_name === term_name);
-          const user = (courseInstructorsMap[course_id] || []).find(u => u.full_name.toLowerCase() === instructor_name.toLowerCase());
-          if (!term || !user) continue;
+          if (!term) {
+            errors.push(`Row ${rowNum}: Term "${term_name}" not found`);
+            continue;
+          }
 
-          validRows.push({
-            course_id, program_id, section_name, number_of_students, year_level,
-            term_id: term.term_id, user_id: user.user_id, is_night_class
-          } as SectionCourse);
+          // Handle instructor names (can be empty, single, or multiple comma-separated)
+          if (!instructor_names_raw) {
+            // No instructor specified - create section without instructor
+            validRows.push({
+              course_id, program_id, section_name, number_of_students, year_level,
+              term_id: term.term_id, user_id: undefined, is_night_class
+            } as SectionCourse);
+            continue;
+          }
+
+          const availableInstructors = courseInstructorsMap[course_id] || [];
+          
+          // Split instructor names by comma and process each
+          const instructorNames = instructor_names_raw.split(',').map(name => name.trim()).filter(name => name);
+          
+          if (instructorNames.length === 0) {
+            // Empty after trimming - create section without instructor
+            validRows.push({
+              course_id, program_id, section_name, number_of_students, year_level,
+              term_id: term.term_id, user_id: undefined, is_night_class
+            } as SectionCourse);
+            continue;
+          }
+
+          let foundAtLeastOne = false;
+          for (const instructor_name of instructorNames) {
+            const user = availableInstructors.find(u => 
+              u.full_name.toLowerCase() === instructor_name.toLowerCase()
+            );
+            
+            if (!user) {
+              if (availableInstructors.length > 0) {
+                const availableNames = availableInstructors.map(i => i.full_name).join(', ');
+                errors.push(`Row ${rowNum}: Instructor "${instructor_name}" not found for course "${course_id}". Available: ${availableNames}`);
+              } else {
+                errors.push(`Row ${rowNum}: Instructor "${instructor_name}" not found - no instructors assigned to course "${course_id}"`);
+              }
+              continue;
+            }
+
+            foundAtLeastOne = true;
+            validRows.push({
+              course_id, program_id, section_name, number_of_students, year_level,
+              term_id: term.term_id, user_id: user.user_id, is_night_class
+            } as SectionCourse);
+          }
+
+          if (!foundAtLeastOne && instructorNames.length > 0) {
+            errors.push(`Row ${rowNum}: None of the specified instructors were found for course "${course_id}"`);
+          }
+        }
+
+        // Show errors if any
+        if (errors.length > 0) {
+          console.error('Import errors:', errors);
+          toast.error(`${errors.length} issue(s) found. Check console for details.`);
+        }
+
+        if (validRows.length === 0) {
+          toast.warning('No valid rows to import');
+          setShowImport(false);
+          setIsImporting(false);
+          return;
         }
 
         let added = 0;
@@ -259,7 +363,8 @@ const SectionCourses: React.FC = () => {
 
         toast.success(`Import completed: ${added} section(s) added`);
         fetchAll();
-      } catch {
+      } catch (err) {
+        console.error('Import error:', err);
         toast.error('Error reading or importing file');
       } finally {
         setShowImport(false);

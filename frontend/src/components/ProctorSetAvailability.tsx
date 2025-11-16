@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import '../styles/proctorSetAvailability.css';
-import { FaChevronLeft, FaChevronRight } from 'react-icons/fa';
+import { FaChevronLeft, FaChevronRight} from 'react-icons/fa';
 import { api } from '../lib/apiClient.ts';
 import { ToastContainer, toast } from 'react-toastify';
 import 'react-toastify/dist/ReactToastify.css';
@@ -42,8 +42,6 @@ const ProctorSetAvailability: React.FC<ProctorSetAvailabilityProps> = ({ user })
     { days: string[]; time_slots: string[]; status: string; remarks?: string }[]
   >([]);
   const [showModal, setShowModal] = useState(false);
-  const [isEditing, setIsEditing] = useState(false);
-  const [editingId, setEditingId] = useState<number | null>(null);
 
   const [loadingAvailability, setLoadingAvailability] = useState(false);
   const [loadingAllowedDates, setLoadingAllowedDates] = useState(false);
@@ -293,9 +291,37 @@ const ProctorSetAvailability: React.FC<ProctorSetAvailabilityProps> = ({ user })
       return;
     }
 
-    // Use selectedDates and selectedTimeSlots arrays
     if (selectedDates.length === 0 || selectedTimeSlots.length === 0) {
       toast.info('Please select at least one date and one time slot.');
+      setIsSubmitting(false);
+      return;
+    }
+
+    // Check for redundancy and total slots
+    let totalSlots = 0;
+    let isRedundant = false;
+
+    const daySlotMapCopy = { ...dayToTimeSlots }; // existing map of day -> time slots
+
+    for (const day of selectedDates) {
+      const existingSlots = daySlotMapCopy[day] || [];
+      for (const slot of selectedTimeSlots) {
+        if (existingSlots.includes(slot)) {
+          isRedundant = true; // This slot already exists for this day
+        } else {
+          totalSlots++;
+        }
+      }
+    }
+
+    if (isRedundant) {
+      toast.error('Some selected date and time slot combinations already exist.');
+      setIsSubmitting(false);
+      return;
+    }
+
+    if (totalSlots > 6) {
+      toast.error('You can only add a maximum of 6 availability slots.');
       setIsSubmitting(false);
       return;
     }
@@ -309,26 +335,38 @@ const ProctorSetAvailability: React.FC<ProctorSetAvailabilityProps> = ({ user })
     };
 
     try {
-      if (isEditing && editingId) {
-        // UPDATE existing entry
-        const response = await api.put(`/tbl_availability/${editingId}/`, data);
-        if (response.status >= 200 && response.status < 300) {
-          toast.success('Availability updated successfully!');
-          setRemarks('');
-          setIsEditing(false);
-          setEditingId(null);
-        } else {
-          toast.error(`Failed to update availability: ${response.data?.message || 'Unknown error'}`);
-        }
+      const response = await api.post('/tbl_availability/', data);
+      if (response.status >= 200 && response.status < 300) {
+        toast.success('Availability set successfully!');
+
+        const formattedData = {
+          days: data.days,
+          time_slots: data.time_slots,
+          status: data.status,
+          remarks: data.remarks ?? undefined,
+        };
+
+        // Update state
+        setAvailabilityList(prev => [...prev, formattedData]);
+        setDayToTimeSlots(prev => {
+          const updated = { ...prev };
+          selectedDates.forEach(day => {
+            if (!updated[day]) updated[day] = [];
+            selectedTimeSlots.forEach(slot => {
+              if (!updated[day].includes(slot)) updated[day].push(slot);
+            });
+          });
+          return updated;
+        });
+        setAvailableDays(prev => Array.from(new Set([...prev, ...selectedDates])));
+
+        // Clear selections
+        setSelectedDates([]);
+        setSelectedTimeSlots([]);
+        setAvailabilityStatus('available');
+        setRemarks('');
       } else {
-        // CREATE new entry
-        const response = await api.post('/tbl_availability/', data);
-        if (response.status >= 200 && response.status < 300) {
-          toast.success('Availability set successfully!');
-          setRemarks('');
-        } else {
-          toast.error(`Failed to submit availability: ${response.data?.message || 'Unknown error'}`);
-        }
+        toast.error(`Failed to submit availability: ${response.data?.message || 'Unknown error'}`);
       }
     } catch (err: any) {
       console.error('API error:', err);
@@ -406,22 +444,36 @@ const ProctorSetAvailability: React.FC<ProctorSetAvailabilityProps> = ({ user })
                   type="text"
                   id="day"
                   value={
-                    selectedDates.length > 0
+                    loadingAllowedDates
+                      ? 'Loading...'
+                      : selectedDates.length > 0
                       ? selectedDates.map(d => new Date(d).toLocaleDateString('en-US')).join(', ')
                       : 'Click to select dates'
                   }
                   readOnly
-                  onClick={() => (allowedDates.length > 0 && !isSubmitting) && setShowDatePicker(!showDatePicker)}
+                  onClick={() => {
+                    if (!loadingAllowedDates && allowedDates.length > 0 && !isSubmitting) {
+                      setShowDatePicker(!showDatePicker);
+                    }
+                  }}
                   className="date-input-field"
-                  style={{ cursor: isSubmitting ? 'not-allowed' : 'pointer', color: 'black' }}
+                  style={{
+                    cursor: loadingAllowedDates || isSubmitting ? 'not-allowed' : 'pointer',
+                    color: loadingAllowedDates ? '#6c757d' : 'black',
+                  }}
                 />
-                <span className="dropdown-arrow" onClick={() => setShowDatePicker(!showDatePicker)}>&#9660;</span>
+                <span
+                  className="dropdown-arrow"
+                  onClick={() => {
+                    if (!loadingAllowedDates && allowedDates.length > 0 && !isSubmitting) {
+                      setShowDatePicker(!showDatePicker);
+                    }
+                  }}
+                >
+                  &#9660;
+                </span>
 
-                {loadingAllowedDates ? (
-                  <div className="loading-dates">
-                    Loading available dates...
-                  </div>
-                ) : showDatePicker && (
+                {showDatePicker && !loadingAllowedDates && (
                   <div className="date-picker">
                     <div className="date-picker-header">
                       <button type="button" onClick={goToPreviousMonth}><FaChevronLeft /></button>
@@ -529,24 +581,40 @@ const ProctorSetAvailability: React.FC<ProctorSetAvailabilityProps> = ({ user })
           <div className="availability-modal-overlay">
             <div className="availability-modal-box">
               <h2 className="availability-modal-title">All Submitted Availabilities</h2>
+
+              {/* Loading state */}
               {loadingAvailability ? (
-                <p>Loading submitted availabilities...</p>
-              ) : availabilityList.length > 0 ? (
-                <div className="availability-modal-body">
-                  {availabilityList.map((entry, idx) => (
-                    <div key={idx} className="availability-entry">
-                      <p><strong>Days:</strong> {entry.days.join(', ')}</p>
-                      <p><strong>Time Slots:</strong> {entry.time_slots.join(', ')}</p>
-                      <p><strong>Status:</strong> {entry.status}</p>
-                      {entry.remarks && <p><strong>Remarks:</strong> {entry.remarks}</p>}
-                      <hr />
-                    </div>
-                  ))}
+                <div className="modal-loading">
+                  <p>Loading submitted availabilities...</p>
                 </div>
               ) : (
-                <p>No availability info found.</p>
+                <>
+                  {/* If there are availabilities */}
+                  {availabilityList.length > 0 ? (
+                    <div className="availability-modal-body">
+                      {availabilityList.map((entry, idx) => (
+                        <div key={idx} className="availability-entry">
+                          <p><strong>Days:</strong> {entry.days.join(', ')}</p>
+                          <p><strong>Time Slots:</strong> {entry.time_slots.join(', ')}</p>
+                          <p><strong>Status:</strong> {entry.status}</p>
+                          {entry.remarks && <p><strong>Remarks:</strong> {entry.remarks}</p>}
+                          <hr />
+                        </div>
+                      ))}
+                    </div>
+                  ) : (
+                    <div className="modal-empty">
+                      <p style={{color: 'black'}}>No availability info found.</p>
+                    </div>
+                  )}
+                </>
               )}
-              <button type="button" onClick={() => setShowModal(false)} className="availability-modal-close-btn">
+
+              <button
+                type="button"
+                onClick={() => setShowModal(false)}
+                className="availability-modal-close-btn"
+              >
                 Close
               </button>
             </div>

@@ -64,17 +64,9 @@
     width: 480px;
     max-width: 95%;
     box-sizing: border-box;
-    display: flex;
     flex-direction: column;
     transition: transform 0.2s ease, box-shadow 0.2s ease;
 }
-
-
-.availability-card:hover {
-    transform: translateY(-3px);
-    box-shadow: 0 6px 16px rgba(0, 0, 0, 0.12);
-}
-
 
 .card-header-set {
     background-color: #f7b731;
@@ -250,7 +242,7 @@
     border: none;
     font-size: 1.5em;
     cursor: pointer;
-    color: #6c757d;
+    color: #e5ff00;
     padding: 5px 10px;
     transition: color 0.2s ease;
 }
@@ -305,7 +297,7 @@
     background-color: #f7b731;
     color: white;
     font-weight: bold;
-    box-shadow: 0 5px 5px rgba(253, 173, 0, 0.3);
+    border: 2px solid #f7b731;
 }
 
 
@@ -511,7 +503,7 @@
   background-color: #ffdd00; /* light green */
   font-weight: bold;
   color: #ffffff;
-  border-radius: 10%;
+  border-radius: 50px;
 }
 .availability-modal-overlay {
   position: fixed;        /* fixed to viewport */
@@ -528,7 +520,7 @@
 .availability-modal-box {
   background: #fff;
   padding: 2rem;
-  border-radius: 8px;
+  border-radius: 10px;
   max-width: 500px;
   max-height: 500px;       /* limit height to viewport */
   width: 90%;
@@ -549,5 +541,85 @@
 .availability-modal-close-btn:hover {
   background: #0056b3;
 }
+.loading-dates {
+  position: absolute;
+  top: calc(100% + 8px);
+  left: 0;
+  width: 100%;
+  background-color: #ffffff;
+  border: 1px solid #ced4da;
+  border-radius: 8px;
+  box-shadow: 0 6px 16px rgba(0, 0, 0, 0.15);
+  padding: 15px;
+  text-align: center;
+  z-index: 1000;
+  font-weight: bold;
+  color: #343a40;
+}
 
+.availability-modal-body {
+  display: flex;
+  flex-direction: column;
+  gap: 1rem;
+  max-height: 350px;
+  overflow-y: auto;
+  padding-right: 5px;
+}
 
+.availability-entry {
+  background-color: #f7f7f7;
+  padding: 12px 16px;
+  border-radius: 8px;
+  border-left: 5px solid #f7b731;
+  box-shadow: 0 2px 5px rgba(0,0,0,0.05);
+  transition: transform 0.15s ease, box-shadow 0.15s ease;
+}
+
+.availability-entry:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 4px 12px rgba(0,0,0,0.1);
+}
+
+.availability-entry p {
+  margin: 4px 0;
+  font-size: 0.95rem;
+  color: #343a40;
+}
+
+.availability-entry hr {
+  margin-top: 8px;
+  border: 0;
+  border-top: 1px solid #dee2e6;
+}
+
+::-webkit-scrollbar {
+  width: 10px;               /* Width of vertical scrollbar */
+  height: 10px;              /* Height of horizontal scrollbar */
+}
+
+::-webkit-scrollbar-track {
+  background: #f0f0f0;       /* Track color */
+  border-radius: 8px;        /* Rounded corners */
+}
+
+::-webkit-scrollbar-thumb {
+  background: #d7e2ed;       /* Scroll thumb color */
+  border-radius: 8px;        /* Rounded corners */
+  border: 2px solid #f0f0f0; /* Padding around thumb */
+}
+
+::-webkit-scrollbar-thumb:hover {
+  background: gray;       /* Hover effect */
+}
+
+/* Scrollbar for Firefox */
+* {
+  scrollbar-width: thin;         /* "auto" or "thin" */
+  scrollbar-color: gray white; /* thumb color | track color */
+}
+
+/* Optional: apply only to a container */
+.scrollable-container {
+  overflow-y: auto;
+  max-height: 400px; /* adjust as needed */
+}
