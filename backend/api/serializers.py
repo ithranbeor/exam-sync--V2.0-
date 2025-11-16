@@ -21,7 +21,7 @@ class CourseSerializer(serializers.Serializer):
         """
         term = instance.term
         # find all TblCourseUsers entries for this course
-        course_users = TblCourseUsers.objects.filter(course=instance)
+        course_users = instance.tblcourseusers_set.select_related('user').all()
         user_ids = [cu.user.user_id for cu in course_users]
         instructor_names = [f"{cu.user.first_name} {cu.user.last_name}" for cu in course_users]
         leaders = [cu.user.user_id for cu in course_users if cu.is_bayanihan_leader]
@@ -358,6 +358,7 @@ class TblSectioncourseSerializer(serializers.ModelSerializer):
     program_id = serializers.CharField(source='program.program_id', write_only=True)
     term_id = serializers.IntegerField(source='term.term_id', write_only=True)
     user_id = serializers.IntegerField(source='user.user_id', write_only=True, required=False, allow_null=True)
+    is_night_class = serializers.CharField(required=False, allow_blank=True, allow_null=True)
 
     class Meta:
         model = TblSectioncourse
@@ -365,7 +366,8 @@ class TblSectioncourseSerializer(serializers.ModelSerializer):
             'id',
             'course', 'program', 'term', 'user',
             'course_id', 'program_id', 'term_id', 'user_id',
-            'section_name', 'number_of_students', 'year_level'
+            'section_name', 'number_of_students', 'year_level',
+            'is_night_class',  # Add it here
         ]
 
     def create(self, validated_data):
@@ -397,6 +399,9 @@ class TblSectioncourseSerializer(serializers.ModelSerializer):
             instance.term = TblTerm.objects.get(term_id=term_data['term_id'])
         if user_data:
             instance.user = TblUsers.objects.get(user_id=user_data['user_id'])
+
+        if 'is_night_class' in validated_data:
+            instance.is_night_class = validated_data.pop('is_night_class', '')
 
         for attr, value in validated_data.items():
             setattr(instance, attr, value)

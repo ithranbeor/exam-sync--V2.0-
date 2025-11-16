@@ -31,11 +31,13 @@ const Buildings: React.FC = () => {
   const [editMode, setEditMode] = useState(false);
   const [loading, setLoading] = useState(true); // new state
   const [isImporting, setIsImporting] = useState(false);
+  const [isBulkDeleting, setIsBulkDeleting] = useState(false);
   const [newBuilding, setNewBuilding] = useState<Building>({
     building_id: '',
     building_name: '',
   });
   const [selectedBuildingName, setSelectedBuildingName] = useState('');
+  const [selectedBuildingIds, setSelectedBuildingIds] = useState<Set<string>>(new Set());
 
   useEffect(() => {
     if (showModal || showImport) return; // pause refresh while editing/importing
@@ -68,6 +70,36 @@ const Buildings: React.FC = () => {
       if (loading) setLoading(false); // only hide first load
     }
   };
+
+  const toggleSelect = (id: string) => {
+    setSelectedBuildingIds((prev) => {
+      const next = new Set(prev);
+      if (next.has(id)) {
+        next.delete(id);
+      } else {
+        next.add(id);
+      }
+      return next;
+    });
+  };
+
+  const isAllSelected = (() => {
+    if (buildings.length === 0) return false;
+    return buildings.every((b) => selectedBuildingIds.has(b.building_id));
+  })();
+
+  const toggleSelectAll = () => {
+    setSelectedBuildingIds(() => {
+      if (isAllSelected) {
+        return new Set();
+      }
+      const all = new Set<string>();
+      buildings.forEach((b) => all.add(b.building_id));
+      return all;
+    });
+  };
+
+  const clearSelection = () => setSelectedBuildingIds(new Set());
 
   const openRoomModal = (buildingId: string) => {
     const building = buildings.find((b) => b.building_id === buildingId);
@@ -104,17 +136,7 @@ const Buildings: React.FC = () => {
     }
   };
 
-  // ✅ Delete building
-  const handleDelete = async (id: string) => {
-    try {
-      await api.delete(`/tbl_buildings/${id}`);
-      toast.success('Building deleted');
-      fetchBuildings();
-    } catch (err) {
-      console.error(err);
-      toast.error('Failed to delete building');
-    }
-  };
+  // (Single-item delete removed; using bulk selection + delete instead)
 
   // ✅ Import Excel file and insert via Axios
   const handleImportFile = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -171,6 +193,33 @@ const Buildings: React.FC = () => {
     b.building_name.toLowerCase().includes(searchTerm.toLowerCase())
   );
 
+  const handleBulkDelete = async () => {
+    const ids = Array.from(selectedBuildingIds);
+    if (ids.length === 0) {
+      toast.info('No buildings selected');
+      return;
+    }
+    const confirmDelete = window.confirm(`Delete ${ids.length} selected building(s)? This cannot be undone.`);
+    if (!confirmDelete) return;
+    setIsBulkDeleting(true);
+    try {
+      const results = await Promise.allSettled(
+        ids.map((id) => api.delete(`/tbl_buildings/${id}`))
+      );
+      const succeeded = results.filter((r) => r.status === 'fulfilled').length;
+      const failed = results.length - succeeded;
+      if (succeeded > 0) toast.success(`Deleted ${succeeded} building(s)`);
+      if (failed > 0) toast.error(`${failed} building(s) failed to delete`);
+      clearSelection();
+      fetchBuildings();
+    } catch (err) {
+      console.error(err);
+      toast.error('Bulk delete failed');
+    } finally {
+      setIsBulkDeleting(false);
+    }
+  };
+
   return (
     <div className="colleges-container">
       <div className="colleges-header">
@@ -187,24 +236,39 @@ const Buildings: React.FC = () => {
       </div>
 
       <div className="colleges-actions">
-        <button
-          type="button"
-          className="action-button add-new"
-          onClick={() => {
-            setEditMode(false);
-            setNewBuilding({ building_id: '', building_name: '' });
-            setShowModal(true);
-          }}
-        >
-          <FaPlus/>
-        </button>
-        <button
-          type="button"
-          className="action-button import"
-          onClick={() => setShowImport(true)}
-        >
-          <FaFileImport/>
-        </button>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 8, width: '100%' }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+            <button
+              type="button"
+              className="action-button add-new"
+              onClick={() => {
+                setEditMode(false);
+                setNewBuilding({ building_id: '', building_name: '' });
+                setShowModal(true);
+              }}
+            >
+              <FaPlus/>
+            </button>
+            <button
+              type="button"
+              className="action-button import"
+              onClick={() => setShowImport(true)}
+            >
+              <FaFileImport/>
+            </button>
+          </div>
+          <div style={{ marginLeft: 'auto', display: 'flex', alignItems: 'center', gap: 8 }}>
+            <button
+              type="button"
+              className="action-button delete"
+              onClick={handleBulkDelete}
+              disabled={isBulkDeleting || selectedBuildingIds.size === 0}
+              title={selectedBuildingIds.size > 0 ? `Delete ${selectedBuildingIds.size} selected` : 'Delete selected'}
+            >
+              <FaTrash/>
+            </button>
+          </div>
+        </div>
       </div>
 
       <div className="colleges-table-container">
@@ -215,7 +279,20 @@ const Buildings: React.FC = () => {
               <th>Building #</th>
               <th>Building Name</th>
               <th>Room Count</th>
-              <th>Actions</th>
+              <th>
+                <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                  <span>Actions</span>
+                  <input
+                    type="checkbox"
+                    checked={isAllSelected}
+                    onChange={toggleSelectAll}
+                    disabled={loading || buildings.length === 0}
+                    aria-label="Select all"
+                    title="Select all"
+                    style={{ marginLeft: 'auto' }}
+                  />
+                </div>
+              </th>
             </tr>
           </thead>
           <tbody>
@@ -238,7 +315,7 @@ const Buildings: React.FC = () => {
                   <td>{b.building_id}</td>
                   <td>{b.building_name}</td>
                   <td>{roomCounts[b.building_id] || 0}</td>
-                  <td className="action-buttons">
+                  <td className="action-buttons" style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
                     <button
                       type="button"
                       className="icon-button view-button"
@@ -258,13 +335,13 @@ const Buildings: React.FC = () => {
                     >
                       <FaEdit />
                     </button>
-                    <button
-                      type="button"
-                      className="icon-button delete-button"
-                      onClick={() => handleDelete(b.building_id)}
-                    >
-                      <FaTrash />
-                    </button>
+                    <input
+                      type="checkbox"
+                      checked={selectedBuildingIds.has(b.building_id)}
+                      onChange={() => toggleSelect(b.building_id)}
+                      aria-label={`Select ${b.building_name}`}
+                      style={{ marginLeft: 'auto' }}
+                    />
                   </td>
                 </tr>
               ))

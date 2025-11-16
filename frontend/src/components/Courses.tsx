@@ -220,72 +220,121 @@ const Courses: React.FC = () => {
     setShowModal(true);
   };
 
-  // Handle import (unchanged)
+  const clean = (str: string) =>
+    String(str)
+      .replace(/\u00A0/g, " ")      // remove non-breaking spaces
+      .replace(/\t/g, " ")          // remove hidden tabs
+      .trim()
+      .toLowerCase();
+
+
+  // --- IMPORT FUNCTION FIX ---
   const handleImport = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
-    if (!file) return;
+    if (!file) {
+      toast.error("No file selected.");
+      return;
+    }
 
     const reader = new FileReader();
     reader.onload = async (evt) => {
       setIsImporting(true);
-      const bstr = evt.target?.result;
-      const wb = XLSX.read(bstr, { type: "binary" });
-      const wsname = wb.SheetNames[0];
-      const ws = wb.Sheets[wsname];
-      const data = XLSX.utils.sheet_to_json(ws);
 
-      let successCount = 0;
+      try {
+        const bstr = evt.target?.result;
+        const wb = XLSX.read(bstr, { type: "binary" });
+        const ws = wb.Sheets[wb.SheetNames[0]];
+        const data = XLSX.utils.sheet_to_json(ws);
 
-      for (const row of data as any[]) {
-        const course_id = row["Course ID"]?.trim();
-        const course_name = row["Course Name"]?.trim();
-        const term_full = row["Term Name (Academic Year)"]?.trim();
-        const instructors_raw = row["Instructor Full Names"]?.trim();
-
-        if (!course_id || !course_name || !term_full || !instructors_raw) continue;
-
-        const [termName, year] = term_full.split(" (");
-        const academic_year = year?.replace(")", "") || "";
-        const term = terms.find(
-          (t) =>
-            t.term_name === termName &&
-            (t.academic_year?.trim() || "") === academic_year.trim()
-        );
-        if (!term) continue;
-
-        const instructorNames = instructors_raw.split(",").map((n: string) => n.trim());
-        const instructorIds = users
-          .filter((u) => instructorNames.includes(`${u.first_name} ${u.last_name}`))
-          .map((u) => u.user_id);
-
-        if (instructorIds.length === 0) continue;
-
-        try {
-          await api.post("/courses/", {
-            course_id,
-            course_name,
-            term_id: term.term_id,
-            user_ids: instructorIds,
-          });
-          successCount++;
-        } catch {
-          console.warn(`Failed to import course: ${course_id}`);
+        if (!data.length) {
+          toast.error("The Excel file is empty.");
+          setIsImporting(false);
+          return;
         }
-      }
 
-      toast.success(`Import complete: ${successCount} courses added`);
-      await fetchCourses();
-      setShowImport(false);
-      setIsImporting(false);
+        let successCount = 0;
+        let errorCount = 0;
+
+        for (const row of data as any[]) {
+          const course_id = clean(row["Course ID"]);
+          const course_name = row["Course Name"]?.trim();
+          const term_full = clean(row["Term Name"]);
+          const instructors_raw = row["Instructor Full Names"]?.trim();
+
+          if (!course_id || !course_name || !term_full || !instructors_raw) {
+            toast.error(`Row skipped (${row["Course ID"]}): Missing required fields.`);
+            errorCount++;
+            continue;
+          }
+
+          // --- TERM MATCHING EXACTLY LIKE MANUAL ADD (no academic year) ---
+          const term = terms.find(
+            (t) => clean(t.term_name) === term_full
+          );
+
+          if (!term) {
+            toast.error(`Row skipped (${row["Course ID"]}): Term not found.`);
+            errorCount++;
+            continue;
+          }
+
+          // --- INSTRUCTOR MATCHING ---
+          const instructorNames = instructors_raw
+            .split(",")
+            .map((n: string) => clean(n));
+
+          const instructorIds = users
+            .filter((u) =>
+              instructorNames.includes(
+                clean(`${u.first_name} ${u.last_name}`)
+              )
+            )
+            .map((u) => u.user_id);
+
+          if (instructorIds.length === 0) {
+            toast.error(
+              `Row skipped (${row["Course ID"]}): No matching instructors found.`
+            );
+            errorCount++;
+            continue;
+          }
+
+          // --- POST EXACTLY THE SAME STRUCTURE AS MANUAL ADD ---
+          try {
+            await api.post("/courses/", {
+              course_id,
+              course_name,
+              term_id: term.term_id,
+              user_ids: instructorIds,
+              leaders: [],     // import same behavior as manual add
+            });
+
+            successCount++;
+          } catch (err) {
+            errorCount++;
+            toast.error(`API error importing ${row["Course ID"]}.`);
+          }
+        }
+
+        toast.success(`Import complete: ${successCount} added, ${errorCount} errors.`);
+        await fetchCourses();
+        setShowImport(false);
+
+      } catch (error) {
+        toast.error("Error reading file.");
+      } finally {
+        setIsImporting(false);
+      }
     };
+
     reader.readAsBinaryString(file);
   };
 
   // Download Excel template (unchanged)
   const downloadTemplate = useCallback(() => {
     const ws = XLSX.utils.aoa_to_sheet([
-      ["Course ID", "Course Name", "Term Name (Academic Year)", "Instructor Full Names"],
-      ["IT112", "Computer Programming 1", "1st Semester (2024-2025)", "Juan Dela Cruz, Maria Santos"],
+      ["Course ID", "Course Name", "Term Name", "Instructor Full Names"],
+      ["IT112", "Computer Programming 1", "1st Semester", "Juan Dela Cruz, Maria Santos"],
     ]);
     const wb = XLSX.utils.book_new();
     XLSX.utils.book_append_sheet(wb, ws, "Template");

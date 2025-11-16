@@ -88,6 +88,7 @@ export const UserManagement: React.FC<UserManagementProps> = ({ user }) => {
   const [isEditMode, setIsEditMode] = useState(false);
   const [selectedUserId, setSelectedUserId] = useState<number | null>(null);
   const [editingRole, setEditingRole] = useState<UserRole | null>(null);
+  const [isDeletingAll, setIsDeletingAll] = useState(false);
 
   const [multiSelectMode, setMultiSelectMode] = useState(false);
   const [selectedAccounts, setSelectedAccounts] = useState<number[]>([]);
@@ -311,6 +312,7 @@ export const UserManagement: React.FC<UserManagementProps> = ({ user }) => {
     if (!confirm(`Are you sure you want to delete all accounts for this college? This action cannot be undone.`)) return;
 
     try {
+        setIsDeletingAll(true);
         // Filter userRoles for the selected college
         const accountsToDelete = userRoles
         .filter(r => r.college_id === selectedCollege)
@@ -333,6 +335,8 @@ export const UserManagement: React.FC<UserManagementProps> = ({ user }) => {
     } catch (err: any) {
         console.error(err);
         toast.error('Error deleting accounts by college.');
+    } finally {
+      setIsDeletingAll(false);
     }
   };
 
@@ -587,6 +591,32 @@ export const UserManagement: React.FC<UserManagementProps> = ({ user }) => {
                 continue;
               }
 
+              // Check if this exact role combination already exists for this user
+              const existingRole = userRoles.find(ur => 
+                ur.user === user_id && 
+                ur.role === roleId && 
+                ur.college === collegeId && 
+                ur.department === departmentId
+              );
+
+              if (existingRole) {
+                // Role already exists - update dates if provided
+                if (dateStart || dateEnded) {
+                  try {
+                    await api.put(`/tbl_user_role/${existingRole.user_role_id}/`, {
+                      date_start: dateStart || existingRole.date_start,
+                      date_ended: dateEnded || existingRole.date_ended,
+                    });
+                  } catch (updateErr: any) {
+                    const errorMsg = updateErr.response?.data?.detail || updateErr.response?.data?.error || updateErr.message || 'Unknown error';
+                    errors.push(`Row ${rowNumber}: Failed to update role ${roleId} for user ${user_id} - ${errorMsg}`);
+                  }
+                }
+                // Skip creating duplicate
+                continue;
+              }
+
+              // Create new role
               try {
                 await api.post("/tbl_user_role/CRUD/", {
                   user: user_id,
@@ -632,7 +662,6 @@ export const UserManagement: React.FC<UserManagementProps> = ({ user }) => {
               {errors.slice(0, 10).map((error, idx) => (
                 <li key={idx}>{error}</li>
               ))}
-              {errors.length > 10 && <li>... and {errors.length - 10} more errors (check console)</li>}
             </ul>
           </div>,
           { autoClose: 10000 }
@@ -674,18 +703,40 @@ export const UserManagement: React.FC<UserManagementProps> = ({ user }) => {
           continue;
         }
 
-        try {
+       try {
+        const convertedDateStart = excelSerialToDate(date_start);
+        const convertedDateEnded = excelSerialToDate(date_ended);
+
+        // Check if this exact role combination already exists
+        const existingRole = userRoles.find(ur => 
+          ur.user === user && 
+          ur.role === role && 
+          ur.college === (college || null) && 
+          ur.department === (department || null)
+        );
+
+        if (existingRole) {
+          // Update existing role dates if provided
+          if (convertedDateStart || convertedDateEnded) {
+            await api.put(`/tbl_user_role/${existingRole.user_role_id}/`, {
+              date_start: convertedDateStart || existingRole.date_start,
+              date_ended: convertedDateEnded || existingRole.date_ended,
+            });
+          }
+        } else {
+          // Create new role
           await api.post("/tbl_user_role/CRUD/", {
             user,
             role,
             college: college || null,
             department: department || null,
-            date_start: date_start || null,
-            date_ended: date_ended || null,
+            date_start: convertedDateStart || null,
+            date_ended: convertedDateEnded || null,
             status: "Active",
           });
-          successCount++;
-        } catch (err) {
+        }
+        successCount++;
+      } catch (err) {
           console.error(err);
           errorCount++;
         }
@@ -927,12 +978,23 @@ export const UserManagement: React.FC<UserManagementProps> = ({ user }) => {
         </button>
 
         <button
-            type="button"
-            className="action-button delete"
-            onClick={handleDeleteAllByCollege}
-            style={{ backgroundColor: '#d9534f', color: 'white', justifyContent: 'center', alignContent: 'center', fontSize: 'small', display: 'flex', borderRadius: '50px' }}
+          type="button"
+          className="action-button delete"
+          onClick={handleDeleteAllByCollege}
+          disabled={isDeletingAll}
+          style={{
+            backgroundColor: '#d9534f',
+            color: 'white',
+            justifyContent: 'center',
+            alignContent: 'center',
+            fontSize: 'small',
+            display: 'flex',
+            borderRadius: '50px',
+            opacity: isDeletingAll ? 0.7 : 1,
+            cursor: isDeletingAll ? "not-allowed" : "pointer",
+          }}
         >
-            Delete All by College
+          {isDeletingAll ? "Deleting…" : "Delete All by College"}
         </button>
         
         <div className="input-group">
@@ -975,7 +1037,7 @@ export const UserManagement: React.FC<UserManagementProps> = ({ user }) => {
               </tr>
             ) : filteredAccounts.length === 0 ? (
               <tr>
-                <td colSpan={8} style={{ textAlign: "center", padding: "20px" }}>
+                <td colSpan={9} style={{ textAlign: "center", padding: "20px" }}>
                   No users found.
                 </td>
               </tr>

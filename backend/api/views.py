@@ -6,6 +6,8 @@ from rest_framework.permissions import AllowAny
 from rest_framework.response import Response
 from rest_framework.authtoken.models import Token
 from rest_framework import status
+from django.views.decorators.cache import cache_page
+from django.db.models import Q
 from .models import TblUsers, TblScheduleapproval, TblAvailableRooms, TblNotification, TblUserRole, TblExamdetails, TblModality, TblAvailability, TblCourseUsers, TblSectioncourse, TblUserRoleHistory, TblRoles, TblBuildings, TblRooms, TblCourse, TblExamperiod, TblProgram, TblTerm, TblCollege, TblDepartment
 from .serializers import (
     UserSerializer,
@@ -125,7 +127,10 @@ def notification_list(request, user_id):
     """
     Get all notifications for a user, ordered by priority and created_at
     """
-    notifications = TblNotification.objects.filter(user_id=user_id).order_by('-priority', '-created_at')
+    notifications = TblNotification.objects.select_related(
+        'user',
+        'sender'
+    ).filter(user_id=user_id).order_by('-priority', '-created_at')
     serializer = TblNotificationSerializer(notifications, many=True)
     return Response(serializer.data)
 
@@ -244,12 +249,8 @@ def send_schedule_to_dean(request):
 @api_view(['GET', 'POST'])
 @permission_classes([AllowAny])
 def tbl_scheduleapproval_list(request):
-    """
-    GET → List all schedule approvals  
-    POST → Create a new schedule approval (if allowed)
-    """
     if request.method == 'GET':
-        approvals = TblScheduleapproval.objects.all().order_by('-created_at')
+        approvals = TblScheduleapproval.objects.select_related('submitted_by').all().order_by('-created_at')
         serializer = TblScheduleapprovalSerializer(approvals, many=True)
         return Response(serializer.data)
 
@@ -292,7 +293,15 @@ def tbl_scheduleapproval_detail(request, pk):
 @permission_classes([AllowAny])
 def tbl_examdetails_list(request):
     if request.method == 'GET':
-        queryset = TblExamdetails.objects.all()
+        queryset = TblExamdetails.objects.select_related(
+            'room',
+            'room__building',
+            'modality',
+            'modality__course',
+            'modality__user',
+            'proctor',
+            'examperiod'
+        ).all()
 
         # Optional filtering (e.g., ?room_id=R101&date=2025-10-23)
         room_id = request.GET.get('room_id')
@@ -343,7 +352,13 @@ def tbl_examdetails_detail(request, pk):
 @permission_classes([AllowAny])
 def tbl_modality_list(request):
     if request.method == 'GET':
-        queryset = TblModality.objects.all()
+        queryset = TblModality.objects.select_related(
+            'course',
+            'course__term',
+            'room',
+            'room__building',
+            'user'
+        ).all()
 
         # Optional filtering by query params
         course_id = request.GET.get('course_id')
@@ -404,6 +419,7 @@ def tbl_availability_list(request):
         college_id = request.GET.get('college_id')
         status_param = request.GET.get('status')
         days = request.GET.getlist('days[]') or request.GET.getlist('days')
+        availabilities = TblAvailability.objects.select_related('user').all()
 
         availabilities = TblAvailability.objects.all()
 
@@ -518,9 +534,17 @@ def tbl_course_users_detail(request, course_id, user_id):
 @permission_classes([AllowAny])
 def tbl_sectioncourse_list(request):
     if request.method == 'GET':
-        sections = TblSectioncourse.objects.all()
-        serializer = TblSectioncourseSerializer(sections, many=True)
-        return Response(serializer.data)
+        qs = TblSectioncourse.objects.select_related(
+            'course',
+            'course__term',
+            'program',
+            'program__department',
+            'term',
+            'user'
+        ).all()
+
+        serializer = TblSectioncourseSerializer(qs, many=True)
+        return Response(serializer.data)  # ✅ Simple array, paginate on frontend
 
     elif request.method == 'POST':
         serializer = TblSectioncourseSerializer(data=request.data)
@@ -551,7 +575,8 @@ def tbl_sectioncourse_detail(request, pk):
     elif request.method == 'DELETE':
         section.delete()
         return Response(status=status.HTTP_204_NO_CONTENT)
-    
+
+@cache_page(60 * 5)    
 @api_view(['GET', 'POST'])
 @permission_classes([AllowAny])
 def tbl_roles_list(request):
@@ -672,7 +697,8 @@ def accounts_detail(request, pk):
     elif request.method == 'DELETE':
         user.delete()
         return Response({'message': 'Deleted successfully'}, status=status.HTTP_204_NO_CONTENT)
-    
+
+@cache_page(60 * 5)    
 @api_view(['GET', 'POST'])
 @permission_classes([AllowAny])
 def tbl_buildings_list(request):
@@ -712,7 +738,7 @@ def tbl_buildings_detail(request, pk):
         building.delete()
         return Response({'message': 'Building deleted'}, status=status.HTTP_204_NO_CONTENT)
 
-# ROOMS
+@cache_page(60 * 3)
 @api_view(['GET', 'POST'])
 @permission_classes([AllowAny])
 def tbl_rooms_list(request):
@@ -757,7 +783,7 @@ def tbl_rooms_detail(request, pk):
 def courses_list(request):
     if request.method == 'GET':
         # ✅ Properly serialize queryset
-        courses = TblCourse.objects.all()
+        courses = TblCourse.objects.select_related('term').prefetch_related('tblcourseusers_set__user').all()
         serializer = CourseSerializer(courses, many=True)
         return Response(serializer.data)
 
@@ -809,7 +835,8 @@ def course_detail(request, pk):
         TblCourseUsers.objects.filter(course=course).delete()
         course.delete()
         return Response(status=status.HTTP_204_NO_CONTENT)
-    
+
+@cache_page(60 * 3)    
 @api_view(['GET', 'POST'])
 @permission_classes([AllowAny])
 def program_list(request):
@@ -847,7 +874,8 @@ def program_detail(request, pk):
     elif request.method == 'DELETE':
         program.delete()
         return Response(status=status.HTTP_204_NO_CONTENT)
-    
+
+@cache_page(60 * 3)     
 @api_view(['GET', 'POST'])
 @permission_classes([AllowAny])
 def department_list(request):
@@ -886,6 +914,7 @@ def department_detail(request, pk):
         department.delete()
         return Response(status=status.HTTP_204_NO_CONTENT)
 
+@cache_page(60 * 5)
 @api_view(['GET', 'POST'])
 @permission_classes([AllowAny])
 def tbl_college_list(request):
@@ -1296,7 +1325,14 @@ def tbl_user_role_list(request):
     if request.method == 'GET':
         user_id = request.GET.get('user_id')
         role_id = request.GET.get('role_id')
-        queryset = TblUserRole.objects.select_related('role', 'college', 'department').all()
+        queryset = TblUserRole.objects.select_related(
+            'role',
+            'college',
+            'department',
+            'department__college',
+            'user'
+        ).all()
+
         if user_id:
             queryset = queryset.filter(user_id=user_id)
         if role_id:
@@ -1335,7 +1371,8 @@ def tbl_user_role_detail(request, user_role_id):
     elif request.method == 'DELETE':
         instance.delete()
         return Response(status=status.HTTP_204_NO_CONTENT)
-    
+
+@cache_page(60 * 5)     
 @api_view(['GET', 'POST'])
 @permission_classes([AllowAny])
 def tbl_term_list(request):

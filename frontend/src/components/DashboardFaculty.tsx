@@ -4,7 +4,7 @@ import { useNavigate } from 'react-router-dom';
 import { api } from '../lib/apiClient.ts';
 import {
   FaHome, FaCalendar, FaClock, FaClipboardList, FaBell, FaUser,
-  FaSignOutAlt, FaBuilding, FaPenAlt, FaCalendarPlus, FaUsers
+  FaSignOutAlt, FaBuilding, FaPenAlt, FaCalendarPlus, FaUsers, FaUserShield
 } from 'react-icons/fa';
 import { BsFillSendPlusFill } from "react-icons/bs";
 import '../styles/dashboardFaculty.css';
@@ -47,6 +47,12 @@ const roleSidebarMap: Record<string, { key: string, label: string, icon: JSX.Ele
     { key: 'set-Modality', label: 'Set Modality', icon: <FaPenAlt {...iconStyle} /> },
     { key: 'exam-Schedule', label: 'View Exam Schedule', icon: <FaClipboardList {...iconStyle} /> },
     { key: 'notification', label: 'Notification', icon: <FaBell {...iconStyle} /> },
+  ],
+  admin: [
+    // Admin has access to ALL features from all roles
+    { key: 'exam-Date', label: 'Exam Date', icon: <FaCalendar {...iconStyle} /> },
+    { key: 'exam-Schedule', label: 'View Exam Schedule', icon: <FaClipboardList {...iconStyle} /> },
+    { key: 'set-Modality', label: 'Set Modality', icon: <FaPenAlt {...iconStyle} /> },
   ]
 };
 
@@ -56,7 +62,6 @@ const DashboardFaculty = () => {
   const [currentDateTime, setCurrentDateTime] = useState(new Date());
   const [user, setUser] = useState<any>(null);
   const [roles, setRoles] = useState<string[]>([]);
-  const [unreadCount, setUnreadCount] = useState(0);
   const [showLogoutModal, setShowLogoutModal] = useState(false);
   const navigate = useNavigate();
 
@@ -107,7 +112,9 @@ const DashboardFaculty = () => {
       if (!user?.user_id) return;
       try {
         const res = await api.get(`/user-roles/${user.user_id}/roles/`);
-        const roleData = res.data.map((r: any) => r.role_name.toLowerCase());
+        const roleData = res.data
+          .filter((r: any) => r.status?.toLowerCase() === 'active')
+          .map((r: any) => r.role_name.toLowerCase());
         setRoles(roleData);
       } catch (err) {
         console.error('Error fetching roles:', err);
@@ -116,40 +123,13 @@ const DashboardFaculty = () => {
     fetchUserRoles();
   }, [user]);
 
-  /** 📩 Unread messages counter */
-  useEffect(() => {
-    if (!user) return;
-    const fetchUnreadCount = async () => {
-      try {
-        const res = await api.get('/inbox', {
-          params: { receiver_id: user.user_id, is_read: false, is_deleted: false },
-        });
-        setUnreadCount(res.data.length);
-      } catch (err) {
-        console.error('Error fetching unread count:', err);
-      }
-    };
-    fetchUnreadCount();
-    const interval = setInterval(fetchUnreadCount, 10000);
-    return () => clearInterval(interval);
-  }, [user]);
 
-  /** 🧭 Merge sidebar items */
+
+  /** 🧭 Merge sidebar items - Admin gets all features */
   const mergedSidebarItems = Array.from(
     new Map(
       roles
         .flatMap(role => roleSidebarMap[role] || [])
-        .map(item => {
-          if (item.key === 'inbox') {
-            return {
-              ...item,
-              label: unreadCount > 0
-                ? <span style={{ color: '#F2994A' }}>{`${item.label} (${unreadCount})`}</span>
-                : item.label,
-            };
-          }
-          return item;
-        })
         .map(item => [item.key, item])
     ).values()
   );
@@ -246,6 +226,12 @@ const DashboardFaculty = () => {
               <div className="card welcome-card">
                 <h3>Welcome, <span className="robert-name">{user.first_name}!</span></h3>
                 <p>Organize your work and improve your performance here</p>
+                {roles.includes('admin') && (
+                  <div style={{ marginTop: '10px', display: 'flex', alignItems: 'center', gap: '8px', color: '#4CAF50' }}>
+                    <FaUserShield size={16} />
+                    <span style={{ fontSize: '14px', fontWeight: '500' }}>Admin Access Enabled</span>
+                  </div>
+                )}
               </div>
 
               <div className="card datetime-card">

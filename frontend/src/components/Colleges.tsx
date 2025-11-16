@@ -24,6 +24,8 @@ const Colleges: React.FC = () => {
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [loading, setLoading] = useState(true); // new state
   const [isImporting, setIsImporting] = useState(false);
+  const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
+  const [isBulkDeleting, setIsBulkDeleting] = useState(false);
 
   // Fetch Colleges on Load
   useEffect(() => {
@@ -52,6 +54,52 @@ const Colleges: React.FC = () => {
       college.college_name.toLowerCase().includes(searchTerm.toLowerCase()) ||
       college.college_id.toLowerCase().includes(searchTerm.toLowerCase())
   );
+
+  const toggleSelect = (id: string) => {
+    setSelectedIds((prev) => {
+      const next = new Set(prev);
+      if (next.has(id)) next.delete(id);
+      else next.add(id);
+      return next;
+    });
+  };
+
+  const isAllSelected = colleges.length > 0 && colleges.every((c) => selectedIds.has(c.college_id));
+
+  const toggleSelectAll = () => {
+    setSelectedIds(() => {
+      if (isAllSelected) return new Set();
+      const all = new Set<string>();
+      colleges.forEach((c) => all.add(c.college_id));
+      return all;
+    });
+  };
+
+  const clearSelection = () => setSelectedIds(new Set());
+
+  const handleBulkDelete = async () => {
+    const ids = Array.from(selectedIds);
+    if (ids.length === 0) {
+      toast.info('No colleges selected');
+      return;
+    }
+    if (!globalThis.confirm(`Delete ${ids.length} selected college(s)?`)) return;
+    setIsBulkDeleting(true);
+    try {
+      const results = await Promise.allSettled(ids.map((id) => api.delete(`/tbl_college/${id}/`)));
+      const ok = results.filter((r) => r.status === 'fulfilled').length;
+      const fail = results.length - ok;
+      if (ok) toast.success(`Deleted ${ok} college(s)`);
+      if (fail) toast.error(`${fail} failed to delete`);
+      clearSelection();
+      fetchColleges();
+    } catch (err) {
+      console.error('Bulk delete error:', err);
+      toast.error('Bulk delete failed');
+    } finally {
+      setIsBulkDeleting(false);
+    }
+  };
 
   const handleAddCollege = () => {
     setNewCollegeId('');
@@ -94,18 +142,7 @@ const Colleges: React.FC = () => {
     }
   };
 
-  const handleDelete = async (id: string) => {
-    if (!globalThis.confirm('Are you sure you want to delete this college?')) return;
-
-    try {
-      await api.delete(`/tbl_college/${id}/`);
-      setColleges(colleges.filter((c) => c.college_id !== id));
-      toast.success('College deleted.');
-    } catch (error: any) {
-      console.error(error);
-      toast.error('Failed to delete college.');
-    }
-  };
+  // Single-item delete removed in favor of bulk delete
 
   const handleImportFile = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
@@ -183,12 +220,27 @@ const Colleges: React.FC = () => {
       </div>
 
       <div className="colleges-actions">
-        <button type='button' className="action-button add-new" onClick={handleAddCollege}>
-          <FaPlus/>
-        </button>
-        <button type='button' className="action-button import" onClick={() => setShowImport(true)}>
-          <FaFileImport/>
-        </button>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 8, width: '100%' }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+            <button type='button' className="action-button add-new" onClick={handleAddCollege}>
+              <FaPlus/>
+            </button>
+            <button type='button' className="action-button import" onClick={() => setShowImport(true)}>
+              <FaFileImport/>
+            </button>
+          </div>
+          <div style={{ marginLeft: 'auto', display: 'flex', alignItems: 'center', gap: 8 }}>
+            <button
+              type="button"
+              className="action-button delete"
+              onClick={handleBulkDelete}
+              disabled={isBulkDeleting || selectedIds.size === 0}
+              title={selectedIds.size ? `Delete ${selectedIds.size} selected` : 'Delete selected'}
+            >
+              <FaTrash/>
+            </button>
+          </div>
+        </div>
       </div>
 
       <div className="colleges-table-container">
@@ -198,7 +250,20 @@ const Colleges: React.FC = () => {
               <th>#</th>
               <th>College ID</th>
               <th>College Name</th>
-              <th>Actions</th>
+              <th>
+                <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                  <span>Actions</span>
+                  <input
+                    type="checkbox"
+                    checked={isAllSelected}
+                    onChange={toggleSelectAll}
+                    disabled={loading || colleges.length === 0}
+                    aria-label="Select all"
+                    title="Select all"
+                    style={{ marginLeft: 'auto' }}
+                  />
+                </div>
+              </th>
             </tr>
           </thead>
           <tbody>
@@ -220,7 +285,7 @@ const Colleges: React.FC = () => {
                   <td>{index + 1}</td>
                   <td>{college.college_id}</td>
                   <td>{college.college_name}</td>
-                  <td className="action-buttons">
+                  <td className="action-buttons" style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
                     <button
                       type="button"
                       className="icon-button edit-button"
@@ -234,13 +299,13 @@ const Colleges: React.FC = () => {
                     >
                       <FaEdit />
                     </button>
-                    <button
-                      type="button"
-                      className="icon-button delete-button"
-                      onClick={() => handleDelete(college.college_id)}
-                    >
-                      <FaTrash />
-                    </button>
+                    <input
+                      type="checkbox"
+                      checked={selectedIds.has(college.college_id)}
+                      onChange={() => toggleSelect(college.college_id)}
+                      aria-label={`Select ${college.college_name}`}
+                      style={{ marginLeft: 'auto' }}
+                    />
                   </td>
                 </tr>
               ))
