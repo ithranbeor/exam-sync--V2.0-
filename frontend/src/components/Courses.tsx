@@ -48,6 +48,8 @@ const Courses: React.FC = () => {
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [loading, setLoading] = useState(true);
   const [isImporting, setIsImporting] = useState(false);
+  const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
+  const [isBulkDeleting, setIsBulkDeleting] = useState(false);
 
   // ✅ Optimized useEffect for faster load
   useEffect(() => {
@@ -109,6 +111,50 @@ const Courses: React.FC = () => {
     [courses, searchTerm]
   );
 
+  const toggleSelect = (id: string) => {
+    setSelectedIds((prev) => {
+      const next = new Set(prev);
+      if (next.has(id)) next.delete(id);
+      else next.add(id);
+      return next;
+    });
+  };
+
+  const isAllSelected = courses.length > 0 && courses.every((c) => selectedIds.has(c.course_id));
+
+  const toggleSelectAll = () => {
+    setSelectedIds(() => {
+      if (isAllSelected) return new Set();
+      const all = new Set<string>();
+      courses.forEach((c) => all.add(c.course_id));
+      return all;
+    });
+  };
+
+  const clearSelection = () => setSelectedIds(new Set());
+
+  const handleBulkDelete = async () => {
+    const ids = Array.from(selectedIds);
+    if (ids.length === 0) {
+      toast.info("No courses selected");
+      return;
+    }
+    if (!globalThis.confirm(`Delete ${ids.length} selected course(s)?`)) return;
+    setIsBulkDeleting(true);
+    try {
+      const results = await Promise.allSettled(ids.map((id) => api.delete(`/courses/${id}/`)));
+      const ok = results.filter((r) => r.status === "fulfilled").length;
+      const fail = results.length - ok;
+      if (ok) toast.success(`Deleted ${ok} course(s)`);
+      if (fail) toast.error(`${fail} failed to delete`);
+      clearSelection();
+      await fetchCourses();
+    } catch {
+      toast.error("Bulk delete failed");
+    } finally {
+      setIsBulkDeleting(false);
+    }
+  };
   // Add or update course
    const handleSubmit = useCallback(async () => {
     const { course_id, course_name, term_id, user_ids, leaders } = newCourse;
@@ -264,31 +310,45 @@ const Courses: React.FC = () => {
       </div>
 
       <div className="colleges-actions">
-        <button
-          type="button"
-          className="action-button add-new"
-          onClick={() => {
-            setNewCourse({
-              course_id: "",
-              course_name: "",
-              term_id: 0,
-              user_ids: [],
-              leaders: [],
-            });
-            setEditMode(false);
-            setShowModal(true);
-          }}
-        >
-          <FaPlus/>
-        </button>
-
-        <button
-          type="button"
-          className="action-button import"
-          onClick={() => setShowImport(true)}
-        >
-          <FaFileImport/>
-        </button>
+        <div style={{ display: "flex", alignItems: "center", gap: 8, width: "100%" }}>
+          <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+            <button
+              type="button"
+              className="action-button add-new"
+              onClick={() => {
+                setNewCourse({
+                  course_id: "",
+                  course_name: "",
+                  term_id: 0,
+                  user_ids: [],
+                  leaders: [],
+                });
+                setEditMode(false);
+                setShowModal(true);
+              }}
+            >
+              <FaPlus/>
+            </button>
+            <button
+              type="button"
+              className="action-button import"
+              onClick={() => setShowImport(true)}
+            >
+              <FaFileImport/>
+            </button>
+          </div>
+          <div style={{ marginLeft: "auto", display: "flex", alignItems: "center", gap: 8 }}>
+            <button
+              type="button"
+              className="action-button delete"
+              onClick={handleBulkDelete}
+              disabled={isBulkDeleting || selectedIds.size === 0}
+              title={selectedIds.size > 0 ? `Delete ${selectedIds.size} selected` : "Delete selected"}
+            >
+              <FaTrash />
+            </button>
+          </div>
+        </div>
       </div>
 
       <div className="colleges-table-container">
@@ -300,7 +360,20 @@ const Courses: React.FC = () => {
               <th>Course Name</th>
               <th>Term</th>
               <th>Instructors</th>
-              <th>Actions</th>
+              <th>
+                <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+                  <span>Actions</span>
+                  <input
+                    type="checkbox"
+                    checked={isAllSelected}
+                    onChange={toggleSelectAll}
+                    disabled={loading || courses.length === 0}
+                    aria-label="Select all"
+                    title="Select all"
+                    style={{ marginLeft: "auto" }}
+                  />
+                </div>
+              </th>
             </tr>
           </thead>
           <tbody>
@@ -324,17 +397,17 @@ const Courses: React.FC = () => {
                   <td>{c.course_name}</td>
                   <td>{c.term_name}</td>
                   <td>{c.instructor_names?.join(", ")}</td>
-                  <td className="action-buttons">
+                  <td className="action-buttons" style={{ display: "flex", alignItems: "center", gap: 8 }}>
                     <button type='button' className="icon-button edit-button" onClick={() => handleEdit(c)}>
                       <FaEdit />
                     </button>
-                    <button
-                      type="button"
-                      className="icon-button delete-button"
-                      onClick={() => handleDelete(c.course_id)}
-                    >
-                      <FaTrash />
-                    </button>
+                    <input
+                      type="checkbox"
+                      checked={selectedIds.has(c.course_id)}
+                      onChange={() => toggleSelect(c.course_id)}
+                      aria-label={`Select ${c.course_id}`}
+                      style={{ marginLeft: "auto" }}
+                    />
                   </td>
                 </tr>
               ))
