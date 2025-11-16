@@ -33,9 +33,9 @@ interface User {
 
 interface SectionCourse {
   id?: number;
-  course: Course;
-  program: Program;
-  term: Term;
+  course?: Course;
+  program?: Program;
+  term?: Term;
   user?: User;
   course_id: string;
   program_id: string;
@@ -44,6 +44,7 @@ interface SectionCourse {
   section_name: string;
   number_of_students: number;
   year_level: string;
+  is_night_class?: string | null;
 }
 
 const SectionCourses: React.FC = () => {
@@ -69,6 +70,7 @@ const SectionCourses: React.FC = () => {
     section_name: '',
     number_of_students: 0,
     year_level: '',
+    is_night_class: "", // Changed from null
   } as SectionCourse);
 
   // Memoized sorted options for selects
@@ -119,13 +121,14 @@ const SectionCourses: React.FC = () => {
         api.get('/tbl_course_users/')
       ]);
 
-      const secData = secRes.data || [];
+      // ✅ FIX: Extract data from the new response structure
+      const secData = secRes.data?.data || secRes.data || [];  // Handle both formats
       const courseData = courseRes.data || [];
       const progData = progRes.data || [];
       const termData = termRes.data || [];
       const courseUserData = courseUserRes.data || [];
 
-      setSectionCourses(secData);
+      setSectionCourses(secData);  // ✅ Use extracted array
       setCourses(courseData);
       setPrograms(progData);
 
@@ -184,6 +187,7 @@ const SectionCourses: React.FC = () => {
       section_name,
       number_of_students,
       year_level,
+      is_night_class: newSection.is_night_class === "YES" ? "YES" : "",  // Changed from null to ""
     };
 
     setIsSubmitting(true);
@@ -209,8 +213,12 @@ const SectionCourses: React.FC = () => {
   const handleDelete = async (sc: SectionCourse) => {
     try {
       const { status } = await api.delete(`/tbl_sectioncourse/${sc.id}/`);
-      if (status === 200) toast.success('Section deleted');
-      else toast.error('Failed to delete section');
+      // ✅ FIX: Django returns 204 for successful DELETE, not 200
+      if (status === 204 || status === 200) {
+        toast.success('Section deleted');
+      } else {
+        toast.error('Failed to delete section');
+      }
     } catch (_error) {
       toast.error('Error deleting section');
     } finally {
@@ -236,6 +244,7 @@ const SectionCourses: React.FC = () => {
           const section_name = String(row['Section Name'] || '').trim();
           const number_of_students = parseInt(String(row['Number of Students'] || '0'));
           const year_level = String(row['Year Level'] || '').trim();
+          const is_night_class = String(row['Night Class'] || '').trim().toUpperCase() === "YES" ? "YES" : ""; // Changed from empty to ""
           const term_name = String(row['Term Name'] || '').trim();
           const course_id = String(row['Course ID'] || '').trim();
           const program_id = String(row['Program ID'] || '').trim();
@@ -250,7 +259,7 @@ const SectionCourses: React.FC = () => {
 
           validRows.push({
             course_id, program_id, section_name, number_of_students, year_level,
-            term_id: term.term_id, user_id: user.user_id
+            term_id: term.term_id, user_id: user.user_id, is_night_class
           } as SectionCourse);
         }
 
@@ -277,8 +286,8 @@ const SectionCourses: React.FC = () => {
 
   const downloadTemplate = () => {
     const ws = XLSX.utils.aoa_to_sheet([
-      ['Course ID','Program ID','Section Name','Number of Students','Year Level','Term Name','Instructor Name'],
-      ['IT 112','BSIT','IT 1R1','30','1st Year','1st Semester','Ithran Beor Turno']
+      ['Course ID','Program ID','Section Name','Number of Students','Year Level','Term Name','Instructor Name','Night Class'],
+      ['IT 112','BSIT','IT 1R1','30','1st Year','1st Semester','Ithran Beor Turno','YES']
     ]);
     const wb = XLSX.utils.book_new();
     XLSX.utils.book_append_sheet(wb, ws, 'SectionCourses Template');
@@ -372,19 +381,20 @@ const SectionCourses: React.FC = () => {
               <th>Year</th>
               <th>Term</th>
               <th>Instructor</th>
+              <th>Night Class</th>
               <th>Actions</th>
             </tr>
           </thead>
           <tbody>
             {loading ? (
               <tr>
-                <td colSpan={9} style={{ textAlign: 'center', padding: '20px' }}>
+                <td colSpan={10} style={{ textAlign: 'center', padding: '20px' }}>
                   Loading sections with courses...
                 </td>
               </tr>
             ) : paginated.length === 0 ? (
               <tr>
-                <td colSpan={9} style={{ textAlign: 'center', padding: '20px' }}>
+                <td colSpan={10} style={{ textAlign: 'center', padding: '20px' }}>
                   No sections with courses.
                 </td>
               </tr>
@@ -399,6 +409,7 @@ const SectionCourses: React.FC = () => {
                   <td>{sc.year_level}</td>
                   <td>{sc.term?.term_name || 'N/A'}</td>
                   <td>{sc.user?.full_name || 'N/A'}</td>
+                  <td>{sc.is_night_class === "YES" ? "YES" : ""}</td>
                   <td className="action-buttons">
                     <button
                       type="button"
@@ -411,6 +422,7 @@ const SectionCourses: React.FC = () => {
                           program_id: sc.program?.program_id || sc.program_id,
                           term_id: sc.term?.term_id || sc.term_id,
                           user_id: sc.user?.user_id || sc.user_id,
+                          is_night_class: sc.is_night_class === "YES" ? "YES" : "" // Changed from null
                         });
                         setShowModal(true);
                       }}
@@ -530,6 +542,7 @@ const SectionCourses: React.FC = () => {
                 <option value="2nd Year">2nd Year</option>
                 <option value="3rd Year">3rd Year</option>
                 <option value="4th Year">4th Year</option>
+                <option value="5th Year">5th Year</option>
               </select>
             </div>
 
@@ -569,6 +582,22 @@ const SectionCourses: React.FC = () => {
                 placeholder="Select Instructor"
                 menuPlacement="top"
               />
+            </div>
+            <div className="input-group">
+              <label>Night Class?</label>
+              <div style={{ display: "flex", alignItems: "center", gap: "10px" }}>
+                <input
+                  type="checkbox"
+                  checked={newSection.is_night_class === "YES"}
+                  onChange={(e) =>
+                    setNewSection({
+                      ...newSection,
+                      is_night_class: e.target.checked ? "YES" : "",
+                    })
+                  }
+                />
+                <span style={{color: 'black'}}>YES</span>
+              </div>
             </div>
 
             <div className="modal-actions">

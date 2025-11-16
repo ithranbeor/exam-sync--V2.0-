@@ -68,6 +68,16 @@ ROOT_URLCONF = "backend.urls"
 WSGI_APPLICATION = "backend.wsgi.application"
 
 # ──────────────────────────────────────────────
+# CACHING CONFIGURATION
+# ──────────────────────────────────────────────
+CACHES = {
+    'default': {
+        'BACKEND': 'django.core.cache.backends.locmem.LocMemCache',
+        'LOCATION': 'unique-snowflake',
+    }
+}
+
+# ──────────────────────────────────────────────
 # DATABASE CONFIGURATION
 # ──────────────────────────────────────────────
 DATABASES = {
@@ -78,6 +88,7 @@ DATABASES = {
         "PASSWORD": config("DB_PASSWORD"),
         "HOST": config("DB_HOST"),
         "PORT": config("DB_PORT", cast=int),
+        "CONN_MAX_AGE": 600,
         "OPTIONS": {
             "application_name": "DjangoApp",
             # Disable SSL and shorten timeout for faster local dev
