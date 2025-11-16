@@ -251,7 +251,7 @@ const Colleges: React.FC = () => {
               <th>College ID</th>
               <th>College Name</th>
               <th>
-                <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                <div className="actions-checkbox-wrapper">
                   <span>Actions</span>
                   <input
                     type="checkbox"

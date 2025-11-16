@@ -411,20 +411,26 @@ def tbl_modality_detail(request, pk):
         instance.delete()
         return Response(status=status.HTTP_204_NO_CONTENT)
     
-@api_view(['GET', 'POST', 'DELETE'])  # ✅ Add DELETE here
+@api_view(['GET', 'POST', 'DELETE'])
 @permission_classes([AllowAny])
 def tbl_availability_list(request):
     if request.method == 'GET':
+        # Support single or multiple user IDs
         user_id = request.GET.get('user_id')
+        user_ids = request.GET.get('user_ids')  # comma-separated string of user IDs
         college_id = request.GET.get('college_id')
         status_param = request.GET.get('status')
         days = request.GET.getlist('days[]') or request.GET.getlist('days')
+
         availabilities = TblAvailability.objects.select_related('user').all()
 
-        availabilities = TblAvailability.objects.all()
-
+        # Filter by single user
         if user_id:
             availabilities = availabilities.filter(user__user_id=user_id)
+        # Filter by multiple users
+        elif user_ids:
+            user_id_list = [int(uid.strip()) for uid in user_ids.split(',') if uid.strip().isdigit()]
+            availabilities = availabilities.filter(user__user_id__in=user_id_list)
 
         if college_id:
             availabilities = availabilities.filter(user__college_id=college_id)
@@ -433,7 +439,7 @@ def tbl_availability_list(request):
             availabilities = availabilities.filter(status=status_param)
 
         if days:
-            availabilities = availabilities.filter(days__overlap=days)  # PostgreSQL ArrayField supports __overlap
+            availabilities = availabilities.filter(days__overlap=days)
 
         serializer = TblAvailabilitySerializer(availabilities, many=True)
         return Response(serializer.data)
@@ -450,24 +456,18 @@ def tbl_availability_list(request):
             return Response(serializer.data, status=status.HTTP_201_CREATED)
         return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
 
-    # ✅ ADD THIS DELETE HANDLER
     elif request.method == 'DELETE':
         user_id = request.GET.get('user_id')
-        
         if not user_id:
             return Response(
-                {'error': 'user_id parameter is required for bulk delete'}, 
+                {'error': 'user_id parameter is required for bulk delete'},
                 status=status.HTTP_400_BAD_REQUEST
             )
-        
-        # Delete all availability records for this user
         deleted_count, _ = TblAvailability.objects.filter(user__user_id=user_id).delete()
-        
         return Response(
             {'message': f'Deleted {deleted_count} availability record(s) for user {user_id}'},
             status=status.HTTP_200_OK
         )
-
 
 @api_view(['GET', 'PUT', 'DELETE'])
 @permission_classes([AllowAny])
@@ -1176,15 +1176,14 @@ def user_detail(request, user_id):
     elif request.method in ['PUT', 'PATCH']:
         serializer = UserSerializer(user, data=request.data, partial=(request.method == 'PATCH'))
         if serializer.is_valid():
-            # Handle password hashing if password field is updated
-            password = request.data.get('password')
             updated_user = serializer.save()
+            password = request.data.get('password')
             if password:
                 updated_user.password = make_password(password)
                 updated_user.save()
             return Response(UserSerializer(updated_user).data, status=status.HTTP_200_OK)
         return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
-# ------------------------------
+
 # User roles
 # ------------------------------
 @api_view(['GET'])

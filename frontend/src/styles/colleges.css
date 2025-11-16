@@ -858,3 +858,34 @@ h3 {
   color: rgb(255, 255, 255) !important;
   border-radius: 80px;
 }
+
+.actions-checkbox-wrapper {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 0.9rem;
+  position: relative;
+}
+
+/* Checkbox custom style */
+.actions-checkbox-wrapper input[type="checkbox"] {
+  width: 18px;
+  height: 18px;
+  cursor: pointer;
+  accent-color: #007bff; /* Modern browser colored checkbox */
+  border-radius: 4px; /* Slightly rounded corners */
+  transition: transform 0.2s ease, box-shadow 0.2s ease;
+  border-radius: 100%;
+}
+
+/* Hover effect */
+.actions-checkbox-wrapper input[type="checkbox"]:hover {
+  transform: scale(1.1);
+  box-shadow: 0 0 2px rgba(0, 0, 0, 0.3);
+}
+
+/* Disabled state */
+.actions-checkbox-wrapper input[type="checkbox"]:disabled {
+  cursor: not-allowed;
+  opacity: 0.5;
+}

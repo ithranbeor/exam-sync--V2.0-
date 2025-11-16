@@ -90,7 +90,7 @@ const DashboardAdmin: React.FC = () => {
   const handleLogout = () => {
     localStorage.removeItem('user');
     sessionStorage.removeItem('user');
-    navigate('/admin-login');
+    navigate('/');
   };
 
   const formattedTime = currentDateTime.toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit', hour12: true });

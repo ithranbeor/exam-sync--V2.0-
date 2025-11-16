@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef, useCallback, useMemo } from 'react';
+import React, { useState, useEffect, useCallback, useMemo } from 'react';
 import { api } from '../lib/apiClient.ts';
 import '../styles/bayanihanModality.css';
 import { ToastContainer, toast } from 'react-toastify';
@@ -42,8 +42,6 @@ const BayanihanModality: React.FC<UserProps> = ({ user }) => {
   const [_sectionDropdownOpen, _setSectionDropdownOpen] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [loadingRooms, setLoadingRooms] = useState(true);
-
-  const _dropdownRef = useRef<HTMLDivElement>(null);
 
   // Modal states
   const [showRoomModal, setShowRoomModal] = useState(false);
@@ -111,6 +109,7 @@ const BayanihanModality: React.FC<UserProps> = ({ user }) => {
   }, [sectionOptions, form.course]);
 
   /** FETCH PROGRAMS, COURSES, SECTIONS, ROOMS, BUILDINGS, AND AVAILABLE ROOMS */
+  /** FETCH PROGRAMS, COURSES, SECTIONS, ROOMS, BUILDINGS, AND AVAILABLE ROOMS */
   useEffect(() => {
     const fetchData = async () => {
       if (!user?.user_id) return;
@@ -125,16 +124,14 @@ const BayanihanModality: React.FC<UserProps> = ({ user }) => {
           { data: allCourses },
           { data: sectionCourses },
           { data: allDepartments },
-          { data: buildings },
-          { data: availableRooms }
+          { data: buildings }
         ] = await Promise.all([
           api.get('/tbl_user_role', { params: { user_id: user.user_id } }),
           api.get('/programs/'),
           api.get('/courses/'),
           api.get('/tbl_sectioncourse/'),
           api.get('/departments/'),
-          api.get('/tbl_buildings'),
-          api.get('/tbl_available_rooms/')
+          api.get('/tbl_buildings')
         ]);
 
         if (!roles || roles.length === 0) {
@@ -142,7 +139,40 @@ const BayanihanModality: React.FC<UserProps> = ({ user }) => {
           return;
         }
 
-        // Get leader roles
+        // Check if user is admin (role 2 or role_id 2)
+        const isAdmin = roles.some((r: any) => r.role === 2 || r.role_id === 2);
+
+        if (isAdmin) {
+          // ADMIN: Show all programs, courses, sections, and ALL rooms (not filtered by scheduler)
+          setProgramOptions(allPrograms);
+          setCourseOptions(allCourses);
+
+          const allSections = sectionCourses.map((sc: any) => ({
+            course_id: sc.course_id || sc.course?.course_id,
+            program_id: sc.program_id || sc.program?.program_id,
+            section_name: sc.section_name
+          }));
+          setSectionOptions(allSections);
+
+          // Fetch ALL rooms for admin (not filtered by available_rooms)
+          const { data: allRooms } = await api.get('/tbl_rooms');
+          setRoomOptions(allRooms);
+          setAvailableRoomIds(allRooms.map((r: any) => r.room_id));
+
+          // Set buildings
+          setBuildingOptions(
+            buildings?.map((b: any) => ({ 
+              id: b.building_id, 
+              name: b.building_name 
+            })) ?? []
+          );
+
+          console.log('Admin access: All rooms available (not filtered by scheduler)');
+          setLoadingRooms(false);
+          return;
+        }
+
+        // Get leader roles (Bayanihan Leader = role 4)
         const leaderRoles = roles.filter((r: any) => 
           r.role === 4 || r.role_id === 4
         );
@@ -178,11 +208,42 @@ const BayanihanModality: React.FC<UserProps> = ({ user }) => {
           return;
         }
 
-        // Filter programs by department
+        // FIX: Extract college IDs properly (they might be objects)
+        const collegeIdStrings = collegeIds
+          .map((c: any) => String(c.college_id || c))
+          .filter(Boolean);
+
+        // FIX: Get department names to match against program.department field
+        const deptNames = departments.map((d: any) => d.department_name).filter(Boolean);
+
+        console.log('=== BAYANIHAN LEADER DEBUG ===');
+        console.log('Leader Department IDs:', leaderDepartmentIds);
+        console.log('Department Names:', deptNames);
+        console.log('College IDs (objects):', collegeIds);
+        console.log('College ID Strings:', collegeIdStrings);
+
+        // Filter programs by matching department name OR college ID
         const programs = allPrograms.filter((p: any) => {
-          const progDept = p.department_id || p.department || p.dept_id || p.dept;
-          return leaderDepartmentIds.includes(progDept);
+          const progDeptName = String(p.department || p.department_name || '');
+          const progDeptId = String(p.department_id || '');
+          const progCollege = String(p.college_id || p.college || '');
+
+          // Match by department ID or name
+          const deptMatch = 
+            leaderDepartmentIds.includes(progDeptId) ||
+            deptNames.some((name: string) => progDeptName.includes(name));
+          
+          // Match by college ID
+          const collegeMatch = collegeIdStrings.includes(progCollege);
+
+          return deptMatch || collegeMatch;
         });
+
+        console.log('Total Programs:', allPrograms.length);
+        console.log('Filtered Programs:', programs.length);
+        console.log('Sample Program:', allPrograms[0]);
+        console.log('==============================');
+
         setProgramOptions(programs);
 
         // Fetch user courses - this still needs to be separate
@@ -208,23 +269,44 @@ const BayanihanModality: React.FC<UserProps> = ({ user }) => {
           })) ?? [];
         setSectionOptions(filteredSections);
 
-        // Filter available rooms by college
-        const filteredAvailableRooms = availableRooms.filter((r: any) =>
-          collegeIds.includes(r.college_id || r.college)
+        // BAYANIHAN LEADER: Fetch available rooms for their college(s)
+        console.log('Fetching available rooms for colleges:', collegeIdStrings);
+        
+        // Fetch available rooms for each college using the string IDs
+        const availableRoomsPromises = collegeIdStrings.map((collegeId: string) => 
+          api.get('/tbl_available_rooms/', { params: { college_id: collegeId } })
         );
+        
+        const availableRoomsResponses = await Promise.all(availableRoomsPromises);
+        
+        // Combine all available rooms from all colleges
+        const allAvailableRooms = availableRoomsResponses.flatMap(response => response.data);
+        
+        console.log('Available rooms data:', allAvailableRooms);
+        
+        // Extract room IDs - handle both nested room object and direct room_id
+        const availableIds = allAvailableRooms
+          .map((ar: any) => {
+            // Try to get room_id from nested room object first, then from direct room_id property
+            return ar.room?.room_id || ar.room_id || ar.room;
+          })
+          .filter((id: string) => id); // Filter out undefined/null values
+        
+        console.log('Extracted room IDs:', availableIds);
+        
+        setAvailableRoomIds(availableIds.map(String));
 
-        const availableIds = filteredAvailableRooms?.map((r: any) => r.room_id || r.room) ?? [];
-        setAvailableRoomIds(availableIds);
-
-        // Fetch rooms if available
+        // Fetch all rooms and filter by available IDs
         if (availableIds.length > 0) {
           const { data: allRooms } = await api.get('/tbl_rooms');
           const filteredRooms = allRooms.filter((r: any) => 
             availableIds.includes(r.room_id)
           );
           setRoomOptions(filteredRooms);
+          console.log('Filtered rooms for Bayanihan Leader:', filteredRooms);
         } else {
           setRoomOptions([]);
+          console.log('No available rooms found for Bayanihan Leader');
         }
 
         // Set buildings
@@ -235,7 +317,7 @@ const BayanihanModality: React.FC<UserProps> = ({ user }) => {
           })) ?? []
         );
 
-        console.log('Available Room IDs:', availableIds);
+        console.log('Bayanihan Leader - Available Room IDs (set by scheduler):', availableIds);
       } catch (error: any) {
         console.error('Unexpected error fetching data:', error);
         toast.error('An unexpected error occurred while loading data');
@@ -444,10 +526,7 @@ const BayanihanModality: React.FC<UserProps> = ({ user }) => {
   };
 
   // Filter rooms to only show available ones
-  const filteredRoomOptions = useMemo(() => 
-    roomOptions.filter(r => availableRoomIds.includes(r.room_id)),
-    [roomOptions, availableRoomIds]
-  );
+  const filteredRoomOptions = roomOptions;
 
   // Memoized sorted and filtered rooms for modal
   const filteredAndSortedRooms = useMemo(() => {

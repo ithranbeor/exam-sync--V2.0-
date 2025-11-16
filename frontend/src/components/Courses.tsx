@@ -193,20 +193,6 @@ const Courses: React.FC = () => {
     }
   }, [newCourse, editMode, fetchCourses]);
 
-  // Delete
-  const handleDelete = useCallback(
-    async (id: string) => {
-      try {
-        await api.delete(`/courses/${id}/`);
-        toast.success("Course deleted");
-        fetchCourses();
-      } catch {
-        toast.error("Failed to delete course");
-      }
-    },
-    [fetchCourses]
-  );
-
   // ✅ Fix Edit button handler (correctly loads full editable data)
   const handleEdit = (course: Course) => {
     setNewCourse({
