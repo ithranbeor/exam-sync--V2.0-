@@ -1,84 +1,97 @@
 // deno-lint-ignore-file no-explicit-any
-import React, { useState, useEffect } from 'react';
-import { useNavigate } from 'react-router-dom';
-import { api } from '../lib/apiClient.ts';
-import { FaEye, FaEyeSlash } from 'react-icons/fa';
-import '../styles/loginAdmin.css';
+import React, { useState, useCallback, useRef } from "react";
+import { useNavigate } from "react-router-dom";
+import { api } from "../lib/apiClient.ts";
+import { FaEye, FaEyeSlash } from "react-icons/fa";
+import "../styles/loginAdmin.css";
 
 const getGreeting = () => {
   const hour = new Date().getHours();
-  if (hour < 12) return 'Good morning';
-  if (hour < 18) return 'Good afternoon';
-  return 'Good evening';
+  if (hour < 12) return "Good morning";
+  if (hour < 18) return "Good afternoon";
+  return "Good evening";
 };
 
 const LoginAdmin: React.FC = () => {
-  const [greeting, setGreeting] = useState(getGreeting());
-  const [id, setID] = useState('');
-  const [password, setPassword] = useState('');
-  const [showPassword, setShowPassword] = useState(false);
-  const [rememberMe, setRememberMe] = useState(false);
-  const [error, setError] = useState('');
-  const [loading, setLoading] = useState(false);
   const navigate = useNavigate();
+  const [form, setForm] = useState({ id: "", password: "" });
+  const [loading, setLoading] = useState(false);
+  const [rememberMe, setRememberMe] = useState(false);
+  const [error, setError] = useState("");
 
-  useEffect(() => {
-    const interval = setInterval(() => setGreeting(getGreeting()), 60000);
-    return () => clearInterval(interval);
+  const showPasswordRef = useRef(false);
+  const [, forceRerender] = useState(false); // for toggling eye icon
+
+  const handleChange = useCallback((e: any) => {
+    const { id, value } = e.target;
+    setForm((prev) => ({ ...prev, [id]: value }));
   }, []);
 
-  const handleLogin = async (e: React.FormEvent) => {
-    e.preventDefault();
-    setError('');
-    setLoading(true);
+  const togglePassword = useCallback(() => {
+    showPasswordRef.current = !showPasswordRef.current;
+    forceRerender((x) => !x); 
+  }, []);
 
-    try {
-      // 1️⃣ Authenticate with user_id and password
-      const { data: authData } = await api.post('/login/', {
-        user_id: id,  // Changed from email to user_id
-        password,
-      });
+  const handleLogin = useCallback(
+    async (e: React.FormEvent) => {
+      e.preventDefault();
+      setError("");
+      setLoading(true);
 
-      if (!authData?.token) {
-        setError('Invalid user ID or password.');
-        return;
+      const ctrl = new AbortController();
+
+      try {
+        const { data: authData } = await api.post(
+          "/login/",
+          {
+            user_id: form.id,
+            password: form.password,
+          },
+          { signal: ctrl.signal }
+        );
+
+        if (!authData?.token) {
+          setError("Invalid user ID or password.");
+          return;
+        }
+
+        const activeRoles = authData.roles
+          .filter((r: any) => r.status?.toLowerCase() === "active")
+          .map((r: any) => r.role_name?.toLowerCase());
+
+        if (!activeRoles.includes("admin")) {
+          setError("Access denied. Only admins can log in.");
+          return;
+        }
+
+        const profileData = {
+          user_id: authData.user_id,
+          email_address: authData.email,
+          first_name: authData.first_name,
+          last_name: authData.last_name,
+          token: authData.token,
+          roles: authData.roles,
+        };
+
+        (rememberMe ? localStorage : sessionStorage).setItem(
+          "user",
+          JSON.stringify(profileData)
+        );
+
+        navigate("/admin-dashboard");
+      } catch (err: any) {
+        console.error("Unexpected error:", err);
+        setError(
+          err.response?.data?.message || "Invalid user ID or password."
+        );
+      } finally {
+        setLoading(false);
       }
 
-      // 2️⃣ Check if user has admin role
-      const activeRoles = authData.roles
-        .filter((r: any) => r.status?.toLowerCase() === 'active')
-        .map((r: any) => r.role_name?.toLowerCase());
-
-      if (!activeRoles.includes('admin')) {
-        setError('Access denied. Only admins can log in.');
-        return;
-      }
-
-      // 3️⃣ Store user session
-      const profileWithToken = { 
-        user_id: authData.user_id,
-        email_address: authData.email,
-        first_name: authData.first_name,
-        last_name: authData.last_name,
-        token: authData.token, 
-        roles: authData.roles 
-      };
-      
-      if (rememberMe) {
-        localStorage.setItem('user', JSON.stringify(profileWithToken));
-      } else {
-        sessionStorage.setItem('user', JSON.stringify(profileWithToken));
-      }
-
-      // 4️⃣ Navigate to admin dashboard
-      navigate('/admin-dashboard');
-    } catch (err: any) {
-      console.error('Unexpected error:', err);
-      setError(err.response?.data?.message || 'Invalid user ID or password.');
-    } finally {
-      setLoading(false);
-    }
-  };
+      return () => ctrl.abort();
+    },
+    [form, rememberMe, navigate]
+  );
 
   return (
     <div className="main-container">
@@ -90,7 +103,7 @@ const LoginAdmin: React.FC = () => {
         <div className="header-section">
           <div className="greeting">
             <p>Hello Admin!</p>
-            <p className="good-morning">{greeting}</p>
+            <p className="good-morning">{getGreeting()}</p>
           </div>
           <div className="logo">
             <img src="../../static/logo/Exam.png" alt="ExamSync Logo" />
@@ -104,13 +117,13 @@ const LoginAdmin: React.FC = () => {
 
           <form className="login-form" onSubmit={handleLogin}>
             <div className="input-group">
-              <label htmlFor="ID">Admin ID</label>
+              <label htmlFor="id">Admin ID</label>
               <input
                 type="text"
-                id="ID"
+                id="id"
                 placeholder="Admin ID"
-                value={id}
-                onChange={(e) => setID(e.target.value)}
+                value={form.id}
+                onChange={handleChange}
                 className="login-input"
                 required
               />
@@ -120,19 +133,16 @@ const LoginAdmin: React.FC = () => {
               <label htmlFor="password">Password</label>
               <div className="password-wrapper">
                 <input
-                  type={showPassword ? 'text' : 'password'}
+                  type={showPasswordRef.current ? "text" : "password"}
                   id="password"
                   placeholder="Password"
-                  value={password}
-                  onChange={(e) => setPassword(e.target.value)}
+                  value={form.password}
+                  onChange={handleChange}
                   className="login-input"
                   required
                 />
-                <span
-                  className="toggle-password"
-                  onClick={() => setShowPassword(!showPassword)}
-                >
-                  {showPassword ? <FaEyeSlash /> : <FaEye />}
+                <span className="toggle-password" onClick={togglePassword}>
+                  {showPasswordRef.current ? <FaEyeSlash /> : <FaEye />}
                 </span>
               </div>
             </div>
@@ -150,15 +160,16 @@ const LoginAdmin: React.FC = () => {
             {error && <p className="error-text">{error}</p>}
 
             <button type="submit" className="login-button" disabled={loading}>
-              {loading ? <span className="spinner"></span> : 'Login'}
+              {loading ? <span className="spinner"></span> : "Login"}
             </button>
           </form>
         </div>
-         <div className="admin-login-link">
+
+        <div className="admin-login-link">
           <button
             type="button"
             className="admin-login-btn"
-            onClick={() => navigate('/')}
+            onClick={() => navigate("/")}
           >
             Sign in as Faculty
           </button>

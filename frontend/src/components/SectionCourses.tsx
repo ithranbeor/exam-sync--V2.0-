@@ -212,26 +212,6 @@ const SectionCourses: React.FC = () => {
     }
   };
 
-<<<<<<< HEAD
-  // Single-item delete removed in favor of bulk delete
-=======
-  const handleDelete = async (sc: SectionCourse) => {
-    try {
-      const { status } = await api.delete(`/tbl_sectioncourse/${sc.id}/`);
-      // ✅ FIX: Django returns 204 for successful DELETE, not 200
-      if (status === 204 || status === 200) {
-        toast.success('Section deleted');
-      } else {
-        toast.error('Failed to delete section');
-      }
-    } catch (_error) {
-      toast.error('Error deleting section');
-    } finally {
-      fetchAll();
-    }
-  };
->>>>>>> 5431830458d78b6c5f23003af06aee96f577186f
-
   const handleImportFile = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (!file) return;
@@ -337,17 +317,6 @@ const SectionCourses: React.FC = () => {
     });
   };
 
-  const isAllSelected = sectionCourses.length > 0 && sectionCourses.every((s) => selectedIds.has(String(s.id)));
-
-  const toggleSelectAll = () => {
-    setSelectedIds(() => {
-      if (isAllSelected) return new Set();
-      const all = new Set<string>();
-      sectionCourses.forEach((s) => all.add(String(s.id)));
-      return all;
-    });
-  };
-
   const clearSelection = () => setSelectedIds(new Set());
 
   const handleBulkDelete = async () => {
@@ -450,25 +419,8 @@ const SectionCourses: React.FC = () => {
               <th>Year</th>
               <th>Term</th>
               <th>Instructor</th>
-<<<<<<< HEAD
-              <th>
-                <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-                  <span>Actions</span>
-                  <input
-                    type="checkbox"
-                    checked={isAllSelected}
-                    onChange={toggleSelectAll}
-                    disabled={loading || sectionCourses.length === 0}
-                    aria-label="Select all"
-                    title="Select all"
-                    style={{ marginLeft: 'auto' }}
-                  />
-                </div>
-              </th>
-=======
               <th>Night Class</th>
               <th>Actions</th>
->>>>>>> 5431830458d78b6c5f23003af06aee96f577186f
             </tr>
           </thead>
           <tbody>
@@ -495,12 +447,8 @@ const SectionCourses: React.FC = () => {
                   <td>{sc.year_level}</td>
                   <td>{sc.term?.term_name || 'N/A'}</td>
                   <td>{sc.user?.full_name || 'N/A'}</td>
-<<<<<<< HEAD
-                  <td className="action-buttons" style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-=======
                   <td>{sc.is_night_class === "YES" ? "YES" : ""}</td>
                   <td className="action-buttons">
->>>>>>> 5431830458d78b6c5f23003af06aee96f577186f
                     <button
                       type="button"
                       className="icon-button edit-button"

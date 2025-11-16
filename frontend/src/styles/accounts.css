@@ -74,7 +74,14 @@
 }
 
 .action-button.add-new {
-  background-color: #ffb800;
+  width: 38px;
+  height: 38px;
+  border-radius: 50%;
+  padding: 0;
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  font-size: 16px;
 }
 
 .action-button.add-new:hover {
@@ -97,6 +104,14 @@
 
 .action-button.import {
   background-color: #ffb800;
+  width: 38px;
+  height: 38px;
+  border-radius: 50%;
+  padding: 0;
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  font-size: 16px;
 }
 
 .action-button.import:hover {
