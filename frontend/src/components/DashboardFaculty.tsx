@@ -51,8 +51,13 @@ const roleSidebarMap: Record<string, { key: string, label: string, icon: JSX.Ele
   admin: [
     // Admin has access to ALL features from all roles
     { key: 'exam-Date', label: 'Exam Date', icon: <FaCalendar {...iconStyle} /> },
+    { key: 'plot-Schedule', label: 'Plot Schedule', icon: <FaCalendarPlus {...iconStyle} /> },
     { key: 'exam-Schedule', label: 'View Exam Schedule', icon: <FaClipboardList {...iconStyle} /> },
+    { key: 'proctors-Availability', label: 'Available Proctor', icon: <FaUsers {...iconStyle} /> },
     { key: 'set-Modality', label: 'Set Modality', icon: <FaPenAlt {...iconStyle} /> },
+    { key: 'Request', label: 'Requests', icon: <BsFillSendPlusFill {...iconStyle} /> },
+    { key: 'Room-Management', label: 'Room Management', icon: <FaBuilding {...iconStyle} /> },
+    { key: 'notification', label: 'Notification', icon: <FaBell {...iconStyle} /> },
   ]
 };
 

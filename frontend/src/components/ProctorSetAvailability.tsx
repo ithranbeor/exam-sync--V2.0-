@@ -13,11 +13,13 @@ type ProctorSetAvailabilityProps = {
   };
 };
 
-enum AvailabilityTimeSlot {
-  Morning = '7 AM - 1 PM (Morning)',
-  Afternoon = '1 PM - 6 PM (Afternoon)',
-  Evening = '6 PM - 9 PM (Evening)',
-}
+export const AvailabilityTimeSlot = {
+  Morning: '7 AM - 1 PM (Morning)',
+  Afternoon: '1 PM - 6 PM (Afternoon)',
+  Evening: '6 PM - 9 PM (Evening)',
+} as const;
+
+export type AvailabilityTimeSlot = (typeof AvailabilityTimeSlot)[keyof typeof AvailabilityTimeSlot];
 
 const ProctorSetAvailability: React.FC<ProctorSetAvailabilityProps> = ({ user }) => {
   const [selectedDates, setSelectedDates] = useState<string[]>([]);
@@ -43,13 +45,16 @@ const ProctorSetAvailability: React.FC<ProctorSetAvailabilityProps> = ({ user })
   const [isEditing, setIsEditing] = useState(false);
   const [editingId, setEditingId] = useState<number | null>(null);
 
+  const [loadingAvailability, setLoadingAvailability] = useState(false);
+  const [loadingAllowedDates, setLoadingAllowedDates] = useState(false);
+
   const today = new Date();
 
   // Fetch availability list for current user
   useEffect(() => {
     const fetchAvailability = async () => {
       if (!user?.user_id) return;
-
+      setLoadingAvailability(true);
       try {
         const { data } = await api.get(`/tbl_availability/`, {
           params: { user_id: user.user_id }
@@ -92,14 +97,14 @@ const ProctorSetAvailability: React.FC<ProctorSetAvailabilityProps> = ({ user })
           setAvailableDays([]);
           setDayToTimeSlots({});
         }
-      } catch (err) {
-        console.error('Error fetching availability:', err);
+       } catch (err) {
+      console.error('Error fetching availability:', err);
+      } finally {
+        setLoadingAvailability(false);
       }
     };
 
     fetchAvailability();
-    const interval = setInterval(fetchAvailability, 5000);
-    return () => clearInterval(interval);
   }, [user.user_id]);
 
   // Initialize current month
@@ -112,6 +117,7 @@ const ProctorSetAvailability: React.FC<ProctorSetAvailabilityProps> = ({ user })
   // Fetch allowed dates (based on exam period)
   useEffect(() => {
     const fetchUserRoleAndSchedule = async () => {
+      setLoadingAllowedDates(true);
       try {
         if (!user?.user_id) return;
 
@@ -199,12 +205,12 @@ const ProctorSetAvailability: React.FC<ProctorSetAvailabilityProps> = ({ user })
       } catch (err) {
         console.error('Error fetching user role or exam schedule:', err);
         setAllowedDates([]);
+      } finally {
+        setLoadingAllowedDates(false);
       }
     };
 
     fetchUserRoleAndSchedule();
-    const interval = setInterval(fetchUserRoleAndSchedule, 5000);
-    return () => clearInterval(interval);
   }, [user.user_id]);
 
   // Check if there's an approved schedule for the proctor's college
@@ -411,7 +417,11 @@ const ProctorSetAvailability: React.FC<ProctorSetAvailabilityProps> = ({ user })
                 />
                 <span className="dropdown-arrow" onClick={() => setShowDatePicker(!showDatePicker)}>&#9660;</span>
 
-                {showDatePicker && (
+                {loadingAllowedDates ? (
+                  <div className="loading-dates">
+                    Loading available dates...
+                  </div>
+                ) : showDatePicker && (
                   <div className="date-picker">
                     <div className="date-picker-header">
                       <button type="button" onClick={goToPreviousMonth}><FaChevronLeft /></button>
@@ -519,7 +529,9 @@ const ProctorSetAvailability: React.FC<ProctorSetAvailabilityProps> = ({ user })
           <div className="availability-modal-overlay">
             <div className="availability-modal-box">
               <h2 className="availability-modal-title">All Submitted Availabilities</h2>
-              {availabilityList.length > 0 ? (
+              {loadingAvailability ? (
+                <p>Loading submitted availabilities...</p>
+              ) : availabilityList.length > 0 ? (
                 <div className="availability-modal-body">
                   {availabilityList.map((entry, idx) => (
                     <div key={idx} className="availability-entry">

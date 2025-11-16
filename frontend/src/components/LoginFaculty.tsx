@@ -1,104 +1,116 @@
 // deno-lint-ignore-file no-explicit-any
-import React, { useState, useEffect } from 'react';
-import { useNavigate } from 'react-router-dom';
-import { api } from '../lib/apiClient.ts';
-import { FaEye, FaEyeSlash } from 'react-icons/fa';
-import '../styles/loginFaculty.css';
+import React, { useState, useCallback, useRef } from "react";
+import { useNavigate } from "react-router-dom";
+import { api } from "../lib/apiClient.ts";
+import { FaEye, FaEyeSlash } from "react-icons/fa";
+import "../styles/loginFaculty.css";
 
 const getGreeting = () => {
   const hour = new Date().getHours();
-  if (hour < 12) return 'Good morning';
-  if (hour < 18) return 'Good afternoon';
-  return 'Good evening';
+  if (hour < 12) return "Good morning";
+  if (hour < 18) return "Good afternoon";
+  return "Good evening";
 };
 
 const roleToDashboardMap: Record<string, string> = {
-  proctor: '/faculty-dashboard',
-  faculty: '/faculty-dashboard',
-  scheduler: '/faculty-dashboard',
-  'bayanihan leader': '/faculty-dashboard',
-  dean: '/faculty-dashboard',
-  admin: '/faculty-dashboard',
+  proctor: "/faculty-dashboard",
+  faculty: "/faculty-dashboard",
+  scheduler: "/faculty-dashboard",
+  "bayanihan leader": "/faculty-dashboard",
+  dean: "/faculty-dashboard",
+  admin: "/faculty-dashboard",
 };
 
 const LoginFaculty: React.FC = () => {
-  const [greeting, setGreeting] = useState(getGreeting());
-  const [id, setID] = useState('');
-  const [password, setPassword] = useState('');
-  const [showPassword, setShowPassword] = useState(false);
-  const [rememberMe, setRememberMe] = useState(false);
-  const [error, setError] = useState('');
-  const [loading, setLoading] = useState(false);
   const navigate = useNavigate();
 
-  useEffect(() => {
-    const interval = setInterval(() => setGreeting(getGreeting()), 60000);
-    return () => clearInterval(interval);
+  const [form, setForm] = useState({ id: "", password: "" });
+  const [rememberMe, setRememberMe] = useState(false);
+  const [error, setError] = useState("");
+  const [loading, setLoading] = useState(false);
+
+  const showPasswordRef = useRef(false);
+  const [, forceRerender] = useState(false);
+
+  const handleChange = useCallback((e: any) => {
+    const { id, value } = e.target;
+    setForm((prev) => ({ ...prev, [id]: value }));
   }, []);
 
-  const handleLogin = async (e: React.FormEvent) => {
-    e.preventDefault();
-    setError('');
-    setLoading(true);
+  const togglePassword = useCallback(() => {
+    showPasswordRef.current = !showPasswordRef.current;
+    forceRerender((x) => !x);
+  }, []);
 
-    try {
-      // ✅ Direct authentication with user_id and password
-      const { data: authData } = await api.post('/login/', {
-        user_id: id,
-        password,
-      });
+  const handleLogin = useCallback(
+    async (e: React.FormEvent) => {
+      e.preventDefault();
+      setError("");
+      setLoading(true);
 
-      if (!authData?.token) {
-        setError('Invalid credentials.');
-        return;
+      const ctrl = new AbortController();
+
+      try {
+        const { data: authData } = await api.post(
+          "/login/",
+          {
+            user_id: form.id,
+            password: form.password,
+          },
+          { signal: ctrl.signal }
+        );
+
+        if (!authData?.token) {
+          setError("Invalid credentials.");
+          return;
+        }
+
+        const activeRoles =
+          authData.roles
+            ?.filter((r: any) => r.status?.toLowerCase() === "active")
+            ?.map((r: any) => r.role_name?.toLowerCase()) || [];
+
+        if (activeRoles.length === 0) {
+          setError("You do not have any active roles.");
+          return;
+        }
+
+        const assignedRole = activeRoles.includes("admin")
+          ? "admin"
+          : activeRoles[0];
+
+        const dashboard = roleToDashboardMap[assignedRole];
+        if (!dashboard) {
+          setError(`No dashboard found for role: ${assignedRole}`);
+          return;
+        }
+
+        const userData = {
+          user_id: authData.user_id,
+          email_address: authData.email,
+          first_name: authData.first_name,
+          last_name: authData.last_name,
+          token: authData.token,
+          roles: authData.roles,
+        };
+
+        (rememberMe ? localStorage : sessionStorage).setItem(
+          "user",
+          JSON.stringify(userData)
+        );
+
+        navigate(dashboard);
+      } catch (err: any) {
+        console.error("Login error:", err);
+        setError(err.response?.data?.message || "Invalid ID or password.");
+      } finally {
+        setLoading(false);
       }
 
-      // ✅ Check if user has at least one active role
-      const activeRoles = authData.roles
-        ?.filter((r: any) => r.status?.toLowerCase() === 'active')
-        ?.map((r: any) => r.role_name?.toLowerCase()) || [];
-
-      if (activeRoles.length === 0) {
-        setError('You do not have any active roles.');
-        return;
-      }
-
-      // ✅ Determine dashboard - prioritize admin role if present
-      const assignedRole = activeRoles.includes('admin') 
-        ? 'admin' 
-        : activeRoles[0];
-
-      const dashboard = roleToDashboardMap[assignedRole];
-      if (!dashboard) {
-        setError(`No dashboard found for role: ${assignedRole}`);
-        return;
-      }
-
-      // ✅ Store session with complete user data
-      const userData = {
-        user_id: authData.user_id,
-        email_address: authData.email,
-        first_name: authData.first_name,
-        last_name: authData.last_name,
-        token: authData.token,
-        roles: authData.roles,
-      };
-
-      if (rememberMe) {
-        localStorage.setItem('user', JSON.stringify(userData));
-      } else {
-        sessionStorage.setItem('user', JSON.stringify(userData));
-      }
-
-      // ✅ Navigate to dashboard
-      navigate(dashboard);
-    } catch (err: any) {
-      console.error('Login error:', err);
-      setError(err.response?.data?.message || 'Invalid employee ID or password.');
-    } finally {
-      setLoading(false);
-    }
-  };
+      return () => ctrl.abort();
+    },
+    [form, rememberMe, navigate]
+  );
 
   return (
     <div className="main-container">
@@ -110,7 +122,7 @@ const LoginFaculty: React.FC = () => {
         <div className="header-section">
           <div className="greeting">
             <p>Hello!</p>
-            <p className="good-morning">{greeting}</p>
+            <p className="good-morning">{getGreeting()}</p>
           </div>
           <div className="logo">
             <img src="../../static/logo/Exam.png" alt="ExamSync Logo" />
@@ -124,13 +136,13 @@ const LoginFaculty: React.FC = () => {
 
           <form className="login-form" onSubmit={handleLogin}>
             <div className="input-group">
-              <label htmlFor="ID">Employee ID</label>
+              <label htmlFor="id">Employee ID</label>
               <input
                 type="text"
-                id="ID"
+                id="id"
                 placeholder="ID"
-                value={id}
-                onChange={(e) => setID(e.target.value)}
+                value={form.id}
+                onChange={handleChange}
                 className="login-input"
                 required
               />
@@ -140,19 +152,16 @@ const LoginFaculty: React.FC = () => {
               <label htmlFor="password">Password</label>
               <div className="password-wrapper">
                 <input
-                  type={showPassword ? 'text' : 'password'}
+                  type={showPasswordRef.current ? "text" : "password"}
                   id="password"
                   placeholder="Password"
-                  value={password}
-                  onChange={(e) => setPassword(e.target.value)}
+                  value={form.password}
+                  onChange={handleChange}
                   className="login-input"
                   required
                 />
-                <span
-                  className="toggle-password"
-                  onClick={() => setShowPassword(!showPassword)}
-                >
-                  {showPassword ? <FaEyeSlash /> : <FaEye />}
+                <span className="toggle-password" onClick={togglePassword}>
+                  {showPasswordRef.current ? <FaEyeSlash /> : <FaEye />}
                 </span>
               </div>
             </div>
@@ -170,7 +179,7 @@ const LoginFaculty: React.FC = () => {
             {error && <p className="error-text">{error}</p>}
 
             <button type="submit" className="login-button" disabled={loading}>
-              {loading ? <span className="spinner"></span> : 'Login'}
+              {loading ? <span className="spinner"></span> : "Login"}
             </button>
           </form>
         </div>
@@ -179,7 +188,7 @@ const LoginFaculty: React.FC = () => {
           <button
             type="button"
             className="admin-login-btn"
-            onClick={() => navigate('/admin-login')}
+            onClick={() => navigate("/admin-login")}
           >
             Sign in as Admin
           </button>
