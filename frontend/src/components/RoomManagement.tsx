@@ -61,6 +61,7 @@ const RoomManagement: React.FC<UserProps> = ({ user }) => {
   const [showResetModal, setShowResetModal] = useState(false);
   const [isResetting, setIsResetting] = useState(false);
   const [isSaving, setIsSaving] = useState(false);
+  const [isLoading, setIsLoading] = useState(true);
   const [editingCapacity, setEditingCapacity] = useState<{ [room_id: string]: number }>({});
   const [occupancyModal, setOccupancyModal] = useState<{ visible: boolean; roomId: string | null }>({
     visible: false,
@@ -71,6 +72,7 @@ const RoomManagement: React.FC<UserProps> = ({ user }) => {
   useEffect(() => {
     const fetchData = async () => {
       try {
+        setIsLoading(true);
         // Fetch rooms
         const roomsResponse = await api.get('/tbl_rooms');
         const rooms = roomsResponse.data.map((r: any) => ({
@@ -113,6 +115,8 @@ const RoomManagement: React.FC<UserProps> = ({ user }) => {
       } catch (error) {
         console.error('Error fetching data:', error);
         toast.error('Failed to load room data');
+      } finally {
+        setIsLoading(false);   // <-- STOP LOADING
       }
     };
 
@@ -350,6 +354,16 @@ const RoomManagement: React.FC<UserProps> = ({ user }) => {
     .filter((r) => rightPanelTypeFilter === 'All' || r.room_type === rightPanelTypeFilter)
     .filter((r) => rightSearch === '' || r.room_name.toLowerCase().includes(rightSearch.toLowerCase()));
 
+  if (isLoading) {
+    return (
+      <div className="rm-loading-container">
+        <div className="rm-spinner"></div>
+        <p style={{ color: '#092C4C', marginTop: '10px' }}>
+          Loading room data...
+        </p>
+      </div>
+    );
+  }
   return (
     <div className="rm-container">
       {/* LEFT PANEL */}
