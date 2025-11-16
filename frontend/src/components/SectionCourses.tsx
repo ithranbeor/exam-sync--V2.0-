@@ -61,6 +61,8 @@ const SectionCourses: React.FC = () => {
   const [currentPage, setCurrentPage] = useState(1);
   const [isImporting, setIsImporting] = useState(false);
   const itemsPerPage = 20;
+  const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
+  const [isBulkDeleting, setIsBulkDeleting] = useState(false);
 
   const [newSection, setNewSection] = useState<SectionCourse>({
     course_id: '',
@@ -206,17 +208,7 @@ const SectionCourses: React.FC = () => {
     }
   };
 
-  const handleDelete = async (sc: SectionCourse) => {
-    try {
-      const { status } = await api.delete(`/tbl_sectioncourse/${sc.id}/`);
-      if (status === 200) toast.success('Section deleted');
-      else toast.error('Failed to delete section');
-    } catch (_error) {
-      toast.error('Error deleting section');
-    } finally {
-      fetchAll();
-    }
-  };
+  // Single-item delete removed in favor of bulk delete
 
   const handleImportFile = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
@@ -311,6 +303,54 @@ const SectionCourses: React.FC = () => {
 
   const totalPages = Math.ceil(filtered.length / itemsPerPage);
 
+  const toggleSelect = (id: string | number | undefined) => {
+    if (id === undefined) return;
+    const key = String(id);
+    setSelectedIds((prev) => {
+      const next = new Set(prev);
+      if (next.has(key)) next.delete(key);
+      else next.add(key);
+      return next;
+    });
+  };
+
+  const isAllSelected = sectionCourses.length > 0 && sectionCourses.every((s) => selectedIds.has(String(s.id)));
+
+  const toggleSelectAll = () => {
+    setSelectedIds(() => {
+      if (isAllSelected) return new Set();
+      const all = new Set<string>();
+      sectionCourses.forEach((s) => all.add(String(s.id)));
+      return all;
+    });
+  };
+
+  const clearSelection = () => setSelectedIds(new Set());
+
+  const handleBulkDelete = async () => {
+    const ids = Array.from(selectedIds);
+    if (ids.length === 0) {
+      toast.info('No sections selected');
+      return;
+    }
+    if (!globalThis.confirm(`Delete ${ids.length} selected section course(s)?`)) return;
+    setIsBulkDeleting(true);
+    try {
+      const results = await Promise.allSettled(ids.map((id) => api.delete(`/tbl_sectioncourse/${id}/`)));
+      const ok = results.filter((r) => r.status === 'fulfilled').length;
+      const fail = results.length - ok;
+      if (ok) toast.success(`Deleted ${ok} section(s)`);
+      if (fail) toast.error(`${fail} failed to delete`);
+      clearSelection();
+      await fetchAll();
+      setCurrentPage(1);
+    } catch {
+      toast.error('Bulk delete failed');
+    } finally {
+      setIsBulkDeleting(false);
+    }
+  };
+
   return (
     <div className="colleges-container">
       <div className="colleges-header">
@@ -327,7 +367,9 @@ const SectionCourses: React.FC = () => {
       </div>
 
       <div className="colleges-actions">
-        <button type='button' className="action-button add-new" onClick={() => {
+        <div style={{ display: 'flex', alignItems: 'center', gap: 8, width: '100%' }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+            <button type='button' className="action-button add-new" onClick={() => {
           setEditMode(false);
           setNewSection({
             course_id: '',
@@ -341,7 +383,20 @@ const SectionCourses: React.FC = () => {
         }}>
           <FaPlus/>
         </button>
-        <button type='button' className="action-button import" onClick={() => setShowImport(true)}><FaFileImport/></button>
+            <button type='button' className="action-button import" onClick={() => setShowImport(true)}><FaFileImport/></button>
+          </div>
+          <div style={{ marginLeft: 'auto', display: 'flex', alignItems: 'center', gap: 8 }}>
+            <button
+              type="button"
+              className="action-button delete"
+              onClick={handleBulkDelete}
+              disabled={isBulkDeleting || selectedIds.size === 0}
+              title={selectedIds.size ? `Delete ${selectedIds.size} selected` : 'Delete selected'}
+            >
+              <FaTrash/>
+            </button>
+          </div>
+        </div>
       </div>
 
       <div className="pagination-controls">
@@ -372,7 +427,20 @@ const SectionCourses: React.FC = () => {
               <th>Year</th>
               <th>Term</th>
               <th>Instructor</th>
-              <th>Actions</th>
+              <th>
+                <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                  <span>Actions</span>
+                  <input
+                    type="checkbox"
+                    checked={isAllSelected}
+                    onChange={toggleSelectAll}
+                    disabled={loading || sectionCourses.length === 0}
+                    aria-label="Select all"
+                    title="Select all"
+                    style={{ marginLeft: 'auto' }}
+                  />
+                </div>
+              </th>
             </tr>
           </thead>
           <tbody>
@@ -399,7 +467,7 @@ const SectionCourses: React.FC = () => {
                   <td>{sc.year_level}</td>
                   <td>{sc.term?.term_name || 'N/A'}</td>
                   <td>{sc.user?.full_name || 'N/A'}</td>
-                  <td className="action-buttons">
+                  <td className="action-buttons" style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
                     <button
                       type="button"
                       className="icon-button edit-button"
@@ -417,13 +485,13 @@ const SectionCourses: React.FC = () => {
                     >
                       <FaEdit />
                     </button>
-                    <button
-                      type="button"
-                      className="icon-button delete-button"
-                      onClick={() => handleDelete(sc)}
-                    >
-                      <FaTrash />
-                    </button>
+                    <input
+                      type="checkbox"
+                      checked={selectedIds.has(String(sc.id))}
+                      onChange={() => toggleSelect(sc.id)}
+                      aria-label={`Select ${sc.section_name}`}
+                      style={{ marginLeft: 'auto' }}
+                    />
                   </td>
                 </tr>
               ))
