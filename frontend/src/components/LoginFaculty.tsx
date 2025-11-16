@@ -18,7 +18,7 @@ const roleToDashboardMap: Record<string, string> = {
   scheduler: '/faculty-dashboard',
   'bayanihan leader': '/faculty-dashboard',
   dean: '/faculty-dashboard',
-  admin: '/admin-dashboard',
+  admin: '/faculty-dashboard',
 };
 
 const LoginFaculty: React.FC = () => {
@@ -53,7 +53,7 @@ const LoginFaculty: React.FC = () => {
         return;
       }
 
-      // ✅ Check if user has at least one active role (excluding admin for faculty login)
+      // ✅ Check if user has at least one active role
       const activeRoles = authData.roles
         ?.filter((r: any) => r.status?.toLowerCase() === 'active')
         ?.map((r: any) => r.role_name?.toLowerCase()) || [];
@@ -63,15 +63,10 @@ const LoginFaculty: React.FC = () => {
         return;
       }
 
-      // ✅ Block admin from logging in via faculty portal
-      if (activeRoles.includes('admin') && activeRoles.length === 1) {
-        setError('Admin accounts must use the Admin login portal.');
-        return;
-      }
-
-      // ✅ Determine dashboard (prefer non-admin roles for faculty)
-      const facultyRoles = activeRoles.filter((r: string) => r !== 'admin');
-      const assignedRole = facultyRoles.length > 0 ? facultyRoles[0] : activeRoles[0];
+      // ✅ Determine dashboard - prioritize admin role if present
+      const assignedRole = activeRoles.includes('admin') 
+        ? 'admin' 
+        : activeRoles[0];
 
       const dashboard = roleToDashboardMap[assignedRole];
       if (!dashboard) {

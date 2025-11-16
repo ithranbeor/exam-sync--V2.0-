@@ -23,6 +23,8 @@ const Terms: React.FC = () => {
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [loading, setLoading] = useState(true); // new state
   const [isImporting, setIsImporting] = useState(false);
+  const [selectedIds, setSelectedIds] = useState<Set<number>>(new Set());
+  const [isBulkDeleting, setIsBulkDeleting] = useState(false);
 
   useEffect(() => {
     fetchTerms();
@@ -89,18 +91,49 @@ const Terms: React.FC = () => {
     }
   };
 
-  // ✅ Delete term
-  const handleDelete = async (id: number) => {
-    if (!globalThis.confirm("Are you sure you want to delete this term?"))
-      return;
+  // Bulk selection helpers
+  const toggleSelect = (id: number) => {
+    setSelectedIds((prev) => {
+      const next = new Set(prev);
+      if (next.has(id)) next.delete(id);
+      else next.add(id);
+      return next;
+    });
+  };
 
+  const isAllSelected = terms.length > 0 && terms.every((t) => selectedIds.has(t.term_id));
+
+  const toggleSelectAll = () => {
+    setSelectedIds(() => {
+      if (isAllSelected) return new Set();
+      const all = new Set<number>();
+      terms.forEach((t) => all.add(t.term_id));
+      return all;
+    });
+  };
+
+  const clearSelection = () => setSelectedIds(new Set());
+
+  const handleBulkDelete = async () => {
+    const ids = Array.from(selectedIds);
+    if (ids.length === 0) {
+      toast.info("No terms selected");
+      return;
+    }
+    if (!globalThis.confirm(`Delete ${ids.length} selected term(s)?`)) return;
+    setIsBulkDeleting(true);
     try {
-      await api.delete(`/tbl_term/${id}/`);
-      setTerms((prev) => prev.filter((t) => t.term_id !== id));
-      toast.success("Term deleted");
+      const results = await Promise.allSettled(ids.map((id) => api.delete(`/tbl_term/${id}/`)));
+      const ok = results.filter((r) => r.status === "fulfilled").length;
+      const fail = results.length - ok;
+      if (ok) toast.success(`Deleted ${ok} term(s)`);
+      if (fail) toast.error(`${fail} failed to delete`);
+      clearSelection();
+      await fetchTerms();
     } catch (err) {
-      console.error("Delete term error:", err);
-      toast.error("Failed to delete term");
+      toast.error("Bulk delete failed");
+    } finally {
+      setIsBulkDeleting(false);
     }
   };
 
@@ -188,25 +221,40 @@ const Terms: React.FC = () => {
       </div>
 
       <div className="colleges-actions">
-        <button
-          type="button"
-          className="action-button add-new"
-          onClick={() => {
-            setNewTermName("");
-            setEditMode(false);
-            setEditingTermId(null);
-            setShowModal(true);
-          }}
-        >
-          <FaPlus/>
-        </button>
-        <button
-          type="button"
-          className="action-button import"
-          onClick={() => setShowImport(true)}
-        >
-          <FaFileImport/>
-        </button>
+        <div style={{ display: "flex", alignItems: "center", gap: 8, width: "100%" }}>
+          <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+            <button
+              type="button"
+              className="action-button add-new"
+              onClick={() => {
+                setNewTermName("");
+                setEditMode(false);
+                setEditingTermId(null);
+                setShowModal(true);
+              }}
+            >
+              <FaPlus/>
+            </button>
+            <button
+              type="button"
+              className="action-button import"
+              onClick={() => setShowImport(true)}
+            >
+              <FaFileImport/>
+            </button>
+          </div>
+          <div style={{ marginLeft: "auto", display: "flex", alignItems: "center", gap: 8 }}>
+            <button
+              type="button"
+              className="action-button delete"
+              onClick={handleBulkDelete}
+              disabled={isBulkDeleting || selectedIds.size === 0}
+              title={selectedIds.size ? `Delete ${selectedIds.size} selected` : "Delete selected"}
+            >
+              <FaTrash/>
+            </button>
+          </div>
+        </div>
       </div>
 
       <div className="colleges-table-container">
@@ -215,7 +263,20 @@ const Terms: React.FC = () => {
             <tr>
               <th>#</th>
               <th>Term Name</th>
-              <th>Actions</th>
+              <th>
+                <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+                  <span>Actions</span>
+                  <input
+                    type="checkbox"
+                    checked={isAllSelected}
+                    onChange={toggleSelectAll}
+                    disabled={loading || terms.length === 0}
+                    aria-label="Select all"
+                    title="Select all"
+                    style={{ marginLeft: "auto" }}
+                  />
+                </div>
+              </th>
             </tr>
           </thead>
           <tbody>
@@ -236,7 +297,7 @@ const Terms: React.FC = () => {
                 <tr key={term.term_id}>
                   <td>{index + 1}</td>
                   <td>{term.term_name}</td>
-                  <td className="action-buttons">
+                  <td className="action-buttons" style={{ display: "flex", alignItems: "center", gap: 8 }}>
                     <button
                       type="button"
                       className="icon-button edit-button"
@@ -249,13 +310,13 @@ const Terms: React.FC = () => {
                     >
                       <FaEdit />
                     </button>
-                    <button
-                      type="button"
-                      className="icon-button delete-button"
-                      onClick={() => handleDelete(term.term_id)}
-                    >
-                      <FaTrash />
-                    </button>
+                    <input
+                      type="checkbox"
+                      checked={selectedIds.has(term.term_id)}
+                      onChange={() => toggleSelect(term.term_id)}
+                      aria-label={`Select ${term.term_name}`}
+                      style={{ marginLeft: "auto" }}
+                    />
                   </td>
                 </tr>
               ))

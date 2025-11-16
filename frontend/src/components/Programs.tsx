@@ -42,6 +42,8 @@ const Programs: React.FC<ProgramsProps> = ({ user: _user }) => {
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [loading, setLoading] = useState(true); // new state
   const [isImporting, setIsImporting] = useState(false);
+  const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
+  const [isBulkDeleting, setIsBulkDeleting] = useState(false);
 
   useEffect(() => {
     fetchDepartments();
@@ -105,6 +107,52 @@ const Programs: React.FC<ProgramsProps> = ({ user: _user }) => {
     );
   });
 
+  const toggleSelect = (id: string) => {
+    setSelectedIds((prev) => {
+      const next = new Set(prev);
+      if (next.has(id)) next.delete(id);
+      else next.add(id);
+      return next;
+    });
+  };
+
+  const isAllSelected = programs.length > 0 && programs.every((p) => selectedIds.has(p.program_id));
+
+  const toggleSelectAll = () => {
+    setSelectedIds(() => {
+      if (isAllSelected) return new Set();
+      const all = new Set<string>();
+      programs.forEach((p) => all.add(p.program_id));
+      return all;
+    });
+  };
+
+  const clearSelection = () => setSelectedIds(new Set());
+
+  const handleBulkDelete = async () => {
+    const ids = Array.from(selectedIds);
+    if (ids.length === 0) {
+      toast.info('No programs selected');
+      return;
+    }
+    if (!globalThis.confirm(`Delete ${ids.length} selected program(s)?`)) return;
+    setIsBulkDeleting(true);
+    try {
+      const results = await Promise.allSettled(ids.map((id) => api.delete(`/programs/${id}/`)));
+      const ok = results.filter((r) => r.status === 'fulfilled').length;
+      const fail = results.length - ok;
+      if (ok) toast.success(`Deleted ${ok} program(s)`);
+      if (fail) toast.error(`${fail} failed to delete`);
+      clearSelection();
+      await fetchPrograms();
+    } catch (err) {
+      console.error('Bulk delete failed:', err);
+      toast.error('Bulk delete failed');
+    } finally {
+      setIsBulkDeleting(false);
+    }
+  };
+
   const handleAddProgram = () => {
     setNewProgId('');
     setNewProgName('');
@@ -146,17 +194,7 @@ const Programs: React.FC<ProgramsProps> = ({ user: _user }) => {
     }
   };
 
-  const handleDelete = async (id: string) => {
-    if (!globalThis.confirm('Are you sure you want to delete this program?')) return;
-    try {
-      await api.delete(`/programs/${id}/`);
-      setPrograms((prev) => prev.filter((p) => p.program_id !== id));
-      toast.success('Program deleted.');
-    } catch (err) {
-      console.error('Failed to delete program:', err);
-      toast.error('Failed to delete program.');
-    }
-  };
+  // Single-item delete replaced with bulk delete
 
   const handleImportFile = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
@@ -235,12 +273,27 @@ const Programs: React.FC<ProgramsProps> = ({ user: _user }) => {
       </div>
 
       <div className="colleges-actions">
-        <button type="button" onClick={handleAddProgram} className="action-button add-new">
-          <FaPlus/>
-        </button>
-        <button type="button" onClick={() => setShowImport(true)} className="action-button import">
-          <FaFileImport/>
-        </button>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 8, width: '100%' }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+            <button type="button" onClick={handleAddProgram} className="action-button add-new">
+              <FaPlus/>
+            </button>
+            <button type="button" onClick={() => setShowImport(true)} className="action-button import">
+              <FaFileImport/>
+            </button>
+          </div>
+          <div style={{ marginLeft: 'auto', display: 'flex', alignItems: 'center', gap: 8 }}>
+            <button
+              type="button"
+              className="action-button delete"
+              onClick={handleBulkDelete}
+              disabled={isBulkDeleting || selectedIds.size === 0}
+              title={selectedIds.size ? `Delete ${selectedIds.size} selected` : 'Delete selected'}
+            >
+              <FaTrash/>
+            </button>
+          </div>
+        </div>
       </div>
 
       <div className="colleges-table-container">
@@ -251,7 +304,20 @@ const Programs: React.FC<ProgramsProps> = ({ user: _user }) => {
               <th>Code</th>
               <th>Name</th>
               <th>Department</th>
-              <th>Actions</th>
+              <th>
+                <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                  <span>Actions</span>
+                  <input
+                    type="checkbox"
+                    checked={isAllSelected}
+                    onChange={toggleSelectAll}
+                    disabled={loading || programs.length === 0}
+                    aria-label="Select all"
+                    title="Select all"
+                    style={{ marginLeft: 'auto' }}
+                  />
+                </div>
+              </th>
             </tr>
           </thead>
           <tbody>
@@ -274,7 +340,7 @@ const Programs: React.FC<ProgramsProps> = ({ user: _user }) => {
                   <td>{p.program_id}</td>
                   <td>{p.program_name}</td>
                   <td>{getDepartmentName(p)}</td>
-                  <td className="action-buttons">
+                  <td className="action-buttons" style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
                     <button
                       type="button"
                       onClick={() => {
@@ -289,13 +355,13 @@ const Programs: React.FC<ProgramsProps> = ({ user: _user }) => {
                     >
                       <FaEdit />
                     </button>
-                    <button
-                      type="button"
-                      onClick={() => handleDelete(p.program_id)}
-                      className="icon-button delete-button"
-                    >
-                      <FaTrash />
-                    </button>
+                    <input
+                      type="checkbox"
+                      checked={selectedIds.has(p.program_id)}
+                      onChange={() => toggleSelect(p.program_id)}
+                      aria-label={`Select ${p.program_name}`}
+                      style={{ marginLeft: 'auto' }}
+                    />
                   </td>
                 </tr>
               ))

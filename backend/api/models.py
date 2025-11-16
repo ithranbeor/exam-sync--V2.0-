@@ -135,6 +135,10 @@ class TblAvailability(models.Model):
     class Meta:
         managed = True
         db_table = 'tbl_availability'
+        indexes = [
+            models.Index(fields=['user']),
+            models.Index(fields=['status']),
+        ]
 
 
 class TblAvailableRooms(models.Model):
@@ -146,6 +150,10 @@ class TblAvailableRooms(models.Model):
         managed = True
         db_table = 'tbl_available_rooms'
         unique_together = (('room_id', 'college_id'),)
+        indexes = [
+            models.Index(fields=['room_id']),
+            models.Index(fields=['college_id']),
+        ]
 
 
 class TblBuildings(models.Model):
@@ -155,6 +163,9 @@ class TblBuildings(models.Model):
     class Meta:
         managed = True
         db_table = 'tbl_buildings'
+        indexes = [
+            models.Index(fields=['building_name']),
+        ]
 
 
 class TblCollege(models.Model):
@@ -174,6 +185,9 @@ class TblCourse(models.Model):
     class Meta:
         managed = True
         db_table = 'tbl_course'
+        indexes = [
+            models.Index(fields=['term']),
+        ]
 
 
 class TblCourseUsers(models.Model):
@@ -186,7 +200,10 @@ class TblCourseUsers(models.Model):
     class Meta:
         managed = True
         db_table = 'tbl_course_users'
-
+        indexes = [
+            models.Index(fields=['course']),
+            models.Index(fields=['user']),
+        ]
 
 class TblDepartment(models.Model):
     department_id = models.TextField(primary_key=True)
@@ -196,6 +213,10 @@ class TblDepartment(models.Model):
     class Meta:
         managed = True
         db_table = 'tbl_department'
+        indexes = [
+            models.Index(fields=['college']),
+            models.Index(fields=['department_name']),
+        ]
 
 
 class TblExamdetails(models.Model):
@@ -224,6 +245,14 @@ class TblExamdetails(models.Model):
     class Meta:
         managed = True
         db_table = 'tbl_examdetails'
+        indexes = [
+            models.Index(fields=['room']),
+            models.Index(fields=['modality']),
+            models.Index(fields=['proctor']),
+            models.Index(fields=['examperiod']),
+            models.Index(fields=['exam_date']),
+            models.Index(fields=['course_id']),
+        ]
 
 
 class TblExamperiod(models.Model):
@@ -239,6 +268,12 @@ class TblExamperiod(models.Model):
     class Meta:
         managed = True
         db_table = 'tbl_examperiod'
+        indexes = [
+            models.Index(fields=['start_date']),
+            models.Index(fields=['term']),
+            models.Index(fields=['college']),
+            models.Index(fields=['department']),
+        ]
 
 class TblModality(models.Model):
     modality_id = models.AutoField(primary_key=True)
@@ -256,7 +291,12 @@ class TblModality(models.Model):
     class Meta:
         managed = True
         db_table = 'tbl_modality'
-
+        indexes = [
+            models.Index(fields=['course']),
+            models.Index(fields=['user']),
+            models.Index(fields=['room']),
+            models.Index(fields=['program_id']),
+        ]
 
 class TblNotification(models.Model):
     notification_id = models.AutoField(primary_key=True)
@@ -281,6 +321,11 @@ class TblNotification(models.Model):
     class Meta:
         managed = True
         db_table = 'tbl_notification'
+        indexes = [
+            models.Index(fields=['user', '-created_at']),
+            models.Index(fields=['is_seen']),
+            models.Index(fields=['status']),
+        ]
 
 
 class TblProgram(models.Model):
@@ -291,6 +336,10 @@ class TblProgram(models.Model):
     class Meta:
         managed = True
         db_table = 'tbl_program'
+        indexes = [
+            models.Index(fields=['department']),
+            models.Index(fields=['program_name']),
+        ]
 
 class TblRoles(models.Model):
     role_id = models.BigAutoField(primary_key=True)
@@ -311,6 +360,11 @@ class TblRooms(models.Model):
     class Meta:
         managed = True
         db_table = 'tbl_rooms'
+        indexes = [
+            models.Index(fields=['building']),
+            models.Index(fields=['room_type']),
+            models.Index(fields=['room_name']),
+        ]
 
 
 class TblScheduleapproval(models.Model):
@@ -342,6 +396,12 @@ class TblSectioncourse(models.Model):
     class Meta:
         managed = True
         db_table = 'tbl_sectioncourse'
+        indexes = [
+            models.Index(fields=['course']),
+            models.Index(fields=['program']),
+            models.Index(fields=['term']),
+            models.Index(fields=['user']),
+        ]
 
 class TblTerm(models.Model):
     term_id = models.AutoField(primary_key=True)
@@ -366,6 +426,12 @@ class TblUserRole(models.Model):
     class Meta:
         managed = True
         db_table = 'tbl_user_role'
+        indexes = [
+            models.Index(fields=['user']),
+            models.Index(fields=['role']),
+            models.Index(fields=['college']),
+            models.Index(fields=['status']),
+        ]
 
 
 class TblUserRoleHistory(models.Model):
@@ -402,3 +468,7 @@ class TblUsers(models.Model):
     class Meta:
         managed = True
         db_table = 'tbl_users'
+        indexes = [
+            models.Index(fields=['email_address']),
+            models.Index(fields=['status']),
+        ]

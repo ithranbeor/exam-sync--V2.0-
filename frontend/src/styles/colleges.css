@@ -77,15 +77,19 @@
     transform: translateY(1px);
 }
 
+.colleges-actions .action-button {
+  width: 38px;
+  height: 38px;
+  border-radius: 50%;
+  padding: 0;
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  font-size: 16px;
+}
+
 .action-button.add-new {
   background-color: #ffb800;
-  font-size: small;
-  border-radius: 50px;
-  padding: 10px;
-
-  display: flex;
-  justify-content: center; 
-  align-items: center;
 }
 
 
@@ -95,13 +99,6 @@
 
 .action-button.import {
   background-color: #ffb800;
-  font-size: small;
-  border-radius: 50px;
-  padding: 10px;
-
-  display: flex;
-  justify-content: center; 
-  align-items: center;
 }
 
 .action-button.import:hover {
@@ -110,17 +107,24 @@
 
 .action-button.delete {
   background-color: #d63e3e;
-  font-size: small;
-  border-radius: 50px;
-  padding: 10px;
-
-  display: flex;
-  justify-content: center; 
-  align-items: center;
 }
 
 .action-button.delete:hover {
+  background-color: #b83333;
+}
+
+.action-button.select-all {
+  background-color: #ffb800;
+}
+.action-button.select-all:hover,
+.action-button.add-new:hover,
+.action-button.import:hover {
   background-color: #e6a700;
+}
+
+.action-button.select-all input[type="checkbox"] {
+  width: 16px;
+  height: 16px;
 }
 
 .colleges-table-container {
@@ -199,6 +203,13 @@
 
 .icon-button.delete-button:hover {
   color: #cc0000;
+}
+
+.colleges-table th input[type="checkbox"],
+.colleges-table td.action-buttons input[type="checkbox"] {
+  width: 17px;
+  height: 17px;
+  cursor: pointer;
 }
 
 .icon-button.edit-button {

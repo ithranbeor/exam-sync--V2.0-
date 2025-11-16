@@ -32,6 +32,8 @@ const Departments: React.FC = () => {
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [loading, setLoading] = useState(true);
   const [isImporting, setIsImporting] = useState(false);
+  const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
+  const [isBulkDeleting, setIsBulkDeleting] = useState(false);
 
   useEffect(() => {
     fetchDepartments();
@@ -76,6 +78,52 @@ const Departments: React.FC = () => {
     );
   });
 
+  const toggleSelect = (id: string) => {
+    setSelectedIds((prev) => {
+      const next = new Set(prev);
+      if (next.has(id)) next.delete(id);
+      else next.add(id);
+      return next;
+    });
+  };
+
+  const isAllSelected = departments.length > 0 && departments.every((d) => selectedIds.has(d.department_id));
+
+  const toggleSelectAll = () => {
+    setSelectedIds(() => {
+      if (isAllSelected) return new Set();
+      const all = new Set<string>();
+      departments.forEach((d) => all.add(d.department_id));
+      return all;
+    });
+  };
+
+  const clearSelection = () => setSelectedIds(new Set());
+
+  const handleBulkDelete = async () => {
+    const ids = Array.from(selectedIds);
+    if (ids.length === 0) {
+      toast.info('No departments selected');
+      return;
+    }
+    if (!window.confirm(`Delete ${ids.length} selected department(s)?`)) return;
+    setIsBulkDeleting(true);
+    try {
+      const results = await Promise.allSettled(ids.map((id) => api.delete(`/departments/${id}/`)));
+      const ok = results.filter((r) => r.status === 'fulfilled').length;
+      const fail = results.length - ok;
+      if (ok) toast.success(`Deleted ${ok} department(s)`);
+      if (fail) toast.error(`${fail} failed to delete`);
+      clearSelection();
+      fetchDepartments();
+    } catch (e) {
+      console.error(e);
+      toast.error('Bulk delete failed');
+    } finally {
+      setIsBulkDeleting(false);
+    }
+  };
+
   const handleAddDepartment = () => {
     setNewDeptId('');
     setNewDeptName('');
@@ -119,17 +167,7 @@ const Departments: React.FC = () => {
     }
   };
 
-  const handleDelete = async (id: string) => {
-    if (!globalThis.confirm('Are you sure you want to delete this department?')) return;
-    try {
-      await api.delete(`/departments/${id}/`);
-      setDepartments(departments.filter(d => d.department_id !== id));
-      toast.success('Department deleted.');
-    } catch (err) {
-      console.error(err);
-      toast.error('Failed to delete department.');
-    }
-  };
+  // Single-item delete replaced by bulk delete
 
   // Import Excel
   const handleImportFile = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -208,8 +246,23 @@ const Departments: React.FC = () => {
       </div>
 
       <div className="colleges-actions">
-        <button type="button" className="action-button add-new" onClick={handleAddDepartment}><FaPlus/></button>
-        <button type="button" className="action-button import" onClick={() => setShowImport(true)}><FaFileImport/></button>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 8, width: '100%' }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+            <button type="button" className="action-button add-new" onClick={handleAddDepartment}><FaPlus/></button>
+            <button type="button" className="action-button import" onClick={() => setShowImport(true)}><FaFileImport/></button>
+          </div>
+          <div style={{ marginLeft: 'auto', display: 'flex', alignItems: 'center', gap: 8 }}>
+            <button
+              type="button"
+              className="action-button delete"
+              onClick={handleBulkDelete}
+              disabled={isBulkDeleting || selectedIds.size === 0}
+              title={selectedIds.size ? `Delete ${selectedIds.size} selected` : 'Delete selected'}
+            >
+              <FaTrash/>
+            </button>
+          </div>
+        </div>
       </div>
 
       <div className="colleges-table-container">
@@ -220,7 +273,20 @@ const Departments: React.FC = () => {
               <th>Department ID</th>
               <th>Department Name</th>
               <th>College</th>
-              <th>Actions</th>
+              <th>
+                <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                  <span>Actions</span>
+                  <input
+                    type="checkbox"
+                    checked={isAllSelected}
+                    onChange={toggleSelectAll}
+                    disabled={loading || departments.length === 0}
+                    aria-label="Select all"
+                    title="Select all"
+                    style={{ marginLeft: 'auto' }}
+                  />
+                </div>
+              </th>
             </tr>
           </thead>
           <tbody>
@@ -243,7 +309,7 @@ const Departments: React.FC = () => {
                   <td>{dept.department_id}</td>
                   <td>{dept.department_name}</td>
                   <td>{dept.college?.college_name || dept.college?.college_id}</td>
-                  <td className="action-buttons">
+                  <td className="action-buttons" style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
                     <button type="button" className="icon-button edit-button" onClick={() => {
                       setNewDeptId(dept.department_id);
                       setNewDeptName(dept.department_name);
@@ -254,9 +320,13 @@ const Departments: React.FC = () => {
                     }}>
                       <FaEdit />
                     </button>
-                    <button type="button" className="icon-button delete-button" onClick={() => handleDelete(dept.department_id)}>
-                      <FaTrash />
-                    </button>
+                    <input
+                      type="checkbox"
+                      checked={selectedIds.has(dept.department_id)}
+                      onChange={() => toggleSelect(dept.department_id)}
+                      aria-label={`Select ${dept.department_name}`}
+                      style={{ marginLeft: 'auto' }}
+                    />
                   </td>
                 </tr>
               ))
