@@ -3,7 +3,7 @@ import React, { useEffect, useState, useRef } from "react";
 import Select from "react-select";
 import { api } from '../lib/apiClient.ts';
 import "../styles/SchedulerView.css";
-import { FaChevronLeft , FaChevronRight, FaUserEdit, FaEnvelope, FaFileDownload, FaPlus, FaTrash, FaSms, FaPaperPlane  } from "react-icons/fa";
+import { FaChevronLeft, FaChevronRight, FaUserEdit, FaEnvelope, FaFileDownload, FaPlus, FaTrash, FaSms, FaPaperPlane } from "react-icons/fa";
 import { MdSwapHoriz, MdEmail } from 'react-icons/md';
 import { ToastContainer, toast } from 'react-toastify';
 import 'react-toastify/dist/ReactToastify.css';
@@ -14,10 +14,11 @@ import EmailSender from "../components/EmailSender.tsx";
 import DeanSend from "../components/DeanSend.tsx";
 import ExportSchedule from "../components/ExportSchedule.tsx";
 
-interface ExamDetail {examdetails_id?: number;  course_id: string;      section_name?: string; room_id?: string;        exam_date?: string;     exam_start_time?: string; semester?: string; 
-                      exam_end_time?: string;   instructor_id?: number; proctor_id?: number;   proctor_timein?: string; academic_year?: string; building_name?: string;
-                      proctor_timeout?: string; program_id?: string;    college_name?: string; modality_id?: number;    exam_period?: string;   exam_category?: string; 
-                     }
+interface ExamDetail {
+  examdetails_id?: number; course_id: string; section_name?: string; room_id?: string; exam_date?: string; exam_start_time?: string; semester?: string;
+  exam_end_time?: string; instructor_id?: number; proctor_id?: number; proctor_timein?: string; academic_year?: string; building_name?: string;
+  proctor_timeout?: string; program_id?: string; college_name?: string; modality_id?: number; exam_period?: string; exam_category?: string;
+}
 
 interface SchedulerViewProps {
   user: {
@@ -247,7 +248,7 @@ const SchedulerView: React.FC<SchedulerViewProps> = ({ user }) => {
           }
         }
 
-        setIsLoadingData(false);  
+        setIsLoadingData(false);
         setCollegeDataReady(true);
       } catch (error) {
         console.error("Error fetching scheduler data:", error);
@@ -268,27 +269,27 @@ const SchedulerView: React.FC<SchedulerViewProps> = ({ user }) => {
         if (schedulerCollegeName && schedulerCollegeName !== "Add schedule first") {
           examParams.college_name = schedulerCollegeName;
         }
-        
+
         const [examsResponse, usersResponse] = await Promise.all([
           api.get('/tbl_examdetails', { params: examParams }),
           api.get('/users/')
         ]);
-        
+
         if (examsResponse.data) {
           console.log(`✅ Fetched ${examsResponse.data.length} schedules`);
-          
+
           // ✅ Check for data integrity issues
-          const invalidSchedules = examsResponse.data.filter((e: ExamDetail) => 
+          const invalidSchedules = examsResponse.data.filter((e: ExamDetail) =>
             !e.room_id || !e.exam_start_time || !e.exam_end_time
           );
-          
+
           if (invalidSchedules.length > 0) {
             console.error(`❌ ${invalidSchedules.length} schedules have missing data:`, invalidSchedules);
           }
-          
+
           setExamData(examsResponse.data);
         }
-        
+
         if (usersResponse.data) {
           setUsers(usersResponse.data);
         }
@@ -315,11 +316,11 @@ const SchedulerView: React.FC<SchedulerViewProps> = ({ user }) => {
 
         if (response.data && response.data.length > 0) {
           // Sort by submitted_at descending and get the first one
-          const sortedData = response.data.sort((a: any, b: any) => 
+          const sortedData = response.data.sort((a: any, b: any) =>
             new Date(b.submitted_at).getTime() - new Date(a.submitted_at).getTime()
           );
           const latestApproval = sortedData[0];
-          
+
           setApprovalStatus(latestApproval.status as 'pending' | 'approved' | 'rejected');
           setRemarks(latestApproval.remarks ?? null);
         } else {
@@ -359,24 +360,24 @@ const SchedulerView: React.FC<SchedulerViewProps> = ({ user }) => {
     if (!id) {
       return "-";
     }
-        
+
     // Convert to number if it's a string
     const numericId = typeof id === 'string' ? parseInt(id, 10) : id;
-    
+
     // Try allCollegeUsers first (filtered proctors)
     const collegeUser = allCollegeUsers.find(u => Number(u.user_id) === Number(numericId));
     if (collegeUser) {
       const name = `${collegeUser.first_name} ${collegeUser.last_name}`;
       return name;
     }
-    
+
     // Fallback to all users
     const user = users.find(u => Number(u.user_id) === Number(numericId));
     if (user) {
       const name = `${user.first_name} ${user.last_name}`;
       return name;
     }
-    
+
     return "-";
   };
 
@@ -398,7 +399,7 @@ const SchedulerView: React.FC<SchedulerViewProps> = ({ user }) => {
         setExamData(prev =>
           prev.map(e =>
             e.examdetails_id === updatedA.examdetails_id ? updatedA :
-            e.examdetails_id === updatedB.examdetails_id ? updatedB : e
+              e.examdetails_id === updatedB.examdetails_id ? updatedB : e
           )
         );
 
@@ -424,29 +425,29 @@ const SchedulerView: React.FC<SchedulerViewProps> = ({ user }) => {
   };
 
   // Filter exam data based on selected filter
-  const filteredExamData = selectedFilter === "all" 
-    ? examData 
+  const filteredExamData = selectedFilter === "all"
+    ? examData
     : examData.filter(exam => {
-        const filterKey = `${exam.semester} | ${exam.academic_year} | ${exam.exam_date}`;
-        return filterKey === selectedFilter;
-      });
+      const filterKey = `${exam.semester} | ${exam.academic_year} | ${exam.exam_date}`;
+      return filterKey === selectedFilter;
+    });
 
   // Further filter by search term
-  const searchFilteredData = searchTerm.trim() === "" 
-    ? filteredExamData 
+  const searchFilteredData = searchTerm.trim() === ""
+    ? filteredExamData
     : filteredExamData.filter(exam => {
-        const searchLower = searchTerm.toLowerCase();
-        return (
-          exam.course_id?.toLowerCase().includes(searchLower) ||
-          exam.section_name?.toLowerCase().includes(searchLower) ||
-          exam.room_id?.toLowerCase().includes(searchLower) ||
-          getUserName(exam.instructor_id).toLowerCase().includes(searchLower) ||
-          getUserName(exam.proctor_id).toLowerCase().includes(searchLower) ||
-          exam.exam_date?.includes(searchTerm) ||
-          exam.exam_start_time?.includes(searchTerm) ||
-          exam.exam_end_time?.includes(searchTerm)
-        );
-      });
+      const searchLower = searchTerm.toLowerCase();
+      return (
+        exam.course_id?.toLowerCase().includes(searchLower) ||
+        exam.section_name?.toLowerCase().includes(searchLower) ||
+        exam.room_id?.toLowerCase().includes(searchLower) ||
+        getUserName(exam.instructor_id).toLowerCase().includes(searchLower) ||
+        getUserName(exam.proctor_id).toLowerCase().includes(searchLower) ||
+        exam.exam_date?.includes(searchTerm) ||
+        exam.exam_start_time?.includes(searchTerm) ||
+        exam.exam_end_time?.includes(searchTerm)
+      );
+    });
 
   // Generate unique filter options
   const getFilterOptions = () => {
@@ -467,31 +468,31 @@ const SchedulerView: React.FC<SchedulerViewProps> = ({ user }) => {
       console.log('📊 Total schedules in searchFilteredData:', searchFilteredData.length);
       console.log('📅 Unique dates:', uniqueDates);
       console.log('🏫 Total rooms:', Array.from(new Set(searchFilteredData.map(e => e.room_id))).length);
-      
+
       // ✅ ADD THIS: Check for incomplete schedules
-      const invalidSchedules = searchFilteredData.filter(e => 
+      const invalidSchedules = searchFilteredData.filter(e =>
         !e.room_id || !e.exam_start_time || !e.exam_end_time || !e.exam_date
       );
-      
+
       if (invalidSchedules.length > 0) {
         console.error('❌ Incomplete schedules:', invalidSchedules);
       }
-      
+
       // ✅ ADD THIS: Log schedule distribution by date and room
       uniqueDates.forEach(date => {
         const dateSchedules = searchFilteredData.filter(e => e.exam_date === date);
         console.log(`📅 ${date}: ${dateSchedules.length} schedules`);
-        
+
         const roomsForDate = Array.from(new Set(dateSchedules.map(e => e.room_id)));
         console.log(`   🏫 Rooms: ${roomsForDate.join(', ')}`);
       });
     }
   }, [searchFilteredData, uniqueDates]);
-  
+
   const rawTimes = [
-    "07:00","07:30","08:00","08:30","09:00","09:30","10:00","10:30","11:00","11:30",
-    "12:00","12:30","13:00","13:30","14:00","14:30","15:00","15:30","16:00","16:30",
-    "17:00","17:30","18:00","18:30","19:00","19:30","20:00","20:30", "21:00"
+    "07:00", "07:30", "08:00", "08:30", "09:00", "09:30", "10:00", "10:30", "11:00", "11:30",
+    "12:00", "12:30", "13:00", "13:30", "14:00", "14:30", "15:00", "15:30", "16:00", "16:30",
+    "17:00", "17:30", "18:00", "18:30", "19:00", "19:30", "20:00", "20:30", "21:00"
   ];
 
   const formatTo12Hour = (time: string) => {
@@ -505,7 +506,7 @@ const SchedulerView: React.FC<SchedulerViewProps> = ({ user }) => {
   const timeSlots = rawTimes.slice(0, -1).map((t, i) => ({
     start24: t,
     end24: rawTimes[i + 1],
-    label: `${formatTo12Hour(t)} - ${formatTo12Hour(rawTimes[i+1])}`,
+    label: `${formatTo12Hour(t)} - ${formatTo12Hour(rawTimes[i + 1])}`,
   }));
 
   const generateCourseColors = (courses: string[]) => {
@@ -533,7 +534,7 @@ const SchedulerView: React.FC<SchedulerViewProps> = ({ user }) => {
   const toggleCard = (key: string) => {
     setActiveCards(prev => ({ ...prev, [key]: !prev[key] }));
   };
-  
+
   const [isModalOpen, setIsModalOpen] = useState(false);
 
   const handleDeleteAllSchedules = async () => {
@@ -556,7 +557,7 @@ const SchedulerView: React.FC<SchedulerViewProps> = ({ user }) => {
 
     try {
       const examsToDelete = examData.filter(e => e.college_name === schedulerCollegeName);
-      
+
       if (examsToDelete.length === 0) {
         toast.dismiss(loadingToast);
         toast.warn(`No schedules found for ${schedulerCollegeName}`);
@@ -571,10 +572,10 @@ const SchedulerView: React.FC<SchedulerViewProps> = ({ user }) => {
       });
 
       toast.dismiss(loadingToast);
-      
+
       // Update state immediately
       setExamData(prev => prev.filter(e => e.college_name !== schedulerCollegeName));
-      
+
       toast.success(`Successfully deleted ${response.data.deleted_count} schedules for ${schedulerCollegeName}!`);
 
     } catch (error: any) {
@@ -674,10 +675,10 @@ const SchedulerView: React.FC<SchedulerViewProps> = ({ user }) => {
   // ✅ Show loading state
   if (isLoadingData) {
     return (
-      <div style={{ 
-        display: 'flex', 
-        justifyContent: 'center', 
-        alignItems: 'center', 
+      <div style={{
+        display: 'flex',
+        justifyContent: 'center',
+        alignItems: 'center',
         height: '100vh',
         fontSize: '24px',
         color: '#092C4C'
@@ -707,8 +708,8 @@ const SchedulerView: React.FC<SchedulerViewProps> = ({ user }) => {
                 approvalStatus === "approved"
                   ? "#4CAF50"
                   : approvalStatus === "rejected"
-                  ? "#f44336"
-                  : "#FF9800",
+                    ? "#f44336"
+                    : "#FF9800",
               color: "white",
               fontWeight: "bold",
               zIndex: 1000,
@@ -753,7 +754,7 @@ const SchedulerView: React.FC<SchedulerViewProps> = ({ user }) => {
               zIndex: 1200,
               textAlign: "center",
               fontWeight: "bold",
-              opacity: 0.9 
+              opacity: 0.9
             }}
           >
             Swapping Mode
@@ -805,14 +806,13 @@ const SchedulerView: React.FC<SchedulerViewProps> = ({ user }) => {
           <div
             key={key}
             ref={key === "Send Messages" ? ref : undefined}
-            className={`scheduler-icon ${
-              (swapMode && key === "Swap Room") ||
+            className={`scheduler-icon ${(swapMode && key === "Swap Room") ||
               (activeProctorEdit !== null && key === "Change Proctor") ||
               (isModalOpen && key === "Add Schedule") ||
               (showEnvelopeDropdown && key === "Send Messages")
-                ? "active"
-                : ""
-            }`}
+              ? "active"
+              : ""
+              }`}
             style={{ position: key === "Send Messages" ? "relative" : undefined }}
             onClick={() => {
               if (action) {
@@ -872,7 +872,7 @@ const SchedulerView: React.FC<SchedulerViewProps> = ({ user }) => {
             )}
           </div>
         ))}
-      <div style={{
+        <div style={{
           top: "20px",
           right: "-100px",
         }}>
@@ -883,7 +883,7 @@ const SchedulerView: React.FC<SchedulerViewProps> = ({ user }) => {
               setPage(0);
             }}
             style={{
-              padding: "8px 1px", fontSize: "14px",borderRadius: "15px", border: "2px solid #092C4C",
+              padding: "8px 1px", fontSize: "14px", borderRadius: "15px", border: "2px solid #092C4C",
               backgroundColor: "white", cursor: "pointer", minWidth: "250px", color: "#092C4C",
             }}
           >
@@ -1033,10 +1033,10 @@ const SchedulerView: React.FC<SchedulerViewProps> = ({ user }) => {
                 <div style={{ fontSize: '20px', color: '#333', marginTop: '-10px', fontFamily: 'serif' }}>{examPeriodName}</div>
               </div>
               <hr />
-              <div style={{ 
-                textAlign: 'center', 
-                padding: '100px 20px', 
-                fontSize: '24px', 
+              <div style={{
+                textAlign: 'center',
+                padding: '100px 20px',
+                fontSize: '24px',
                 color: '#999',
                 fontFamily: 'serif'
               }}>
@@ -1063,7 +1063,7 @@ const SchedulerView: React.FC<SchedulerViewProps> = ({ user }) => {
             return Array.from({ length: dateTotalPages }).map((_, p) => {
               const pageRooms = dateRooms.slice(p * maxRoomColumns, (p + 1) * maxRoomColumns);
               const occupiedCells: Record<string, boolean> = {};
-              
+
               const groupedData: Record<string, ExamDetail[]> = {};
               dateExams.forEach((exam) => {
                 if (!exam.room_id) {
@@ -1169,25 +1169,25 @@ const SchedulerView: React.FC<SchedulerViewProps> = ({ user }) => {
                                   console.warn('⚠️ Missing time data:', e.examdetails_id);
                                   return false;
                                 }
-                                
+
                                 // ✅ FIX: Parse the FULL ISO timestamp, not just time portion
                                 const examStartTime = new Date(e.exam_start_time);
                                 const examEndTime = new Date(e.exam_end_time);
-                                
+
                                 // Extract minutes from midnight of the exam date
                                 const examStart = examStartTime.getUTCHours() * 60 + examStartTime.getUTCMinutes();
                                 const examEnd = examEndTime.getUTCHours() * 60 + examEndTime.getUTCMinutes();
-                                
+
                                 const slotStart = Number(slot.start24.split(":")[0]) * 60 + Number(slot.start24.split(":")[1]);
                                 const slotEnd = Number(slot.end24.split(":")[0]) * 60 + Number(slot.end24.split(":")[1]);
-                                
+
                                 const matches = (examStart < slotEnd) && (examEnd > slotStart);
-                                
+
                                 // ✅ Debug log for first room only
                                 if (rowIndex < 3 && room === pageRooms[0]) {
                                   console.log(`🔍 Slot ${slot.start24}-${slot.end24} (${slotStart}-${slotEnd}min) vs Exam ${examStart}-${examEnd}min (${e.exam_start_time.slice(11, 16)}-${e.exam_end_time.slice(11, 16)}): ${matches ? '✅' : '❌'}`);
                                 }
-                                
+
                                 return matches;
                               });
 
@@ -1211,7 +1211,7 @@ const SchedulerView: React.FC<SchedulerViewProps> = ({ user }) => {
 
                               const rowSpan = Math.ceil((endMinutes - startMinutes) / 30);
 
-                              console.log(`📏 Exam ${exam.examdetails_id}: ${examStartTime.toISOString().slice(11,16)}-${examEndTime.toISOString().slice(11,16)} → start=${startMinutes}min, end=${endMinutes}min, rowSpan=${rowSpan}, startSlotIndex=${startSlotIndex}`);
+                              console.log(`📏 Exam ${exam.examdetails_id}: ${examStartTime.toISOString().slice(11, 16)}-${examEndTime.toISOString().slice(11, 16)} → start=${startMinutes}min, end=${endMinutes}min, rowSpan=${rowSpan}, startSlotIndex=${startSlotIndex}`);
 
                               for (let i = 0; i < rowSpan; i++) {
                                 if (startSlotIndex + i < timeSlots.length) {
@@ -1230,17 +1230,17 @@ const SchedulerView: React.FC<SchedulerViewProps> = ({ user }) => {
                                       borderRadius: 4,
                                       fontSize: 12,
                                       cursor: swapMode ? "pointer" : "default",
-                                      outline: selectedSwap?.examdetails_id === exam.examdetails_id 
-                                        ? "10px solid blue" 
+                                      outline: selectedSwap?.examdetails_id === exam.examdetails_id
+                                        ? "10px solid blue"
                                         : searchTerm && (
-                                            exam.course_id?.toLowerCase().includes(searchTerm.toLowerCase()) ||
-                                            exam.section_name?.toLowerCase().includes(searchTerm.toLowerCase()) ||
-                                            exam.room_id?.toLowerCase().includes(searchTerm.toLowerCase()) ||
-                                            getUserName(exam.instructor_id).toLowerCase().includes(searchTerm.toLowerCase()) ||
-                                            getUserName(exam.proctor_id).toLowerCase().includes(searchTerm.toLowerCase())
-                                          )
-                                        ? "3px solid yellow"
-                                        : "none",
+                                          exam.course_id?.toLowerCase().includes(searchTerm.toLowerCase()) ||
+                                          exam.section_name?.toLowerCase().includes(searchTerm.toLowerCase()) ||
+                                          exam.room_id?.toLowerCase().includes(searchTerm.toLowerCase()) ||
+                                          getUserName(exam.instructor_id).toLowerCase().includes(searchTerm.toLowerCase()) ||
+                                          getUserName(exam.proctor_id).toLowerCase().includes(searchTerm.toLowerCase())
+                                        )
+                                          ? "3px solid yellow"
+                                          : "none",
                                       boxShadow: searchTerm && (
                                         exam.course_id?.toLowerCase().includes(searchTerm.toLowerCase()) ||
                                         exam.section_name?.toLowerCase().includes(searchTerm.toLowerCase()) ||
@@ -1254,15 +1254,15 @@ const SchedulerView: React.FC<SchedulerViewProps> = ({ user }) => {
                                     <p>{exam.section_name}</p>
                                     <p>Instructor: {getUserName(exam.instructor_id)}</p>
                                     <p>
-                                      Proctor: 
+                                      Proctor:
                                       {activeProctorEdit === exam.examdetails_id || activeProctorEdit === -1 ? (
                                         <Select
                                           value={
                                             exam.proctor_id
                                               ? {
-                                                  value: exam.proctor_id,
-                                                  label: getUserName(exam.proctor_id)
-                                                }
+                                                value: exam.proctor_id,
+                                                label: getUserName(exam.proctor_id)
+                                              }
                                               : null
                                           }
                                           onChange={(selectedOption) => {
@@ -1288,8 +1288,8 @@ const SchedulerView: React.FC<SchedulerViewProps> = ({ user }) => {
                                               (instr) => Number(instr.user_id) !== Number(sectionInstructorId)
                                             );
 
-                                            const eligibleUsers = alternativeInstructors.length > 0 
-                                              ? alternativeInstructors 
+                                            const eligibleUsers = alternativeInstructors.length > 0
+                                              ? alternativeInstructors
                                               : availableUserPool.filter(u => u.user_id !== sectionInstructorId);
 
                                             // Filter out users with conflicting schedules
@@ -1313,9 +1313,8 @@ const SchedulerView: React.FC<SchedulerViewProps> = ({ user }) => {
 
                                             return availableUsers.map((p) => ({
                                               value: p.user_id,
-                                              label: `${p.first_name} ${p.last_name}${
-                                                p.user_id === sectionInstructorId ? ' (Own Section)' : ''
-                                              }`
+                                              label: `${p.first_name} ${p.last_name}${p.user_id === sectionInstructorId ? ' (Own Section)' : ''
+                                                }`
                                             }));
                                           })()}
                                           placeholder="--Select Proctor--"
@@ -1329,7 +1328,7 @@ const SchedulerView: React.FC<SchedulerViewProps> = ({ user }) => {
                                         </span>
                                       )}
                                     </p>
-                                    <p>{formatTo12Hour(exam.exam_start_time!.slice(11,16))} - {formatTo12Hour(exam.exam_end_time!.slice(11,16))}</p>
+                                    <p>{formatTo12Hour(exam.exam_start_time!.slice(11, 16))} - {formatTo12Hour(exam.exam_end_time!.slice(11, 16))}</p>
                                   </div>
                                 </td>
                               );
@@ -1361,7 +1360,7 @@ const SchedulerView: React.FC<SchedulerViewProps> = ({ user }) => {
             return Array.from({ length: singleDatePages }).map((_, p) => {
               const pageRooms = rooms.slice(p * maxRoomColumns, (p + 1) * maxRoomColumns);
               const occupiedCells: Record<string, boolean> = {};
-              
+
               const groupedData: Record<string, ExamDetail[]> = {};
               filteredExamData.forEach((exam) => {
                 if (!exam.exam_date || !exam.room_id) return;
@@ -1414,35 +1413,35 @@ const SchedulerView: React.FC<SchedulerViewProps> = ({ user }) => {
                             <th colSpan={pageRooms.length + 1}>{date && new Date(date).toLocaleDateString("en-US", { year: "numeric", month: "long", day: "numeric" })}</th>
                           </tr>
                           <tr>
-                          <th></th>
-                          {(() => {
-                            const buildingGroups: Record<string, string[]> = {};
-                            pageRooms.forEach((room) => {
-                              const building = filteredExamData.find(e => e.room_id === (room ?? ""))?.building_name || "Unknown Building";
-                              if (!buildingGroups[building]) buildingGroups[building] = [];
-                              buildingGroups[building].push(String(room));
-                            });
+                            <th></th>
+                            {(() => {
+                              const buildingGroups: Record<string, string[]> = {};
+                              pageRooms.forEach((room) => {
+                                const building = filteredExamData.find(e => e.room_id === (room ?? ""))?.building_name || "Unknown Building";
+                                if (!buildingGroups[building]) buildingGroups[building] = [];
+                                buildingGroups[building].push(String(room));
+                              });
 
-                            return Object.entries(buildingGroups).map(([building, rooms]) => (
-                              <th key={building} colSpan={rooms.length}>{building}</th>
-                            ));
-                          })()}
-                        </tr>
-                        <tr>
-                          <th>Time</th>
-                          {(() => {
-                            const buildingGroups: Record<string, string[]> = {};
-                            pageRooms.forEach((room) => {
-                              const building = filteredExamData.find(e => e.room_id === (room ?? ""))?.building_name || "Unknown Building";
-                              if (!buildingGroups[building]) buildingGroups[building] = [];
-                              buildingGroups[building].push(String(room));
-                            });
+                              return Object.entries(buildingGroups).map(([building, rooms]) => (
+                                <th key={building} colSpan={rooms.length}>{building}</th>
+                              ));
+                            })()}
+                          </tr>
+                          <tr>
+                            <th>Time</th>
+                            {(() => {
+                              const buildingGroups: Record<string, string[]> = {};
+                              pageRooms.forEach((room) => {
+                                const building = filteredExamData.find(e => e.room_id === (room ?? ""))?.building_name || "Unknown Building";
+                                if (!buildingGroups[building]) buildingGroups[building] = [];
+                                buildingGroups[building].push(String(room));
+                              });
 
-                            return Object.values(buildingGroups)
-                              .flat()
-                              .map((room, idx) => <th key={idx}>{room}</th>);
-                          })()}
-                        </tr>
+                              return Object.values(buildingGroups)
+                                .flat()
+                                .map((room, idx) => <th key={idx}>{room}</th>);
+                            })()}
+                          </tr>
                         </thead>
                         <tbody>
                           {timeSlots.map((slot, rowIndex) => (
@@ -1459,25 +1458,25 @@ const SchedulerView: React.FC<SchedulerViewProps> = ({ user }) => {
                                     console.warn('⚠️ Missing time data:', e.examdetails_id);
                                     return false;
                                   }
-                                  
+
                                   // ✅ FIX: Parse the FULL ISO timestamp, not just time portion
                                   const examStartTime = new Date(e.exam_start_time);
                                   const examEndTime = new Date(e.exam_end_time);
-                                  
+
                                   // Extract minutes from midnight of the exam date
                                   const examStart = examStartTime.getUTCHours() * 60 + examStartTime.getUTCMinutes();
                                   const examEnd = examEndTime.getUTCHours() * 60 + examEndTime.getUTCMinutes();
-                                  
+
                                   const slotStart = Number(slot.start24.split(":")[0]) * 60 + Number(slot.start24.split(":")[1]);
                                   const slotEnd = Number(slot.end24.split(":")[0]) * 60 + Number(slot.end24.split(":")[1]);
-                                  
+
                                   const matches = (examStart < slotEnd) && (examEnd > slotStart);
-                                  
+
                                   // ✅ Debug log for first room only
                                   if (rowIndex < 3 && room === pageRooms[0]) {
                                     console.log(`🔍 Slot ${slot.start24}-${slot.end24} (${slotStart}-${slotEnd}min) vs Exam ${examStart}-${examEnd}min (${e.exam_start_time.slice(11, 16)}-${e.exam_end_time.slice(11, 16)}): ${matches ? '✅' : '❌'}`);
                                   }
-                                  
+
                                   return matches;
                                 });
 
@@ -1501,7 +1500,7 @@ const SchedulerView: React.FC<SchedulerViewProps> = ({ user }) => {
 
                                 const rowSpan = Math.ceil((endMinutes - startMinutes) / 30);
 
-                                console.log(`📏 Exam ${exam.examdetails_id}: ${examStartTime.toISOString().slice(11,16)}-${examEndTime.toISOString().slice(11,16)} → start=${startMinutes}min, end=${endMinutes}min, rowSpan=${rowSpan}, startSlotIndex=${startSlotIndex}`);
+                                console.log(`📏 Exam ${exam.examdetails_id}: ${examStartTime.toISOString().slice(11, 16)}-${examEndTime.toISOString().slice(11, 16)} → start=${startMinutes}min, end=${endMinutes}min, rowSpan=${rowSpan}, startSlotIndex=${startSlotIndex}`);
 
                                 for (let i = 0; i < rowSpan; i++) {
                                   if (startSlotIndex + i < timeSlots.length) {
@@ -1520,17 +1519,17 @@ const SchedulerView: React.FC<SchedulerViewProps> = ({ user }) => {
                                         borderRadius: 4,
                                         fontSize: 12,
                                         cursor: swapMode ? "pointer" : "default",
-                                        outline: selectedSwap?.examdetails_id === exam.examdetails_id 
-                                          ? "10px solid blue" 
+                                        outline: selectedSwap?.examdetails_id === exam.examdetails_id
+                                          ? "10px solid blue"
                                           : searchTerm && (
-                                              exam.course_id?.toLowerCase().includes(searchTerm.toLowerCase()) ||
-                                              exam.section_name?.toLowerCase().includes(searchTerm.toLowerCase()) ||
-                                              exam.room_id?.toLowerCase().includes(searchTerm.toLowerCase()) ||
-                                              getUserName(exam.instructor_id).toLowerCase().includes(searchTerm.toLowerCase()) ||
-                                              getUserName(exam.proctor_id).toLowerCase().includes(searchTerm.toLowerCase())
-                                            )
-                                          ? "3px solid yellow"
-                                          : "none",
+                                            exam.course_id?.toLowerCase().includes(searchTerm.toLowerCase()) ||
+                                            exam.section_name?.toLowerCase().includes(searchTerm.toLowerCase()) ||
+                                            exam.room_id?.toLowerCase().includes(searchTerm.toLowerCase()) ||
+                                            getUserName(exam.instructor_id).toLowerCase().includes(searchTerm.toLowerCase()) ||
+                                            getUserName(exam.proctor_id).toLowerCase().includes(searchTerm.toLowerCase())
+                                          )
+                                            ? "3px solid yellow"
+                                            : "none",
                                         boxShadow: searchTerm && (
                                           exam.course_id?.toLowerCase().includes(searchTerm.toLowerCase()) ||
                                           exam.section_name?.toLowerCase().includes(searchTerm.toLowerCase()) ||
@@ -1544,15 +1543,15 @@ const SchedulerView: React.FC<SchedulerViewProps> = ({ user }) => {
                                       <p>{exam.section_name}</p>
                                       <p>Instructor: {getUserName(exam.instructor_id)}</p>
                                       <p>
-                                        Proctor: 
+                                        Proctor:
                                         {activeProctorEdit === exam.examdetails_id || activeProctorEdit === -1 ? (
                                           <Select
                                             value={
                                               exam.proctor_id
                                                 ? {
-                                                    value: exam.proctor_id,
-                                                    label: getUserName(exam.proctor_id)
-                                                  }
+                                                  value: exam.proctor_id,
+                                                  label: getUserName(exam.proctor_id)
+                                                }
                                                 : null
                                             }
                                             onChange={(selectedOption) => {
@@ -1578,8 +1577,8 @@ const SchedulerView: React.FC<SchedulerViewProps> = ({ user }) => {
                                                 (instr) => Number(instr.user_id) !== Number(sectionInstructorId)
                                               );
 
-                                              const eligibleUsers = alternativeInstructors.length > 0 
-                                                ? alternativeInstructors 
+                                              const eligibleUsers = alternativeInstructors.length > 0
+                                                ? alternativeInstructors
                                                 : availableUserPool.filter(u => u.user_id !== sectionInstructorId);
 
                                               // Filter out users with conflicting schedules
@@ -1603,9 +1602,8 @@ const SchedulerView: React.FC<SchedulerViewProps> = ({ user }) => {
 
                                               return availableUsers.map((p) => ({
                                                 value: p.user_id,
-                                                label: `${p.first_name} ${p.last_name}${
-                                                  p.user_id === sectionInstructorId ? ' (Own Section)' : ''
-                                                }`
+                                                label: `${p.first_name} ${p.last_name}${p.user_id === sectionInstructorId ? ' (Own Section)' : ''
+                                                  }`
                                               }));
                                             })()}
                                             placeholder="--Select Proctor--"
@@ -1619,7 +1617,7 @@ const SchedulerView: React.FC<SchedulerViewProps> = ({ user }) => {
                                           </span>
                                         )}
                                       </p>
-                                      <p>{formatTo12Hour(exam.exam_start_time!.slice(11,16))} - {formatTo12Hour(exam.exam_end_time!.slice(11,16))}</p>
+                                      <p>{formatTo12Hour(exam.exam_start_time!.slice(11, 16))} - {formatTo12Hour(exam.exam_end_time!.slice(11, 16))}</p>
                                     </div>
                                   </td>
                                 );
@@ -1636,8 +1634,8 @@ const SchedulerView: React.FC<SchedulerViewProps> = ({ user }) => {
           })()
         )}
         <Modal isOpen={isModalOpen} onClose={() => setIsModalOpen(false)}>
-          <AddScheduleForm 
-            user={user} 
+          <AddScheduleForm
+            user={user}
             onScheduleCreated={async () => {
               // Force immediate refresh with proper filtering
               try {
@@ -1646,7 +1644,7 @@ const SchedulerView: React.FC<SchedulerViewProps> = ({ user }) => {
                 if (schedulerCollegeName && schedulerCollegeName !== "Add schedule first") {
                   params.college_name = schedulerCollegeName;
                 }
-                
+
                 const examsResponse = await api.get('/tbl_examdetails', { params });
                 if (examsResponse.data) {
                   console.log(`✅ Immediate refresh: ${examsResponse.data.length} schedules loaded`);
