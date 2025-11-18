@@ -260,7 +260,7 @@ const SchedulerView: React.FC<SchedulerViewProps> = ({ user }) => {
 
   // ✅ FIXED: Filter exam data by scheduler's college
   useEffect(() => {
-    if (!collegeDataReady) {
+    if (!collegeDataReady || !schedulerCollegeName) {
       return;
     }
 
@@ -271,52 +271,23 @@ const SchedulerView: React.FC<SchedulerViewProps> = ({ user }) => {
       }
 
       try {
-        console.log('🔄 Polling: Fetching exam details and users...');
+        console.log('🔄 Polling: Fetching exam details...');
         
-        // Fetch both exams and users in parallel
+        // ✅ FIX: Add college_name query parameter
         const [examsResponse, usersResponse] = await Promise.all([
-          api.get('/tbl_examdetails'),
+          api.get('/tbl_examdetails', {
+            params: { college_name: schedulerCollegeName }
+          }),
           api.get('/users/')
         ]);
         
         if (examsResponse.data) {
-          if (schedulerCollegeName && schedulerCollegeName !== "Add schedule first") {
-            const filteredExams = examsResponse.data.filter(
-              (exam: ExamDetail) => exam.college_name === schedulerCollegeName
-            );
-            
-            // Log proctor IDs from exams
-            const proctorIds = filteredExams
-              .filter((e: ExamDetail) => e.proctor_id)
-              .map((e: ExamDetail) => e.proctor_id);
-            console.log('📋 Proctor IDs in exams:', [...new Set(proctorIds)]);
-            
-            setExamData(filteredExams);
-          } else {
-            setExamData(examsResponse.data);
-          }
+          setExamData(examsResponse.data);
+          console.log(`✅ Loaded ${examsResponse.data.length} schedules for ${schedulerCollegeName}`);
         }
-
+        
         if (usersResponse.data) {
-          console.log(`✅ Fetched ${usersResponse.data.length} total users`);
           setUsers(usersResponse.data);
-          
-          // Log if we have the proctor IDs in the users data
-          if (examsResponse.data) {
-            const examProctorIds = new Set(
-              examsResponse.data
-                .filter((e: ExamDetail) => e.proctor_id)
-                .map((e: ExamDetail) => Number(e.proctor_id))
-            );
-            const userIds = new Set(usersResponse.data.map((u: any) => Number(u.user_id)));
-            const missingProctors = [...examProctorIds].filter(id => !userIds.has(id));
-            
-            if (missingProctors.length > 0) {
-              console.error('❌ Missing proctor IDs in users table:', missingProctors);
-            } else {
-              console.log('✅ All proctors found in users table');
-            }
-          }
         }
       } catch (error) {
         console.error("Error fetching data:", error);
@@ -1031,7 +1002,7 @@ const SchedulerView: React.FC<SchedulerViewProps> = ({ user }) => {
             <div className="scheduler-view-container">
               <div className="header" style={{ textAlign: "center", marginBottom: "20px" }}>
                 <img
-                  src="../../../static/logo/USTPlogo.png"
+                  src="../../static/logo/USTPlogo.png"
                   alt="School Logo"
                   style={{ width: '200px', height: '160px', marginBottom: '5px' }}
                 />
@@ -1107,7 +1078,7 @@ const SchedulerView: React.FC<SchedulerViewProps> = ({ user }) => {
                   <div className="scheduler-view-container">
                     <div className="header" style={{ textAlign: "center", marginBottom: "20px" }}>
                       <img
-                        src="../../../static/logo/USTPlogo.png"
+                        src="../../static/logo/USTPlogo.png"
                         alt="School Logo"
                         style={{ width: '200px', height: '160px', marginBottom: '5px' }}
                       />
@@ -1373,7 +1344,7 @@ const SchedulerView: React.FC<SchedulerViewProps> = ({ user }) => {
                   <div className="scheduler-view-container">
                     <div className="header" style={{ textAlign: "center", marginBottom: "20px" }}>
                       <img
-                        src="/USTPlogo.png"
+                        src="../../static/logo/USTPlogo.png"
                         alt="School Logo"
                         style={{ width: '200px', height: '160px', marginBottom: '5px' }}
                       />

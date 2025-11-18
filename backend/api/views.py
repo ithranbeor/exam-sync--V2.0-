@@ -304,17 +304,19 @@ def tbl_examdetails_list(request):
                 'examperiod'
             ).all()
 
-            # Optional filtering (e.g., ?room_id=R101&date=2025-10-23)
+            # ✅ ADD: Filter by college_name
+            college_name = request.GET.get('college_name')
             room_id = request.GET.get('room_id')
             exam_date = request.GET.get('exam_date')
             modality_id = request.GET.get('modality_id')
 
+            if college_name:
+                queryset = queryset.filter(college_name=college_name)
             if room_id:
                 queryset = queryset.filter(room__room_id=room_id)
             if exam_date:
                 queryset = queryset.filter(exam_date=exam_date)
             if modality_id:
-                # Handle comma-separated modality IDs
                 modality_ids = [mid.strip() for mid in modality_id.split(',') if mid.strip()]
                 queryset = queryset.filter(modality_id__in=modality_ids)
 
