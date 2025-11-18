@@ -260,30 +260,33 @@ const SchedulerView: React.FC<SchedulerViewProps> = ({ user }) => {
 
   // ✅ FIXED: Filter exam data by scheduler's college
   useEffect(() => {
-    if (!collegeDataReady || !schedulerCollegeName) {
-      return;
-    }
+    if (!collegeDataReady) return;
 
     const fetchData = async () => {
-      if (!user?.user_id) {
-        console.log('No user_id, skipping exam data fetch');
-        return;
-      }
-
       try {
-        console.log('🔄 Polling: Fetching exam details...');
+        const examParams: any = {};
+        if (schedulerCollegeName && schedulerCollegeName !== "Add schedule first") {
+          examParams.college_name = schedulerCollegeName;
+        }
         
-        // ✅ FIX: Add college_name query parameter
         const [examsResponse, usersResponse] = await Promise.all([
-          api.get('/tbl_examdetails', {
-            params: { college_name: schedulerCollegeName }
-          }),
+          api.get('/tbl_examdetails', { params: examParams }),
           api.get('/users/')
         ]);
         
         if (examsResponse.data) {
+          console.log(`✅ Fetched ${examsResponse.data.length} schedules`);
+          
+          // ✅ Check for data integrity issues
+          const invalidSchedules = examsResponse.data.filter((e: ExamDetail) => 
+            !e.room_id || !e.exam_start_time || !e.exam_end_time
+          );
+          
+          if (invalidSchedules.length > 0) {
+            console.error(`❌ ${invalidSchedules.length} schedules have missing data:`, invalidSchedules);
+          }
+          
           setExamData(examsResponse.data);
-          console.log(`✅ Loaded ${examsResponse.data.length} schedules for ${schedulerCollegeName}`);
         }
         
         if (usersResponse.data) {
@@ -444,21 +447,6 @@ const SchedulerView: React.FC<SchedulerViewProps> = ({ user }) => {
           exam.exam_end_time?.includes(searchTerm)
         );
       });
-      // Add debug logging after searchFilteredData definition
-      useEffect(() => {
-      if (searchFilteredData.length > 0 && searchFilteredData[0].proctor_id) {
-        const sampleExam = searchFilteredData[0];
-        console.log('🔍 Proctor Debug:', {
-          examId: sampleExam.examdetails_id,
-          proctorId: sampleExam.proctor_id,
-          proctorInUsers: users.find(u => u.user_id === sampleExam.proctor_id),
-          proctorInCollegeUsers: allCollegeUsers.find(u => u.user_id === sampleExam.proctor_id),
-          proctorName: getUserName(sampleExam.proctor_id),
-          totalUsers: users.length,
-          totalCollegeUsers: allCollegeUsers.length
-        });
-      }
-    }, [searchFilteredData, users, allCollegeUsers]);
 
   // Generate unique filter options
   const getFilterOptions = () => {
@@ -473,6 +461,32 @@ const SchedulerView: React.FC<SchedulerViewProps> = ({ user }) => {
 
   // Get unique dates from filtered data
   const uniqueDates = Array.from(new Set(searchFilteredData.map((e) => e.exam_date))).filter(Boolean).sort();
+
+  useEffect(() => {
+    if (searchFilteredData.length > 0) {
+      console.log('📊 Total schedules in searchFilteredData:', searchFilteredData.length);
+      console.log('📅 Unique dates:', uniqueDates);
+      console.log('🏫 Total rooms:', Array.from(new Set(searchFilteredData.map(e => e.room_id))).length);
+      
+      // ✅ ADD THIS: Check for incomplete schedules
+      const invalidSchedules = searchFilteredData.filter(e => 
+        !e.room_id || !e.exam_start_time || !e.exam_end_time || !e.exam_date
+      );
+      
+      if (invalidSchedules.length > 0) {
+        console.error('❌ Incomplete schedules:', invalidSchedules);
+      }
+      
+      // ✅ ADD THIS: Log schedule distribution by date and room
+      uniqueDates.forEach(date => {
+        const dateSchedules = searchFilteredData.filter(e => e.exam_date === date);
+        console.log(`📅 ${date}: ${dateSchedules.length} schedules`);
+        
+        const roomsForDate = Array.from(new Set(dateSchedules.map(e => e.room_id)));
+        console.log(`   🏫 Rooms: ${roomsForDate.join(', ')}`);
+      });
+    }
+  }, [searchFilteredData, uniqueDates]);
   
   const rawTimes = [
     "07:00","07:30","08:00","08:30","09:00","09:30","10:00","10:30","11:00","11:30",
@@ -1052,10 +1066,19 @@ const SchedulerView: React.FC<SchedulerViewProps> = ({ user }) => {
               
               const groupedData: Record<string, ExamDetail[]> = {};
               dateExams.forEach((exam) => {
-                if (!exam.room_id) return;
+                if (!exam.room_id) {
+                  console.warn('⚠️ Exam without room_id:', exam.examdetails_id);
+                  return;
+                }
                 const key = `${date}-${exam.room_id}`;
                 if (!groupedData[key]) groupedData[key] = [];
                 groupedData[key].push(exam);
+              });
+
+              // ✅ ADD THIS: Log grouped data
+              console.log(`📦 Grouped data for ${date}:`, Object.keys(groupedData).length, 'room groups');
+              Object.entries(groupedData).forEach(([key, exams]) => {
+                console.log(`   ${key}: ${exams.length} exam(s)`);
               });
 
               return (
@@ -1142,30 +1165,53 @@ const SchedulerView: React.FC<SchedulerViewProps> = ({ user }) => {
                               const examsInRoom = groupedData[`${date}-${room}`] || [];
 
                               const exam = examsInRoom.find((e) => {
-                                if (!e.exam_start_time || !e.exam_end_time) return false;
-                                const examStart = Number(e.exam_start_time!.slice(11,13)) * 60 + Number(e.exam_start_time!.slice(14,16));
-                                const examEnd   = Number(e.exam_end_time!.slice(11,13)) * 60 + Number(e.exam_end_time!.slice(14,16));
-                                const slotStart  = Number(slot.start24.split(":")[0]) * 60 + Number(slot.start24.split(":")[1]);
-                                const slotEnd    = Number(slot.end24.split(":")[0]) * 60 + Number(slot.end24.split(":")[1]);
-                                return (examStart < slotEnd) && (examEnd > slotStart);
+                                if (!e.exam_start_time || !e.exam_end_time) {
+                                  console.warn('⚠️ Missing time data:', e.examdetails_id);
+                                  return false;
+                                }
+                                
+                                // ✅ FIX: Parse the FULL ISO timestamp, not just time portion
+                                const examStartTime = new Date(e.exam_start_time);
+                                const examEndTime = new Date(e.exam_end_time);
+                                
+                                // Extract minutes from midnight of the exam date
+                                const examStart = examStartTime.getUTCHours() * 60 + examStartTime.getUTCMinutes();
+                                const examEnd = examEndTime.getUTCHours() * 60 + examEndTime.getUTCMinutes();
+                                
+                                const slotStart = Number(slot.start24.split(":")[0]) * 60 + Number(slot.start24.split(":")[1]);
+                                const slotEnd = Number(slot.end24.split(":")[0]) * 60 + Number(slot.end24.split(":")[1]);
+                                
+                                const matches = (examStart < slotEnd) && (examEnd > slotStart);
+                                
+                                // ✅ Debug log for first room only
+                                if (rowIndex < 3 && room === pageRooms[0]) {
+                                  console.log(`🔍 Slot ${slot.start24}-${slot.end24} (${slotStart}-${slotEnd}min) vs Exam ${examStart}-${examEnd}min (${e.exam_start_time.slice(11, 16)}-${e.exam_end_time.slice(11, 16)}): ${matches ? '✅' : '❌'}`);
+                                }
+                                
+                                return matches;
                               });
 
                               if (!exam) return <td key={room}></td>;
 
-                              const startMinutes = Number(exam.exam_start_time!.slice(11, 13)) * 60 + Number(exam.exam_start_time!.slice(14, 16));
-                              const endMinutes   = Number(exam.exam_end_time!.slice(11, 13)) * 60 + Number(exam.exam_end_time!.slice(14, 16));
+                              const examStartTime = new Date(exam.exam_start_time!);
+                              const examEndTime = new Date(exam.exam_end_time!);
 
-                              const examStartHour = Number(exam.exam_start_time!.slice(11, 13));
-                              const examStartMin  = Number(exam.exam_start_time!.slice(14, 16));
+                              const startMinutes = examStartTime.getUTCHours() * 60 + examStartTime.getUTCMinutes();
+                              const endMinutes = examEndTime.getUTCHours() * 60 + examEndTime.getUTCMinutes();
+
+                              const examStartHour = examStartTime.getUTCHours();
+                              const examStartMin = examStartTime.getUTCMinutes();
                               const examStartTotalMin = examStartHour * 60 + examStartMin;
 
                               const startSlotIndex = timeSlots.findIndex(slot => {
                                 const slotStart = Number(slot.start24.split(":")[0]) * 60 + Number(slot.start24.split(":")[1]);
-                                const slotEnd   = Number(slot.end24.split(":")[0]) * 60 + Number(slot.end24.split(":")[1]);
+                                const slotEnd = Number(slot.end24.split(":")[0]) * 60 + Number(slot.end24.split(":")[1]);
                                 return examStartTotalMin >= slotStart && examStartTotalMin < slotEnd;
                               });
 
                               const rowSpan = Math.ceil((endMinutes - startMinutes) / 30);
+
+                              console.log(`📏 Exam ${exam.examdetails_id}: ${examStartTime.toISOString().slice(11,16)}-${examEndTime.toISOString().slice(11,16)} → start=${startMinutes}min, end=${endMinutes}min, rowSpan=${rowSpan}, startSlotIndex=${startSlotIndex}`);
 
                               for (let i = 0; i < rowSpan; i++) {
                                 if (startSlotIndex + i < timeSlots.length) {
@@ -1409,30 +1455,53 @@ const SchedulerView: React.FC<SchedulerViewProps> = ({ user }) => {
                                 const examsInRoom = groupedData[`${date}-${room}`] || [];
 
                                 const exam = examsInRoom.find((e) => {
-                                  if (!e.exam_start_time || !e.exam_end_time) return false;
-                                  const examStart = Number(e.exam_start_time!.slice(11,13)) * 60 + Number(e.exam_start_time!.slice(14,16));
-                                  const examEnd   = Number(e.exam_end_time!.slice(11,13)) * 60 + Number(e.exam_end_time!.slice(14,16));
-                                  const slotStart  = Number(slot.start24.split(":")[0]) * 60 + Number(slot.start24.split(":")[1]);
-                                  const slotEnd    = Number(slot.end24.split(":")[0]) * 60 + Number(slot.end24.split(":")[1]);
-                                  return (examStart < slotEnd) && (examEnd > slotStart);
+                                  if (!e.exam_start_time || !e.exam_end_time) {
+                                    console.warn('⚠️ Missing time data:', e.examdetails_id);
+                                    return false;
+                                  }
+                                  
+                                  // ✅ FIX: Parse the FULL ISO timestamp, not just time portion
+                                  const examStartTime = new Date(e.exam_start_time);
+                                  const examEndTime = new Date(e.exam_end_time);
+                                  
+                                  // Extract minutes from midnight of the exam date
+                                  const examStart = examStartTime.getUTCHours() * 60 + examStartTime.getUTCMinutes();
+                                  const examEnd = examEndTime.getUTCHours() * 60 + examEndTime.getUTCMinutes();
+                                  
+                                  const slotStart = Number(slot.start24.split(":")[0]) * 60 + Number(slot.start24.split(":")[1]);
+                                  const slotEnd = Number(slot.end24.split(":")[0]) * 60 + Number(slot.end24.split(":")[1]);
+                                  
+                                  const matches = (examStart < slotEnd) && (examEnd > slotStart);
+                                  
+                                  // ✅ Debug log for first room only
+                                  if (rowIndex < 3 && room === pageRooms[0]) {
+                                    console.log(`🔍 Slot ${slot.start24}-${slot.end24} (${slotStart}-${slotEnd}min) vs Exam ${examStart}-${examEnd}min (${e.exam_start_time.slice(11, 16)}-${e.exam_end_time.slice(11, 16)}): ${matches ? '✅' : '❌'}`);
+                                  }
+                                  
+                                  return matches;
                                 });
 
                                 if (!exam) return <td key={room}></td>;
 
-                                const startMinutes = Number(exam.exam_start_time!.slice(11, 13)) * 60 + Number(exam.exam_start_time!.slice(14, 16));
-                                const endMinutes   = Number(exam.exam_end_time!.slice(11, 13)) * 60 + Number(exam.exam_end_time!.slice(14, 16));
+                                const examStartTime = new Date(exam.exam_start_time!);
+                                const examEndTime = new Date(exam.exam_end_time!);
 
-                                const examStartHour = Number(exam.exam_start_time!.slice(11, 13));
-                                const examStartMin  = Number(exam.exam_start_time!.slice(14, 16));
+                                const startMinutes = examStartTime.getUTCHours() * 60 + examStartTime.getUTCMinutes();
+                                const endMinutes = examEndTime.getUTCHours() * 60 + examEndTime.getUTCMinutes();
+
+                                const examStartHour = examStartTime.getUTCHours();
+                                const examStartMin = examStartTime.getUTCMinutes();
                                 const examStartTotalMin = examStartHour * 60 + examStartMin;
 
                                 const startSlotIndex = timeSlots.findIndex(slot => {
                                   const slotStart = Number(slot.start24.split(":")[0]) * 60 + Number(slot.start24.split(":")[1]);
-                                  const slotEnd   = Number(slot.end24.split(":")[0]) * 60 + Number(slot.end24.split(":")[1]);
+                                  const slotEnd = Number(slot.end24.split(":")[0]) * 60 + Number(slot.end24.split(":")[1]);
                                   return examStartTotalMin >= slotStart && examStartTotalMin < slotEnd;
                                 });
 
                                 const rowSpan = Math.ceil((endMinutes - startMinutes) / 30);
+
+                                console.log(`📏 Exam ${exam.examdetails_id}: ${examStartTime.toISOString().slice(11,16)}-${examEndTime.toISOString().slice(11,16)} → start=${startMinutes}min, end=${endMinutes}min, rowSpan=${rowSpan}, startSlotIndex=${startSlotIndex}`);
 
                                 for (let i = 0; i < rowSpan; i++) {
                                   if (startSlotIndex + i < timeSlots.length) {
@@ -1572,20 +1641,16 @@ const SchedulerView: React.FC<SchedulerViewProps> = ({ user }) => {
             onScheduleCreated={async () => {
               // Force immediate refresh with proper filtering
               try {
-                const examsResponse = await api.get('/tbl_examdetails');
+                // ✅ FIX: Add college_name filter
+                const params: any = {};
+                if (schedulerCollegeName && schedulerCollegeName !== "Add schedule first") {
+                  params.college_name = schedulerCollegeName;
+                }
+                
+                const examsResponse = await api.get('/tbl_examdetails', { params });
                 if (examsResponse.data) {
-                  // Apply the same filtering logic as the polling effect
-                  if (schedulerCollegeName) {
-                    const filteredExams = examsResponse.data.filter(
-                      (exam: ExamDetail) => exam.college_name === schedulerCollegeName
-                    );
-                    console.log(`✅ Immediate refresh: ${filteredExams.length} schedules loaded`);
-                    setExamData(filteredExams);
-                  } else {
-                    // Fallback: set all data and let polling filter it
-                    console.log(`⚠️ College name not set yet, loading all data`);
-                    setExamData(examsResponse.data);
-                  }
+                  console.log(`✅ Immediate refresh: ${examsResponse.data.length} schedules loaded`);
+                  setExamData(examsResponse.data);
                 }
               } catch (error) {
                 console.error("Error fetching data:", error);
