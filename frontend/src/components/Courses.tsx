@@ -17,6 +17,7 @@ interface Term {
 interface User {
   user_id: number;
   first_name: string;
+  middle_name?: string;
   last_name: string;
 }
 
@@ -86,6 +87,11 @@ const Courses: React.FC = () => {
       mounted = false;
     };
   }, []);
+
+  const formatName = (u: User) => {
+    const mid = u.middle_name ? ` ${u.middle_name}` : "";
+    return `${u.first_name}${mid} ${u.last_name}`.trim();
+  };
 
   // ✅ Prevent re-fetch race conditions
   const fetchCourses = useCallback(async () => {
@@ -242,12 +248,17 @@ const Courses: React.FC = () => {
         let errorCount = 0;
 
         for (const row of data as any[]) {
-          const course_id = clean(row["Course ID"]);
+          const rawCourseId = String(row["Course ID"] || "").trim();
+          // still clean invisible characters but DO NOT lowercase
+          const course_id = rawCourseId
+            .replace(/\u00A0/g, " ")
+            .replace(/\t/g, " ")
+            .trim();
           const course_name = row["Course Name"]?.trim();
           const term_full = clean(row["Term Name"]);
           const instructors_raw = row["Instructor Full Names"]?.trim();
 
-          if (!course_id || !course_name || !term_full || !instructors_raw) {
+          if (!course_id || !course_name || !term_full) {
             toast.error(`Row skipped (${row["Course ID"]}): Missing required fields.`);
             errorCount++;
             continue;
@@ -265,24 +276,29 @@ const Courses: React.FC = () => {
           }
 
           // --- INSTRUCTOR MATCHING ---
-          const instructorNames = instructors_raw
-            .split(",")
-            .map((n: string) => clean(n));
+          let instructorIds: number[] = [];
 
-          const instructorIds = users
-            .filter((u) =>
-              instructorNames.includes(
-                clean(`${u.first_name} ${u.last_name}`)
+          if (instructors_raw && instructors_raw.trim() !== "") {
+            const instructorNames = instructors_raw
+              .split(",")
+              .map((n: string) => clean(n));
+
+            instructorIds = users
+              .filter((u) =>
+                instructorNames.includes(
+                  clean(formatName(u))
+                )
               )
-            )
-            .map((u) => u.user_id);
+              .map((u) => u.user_id);
 
-          if (instructorIds.length === 0) {
-            toast.error(
-              `Row skipped (${row["Course ID"]}): No matching instructors found.`
-            );
-            errorCount++;
-            continue;
+            if (instructorIds.length === 0) {
+              toast.warn(
+                `No matching instructors for ${row["Course ID"]}. Importing with none.`
+              );
+            }
+          } else {
+            // no instructors provided
+            instructorIds = [];
           }
 
           // --- POST EXACTLY THE SAME STRUCTURE AS MANUAL ADD ---
@@ -431,7 +447,14 @@ const Courses: React.FC = () => {
                   <td>{c.course_id}</td>
                   <td>{c.course_name}</td>
                   <td>{c.term_name}</td>
-                  <td>{c.instructor_names?.join(", ")}</td>
+                  <td>
+                    {c.user_ids
+                      ?.map((id) => {
+                        const u = users.find((usr) => usr.user_id === id);
+                        return u ? formatName(u) : "";
+                      })
+                      .join(", ")}
+                  </td>
                   <td className="action-buttons" style={{ display: "flex", alignItems: "center", gap: 8 }}>
                     <button type='button' className="icon-button edit-button" onClick={() => handleEdit(c)}>
                       <FaEdit />
@@ -508,13 +531,13 @@ const Courses: React.FC = () => {
                 isMulti
                 options={users.map((u) => ({
                   value: u.user_id,
-                  label: `${u.first_name} ${u.last_name}`,
+                  label: formatName(u),
                 }))}
                 value={users
                   .filter((u) => newCourse.user_ids.includes(u.user_id))
                   .map((u) => ({
                     value: u.user_id,
-                    label: `${u.first_name} ${u.last_name}`,
+                    label: formatName(u),
                   }))}
                 onChange={(selected) => {
                   const ids = selected.map((opt) => opt.value);
@@ -536,13 +559,13 @@ const Courses: React.FC = () => {
                     .filter((u) => newCourse.user_ids.includes(u.user_id))
                     .map((u) => ({
                       value: u.user_id,
-                      label: `${u.first_name} ${u.last_name}`,
+                      label: formatName(u),
                     }))}
                   value={users
                     .filter((u) => newCourse.leaders.includes(u.user_id))
                     .map((u) => ({
                       value: u.user_id,
-                      label: `${u.first_name} ${u.last_name}`,
+                      label: formatName(u),
                     }))}
                   onChange={(selected) =>
                     setNewCourse({

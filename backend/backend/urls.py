@@ -54,6 +54,7 @@ urlpatterns = [
     path('api/tbl_modality/<int:pk>/', views.tbl_modality_detail, name='tbl_modality_detail'),
     path('api/tbl_examdetails', views.tbl_examdetails_list, name='tbl_examdetails_list'),
     path('api/tbl_examdetails/<int:pk>/', views.tbl_examdetails_detail, name='tbl_examdetails_detail'),
+    path('api/tbl_examdetails/batch-delete/', views.tbl_examdetails_batch_delete, name='examdetails-batch-delete'),
     path('api/tbl_scheduleapproval/', views.tbl_scheduleapproval_list, name='tbl_scheduleapproval_list'),
     path('api/tbl_scheduleapproval/<uuid:pk>/', views.tbl_scheduleapproval_detail, name='tbl_scheduleapproval_detail'),
     path('api/send_schedule_to_dean/', views.send_schedule_to_dean, name='send_schedule_to_dean'),

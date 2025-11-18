@@ -293,36 +293,60 @@ def tbl_scheduleapproval_detail(request, pk):
 @permission_classes([AllowAny])
 def tbl_examdetails_list(request):
     if request.method == 'GET':
-        queryset = TblExamdetails.objects.select_related(
-            'room',
-            'room__building',
-            'modality',
-            'modality__course',
-            'modality__user',
-            'proctor',
-            'examperiod'
-        ).all()
+        try:
+            queryset = TblExamdetails.objects.select_related(
+                'room',
+                'room__building',
+                'modality',
+                'modality__course',
+                'modality__user',
+                'proctor',
+                'examperiod'
+            ).all()
 
-        # Optional filtering (e.g., ?room_id=R101&date=2025-10-23)
-        room_id = request.GET.get('room_id')
-        exam_date = request.GET.get('exam_date')
+            # Optional filtering (e.g., ?room_id=R101&date=2025-10-23)
+            room_id = request.GET.get('room_id')
+            exam_date = request.GET.get('exam_date')
+            modality_id = request.GET.get('modality_id')
 
-        if room_id:
-            queryset = queryset.filter(room__room_id=room_id)
-        if exam_date:
-            queryset = queryset.filter(exam_date=exam_date)
+            if room_id:
+                queryset = queryset.filter(room__room_id=room_id)
+            if exam_date:
+                queryset = queryset.filter(exam_date=exam_date)
+            if modality_id:
+                # Handle comma-separated modality IDs
+                modality_ids = [mid.strip() for mid in modality_id.split(',') if mid.strip()]
+                queryset = queryset.filter(modality_id__in=modality_ids)
 
-        serializer = TblExamdetailsSerializer(queryset, many=True)
-        return Response(serializer.data)
+            serializer = TblExamdetailsSerializer(queryset, many=True)
+            return Response(serializer.data)
+        
+        except Exception as e:
+            print(f"❌ Error in tbl_examdetails GET: {str(e)}")
+            import traceback
+            traceback.print_exc()
+            return Response(
+                {'error': str(e), 'detail': 'Failed to fetch exam details'},
+                status=status.HTTP_500_INTERNAL_SERVER_ERROR
+            )
 
     elif request.method == 'POST':
         many = isinstance(request.data, list)
-        print("📦 Incoming exam details data:", request.data)  # 👈 add this
+        print("📦 Incoming exam details data:", request.data)
         serializer = TblExamdetailsSerializer(data=request.data, many=many)
         if serializer.is_valid():
-            serializer.save()
-            return Response(serializer.data, status=status.HTTP_201_CREATED)
-        print("❌ Validation errors:", serializer.errors)  # 👈 add this
+            try:
+                serializer.save()
+                return Response(serializer.data, status=status.HTTP_201_CREATED)
+            except Exception as e:
+                print(f"❌ Error saving exam details: {str(e)}")
+                import traceback
+                traceback.print_exc()
+                return Response(
+                    {'error': str(e), 'detail': 'Failed to save exam details'},
+                    status=status.HTTP_400_BAD_REQUEST
+                )
+        print("❌ Validation errors:", serializer.errors)
         return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
 
 @api_view(['GET', 'PUT', 'DELETE'])
@@ -352,41 +376,126 @@ def tbl_examdetails_detail(request, pk):
 @permission_classes([AllowAny])
 def tbl_modality_list(request):
     if request.method == 'GET':
-        queryset = TblModality.objects.select_related(
-            'course',
-            'course__term',
-            'room',
-            'room__building',
-            'user'
-        ).all()
+        try:
+            queryset = TblModality.objects.select_related(
+                'course',
+                'course__term',
+                'room',
+                'room__building',
+                'user'
+            ).all()
 
-        # Optional filtering by query params
-        course_id = request.GET.get('course_id')
-        program_id = request.GET.get('program_id')
-        section_name = request.GET.get('section_name')
-        modality_type = request.GET.get('modality_type')
-        room_type = request.GET.get('room_type')
+            # Optional filtering by query params
+            course_id = request.GET.get('course_id')
+            program_id = request.GET.get('program_id')
+            section_name = request.GET.get('section_name')
+            modality_type = request.GET.get('modality_type')
+            room_type = request.GET.get('room_type')
+            user_id = request.GET.get('user_id')  # ✅ ADD THIS
 
-        if course_id:
-            queryset = queryset.filter(course=course_id)
-        if program_id:
-            queryset = queryset.filter(program_id=program_id)
-        if section_name:
-            queryset = queryset.filter(section_name=section_name)
-        if modality_type:
-            queryset = queryset.filter(modality_type=modality_type)
-        if room_type:
-            queryset = queryset.filter(room_type=room_type)
+            print(f"📥 Modality GET request - course_id: {course_id}, program_id: {program_id}, user_id: {user_id}")
 
-        serializer = TblModalitySerializer(queryset, many=True)
-        return Response(serializer.data)
+            # ✅ ADD: Filter by user_id
+            if user_id:
+                queryset = queryset.filter(user__user_id=user_id)
+                print(f"🔍 Filtering by user_id: {user_id}")
 
+            # Handle comma-separated course_ids
+            if course_id:
+                course_ids = [cid.strip() for cid in course_id.split(',') if cid.strip()]
+                print(f"🔍 Filtering by course_ids: {course_ids}")
+                queryset = queryset.filter(course_id__in=course_ids)
+            
+            # Handle comma-separated program_ids
+            if program_id:
+                program_ids = [pid.strip() for pid in program_id.split(',') if pid.strip()]
+                print(f"🔍 Filtering by program_ids: {program_ids}")
+                queryset = queryset.filter(program_id__in=program_ids)
+            
+            if section_name:
+                queryset = queryset.filter(section_name=section_name)
+            if modality_type:
+                queryset = queryset.filter(modality_type=modality_type)
+            if room_type:
+                queryset = queryset.filter(room_type=room_type)
+
+            print(f"✅ Found {queryset.count()} modalities")
+            
+            serializer = TblModalitySerializer(queryset, many=True)
+            return Response(serializer.data)
+        
+        except Exception as e:
+            print(f"❌ Error in tbl_modality_list: {str(e)}")
+            import traceback
+            traceback.print_exc()
+            return Response(
+                {'error': str(e), 'detail': 'Failed to fetch modalities'},
+                status=status.HTTP_500_INTERNAL_SERVER_ERROR
+            )
+    
     elif request.method == 'POST':
+        # ✅ ADD: Log incoming data
+        print("📥 Incoming modality POST data:", request.data)
+        
         serializer = TblModalitySerializer(data=request.data)
         if serializer.is_valid():
-            serializer.save()
-            return Response(serializer.data, status=status.HTTP_201_CREATED)
+            try:
+                serializer.save()
+                print(f"✅ Modality created: ID {serializer.data.get('modality_id')}")
+                return Response(serializer.data, status=status.HTTP_201_CREATED)
+            except Exception as e:
+                print(f"❌ Error saving modality: {str(e)}")
+                return Response({
+                    'error': str(e),
+                    'detail': 'Failed to save modality'
+                }, status=status.HTTP_400_BAD_REQUEST)
+        
+        print(f"❌ Validation errors: {serializer.errors}")
         return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
+    
+@api_view(['POST'])
+@permission_classes([AllowAny])
+def tbl_examdetails_batch_delete(request):
+    """
+    Delete multiple exam details by college_name or list of IDs
+    """
+    college_name = request.data.get('college_name')
+    exam_ids = request.data.get('exam_ids', [])
+    
+    try:
+        if college_name:
+            # Delete all exams for a specific college
+            deleted_count, _ = TblExamdetails.objects.filter(
+                college_name=college_name
+            ).delete()
+            
+            return Response({
+                'message': f'Successfully deleted {deleted_count} schedules',
+                'deleted_count': deleted_count
+            }, status=status.HTTP_200_OK)
+            
+        elif exam_ids:
+            # Delete specific exam IDs
+            deleted_count, _ = TblExamdetails.objects.filter(
+                examdetails_id__in=exam_ids
+            ).delete()
+            
+            return Response({
+                'message': f'Successfully deleted {deleted_count} schedules',
+                'deleted_count': deleted_count
+            }, status=status.HTTP_200_OK)
+        
+        else:
+            return Response({
+                'error': 'Either college_name or exam_ids must be provided'
+            }, status=status.HTTP_400_BAD_REQUEST)
+            
+    except Exception as e:
+        print(f"❌ Error in batch delete: {str(e)}")
+        return Response({
+            'error': str(e),
+            'detail': 'Failed to delete exam details'
+        }, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
 
 @api_view(['GET', 'PUT', 'DELETE'])
 @permission_classes([AllowAny])
@@ -408,7 +517,9 @@ def tbl_modality_detail(request, pk):
         return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
 
     elif request.method == 'DELETE':
+        print(f"🗑️ Deleting modality {pk}")
         instance.delete()
+        print(f"✅ Modality {pk} deleted successfully")
         return Response(status=status.HTTP_204_NO_CONTENT)
     
 @api_view(['GET', 'POST', 'DELETE'])

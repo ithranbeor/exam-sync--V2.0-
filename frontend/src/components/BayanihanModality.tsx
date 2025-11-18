@@ -4,6 +4,7 @@ import '../styles/bayanihanModality.css';
 import { ToastContainer, toast } from 'react-toastify';
 import 'react-toastify/dist/ReactToastify.css';
 import Select, { components } from 'react-select';
+import { FaTrash  } from "react-icons/fa";
 
 interface UserProps {
   user: {
@@ -51,6 +52,111 @@ const BayanihanModality: React.FC<UserProps> = ({ user }) => {
     visible: false,
     roomId: null,
   });
+
+  const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
+  const [userModalities, setUserModalities] = useState<any[]>([]);
+  const [selectedForDelete, setSelectedForDelete] = useState<number[]>([]);
+  const [isDeleting, setIsDeleting] = useState(false);
+
+  const fetchUserModalities = useCallback(async () => {
+    if (!user?.user_id) return;
+
+    try {
+      const { data } = await api.get('/tbl_modality/', {
+        params: { user_id: user.user_id }
+      });
+
+      setUserModalities(data || []);
+      console.log('User modalities loaded:', data?.length || 0);
+    } catch (error) {
+      console.error('Error fetching user modalities:', error);
+      toast.error('Failed to load your modalities');
+    }
+  }, [user]);
+
+  // Add this useEffect to load user's modalities on component mount
+  useEffect(() => {
+    fetchUserModalities();
+  }, [fetchUserModalities]);
+
+  // Add delete handlers
+  const handleDeleteSelected = async () => {
+    if (selectedForDelete.length === 0) {
+      toast.warn('Please select modalities to delete');
+      return;
+    }
+
+    setIsDeleting(true);
+
+    try {
+      await Promise.all(
+        selectedForDelete.map(modalityId =>
+          api.delete(`/tbl_modality/${modalityId}/`)
+        )
+      );
+
+      toast.success(`Successfully deleted ${selectedForDelete.length} modality/modalities`);
+      setSelectedForDelete([]);
+      setShowDeleteConfirm(false);
+      
+      // Refresh the list
+      await fetchUserModalities();
+    } catch (error) {
+      console.error('Error deleting modalities:', error);
+      toast.error('Failed to delete some modalities');
+    } finally {
+      setIsDeleting(false);
+    }
+  };
+
+  const handleDeleteAll = async () => {
+    if (userModalities.length === 0) {
+      toast.warn('No modalities to delete');
+      return;
+    }
+
+    const confirmed = window.confirm(
+      `⚠️ WARNING: You are about to delete ALL ${userModalities.length} modalities you created.\n\nThis action cannot be undone. Continue?`
+    );
+
+    if (!confirmed) return;
+
+    setIsDeleting(true);
+
+    try {
+      await Promise.all(
+        userModalities.map(modality =>
+          api.delete(`/tbl_modality/${modality.modality_id}/`)
+        )
+      );
+
+      toast.success(`Successfully deleted all ${userModalities.length} modalities`);
+      setUserModalities([]);
+      setSelectedForDelete([]);
+      setShowDeleteConfirm(false);
+    } catch (error) {
+      console.error('Error deleting all modalities:', error);
+      toast.error('Failed to delete all modalities');
+    } finally {
+      setIsDeleting(false);
+    }
+  };
+
+  const toggleSelectModality = (modalityId: number) => {
+    setSelectedForDelete(prev =>
+      prev.includes(modalityId)
+        ? prev.filter(id => id !== modalityId)
+        : [...prev, modalityId]
+    );
+  };
+
+  const toggleSelectAll = () => {
+    if (selectedForDelete.length === userModalities.length) {
+      setSelectedForDelete([]);
+    } else {
+      setSelectedForDelete(userModalities.map(m => m.modality_id));
+    }
+  };
 
   // Room status with occupied times
   const [roomStatus, setRoomStatus] = useState<{
@@ -739,6 +845,30 @@ const BayanihanModality: React.FC<UserProps> = ({ user }) => {
                 'Submit'
               )}
             </button>
+
+            {/* Add this after the submit button or create a new section */}
+            <div style={{ marginTop: '20px', textAlign: 'center' }}>
+              <button
+                type="button"
+                onClick={() => setShowDeleteConfirm(true)}
+                className="delete-button"
+                title="Delete all modalities"
+                style={{
+                  backgroundColor: '#dc3545',
+                  color: 'white',
+                  border: 'none',
+                  padding: '10px',
+                  borderRadius: '50px',
+                  cursor: 'pointer',
+                  fontSize: '16px',
+                  fontWeight: 'bold',
+                  display: 'inline-flex',
+                  alignItems: 'center',
+                }}
+              >
+                <FaTrash />
+              </button>
+            </div>
           </form>
         </div>
       </div>
@@ -837,6 +967,193 @@ const BayanihanModality: React.FC<UserProps> = ({ user }) => {
       )}
 
       <ToastContainer position="top-right" autoClose={2000} />
+      {/* DELETE MODALITIES MODAL */}
+      {showDeleteConfirm && (
+        <div className="modal-overlay">
+          <div className="modal-contents-modality" style={{ maxWidth: '800px', maxHeight: '80vh', overflow: 'auto' }}>
+            <h3>Delete Your Modalities</h3>
+            
+            {userModalities.length === 0 ? (
+              <>
+                <div style={{ textAlign: 'center', padding: '2rem', color: '#666' }}>
+                  You haven't created any modalities yet.
+                </div>
+                
+                {/* ✅ ADD: Close button for empty state */}
+                <div style={{ 
+                  marginTop: '1rem', 
+                  display: 'flex', 
+                  justifyContent: 'center'
+                }}>
+                  <button
+                    type="button"
+                    className="close-modal"
+                    onClick={() => setShowDeleteConfirm(false)}
+                    style={{ 
+                      backgroundColor: '#6c757d',
+                      color: 'white',
+                      padding: '10px 20px',
+                      border: 'none',
+                      borderRadius: '4px',
+                      cursor: 'pointer'
+                    }}
+                  >
+                    Close
+                  </button>
+                </div>
+              </>
+            ) : (
+              <>
+                <div style={{ marginBottom: '1rem', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                  <label style={{ display: 'flex', alignItems: 'center', cursor: 'pointer' }}>
+                    <input
+                      type="checkbox"
+                      checked={selectedForDelete.length === userModalities.length}
+                      onChange={toggleSelectAll}
+                      style={{ marginRight: '8px' }}
+                    />
+                    <strong>Select All ({userModalities.length})</strong>
+                  </label>
+                  
+                  <span style={{ color: '#666', fontSize: '14px' }}>
+                    {selectedForDelete.length} selected
+                  </span>
+                </div>
+
+                {/* ✅ REMOVED: Duplicate cancel button that was here */}
+
+                <div style={{ 
+                  maxHeight: '400px', 
+                  overflowY: 'auto', 
+                  border: '1px solid #ddd', 
+                  borderRadius: '4px',
+                  padding: '10px'
+                }}>
+                  {userModalities.map((modality) => {
+                    const course = courseOptions.find(c => c.course_id === modality.course_id);
+                    const program = programOptions.find(p => p.program_id === modality.program_id);
+                    
+                    return (
+                      <div
+                        key={modality.modality_id}
+                        style={{
+                          padding: '12px',
+                          marginBottom: '8px',
+                          border: '1px solid #e0e0e0',
+                          borderRadius: '4px',
+                          backgroundColor: selectedForDelete.includes(modality.modality_id) ? '#fff3cd' : 'white',
+                          cursor: 'pointer',
+                          transition: 'all 0.2s'
+                        }}
+                        onClick={() => toggleSelectModality(modality.modality_id)}
+                      >
+                        <label style={{ display: 'flex', alignItems: 'start', cursor: 'pointer' }}>
+                          <input
+                            type="checkbox"
+                            checked={selectedForDelete.includes(modality.modality_id)}
+                            onChange={() => toggleSelectModality(modality.modality_id)}
+                            style={{ marginRight: '12px', marginTop: '4px' }}
+                            onClick={(e) => e.stopPropagation()}
+                          />
+                          
+                          <div style={{ flex: 1 }}>
+                            <div style={{ fontWeight: 'bold', marginBottom: '4px' }}>
+                              {modality.section_name || 'No Section'}
+                            </div>
+                            
+                            <div style={{ fontSize: '14px', color: '#666' }}>
+                              <div><strong>Course:</strong> {course?.course_id || 'N/A'} - {course?.course_name || 'Unknown'}</div>
+                              <div><strong>Program:</strong> {program?.program_id || 'N/A'} - {program?.program_name || 'Unknown'}</div>
+                              <div><strong>Modality:</strong> {modality.modality_type}</div>
+                              <div><strong>Room Type:</strong> {modality.room_type}</div>
+                              {modality.possible_rooms && modality.possible_rooms.length > 0 && (
+                                <div>
+                                  <strong>Possible Rooms:</strong> {modality.possible_rooms.join(', ')}
+                                </div>
+                              )}
+                              {modality.modality_remarks && (
+                                <div><strong>Remarks:</strong> {modality.modality_remarks}</div>
+                              )}
+                            </div>
+                          </div>
+                        </label>
+                      </div>
+                    );
+                  })}
+                </div>
+
+                <div style={{ 
+                  marginTop: '1rem', 
+                  display: 'flex', 
+                  gap: '10px', 
+                  justifyContent: 'flex-end',
+                  flexWrap: 'wrap'
+                }}>
+                  <button
+                    type="button"
+                    className="close-modal"
+                    onClick={() => {
+                      setShowDeleteConfirm(false);
+                      setSelectedForDelete([]);
+                    }}
+                    disabled={isDeleting}
+                    style={{ 
+                      backgroundColor: '#6c757d',
+                      color: 'white',
+                      padding: '10px 20px',
+                      border: 'none',
+                      borderRadius: '4px',
+                      cursor: isDeleting ? 'not-allowed' : 'pointer',
+                      opacity: isDeleting ? 0.6 : 1
+                    }}
+                  >
+                    Cancel
+                  </button>
+
+                  <button
+                    type="button"
+                    onClick={handleDeleteAll}
+                    disabled={isDeleting || userModalities.length === 0}
+                    style={{
+                      backgroundColor: '#dc3545',
+                      color: 'white',
+                      padding: '10px 20px',
+                      border: 'none',
+                      borderRadius: '4px',
+                      cursor: isDeleting || userModalities.length === 0 ? 'not-allowed' : 'pointer',
+                      opacity: isDeleting || userModalities.length === 0 ? 0.6 : 1
+                    }}
+                  >
+                    {isDeleting ? 'Deleting...' : 'Delete All'}
+                  </button>
+
+                  <button
+                    type="button"
+                    onClick={handleDeleteSelected}
+                    disabled={isDeleting || selectedForDelete.length === 0}
+                    style={{
+                      backgroundColor: '#ffc107',
+                      color: '#000',
+                      padding: '10px 20px',
+                      border: 'none',
+                      borderRadius: '4px',
+                      cursor: isDeleting || selectedForDelete.length === 0 ? 'not-allowed' : 'pointer',
+                      opacity: isDeleting || selectedForDelete.length === 0 ? 0.6 : 1,
+                      fontWeight: 'bold'
+                    }}
+                  >
+                    {isDeleting ? (
+                      <span className="spinner"></span>
+                    ) : (
+                      `Delete Selected (${selectedForDelete.length})`
+                    )}
+                  </button>
+                </div>
+              </>
+            )}
+          </div>
+        </div>
+      )}
     </div>
   );
 };

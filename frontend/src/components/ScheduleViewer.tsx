@@ -66,6 +66,7 @@ const SchedulerView: React.FC<SchedulerViewProps> = ({ user }) => {
 
   const [showExportModal, setShowExportModal] = useState(false);
   const [_showExportDropdown, setShowExportDropdown] = useState(false);
+  const [collegeDataReady, setCollegeDataReady] = useState(false); // NEW
   const exportRef = useRef<HTMLDivElement>(null);
 
   const resetAllModes = () => {
@@ -217,6 +218,13 @@ const SchedulerView: React.FC<SchedulerViewProps> = ({ user }) => {
         setAllCollegeUsers(userDetails || []);
         setProctors(userDetails || []);
 
+        setUsers((prevUsers) => {
+          // Merge existing users with newly fetched proctor details
+          const existingUserIds = new Set(prevUsers.map(u => u.user_id));
+          const newUsers = (userDetails || []).filter((u: { user_id: number; }) => !existingUserIds.has(u.user_id));
+          return [...prevUsers, ...newUsers];
+        });
+
         // Fetch dean info
         const deanRoleResponse = await api.get('/tbl_user_role', {
           params: {
@@ -239,7 +247,8 @@ const SchedulerView: React.FC<SchedulerViewProps> = ({ user }) => {
           }
         }
 
-        setIsLoadingData(false);
+        setIsLoadingData(false);  
+        setCollegeDataReady(true);
       } catch (error) {
         console.error("Error fetching scheduler data:", error);
         setIsLoadingData(false);
@@ -251,27 +260,63 @@ const SchedulerView: React.FC<SchedulerViewProps> = ({ user }) => {
 
   // ✅ FIXED: Filter exam data by scheduler's college
   useEffect(() => {
+    if (!collegeDataReady) {
+      return;
+    }
+
     const fetchData = async () => {
-      if (!user?.user_id || !schedulerCollegeName) {
-        console.log('No user_id or college name, skipping exam data fetch');
+      if (!user?.user_id) {
+        console.log('No user_id, skipping exam data fetch');
         return;
       }
 
       try {
-        // Fetch all exam details
-        const examsResponse = await api.get('/tbl_examdetails');
+        console.log('🔄 Polling: Fetching exam details and users...');
+        
+        // Fetch both exams and users in parallel
+        const [examsResponse, usersResponse] = await Promise.all([
+          api.get('/tbl_examdetails'),
+          api.get('/users/')
+        ]);
+        
         if (examsResponse.data) {
-          // ✅ Filter to only show schedules for this scheduler's college
-          const filteredExams = examsResponse.data.filter(
-            (exam: ExamDetail) => exam.college_name === schedulerCollegeName
-          );
-          console.log(`Filtered exam data for college "${schedulerCollegeName}":`, filteredExams.length);
-          setExamData(filteredExams);
+          if (schedulerCollegeName && schedulerCollegeName !== "Add schedule first") {
+            const filteredExams = examsResponse.data.filter(
+              (exam: ExamDetail) => exam.college_name === schedulerCollegeName
+            );
+            
+            // Log proctor IDs from exams
+            const proctorIds = filteredExams
+              .filter((e: ExamDetail) => e.proctor_id)
+              .map((e: ExamDetail) => e.proctor_id);
+            console.log('📋 Proctor IDs in exams:', [...new Set(proctorIds)]);
+            
+            setExamData(filteredExams);
+          } else {
+            setExamData(examsResponse.data);
+          }
         }
 
-        const usersResponse = await api.get('/users/');
         if (usersResponse.data) {
+          console.log(`✅ Fetched ${usersResponse.data.length} total users`);
           setUsers(usersResponse.data);
+          
+          // Log if we have the proctor IDs in the users data
+          if (examsResponse.data) {
+            const examProctorIds = new Set(
+              examsResponse.data
+                .filter((e: ExamDetail) => e.proctor_id)
+                .map((e: ExamDetail) => Number(e.proctor_id))
+            );
+            const userIds = new Set(usersResponse.data.map((u: any) => Number(u.user_id)));
+            const missingProctors = [...examProctorIds].filter(id => !userIds.has(id));
+            
+            if (missingProctors.length > 0) {
+              console.error('❌ Missing proctor IDs in users table:', missingProctors);
+            } else {
+              console.log('✅ All proctors found in users table');
+            }
+          }
         }
       } catch (error) {
         console.error("Error fetching data:", error);
@@ -281,7 +326,7 @@ const SchedulerView: React.FC<SchedulerViewProps> = ({ user }) => {
     fetchData();
     const interval = setInterval(fetchData, 2000);
     return () => clearInterval(interval);
-  }, [user, schedulerCollegeName]);
+  }, [user, schedulerCollegeName, collegeDataReady]);
 
   useEffect(() => {
     const checkApprovalStatus = async () => {
@@ -337,9 +382,28 @@ const SchedulerView: React.FC<SchedulerViewProps> = ({ user }) => {
   };
 
   const getUserName = (id: number | null | undefined) => {
-    if (!id) return "-";
-    const user = users.find(u => u.user_id === id);
-    return user ? `${user.first_name} ${user.last_name}` : "-";
+    if (!id) {
+      return "-";
+    }
+        
+    // Convert to number if it's a string
+    const numericId = typeof id === 'string' ? parseInt(id, 10) : id;
+    
+    // Try allCollegeUsers first (filtered proctors)
+    const collegeUser = allCollegeUsers.find(u => Number(u.user_id) === Number(numericId));
+    if (collegeUser) {
+      const name = `${collegeUser.first_name} ${collegeUser.last_name}`;
+      return name;
+    }
+    
+    // Fallback to all users
+    const user = users.find(u => Number(u.user_id) === Number(numericId));
+    if (user) {
+      const name = `${user.first_name} ${user.last_name}`;
+      return name;
+    }
+    
+    return "-";
   };
 
   const handleScheduleClick = async (exam: ExamDetail) => {
@@ -409,6 +473,21 @@ const SchedulerView: React.FC<SchedulerViewProps> = ({ user }) => {
           exam.exam_end_time?.includes(searchTerm)
         );
       });
+      // Add debug logging after searchFilteredData definition
+      useEffect(() => {
+      if (searchFilteredData.length > 0 && searchFilteredData[0].proctor_id) {
+        const sampleExam = searchFilteredData[0];
+        console.log('🔍 Proctor Debug:', {
+          examId: sampleExam.examdetails_id,
+          proctorId: sampleExam.proctor_id,
+          proctorInUsers: users.find(u => u.user_id === sampleExam.proctor_id),
+          proctorInCollegeUsers: allCollegeUsers.find(u => u.user_id === sampleExam.proctor_id),
+          proctorName: getUserName(sampleExam.proctor_id),
+          totalUsers: users.length,
+          totalCollegeUsers: allCollegeUsers.length
+        });
+      }
+    }, [searchFilteredData, users, allCollegeUsers]);
 
   // Generate unique filter options
   const getFilterOptions = () => {
@@ -427,7 +506,7 @@ const SchedulerView: React.FC<SchedulerViewProps> = ({ user }) => {
   const rawTimes = [
     "07:00","07:30","08:00","08:30","09:00","09:30","10:00","10:30","11:00","11:30",
     "12:00","12:30","13:00","13:30","14:00","14:30","15:00","15:30","16:00","16:30",
-    "17:00","17:30","18:00","18:30","19:00","19:30","20:00","20:30"
+    "17:00","17:30","18:00","18:30","19:00","19:30","20:00","20:30", "21:00"
   ];
 
   const formatTo12Hour = (time: string) => {
@@ -473,34 +552,50 @@ const SchedulerView: React.FC<SchedulerViewProps> = ({ user }) => {
   const [isModalOpen, setIsModalOpen] = useState(false);
 
   const handleDeleteAllSchedules = async () => {
-    if (!collegeName || collegeName === "Add schedule first") {
+    if (!schedulerCollegeName || schedulerCollegeName === "Add schedule first") {
       toast.warn("No college detected. Cannot delete schedules.");
       return;
     }
 
     const confirmStep1 = globalThis.confirm(
-      `⚠️ WARNING: You are about to delete ALL schedules for ${collegeName}.\n\nAre you absolutely sure you want to continue?`
+      `⚠️ WARNING: You are about to delete ALL schedules for ${schedulerCollegeName}.\n\nAre you absolutely sure you want to continue?`
     );
     if (!confirmStep1) return;
 
     const confirmStep2 = globalThis.confirm(
-      `🚨 FINAL CONFIRMATION:\n\nThis will permanently remove ALL exam schedules for ${collegeName}.\nThis action cannot be undone.\n\nDo you still want to proceed?`
+      `🚨 FINAL CONFIRMATION:\n\nThis will permanently remove ALL exam schedules for ${schedulerCollegeName}.\nThis action cannot be undone.\n\nDo you still want to proceed?`
     );
     if (!confirmStep2) return;
 
+    const loadingToast = toast.info("Deleting schedules...", { autoClose: false });
+
     try {
-      // Delete all schedules for this college
-      const examsToDelete = examData.filter(e => e.college_name === collegeName);
+      const examsToDelete = examData.filter(e => e.college_name === schedulerCollegeName);
       
-      for (const exam of examsToDelete) {
-        await api.delete(`/tbl_examdetails/${exam.examdetails_id}/`);
+      if (examsToDelete.length === 0) {
+        toast.dismiss(loadingToast);
+        toast.warn(`No schedules found for ${schedulerCollegeName}`);
+        return;
       }
 
-      setExamData(prev => prev.filter(e => e.college_name !== collegeName));
-      toast.success(`All schedules for ${collegeName} deleted successfully!`);
-    } catch (error) {
+      console.log(`🗑️ Batch deleting ${examsToDelete.length} schedules for "${schedulerCollegeName}"`);
+
+      // ✅ Use batch delete endpoint
+      const response = await api.post('/tbl_examdetails/batch-delete/', {
+        college_name: schedulerCollegeName
+      });
+
+      toast.dismiss(loadingToast);
+      
+      // Update state immediately
+      setExamData(prev => prev.filter(e => e.college_name !== schedulerCollegeName));
+      
+      toast.success(`Successfully deleted ${response.data.deleted_count} schedules for ${schedulerCollegeName}!`);
+
+    } catch (error: any) {
       console.error("Error deleting schedules:", error);
-      toast.error("Failed to delete schedules!");
+      toast.dismiss(loadingToast);
+      toast.error(`Failed to delete schedules: ${error?.response?.data?.error || error?.message || 'Unknown error'}`);
     }
   };
 
@@ -936,7 +1031,7 @@ const SchedulerView: React.FC<SchedulerViewProps> = ({ user }) => {
             <div className="scheduler-view-container">
               <div className="header" style={{ textAlign: "center", marginBottom: "20px" }}>
                 <img
-                  src="../../../backend/static/logo/USTPlogo.png"
+                  src="../../../static/logo/USTPlogo.png"
                   alt="School Logo"
                   style={{ width: '200px', height: '160px', marginBottom: '5px' }}
                 />
@@ -1012,7 +1107,7 @@ const SchedulerView: React.FC<SchedulerViewProps> = ({ user }) => {
                   <div className="scheduler-view-container">
                     <div className="header" style={{ textAlign: "center", marginBottom: "20px" }}>
                       <img
-                        src="../../../backend/static/logo/USTPlogo.png"
+                        src="../../../static/logo/USTPlogo.png"
                         alt="School Logo"
                         style={{ width: '200px', height: '160px', marginBottom: '5px' }}
                       />
@@ -1113,7 +1208,7 @@ const SchedulerView: React.FC<SchedulerViewProps> = ({ user }) => {
                                     onClick={() => handleScheduleClick(exam)}
                                     style={{
                                       backgroundColor: courseColorMap[exam.course_id || ""] || "#ccc",
-                                      color: "#fff",
+                                      color: "black",
                                       padding: 4,
                                       borderRadius: 4,
                                       fontSize: 12,
@@ -1149,7 +1244,7 @@ const SchedulerView: React.FC<SchedulerViewProps> = ({ user }) => {
                                             exam.proctor_id
                                               ? {
                                                   value: exam.proctor_id,
-                                                  label: `${getUserName(exam.proctor_id)}`
+                                                  label: getUserName(exam.proctor_id)
                                                 }
                                               : null
                                           }
@@ -1159,10 +1254,7 @@ const SchedulerView: React.FC<SchedulerViewProps> = ({ user }) => {
                                             }
                                           }}
                                           options={(() => {
-                                            // Get section instructor ID
                                             const sectionInstructorId = exam.instructor_id;
-
-                                            // Use allCollegeUsers if available, fallback to users
                                             const availableUserPool = allCollegeUsers.length > 0 ? allCollegeUsers : users;
 
                                             // Get all instructors for the same course & program
@@ -1175,12 +1267,10 @@ const SchedulerView: React.FC<SchedulerViewProps> = ({ user }) => {
                                               )
                                             );
 
-                                            // Exclude the instructor of THIS section
                                             const alternativeInstructors = candidateInstructors.filter(
                                               (instr) => Number(instr.user_id) !== Number(sectionInstructorId)
                                             );
 
-                                            // If no alternatives, use ALL available users excluding section instructor
                                             const eligibleUsers = alternativeInstructors.length > 0 
                                               ? alternativeInstructors 
                                               : availableUserPool.filter(u => u.user_id !== sectionInstructorId);
@@ -1216,7 +1306,10 @@ const SchedulerView: React.FC<SchedulerViewProps> = ({ user }) => {
                                           styles={{ menu: (provided) => ({ ...provided, zIndex: 9999 }) }}
                                         />
                                       ) : (
-                                        ` ${getUserName(exam.proctor_id)}`
+                                        // ✅ FIX: Always show proctor name, even in non-edit mode
+                                        <span style={{ marginLeft: '5px' }}>
+                                          {exam.proctor_id ? getUserName(exam.proctor_id) : "Not Assigned"}
+                                        </span>
                                       )}
                                     </p>
                                     <p>{formatTo12Hour(exam.exam_start_time!.slice(11,16))} - {formatTo12Hour(exam.exam_end_time!.slice(11,16))}</p>
@@ -1277,15 +1370,258 @@ const SchedulerView: React.FC<SchedulerViewProps> = ({ user }) => {
                     transition: "transform 0.3s ease"
                   }}
                 >
-                  {/* Rest of the single date rendering code - identical to original, just using filteredExamData */}
-                  {/* ... (keeping the rest of the table structure the same) ... */}
+                  <div className="scheduler-view-container">
+                    <div className="header" style={{ textAlign: "center", marginBottom: "20px" }}>
+                      <img
+                        src="/USTPlogo.png"
+                        alt="School Logo"
+                        style={{ width: '200px', height: '160px', marginBottom: '5px' }}
+                      />
+                      <div style={{ fontSize: '30px', color: '#333', marginBottom: '-10px', fontFamily: 'serif' }}>
+                        University of Science and Technology of Southern Philippines
+                      </div>
+                      <div style={{ fontSize: '15px', color: '#555', marginBottom: '-10px', fontFamily: 'serif' }}>
+                        Alubijid | Balubal | Cagayan de Oro City | Claveria | Jasaan | Oroquieta | Panaon | Villanueva
+                      </div>
+                      <div style={{ fontSize: '30px', color: '#333', marginBottom: '-10px', fontFamily: 'serif' }}>{collegeName}</div>
+                      <div style={{ fontSize: '20px', color: '#333', marginBottom: '-10px', fontFamily: 'serif', fontWeight: 'bold' }}>
+                        {termName} Examination Schedule | {semesterName} Semester | A.Y. {yearName}
+                      </div>
+                      <div style={{ fontSize: '20px', color: '#333', marginTop: '-10px', fontFamily: 'serif' }}>{examPeriodName}</div>
+                    </div>
+                    <hr />
+                    {uniqueDates.map((date) => (
+                      <table key={date} className="exam-table">
+                        <thead>
+                          <tr>
+                            <th colSpan={pageRooms.length + 1}>{date && new Date(date).toLocaleDateString("en-US", { year: "numeric", month: "long", day: "numeric" })}</th>
+                          </tr>
+                          <tr>
+                          <th></th>
+                          {(() => {
+                            const buildingGroups: Record<string, string[]> = {};
+                            pageRooms.forEach((room) => {
+                              const building = filteredExamData.find(e => e.room_id === (room ?? ""))?.building_name || "Unknown Building";
+                              if (!buildingGroups[building]) buildingGroups[building] = [];
+                              buildingGroups[building].push(String(room));
+                            });
+
+                            return Object.entries(buildingGroups).map(([building, rooms]) => (
+                              <th key={building} colSpan={rooms.length}>{building}</th>
+                            ));
+                          })()}
+                        </tr>
+                        <tr>
+                          <th>Time</th>
+                          {(() => {
+                            const buildingGroups: Record<string, string[]> = {};
+                            pageRooms.forEach((room) => {
+                              const building = filteredExamData.find(e => e.room_id === (room ?? ""))?.building_name || "Unknown Building";
+                              if (!buildingGroups[building]) buildingGroups[building] = [];
+                              buildingGroups[building].push(String(room));
+                            });
+
+                            return Object.values(buildingGroups)
+                              .flat()
+                              .map((room, idx) => <th key={idx}>{room}</th>);
+                          })()}
+                        </tr>
+                        </thead>
+                        <tbody>
+                          {timeSlots.map((slot, rowIndex) => (
+                            <tr key={slot.start24}>
+                              <td>{slot.label}</td>
+                              {pageRooms.map((room) => {
+                                const key = `${date}-${room}-${rowIndex}`;
+                                if (occupiedCells[key]) return null;
+
+                                const examsInRoom = groupedData[`${date}-${room}`] || [];
+
+                                const exam = examsInRoom.find((e) => {
+                                  if (!e.exam_start_time || !e.exam_end_time) return false;
+                                  const examStart = Number(e.exam_start_time!.slice(11,13)) * 60 + Number(e.exam_start_time!.slice(14,16));
+                                  const examEnd   = Number(e.exam_end_time!.slice(11,13)) * 60 + Number(e.exam_end_time!.slice(14,16));
+                                  const slotStart  = Number(slot.start24.split(":")[0]) * 60 + Number(slot.start24.split(":")[1]);
+                                  const slotEnd    = Number(slot.end24.split(":")[0]) * 60 + Number(slot.end24.split(":")[1]);
+                                  return (examStart < slotEnd) && (examEnd > slotStart);
+                                });
+
+                                if (!exam) return <td key={room}></td>;
+
+                                const startMinutes = Number(exam.exam_start_time!.slice(11, 13)) * 60 + Number(exam.exam_start_time!.slice(14, 16));
+                                const endMinutes   = Number(exam.exam_end_time!.slice(11, 13)) * 60 + Number(exam.exam_end_time!.slice(14, 16));
+
+                                const examStartHour = Number(exam.exam_start_time!.slice(11, 13));
+                                const examStartMin  = Number(exam.exam_start_time!.slice(14, 16));
+                                const examStartTotalMin = examStartHour * 60 + examStartMin;
+
+                                const startSlotIndex = timeSlots.findIndex(slot => {
+                                  const slotStart = Number(slot.start24.split(":")[0]) * 60 + Number(slot.start24.split(":")[1]);
+                                  const slotEnd   = Number(slot.end24.split(":")[0]) * 60 + Number(slot.end24.split(":")[1]);
+                                  return examStartTotalMin >= slotStart && examStartTotalMin < slotEnd;
+                                });
+
+                                const rowSpan = Math.ceil((endMinutes - startMinutes) / 30);
+
+                                for (let i = 0; i < rowSpan; i++) {
+                                  if (startSlotIndex + i < timeSlots.length) {
+                                    occupiedCells[`${date}-${room}-${startSlotIndex + i}`] = true;
+                                  }
+                                }
+
+                                return (
+                                  <td key={room} rowSpan={rowSpan}>
+                                    <div
+                                      onClick={() => handleScheduleClick(exam)}
+                                      style={{
+                                        backgroundColor: courseColorMap[exam.course_id || ""] || "#ccc",
+                                        color: "#fff",
+                                        padding: 4,
+                                        borderRadius: 4,
+                                        fontSize: 12,
+                                        cursor: swapMode ? "pointer" : "default",
+                                        outline: selectedSwap?.examdetails_id === exam.examdetails_id 
+                                          ? "10px solid blue" 
+                                          : searchTerm && (
+                                              exam.course_id?.toLowerCase().includes(searchTerm.toLowerCase()) ||
+                                              exam.section_name?.toLowerCase().includes(searchTerm.toLowerCase()) ||
+                                              exam.room_id?.toLowerCase().includes(searchTerm.toLowerCase()) ||
+                                              getUserName(exam.instructor_id).toLowerCase().includes(searchTerm.toLowerCase()) ||
+                                              getUserName(exam.proctor_id).toLowerCase().includes(searchTerm.toLowerCase())
+                                            )
+                                          ? "3px solid yellow"
+                                          : "none",
+                                        boxShadow: searchTerm && (
+                                          exam.course_id?.toLowerCase().includes(searchTerm.toLowerCase()) ||
+                                          exam.section_name?.toLowerCase().includes(searchTerm.toLowerCase()) ||
+                                          exam.room_id?.toLowerCase().includes(searchTerm.toLowerCase()) ||
+                                          getUserName(exam.instructor_id).toLowerCase().includes(searchTerm.toLowerCase()) ||
+                                          getUserName(exam.proctor_id).toLowerCase().includes(searchTerm.toLowerCase())
+                                        ) ? "0 0 15px 3px rgba(255, 255, 0, 0.8)" : "none"
+                                      }}
+                                    >
+                                      <p>{exam.course_id}</p>
+                                      <p>{exam.section_name}</p>
+                                      <p>Instructor: {getUserName(exam.instructor_id)}</p>
+                                      <p>
+                                        Proctor: 
+                                        {activeProctorEdit === exam.examdetails_id || activeProctorEdit === -1 ? (
+                                          <Select
+                                            value={
+                                              exam.proctor_id
+                                                ? {
+                                                    value: exam.proctor_id,
+                                                    label: getUserName(exam.proctor_id)
+                                                  }
+                                                : null
+                                            }
+                                            onChange={(selectedOption) => {
+                                              if (selectedOption) {
+                                                handleProctorChange(exam.examdetails_id!, selectedOption.value);
+                                              }
+                                            }}
+                                            options={(() => {
+                                              const sectionInstructorId = exam.instructor_id;
+                                              const availableUserPool = allCollegeUsers.length > 0 ? allCollegeUsers : users;
+
+                                              // Get all instructors for the same course & program
+                                              const candidateInstructors = availableUserPool.filter((instr) =>
+                                                examData.some(
+                                                  (ex) =>
+                                                    ex.course_id === exam.course_id &&
+                                                    ex.program_id === exam.program_id &&
+                                                    ex.instructor_id === instr.user_id
+                                                )
+                                              );
+
+                                              const alternativeInstructors = candidateInstructors.filter(
+                                                (instr) => Number(instr.user_id) !== Number(sectionInstructorId)
+                                              );
+
+                                              const eligibleUsers = alternativeInstructors.length > 0 
+                                                ? alternativeInstructors 
+                                                : availableUserPool.filter(u => u.user_id !== sectionInstructorId);
+
+                                              // Filter out users with conflicting schedules
+                                              const availableUsers = eligibleUsers.filter((p) => {
+                                                const assignedExams = examData.filter(
+                                                  (ex) =>
+                                                    ex.proctor_id === p.user_id &&
+                                                    ex.examdetails_id !== exam.examdetails_id &&
+                                                    ex.exam_date === exam.exam_date
+                                                );
+
+                                                return !assignedExams.some((ex) => {
+                                                  const startA = new Date(exam.exam_start_time!).getTime();
+                                                  const endA = new Date(exam.exam_end_time!).getTime();
+                                                  const startB = new Date(ex.exam_start_time!).getTime();
+                                                  const endB = new Date(ex.exam_end_time!).getTime();
+
+                                                  return startA < endB && endA > startB;
+                                                });
+                                              });
+
+                                              return availableUsers.map((p) => ({
+                                                value: p.user_id,
+                                                label: `${p.first_name} ${p.last_name}${
+                                                  p.user_id === sectionInstructorId ? ' (Own Section)' : ''
+                                                }`
+                                              }));
+                                            })()}
+                                            placeholder="--Select Proctor--"
+                                            isSearchable
+                                            styles={{ menu: (provided) => ({ ...provided, zIndex: 9999 }) }}
+                                          />
+                                        ) : (
+                                          // ✅ FIX: Always show proctor name, even in non-edit mode
+                                          <span style={{ marginLeft: '5px' }}>
+                                            {exam.proctor_id ? getUserName(exam.proctor_id) : "Not Assigned"}
+                                          </span>
+                                        )}
+                                      </p>
+                                      <p>{formatTo12Hour(exam.exam_start_time!.slice(11,16))} - {formatTo12Hour(exam.exam_end_time!.slice(11,16))}</p>
+                                    </div>
+                                  </td>
+                                );
+                              })}
+                            </tr>
+                          ))}
+                        </tbody>
+                      </table>
+                    ))}
+                  </div>
                 </div>
               );
             });
           })()
         )}
         <Modal isOpen={isModalOpen} onClose={() => setIsModalOpen(false)}>
-          <AddScheduleForm user={user} />
+          <AddScheduleForm 
+            user={user} 
+            onScheduleCreated={async () => {
+              // Force immediate refresh with proper filtering
+              try {
+                const examsResponse = await api.get('/tbl_examdetails');
+                if (examsResponse.data) {
+                  // Apply the same filtering logic as the polling effect
+                  if (schedulerCollegeName) {
+                    const filteredExams = examsResponse.data.filter(
+                      (exam: ExamDetail) => exam.college_name === schedulerCollegeName
+                    );
+                    console.log(`✅ Immediate refresh: ${filteredExams.length} schedules loaded`);
+                    setExamData(filteredExams);
+                  } else {
+                    // Fallback: set all data and let polling filter it
+                    console.log(`⚠️ College name not set yet, loading all data`);
+                    setExamData(examsResponse.data);
+                  }
+                }
+              } catch (error) {
+                console.error("Error fetching data:", error);
+              }
+              setIsModalOpen(false);
+            }}
+          />
         </Modal>
       </div>
 
