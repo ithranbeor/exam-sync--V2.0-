@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import '../styles/proctorSetAvailability.css';
-import { FaChevronLeft, FaChevronRight, FaEye, FaTrash, FaPenAlt, FaPlus } from 'react-icons/fa';
+import { FaChevronLeft, FaChevronRight, FaEye, FaTrash, FaPenAlt, FaPlus, FaSearch } from 'react-icons/fa';
 import { api } from '../lib/apiClient.ts';
 import { ToastContainer, toast } from 'react-toastify';
 import Select, { components } from 'react-select';
@@ -61,8 +61,10 @@ const SchedulerAvailability: React.FC<ProctorSetAvailabilityProps> = ({ user }) 
   const today = new Date();
 
   const [loading, setLoading] = useState(false);
+  const [isBulkDeleting, setIsBulkDeleting] = useState(false);
 
   const [userCache, setUserCache] = useState<Map<number, any>>(new Map());
+  const [selectedAvailabilityIds, setSelectedAvailabilityIds] = useState<Set<number>>(new Set());
 
   const MultiValue = (props: any) => {
     if (props.data.value === 'all') return null;
@@ -449,47 +451,30 @@ const SchedulerAvailability: React.FC<ProctorSetAvailabilityProps> = ({ user }) 
     }
   };
 
-  const handleDeleteAll = async () => {
-    if (!user?.user_id) return;
-
-    if (!window.confirm('Are you sure you want to delete all availability for your college?')) return;
-
+  const handleBulkDelete = async () => {
+    const ids = Array.from(selectedAvailabilityIds);
+    if (ids.length === 0) {
+      toast.info('No availability entries selected');
+      return;
+    }
+    const confirmDelete = window.confirm(`Delete ${ids.length} selected availability entr${ids.length === 1 ? 'y' : 'ies'}? This cannot be undone.`);
+    if (!confirmDelete) return;
+    setIsBulkDeleting(true);
     try {
-      const { data: schedulerRoles } = await api.get(`/tbl_user_role`, {
-        params: { user_id: user.user_id, role_id: 3 }
-      });
-
-      const schedulerRole = Array.isArray(schedulerRoles)
-        ? schedulerRoles.find((r: any) => r.role_id === 3 || r.role === 3)
-        : schedulerRoles;
-
-      if (!schedulerRole?.college_id) {
-        toast.error('Failed to get scheduler college.');
-        return;
-      }
-
-      const { data: collegeUsers } = await api.get(`/tbl_user_role`, {
-        params: { college_id: schedulerRole.college_id }
-      });
-
-      if (!collegeUsers || !Array.isArray(collegeUsers) || collegeUsers.length === 0) {
-        toast.error('No users found for your college.');
-        return;
-      }
-
-      const userIdsToDelete = [...new Set(collegeUsers.map((u: any) => u.user_id))];
-
-      await Promise.all(
-        userIdsToDelete.map((userId: number) =>
-          api.delete(`/tbl_availability/`, { params: { user_id: userId } })
-        )
+      const results = await Promise.allSettled(
+        ids.map((id) => api.delete(`/tbl_availability/${id}/`))
       );
-      
-      toast.success('All availability for your college has been deleted.');
-      fetchAvailability(); // Async, doesn't block
+      const succeeded = results.filter((r) => r.status === 'fulfilled').length;
+      const failed = results.length - succeeded;
+      if (succeeded > 0) toast.success(`Deleted ${succeeded} availability entr${succeeded === 1 ? 'y' : 'ies'}`);
+      if (failed > 0) toast.error(`${failed} entr${failed === 1 ? 'y' : 'ies'} failed to delete`);
+      clearSelection();
+      fetchAvailability();
     } catch (err) {
       console.error(err);
-      toast.error('An unexpected error occurred.');
+      toast.error('Bulk delete failed');
+    } finally {
+      setIsBulkDeleting(false);
     }
   };
 
@@ -503,32 +488,70 @@ const SchedulerAvailability: React.FC<ProctorSetAvailabilityProps> = ({ user }) 
     }
   };
 
+  // Bulk selection functions
+  const toggleSelect = (id: number) => {
+    setSelectedAvailabilityIds((prev) => {
+      const next = new Set(prev);
+      if (next.has(id)) {
+        next.delete(id);
+      } else {
+        next.add(id);
+      }
+      return next;
+    });
+  };
+
+  const filteredEntries = entries.filter((entry) =>
+    (entry.user_fullname || '').toLowerCase().includes(searchTerm.toLowerCase())
+  );
+
+  const isAllSelected = filteredEntries.length > 0 && filteredEntries.every((entry) => selectedAvailabilityIds.has(entry.availability_id));
+
+  const toggleSelectAll = () => {
+    setSelectedAvailabilityIds(() => {
+      if (isAllSelected) {
+        return new Set();
+      }
+      const all = new Set<number>();
+      filteredEntries.forEach((entry) => all.add(entry.availability_id));
+      return all;
+    });
+  };
+
+  const clearSelection = () => setSelectedAvailabilityIds(new Set());
+
   return (
     <div className="colleges-container">
-      <div className="colleges-header"></div>
-
-      <div className="colleges-actions">
-        <button type="button" className="action-button add-new" onClick={openAddModal}>
-          <FaPlus />
-        </button>
-
-        <button
-          type="button"
-          className="action-button delete-all"
-          onClick={handleDeleteAll}
-          style={{ marginLeft: '10px', backgroundColor: '#e74c3c', color: 'white' }}
-        >
-          <FaTrash />
-        </button>
-
-        <div className="search-bar" style={{ marginLeft: 'auto' }}>
+      <div className="colleges-header">
+        <div className="search-bar">
           <input
             type="text"
             placeholder="Search Proctor"
             value={searchTerm}
             onChange={(e) => setSearchTerm(e.target.value)}
-            style={{ padding: '6px 10px', borderRadius: '6px', border: '1px solid #ccc' }}
           />
+          <button type="button" className="search-button"><FaSearch /></button>
+        </div>
+      </div>
+
+      <div className="colleges-actions">
+        <div style={{ display: 'flex', alignItems: 'center', gap: 8, width: '100%' }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+            <button type="button" className="action-button add-new" onClick={openAddModal}>
+              <FaPlus />
+            </button>
+          </div>
+          <div style={{ marginLeft: 'auto', display: 'flex', alignItems: 'center', gap: 8 }}>
+            <button
+              type="button"
+              className="action-button delete"
+              onClick={handleBulkDelete}
+              disabled={isBulkDeleting || selectedAvailabilityIds.size === 0}
+              title={selectedAvailabilityIds.size > 0 ? `Delete ${selectedAvailabilityIds.size} selected` : 'Delete selected'}
+            >
+              <FaTrash />
+            </button>
+          </div>
         </div>
       </div>
 
@@ -542,22 +565,31 @@ const SchedulerAvailability: React.FC<ProctorSetAvailabilityProps> = ({ user }) 
                 <th>Time Slot</th>
                 <th>Status</th>
                 <th>Remarks</th>
-                <th>Actions</th>
+                <th>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                    <span>Actions</span>
+                    <input
+                      type="checkbox"
+                      checked={isAllSelected}
+                      onChange={toggleSelectAll}
+                      disabled={loading || filteredEntries.length === 0}
+                      aria-label="Select all"
+                      title="Select all"
+                      style={{ marginLeft: 'auto' }}
+                    />
+                  </div>
+                </th>
               </tr>
             </thead>
             <tbody>
-              {entries.length === 0 && !isSubmitting ? (
+              {filteredEntries.length === 0 && !isSubmitting ? (
                 <tr>
                   <td colSpan={7} style={{ textAlign: 'center', padding: '20px' }}>
                     {loading ? 'Loading availability...' : 'No availability found.'}
                   </td>
                 </tr>
               ) : (
-                entries
-                  .filter((entry) =>
-                    (entry.user_fullname || '').toLowerCase().includes(searchTerm.toLowerCase())
-                  )
-                  .map((entry, idx) => (
+                filteredEntries.map((entry, idx) => (
                     <tr key={entry.availability_id}>
                       <td>{idx + 1}</td>
                       <td>{entry.user_fullname}</td>
@@ -593,28 +625,17 @@ const SchedulerAvailability: React.FC<ProctorSetAvailabilityProps> = ({ user }) 
                           '—'
                         )}
                       </td>
-                      <td>
-                        <button
-                          type="button"
-                          className="icon-button delete-button"
-                          onClick={async () => {
-                            try {
-                              setIsSubmitting(true);
-                              await api.delete(`/tbl_availability/${entry.availability_id}/`);
-                              toast.success('Deleted');
-                              fetchAvailability();
-                            } catch (error) {
-                              toast.error('Failed to delete');
-                            } finally {
-                              setIsSubmitting(false);
-                            }
-                          }}
-                        >
-                          <FaTrash />
-                        </button>
+                      <td className="action-buttons" style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
                         <button type="button" className="icon-button" onClick={() => openEditModal(entry)}>
                           <FaPenAlt style={{ color: "#092C4C" }} />
                         </button>
+                        <input
+                          type="checkbox"
+                          checked={selectedAvailabilityIds.has(entry.availability_id)}
+                          onChange={() => toggleSelect(entry.availability_id)}
+                          aria-label={`Select ${entry.user_fullname}`}
+                          style={{ marginLeft: 'auto' }}
+                        />
                       </td>
                     </tr>
                   ))
