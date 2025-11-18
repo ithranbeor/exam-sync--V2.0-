@@ -422,6 +422,19 @@ const SectionCourses: React.FC = () => {
     });
   };
 
+  const isAllSelected = sectionCourses.length > 0 && sectionCourses.every((sc) => selectedIds.has(String(sc.id || '')));
+
+  const toggleSelectAll = () => {
+    setSelectedIds(() => {
+      if (isAllSelected) return new Set();
+      const all = new Set<string>();
+      sectionCourses.forEach((sc) => {
+        if (sc.id !== undefined) all.add(String(sc.id));
+      });
+      return all;
+    });
+  };
+
   const clearSelection = () => setSelectedIds(new Set());
 
   const handleBulkDelete = async () => {
@@ -525,7 +538,20 @@ const SectionCourses: React.FC = () => {
               <th>Term</th>
               <th>Instructor</th>
               <th>Night Class</th>
-              <th>Actions</th>
+              <th>
+                <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                  <span>Actions</span>
+                  <input
+                    type="checkbox"
+                    checked={isAllSelected}
+                    onChange={toggleSelectAll}
+                    disabled={loading || sectionCourses.length === 0}
+                    aria-label="Select all"
+                    title="Select all"
+                    style={{ marginLeft: 'auto' }}
+                  />
+                </div>
+              </th>
             </tr>
           </thead>
           <tbody>
