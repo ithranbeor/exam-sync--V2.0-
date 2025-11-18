@@ -93,7 +93,7 @@ class CourseSerializer(serializers.Serializer):
     
 class TblProgramSerializer(serializers.ModelSerializer):
     department = serializers.SerializerMethodField()
-    department_id = serializers.CharField(write_only=True)
+    department_id = serializers.CharField()
 
     class Meta:
         model = TblProgram
@@ -125,7 +125,7 @@ class TblCollegeSerializer(serializers.ModelSerializer):
 
 class TblDepartmentSerializer(serializers.ModelSerializer):
     college = TblCollegeSerializer(read_only=True)
-    college_id = serializers.CharField(write_only=True)
+    college_id = serializers.CharField()
 
     class Meta:
         model = TblDepartment
@@ -197,16 +197,19 @@ class TblUserRoleSerializer(serializers.ModelSerializer):
         required=False
     )
 
-    # ✅ ADD THESE FIELDS
+    # Read-only fields with IDs
     user_id = serializers.IntegerField(source='user.user_id', read_only=True)
     role_id = serializers.IntegerField(source='role.role_id', read_only=True)
     college_id = serializers.CharField(source='college.college_id', read_only=True, allow_null=True)
     department_id = serializers.CharField(source='department.department_id', read_only=True, allow_null=True)
 
-    # Display (read-only) fields
+    # ✅ ADD THESE EXPANDED FIELDS
+    college_object = serializers.SerializerMethodField(read_only=True)
+    
+    # Display fields
     role_name = serializers.CharField(source='role.role_name', read_only=True)
-    college_name = serializers.CharField(source='college.college_name', read_only=True)
-    department_name = serializers.CharField(source='department.department_name', read_only=True)
+    college_name = serializers.CharField(source='college.college_name', read_only=True, allow_null=True)
+    department_name = serializers.CharField(source='department.department_name', read_only=True, allow_null=True)
     user_full_name = serializers.SerializerMethodField()
 
     class Meta:
@@ -214,16 +217,17 @@ class TblUserRoleSerializer(serializers.ModelSerializer):
         fields = [
             'user_role_id',
             'user',
-            'user_id',  # ✅ ADD THIS
+            'user_id',
             'user_full_name',
             'role',
-            'role_id',  # ✅ ADD THIS
+            'role_id',
             'role_name',
             'college',
-            'college_id',  # ✅ ADD THIS
+            'college_id',
             'college_name',
+            'college_object',  # ✅ ADD THIS
             'department',
-            'department_id',  # ✅ ADD THIS
+            'department_id',
             'department_name',
             'status',
             'created_at',
@@ -234,6 +238,15 @@ class TblUserRoleSerializer(serializers.ModelSerializer):
     def get_user_full_name(self, obj):
         """Return user's full name if available"""
         return f"{obj.user.first_name} {obj.user.last_name}"
+    
+    def get_college_object(self, obj):
+        """✅ Return full college object with all fields"""
+        if obj.college:
+            return {
+                'college_id': obj.college.college_id,
+                'college_name': obj.college.college_name
+            }
+        return None
 
     def create(self, validated_data):
         """Automatically set created_at when creating"""
@@ -354,10 +367,11 @@ class TblSectioncourseSerializer(serializers.ModelSerializer):
     term = TblTermSerializer(read_only=True)
     user = TblUsersSerializer(read_only=True)
 
-    course_id = serializers.CharField(source='course.course_id', write_only=True)
-    program_id = serializers.CharField(source='program.program_id', write_only=True)
-    term_id = serializers.IntegerField(source='term.term_id', write_only=True)
-    user_id = serializers.IntegerField(source='user.user_id', write_only=True, required=False, allow_null=True)
+    # ✅ CHANGED: removed write_only=True from all IDs
+    course_id = serializers.CharField()
+    program_id = serializers.CharField()
+    term_id = serializers.IntegerField()
+    user_id = serializers.IntegerField(required=False, allow_null=True)
     is_night_class = serializers.CharField(required=False, allow_blank=True, allow_null=True)
 
     class Meta:
@@ -367,38 +381,47 @@ class TblSectioncourseSerializer(serializers.ModelSerializer):
             'course', 'program', 'term', 'user',
             'course_id', 'program_id', 'term_id', 'user_id',
             'section_name', 'number_of_students', 'year_level',
-            'is_night_class',  # Add it here
+            'is_night_class',
         ]
 
-    def create(self, validated_data):
-        course_data = validated_data.pop('course')
-        program_data = validated_data.pop('program')
-        term_data = validated_data.pop('term')
-        user_data = validated_data.pop('user', None)
+    def to_representation(self, instance):
+        """Ensure all IDs are included"""
+        representation = super().to_representation(instance)
+        representation['course_id'] = instance.course.course_id if instance.course else None
+        representation['program_id'] = instance.program.program_id if instance.program else None
+        representation['term_id'] = instance.term.term_id if instance.term else None
+        representation['user_id'] = instance.user.user_id if instance.user else None
+        return representation
 
-        course = TblCourse.objects.get(course_id=course_data['course_id'])
-        program = TblProgram.objects.get(program_id=program_data['program_id'])
-        term = TblTerm.objects.get(term_id=term_data['term_id'])
-        user = TblUsers.objects.get(user_id=user_data['user_id']) if user_data else None
+    def create(self, validated_data):
+        course_id = validated_data.pop('course_id')
+        program_id = validated_data.pop('program_id')
+        term_id = validated_data.pop('term_id')
+        user_id = validated_data.pop('user_id', None)
+
+        course = TblCourse.objects.get(course_id=course_id)
+        program = TblProgram.objects.get(program_id=program_id)
+        term = TblTerm.objects.get(term_id=term_id)
+        user = TblUsers.objects.get(user_id=user_id) if user_id else None
 
         return TblSectioncourse.objects.create(
             course=course, program=program, term=term, user=user, **validated_data
         )
 
     def update(self, instance, validated_data):
-        course_data = validated_data.pop('course', None)
-        program_data = validated_data.pop('program', None)
-        term_data = validated_data.pop('term', None)
-        user_data = validated_data.pop('user', None)
+        course_id = validated_data.pop('course_id', None)
+        program_id = validated_data.pop('program_id', None)
+        term_id = validated_data.pop('term_id', None)
+        user_id = validated_data.pop('user_id', None)
 
-        if course_data:
-            instance.course = TblCourse.objects.get(course_id=course_data['course_id'])
-        if program_data:
-            instance.program = TblProgram.objects.get(program_id=program_data['program_id'])
-        if term_data:
-            instance.term = TblTerm.objects.get(term_id=term_data['term_id'])
-        if user_data:
-            instance.user = TblUsers.objects.get(user_id=user_data['user_id'])
+        if course_id:
+            instance.course = TblCourse.objects.get(course_id=course_id)
+        if program_id:
+            instance.program = TblProgram.objects.get(program_id=program_id)
+        if term_id:
+            instance.term = TblTerm.objects.get(term_id=term_id)
+        if user_id:
+            instance.user = TblUsers.objects.get(user_id=user_id)
 
         if 'is_night_class' in validated_data:
             instance.is_night_class = validated_data.pop('is_night_class', '')
@@ -485,12 +508,12 @@ class TblModalitySerializer(serializers.ModelSerializer):
     # Foreign Keys (expanded for read)
     room = TblRoomsSerializer(read_only=True)
     user = TblUsersSerializer(read_only=True)
-    course = CourseSerializer(read_only=True)  # ✅ ADD THIS LINE
+    course = CourseSerializer(read_only=True)
     
-    # Write-only FKs for POST/PUT
-    room_id = serializers.CharField(write_only=True, required=False, allow_null=True, allow_blank=True)
-    user_id = serializers.IntegerField(write_only=True)
-    course_id = serializers.CharField(write_only=True)
+    # Write-only FKs for POST/PUT - ✅ CHANGED: removed write_only=True
+    room_id = serializers.CharField(required=False, allow_null=True, allow_blank=True)
+    user_id = serializers.IntegerField()
+    course_id = serializers.CharField()
     
     # Handle possible_rooms as array
     possible_rooms = serializers.ListField(
@@ -507,7 +530,7 @@ class TblModalitySerializer(serializers.ModelSerializer):
             'modality_type',
             'room_type',
             'modality_remarks',
-            'course',           # ✅ ADD THIS
+            'course',
             'course_id',
             'program_id',
             'room',
@@ -518,6 +541,15 @@ class TblModalitySerializer(serializers.ModelSerializer):
             'section_name',
             'possible_rooms',
         ]
+    
+    def to_representation(self, instance):
+        """Ensure all IDs are included"""
+        representation = super().to_representation(instance)
+        representation['course_id'] = instance.course.course_id if instance.course else None
+        representation['user_id'] = instance.user.user_id if instance.user else None
+        representation['room_id'] = instance.room.room_id if instance.room else None
+        representation['program_id'] = instance.program_id
+        return representation
     
     def create(self, validated_data):
         # Extract write-only fields
@@ -557,16 +589,34 @@ class TblModalitySerializer(serializers.ModelSerializer):
 
 class TblExamdetailsSerializer(serializers.ModelSerializer):
     # FKs (expanded for reading)
-    room = TblRoomsSerializer(read_only=True)
-    modality = TblModalitySerializer(read_only=True)
-    proctor = TblUsersSerializer(read_only=True)
-    examperiod = serializers.StringRelatedField(read_only=True)
+    room = TblRoomsSerializer(read_only=True, allow_null=True)
+    modality = TblModalitySerializer(read_only=True, allow_null=True)
+    proctor = TblUsersSerializer(read_only=True, allow_null=True)
+    examperiod = serializers.SerializerMethodField()
 
-    # Write-only FK fields (for POST/PUT)
-    room_id = serializers.CharField(write_only=True, required=False)  # FIXED: removed source
-    modality_id = serializers.IntegerField(write_only=True, required=False)  # FIXED: removed source
-    proctor_id = serializers.IntegerField(write_only=True, required=False, allow_null=True)  # FIXED: removed source
-    examperiod_id = serializers.IntegerField(write_only=True, required=False)  # FIXED: removed source
+    # ✅ FIXED: Remove write_only=True from room_id so it's available in GET responses
+    room_id = serializers.CharField(required=False, allow_null=True, allow_blank=True)
+    modality_id = serializers.IntegerField(write_only=True, required=False, allow_null=True)
+    proctor_id = serializers.IntegerField(required=False, allow_null=True)
+    examperiod_id = serializers.IntegerField(write_only=True, required=False, allow_null=True)
+    
+    def get_examperiod(self, obj):
+        """Handle examperiod serialization with null safety"""
+        if obj.examperiod:
+            return {
+                'examperiod_id': obj.examperiod.examperiod_id,
+                'start_date': obj.examperiod.start_date,
+                'end_date': obj.examperiod.end_date,
+                'academic_year': obj.examperiod.academic_year,
+                'exam_category': obj.examperiod.exam_category,
+            }
+        return None
+    
+    # ✅ ADD: Ensure room_id is always included in response
+    def to_representation(self, instance):
+        representation = super().to_representation(instance)
+        representation['room_id'] = instance.room.room_id if instance.room else None
+        return representation
 
     class Meta:
         model = TblExamdetails
@@ -575,7 +625,7 @@ class TblExamdetailsSerializer(serializers.ModelSerializer):
             'course_id',
             'program_id',
             'room',
-            'room_id',
+            'room_id',  # Now available for both read and write
             'modality',
             'modality_id',
             'proctor',

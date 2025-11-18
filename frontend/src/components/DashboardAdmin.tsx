@@ -4,7 +4,7 @@ import { useNavigate } from 'react-router-dom';
 import { api } from '../lib/apiClient.ts';
 import { 
   FaHome, FaUsers, FaBuilding, FaBook, FaCalendarAlt, 
-  FaUser, FaSignOutAlt 
+  FaUser, FaSignOutAlt, FaPenAlt 
 } from 'react-icons/fa';
 import { PiBuildingApartmentFill, PiBuildingsFill  } from "react-icons/pi";
 import { FaBookAtlas, FaBookJournalWhills } from "react-icons/fa6";
@@ -26,7 +26,7 @@ import UserManagement from '../components/UserManagement.tsx';
 import Profile from '../components/Profile.tsx';
 import ProctorExamDate from "./ProctorExamDate.tsx";
 import ProctorViewExam from "./ProctorViewExam.tsx";
-
+import BayanihanModality from "./BayanihanModality.tsx";
 
 const iconStyle = { className: 'icon', size: 25 };
 
@@ -42,6 +42,7 @@ const adminSidebarItems = [
   { key: 'buildings', label: 'Buildings', icon: <PiBuildingsFill {...iconStyle} /> },
   { key: 'rooms', label: 'Rooms', icon: <BiSolidBuildings {...iconStyle} /> },
   { key: 'exam-period', label: 'Exam Period', icon: <IoCalendarSharp {...iconStyle} /> },
+  { key: 'set-Modality', label: 'Set Modality', icon: <FaPenAlt {...iconStyle} /> },
   { key: 'User Management', label: 'User Management', icon: <FaUsers {...iconStyle} /> },
   { key: 'profile', label: 'Profile', icon: <FaUser {...iconStyle} /> },
 ];
@@ -110,7 +111,8 @@ const DashboardAdmin: React.FC = () => {
       case 'buildings': return <Buildings />;
       case 'rooms': return <Rooms />;
       case 'exam-period': return <ExamPeriod />;
-      case 'User Management': return <UserManagement user={user} />
+      case 'User Management': return <UserManagement user={user}/>;
+      case 'set-Modality': return <BayanihanModality user={user}/>;
       case 'profile': return <Profile user={user} />;
       case 'dashboard':
       default:

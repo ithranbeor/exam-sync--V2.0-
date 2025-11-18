@@ -277,8 +277,8 @@ class TblExamperiod(models.Model):
 
 class TblModality(models.Model):
     modality_id = models.AutoField(primary_key=True)
-    modality_type = models.TextField()  # This field type is a guess.
-    room_type = models.TextField()  # This field type is a guess.
+    modality_type = models.TextField()
+    room_type = models.TextField()
     modality_remarks = models.TextField(blank=True, null=True)
     course = models.ForeignKey(TblCourse, models.DO_NOTHING)
     program_id = models.TextField()
@@ -286,17 +286,18 @@ class TblModality(models.Model):
     user = models.ForeignKey('TblUsers', models.DO_NOTHING)
     created_at = models.DateTimeField(blank=True, null=True)
     section_name = models.CharField(blank=True, null=True)
-    possible_rooms = models.TextField(blank=True, null=True)  # This field type is a guess.
+    
+    # ✅ FIXED: Proper ArrayField
+    possible_rooms = ArrayField(
+        models.CharField(max_length=50),
+        blank=True,
+        null=True,
+        default=list
+    )
 
     class Meta:
         managed = True
         db_table = 'tbl_modality'
-        indexes = [
-            models.Index(fields=['course']),
-            models.Index(fields=['user']),
-            models.Index(fields=['room']),
-            models.Index(fields=['program_id']),
-        ]
 
 class TblNotification(models.Model):
     notification_id = models.AutoField(primary_key=True)
