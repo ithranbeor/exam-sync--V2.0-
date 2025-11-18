@@ -773,7 +773,7 @@ export const UserManagement: React.FC<UserManagementProps> = ({ user }) => {
       ['INSTRUCTIONS:'],
       ['- Multiple roles can be added by separating values with semicolons (;)'],
       ['- roles: Use role IDs (e.g., 1;2;3 for three roles)'],
-      ['- Roles: 1 (Dean), 2 (Admin), 3 (Scheduler), 4 (Bayanihan Leader), 5 (Proctor)'],
+      ['- Roles: 1 (Dean), 3 (Scheduler), 4 (Bayanihan Leader), 5 (Proctor)'],
       ['- colleges: Use college IDs or leave empty (e.g., CITC;CAS)'],
       ['- departments: Use department IDs or leave empty (e.g., DIT;DCIT;)'],
       ['- Each role must have either a college OR department (or both)'],

@@ -703,7 +703,7 @@ const SectionCourses: React.FC = () => {
                 <option value="">Select Term</option>
                 {terms.map(t => (
                   <option key={t.term_id} value={t.term_id}>
-                    {t.term_name} ({t.tbl_examperiod?.academic_year || 'N/A'})
+                    {t.term_name}
                   </option>
                 ))}
               </select>
