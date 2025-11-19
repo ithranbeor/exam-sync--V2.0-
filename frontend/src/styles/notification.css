@@ -68,8 +68,9 @@
 
 
 .notification-card {
+  display: flex;
   justify-content: space-between;
-  align-items: center;
+  align-items: flex-start;
   background-color: #eeeeee;
   padding: 12px 18px;
   border-radius: 10px;
@@ -77,6 +78,8 @@
   box-shadow: 0 1px 4px rgba(0, 0, 0, 0.04);
   transition: background-color 0.2s ease;
   cursor: pointer;
+  gap: 16px;
+  position: relative;
 }
 
 
@@ -105,6 +108,26 @@
   margin-left: 20px;
   color: #555;
   font-weight: 500;
+}
+
+
+.notif-right {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  gap: 8px;
+}
+
+.notif-right input {
+  width: 16px;
+  height: 16px;
+  cursor: pointer;
+}
+
+.notif-select-all-checkbox {
+  width: 16px;
+  height: 16px;
+  cursor: pointer;
 }
 
 
@@ -244,18 +267,8 @@
   transform: scale(1.1);
 }
 
-.notif-delete-btn {
-  position: absolute;
-  right: 10px;
-  top: 10px;
-  border: none;
-  background: transparent;
-  color: #888;
-  cursor: pointer;
-  font-size: 14px;
-  transition: 0.2s;
-}
-
-.notif-delete-btn:hover {
-  color: #f44336;
+.notif-btn:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+  transform: none;
 }

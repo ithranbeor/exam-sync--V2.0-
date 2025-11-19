@@ -523,7 +523,7 @@ const SchedulerAvailability: React.FC<ProctorSetAvailabilityProps> = ({ user }) 
   return (
     <div className="colleges-container">
       <div className="colleges-header">
-        <div className="search-bar">
+        <div className="search-bar" style={{ marginLeft: 'auto' }}>
           <input
             type="text"
             placeholder="Search Proctor"
