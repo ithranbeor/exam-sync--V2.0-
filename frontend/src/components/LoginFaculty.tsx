@@ -231,11 +231,11 @@ const LoginFaculty: React.FC = () => {
         {/* Login Button */}
         <button 
             type="submit" 
-            className="submit-buttons" 
+            className="submit-button" 
             disabled={loading}
             aria-label={`Log in as ${isFacultyLogin ? 'Faculty' : 'Admin'}`}
         >
-          {loading ? <span className="spinner"></span> : <FaPlayCircle />}
+          {loading ? <span className="spinner"></span> : 'Login'}
         </button>
       </form>
 
