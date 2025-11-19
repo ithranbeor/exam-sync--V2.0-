@@ -291,47 +291,57 @@ const ExamPeriodComponent: React.FC = () => {
     <div className="colleges-container">
       <div className="colleges-header">
         <h2 className="colleges-title">Exam Periods</h2>
-        <div className="search-bar-container">
-          <div className="search-bar" onClick={() => setShowFilters(!showFilters)}>
-            <FaSearch className="search-icon" />
+        <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
+          <div className="search-bar">
             <input
+              type="text"
+              placeholder="Search exam periods..."
               value={search}
               onChange={(e) => setSearch(e.target.value)}
-              placeholder="Search exam periods..."
-              onFocus={() => setShowFilters(true)}
             />
+            <button type="button" className="search-button">
+              <FaSearch />
+            </button>
           </div>
-
-          {showFilters && (
-            <div className="advanced-filters">
-              <select value={filterYear} onChange={(e) => setFilterYear(e.target.value)}>
-                <option value="">All Years</option>
-                {academicYears.map(y => <option key={y} value={y}>{y}</option>)}
-              </select>
-
-              <select value={filterCategory} onChange={(e) => setFilterCategory(e.target.value)}>
-                <option value="">All Categories</option>
-                {examCategories.map(c => <option key={c} value={c}>{c}</option>)}
-              </select>
-
-              <select value={filterTerm} onChange={(e) => setFilterTerm(e.target.value)}>
-                <option value="">All Terms</option>
-                {terms.map(t => <option key={t.term_id} value={t.term_id.toString()}>{t.term_name}</option>)}
-              </select>
-
-              <select value={filterDept} onChange={(e) => setFilterDept(e.target.value)}>
-                <option value="">All Departments</option>
-                {departments.map(d => <option key={d.department_id} value={d.department_id}>{d.department_name}</option>)}
-              </select>
-
-              <select value={filterCollege} onChange={(e) => setFilterCollege(e.target.value)}>
-                <option value="">All Colleges</option>
-                {colleges.map(c => <option key={c.college_id} value={c.college_id}>{c.college_name}</option>)}
-              </select>
-            </div>
-          )}
+          <button
+            type="button"
+            className="action-button"
+            style={{ minWidth: 90 }}
+            onClick={() => setShowFilters(prev => !prev)}
+          >
+            {showFilters ? 'Hide Filters' : 'Show Filters'}
+          </button>
         </div>
       </div>
+
+      {showFilters && (
+        <div className="advanced-filters" style={{ marginBottom: 16 }}>
+          <select value={filterYear} onChange={(e) => setFilterYear(e.target.value)}>
+            <option value="">All Years</option>
+            {academicYears.map(y => <option key={y} value={y}>{y}</option>)}
+          </select>
+
+          <select value={filterCategory} onChange={(e) => setFilterCategory(e.target.value)}>
+            <option value="">All Categories</option>
+            {examCategories.map(c => <option key={c} value={c}>{c}</option>)}
+          </select>
+
+          <select value={filterTerm} onChange={(e) => setFilterTerm(e.target.value)}>
+            <option value="">All Terms</option>
+            {terms.map(t => <option key={t.term_id} value={t.term_id.toString()}>{t.term_name}</option>)}
+          </select>
+
+          <select value={filterDept} onChange={(e) => setFilterDept(e.target.value)}>
+            <option value="">All Departments</option>
+            {departments.map(d => <option key={d.department_id} value={d.department_id}>{d.department_name}</option>)}
+          </select>
+
+          <select value={filterCollege} onChange={(e) => setFilterCollege(e.target.value)}>
+            <option value="">All Colleges</option>
+            {colleges.map(c => <option key={c.college_id} value={c.college_id}>{c.college_name}</option>)}
+          </select>
+        </div>
+      )}
 
       <div className="colleges-actions" style={{ display: 'flex', width: '100%', alignItems: 'center' }}>
         <div>
