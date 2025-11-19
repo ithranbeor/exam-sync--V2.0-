@@ -67,7 +67,7 @@ const SchedulerView: React.FC<SchedulerViewProps> = ({ user }) => {
 
   const [showExportModal, setShowExportModal] = useState(false);
   const [_showExportDropdown, setShowExportDropdown] = useState(false);
-  const [collegeDataReady, setCollegeDataReady] = useState(false); // NEW
+  const [collegeDataReady, setCollegeDataReady] = useState(false);
   const exportRef = useRef<HTMLDivElement>(null);
 
   const resetAllModes = () => {
@@ -93,18 +93,6 @@ const SchedulerView: React.FC<SchedulerViewProps> = ({ user }) => {
     return () => document.removeEventListener('mousedown', handleClickOutside);
   }, []);
 
-  // Close dropdown when clicking outside
-  useEffect(() => {
-    const handleClickOutside = (event: MouseEvent) => {
-      if (envelopeRef.current && !envelopeRef.current.contains(event.target as Node)) {
-        setShowEnvelopeDropdown(false);
-      }
-    };
-
-    document.addEventListener('mousedown', handleClickOutside);
-    return () => document.removeEventListener('mousedown', handleClickOutside);
-  }, []);
-
   useEffect(() => {
     const fetchSchedulerData = async () => {
       if (!user?.user_id) {
@@ -119,7 +107,6 @@ const SchedulerView: React.FC<SchedulerViewProps> = ({ user }) => {
       console.log('Scheduler User ID:', realUserId);
 
       try {
-        // Get scheduler's college - role_id = 3
         const schedulerRolesResponse = await api.get('/tbl_user_role', {
           params: {
             user_id: realUserId,
@@ -137,13 +124,11 @@ const SchedulerView: React.FC<SchedulerViewProps> = ({ user }) => {
         const schedulerCollegeId = schedulerRoles[0].college_id;
         console.log('Scheduler College ID:', schedulerCollegeId);
 
-        // ✅ GET THE COLLEGE NAME
         const collegeResponse = await api.get(`/tbl_college/${schedulerCollegeId}/`);
         const collegeName = collegeResponse.data?.college_name;
         console.log('Scheduler College Name:', collegeName);
         setSchedulerCollegeName(collegeName || "");
 
-        // Get ALL departments under this college
         const departmentsResponse = await api.get('/departments/', {
           params: {
             college_id: schedulerCollegeId
@@ -154,7 +139,6 @@ const SchedulerView: React.FC<SchedulerViewProps> = ({ user }) => {
         const departmentIds = departments?.map((d: any) => d.department_id) || [];
         console.log('Department IDs under college:', departmentIds);
 
-        // Get all proctors (role_id = 5)
         const proctorRolesResponse = await api.get('/tbl_user_role', {
           params: {
             role_id: 5
@@ -171,18 +155,15 @@ const SchedulerView: React.FC<SchedulerViewProps> = ({ user }) => {
 
         console.log('Total proctors fetched:', proctorRoles.length);
 
-        // Filter proctors: college_id matches OR department_id matches
         const matchingUserIds = new Set<number>();
 
         proctorRoles.forEach((p: any) => {
           let matches = false;
 
-          // Case 1: college_id matches directly
           if (p.college_id && String(p.college_id) === String(schedulerCollegeId)) {
             matches = true;
             console.log(`✓ Match (Direct College): User ${p.user_id} - College: ${p.college_id}`);
           }
-          // Case 2: department_id belongs to scheduler's college
           else if (p.department_id && departmentIds.includes(p.department_id)) {
             matches = true;
             console.log(`✓ Match (Department): User ${p.user_id} - Dept: ${p.department_id}`);
@@ -199,7 +180,6 @@ const SchedulerView: React.FC<SchedulerViewProps> = ({ user }) => {
 
         console.log('Matching User IDs:', Array.from(matchingUserIds));
 
-        // Fetch user details for matching proctors ONLY
         if (matchingUserIds.size === 0) {
           console.log('No matching proctors found');
           setAllCollegeUsers([]);
@@ -215,18 +195,15 @@ const SchedulerView: React.FC<SchedulerViewProps> = ({ user }) => {
         console.log('Final filtered users:', userDetails?.length || 0);
         console.log('========================================');
 
-        // Set all college users and proctors
         setAllCollegeUsers(userDetails || []);
         setProctors(userDetails || []);
 
         setUsers((prevUsers) => {
-          // Merge existing users with newly fetched proctor details
           const existingUserIds = new Set(prevUsers.map(u => u.user_id));
           const newUsers = (userDetails || []).filter((u: { user_id: number; }) => !existingUserIds.has(u.user_id));
           return [...prevUsers, ...newUsers];
         });
 
-        // Fetch dean info
         const deanRoleResponse = await api.get('/tbl_user_role', {
           params: {
             college_id: schedulerCollegeId,
@@ -259,7 +236,6 @@ const SchedulerView: React.FC<SchedulerViewProps> = ({ user }) => {
     fetchSchedulerData();
   }, [user]);
 
-  // ✅ FIXED: Filter exam data by scheduler's college
   useEffect(() => {
     if (!collegeDataReady) return;
 
@@ -278,7 +254,6 @@ const SchedulerView: React.FC<SchedulerViewProps> = ({ user }) => {
         if (examsResponse.data) {
           console.log(`✅ Fetched ${examsResponse.data.length} schedules`);
 
-          // ✅ Check for data integrity issues
           const invalidSchedules = examsResponse.data.filter((e: ExamDetail) =>
             !e.room_id || !e.exam_start_time || !e.exam_end_time
           );
@@ -315,7 +290,6 @@ const SchedulerView: React.FC<SchedulerViewProps> = ({ user }) => {
         });
 
         if (response.data && response.data.length > 0) {
-          // Sort by submitted_at descending and get the first one
           const sortedData = response.data.sort((a: any, b: any) =>
             new Date(b.submitted_at).getTime() - new Date(a.submitted_at).getTime()
           );
@@ -361,17 +335,14 @@ const SchedulerView: React.FC<SchedulerViewProps> = ({ user }) => {
       return "-";
     }
 
-    // Convert to number if it's a string
     const numericId = typeof id === 'string' ? parseInt(id, 10) : id;
 
-    // Try allCollegeUsers first (filtered proctors)
     const collegeUser = allCollegeUsers.find(u => Number(u.user_id) === Number(numericId));
     if (collegeUser) {
       const name = `${collegeUser.first_name} ${collegeUser.last_name}`;
       return name;
     }
 
-    // Fallback to all users
     const user = users.find(u => Number(u.user_id) === Number(numericId));
     if (user) {
       const name = `${user.first_name} ${user.last_name}`;
@@ -424,7 +395,6 @@ const SchedulerView: React.FC<SchedulerViewProps> = ({ user }) => {
     }
   };
 
-  // Filter exam data based on selected filter
   const filteredExamData = selectedFilter === "all"
     ? examData
     : examData.filter(exam => {
@@ -432,7 +402,6 @@ const SchedulerView: React.FC<SchedulerViewProps> = ({ user }) => {
       return filterKey === selectedFilter;
     });
 
-  // Further filter by search term
   const searchFilteredData = searchTerm.trim() === ""
     ? filteredExamData
     : filteredExamData.filter(exam => {
@@ -449,7 +418,6 @@ const SchedulerView: React.FC<SchedulerViewProps> = ({ user }) => {
       );
     });
 
-  // Generate unique filter options
   const getFilterOptions = () => {
     const uniqueOptions = new Set<string>();
     examData.forEach(exam => {
@@ -460,7 +428,6 @@ const SchedulerView: React.FC<SchedulerViewProps> = ({ user }) => {
     return Array.from(uniqueOptions).sort();
   };
 
-  // Get unique dates from filtered data
   const uniqueDates = Array.from(new Set(searchFilteredData.map((e) => e.exam_date))).filter(Boolean).sort();
 
   useEffect(() => {
@@ -469,7 +436,6 @@ const SchedulerView: React.FC<SchedulerViewProps> = ({ user }) => {
       console.log('📅 Unique dates:', uniqueDates);
       console.log('🏫 Total rooms:', Array.from(new Set(searchFilteredData.map(e => e.room_id))).length);
 
-      // ✅ ADD THIS: Check for incomplete schedules
       const invalidSchedules = searchFilteredData.filter(e =>
         !e.room_id || !e.exam_start_time || !e.exam_end_time || !e.exam_date
       );
@@ -478,7 +444,6 @@ const SchedulerView: React.FC<SchedulerViewProps> = ({ user }) => {
         console.error('❌ Incomplete schedules:', invalidSchedules);
       }
 
-      // ✅ ADD THIS: Log schedule distribution by date and room
       uniqueDates.forEach(date => {
         const dateSchedules = searchFilteredData.filter(e => e.exam_date === date);
         console.log(`📅 ${date}: ${dateSchedules.length} schedules`);
@@ -566,14 +531,12 @@ const SchedulerView: React.FC<SchedulerViewProps> = ({ user }) => {
 
       console.log(`🗑️ Batch deleting ${examsToDelete.length} schedules for "${schedulerCollegeName}"`);
 
-      // ✅ Use batch delete endpoint
       const response = await api.post('/tbl_examdetails/batch-delete/', {
         college_name: schedulerCollegeName
       });
 
       toast.dismiss(loadingToast);
 
-      // Update state immediately
       setExamData(prev => prev.filter(e => e.college_name !== schedulerCollegeName));
 
       toast.success(`Successfully deleted ${response.data.deleted_count} schedules for ${schedulerCollegeName}!`);
@@ -595,7 +558,7 @@ const SchedulerView: React.FC<SchedulerViewProps> = ({ user }) => {
         } else if (approvalStatus === "approved") {
           toast.warn("Schedule already approved. Cannot modify.");
         } else {
-          resetAllModes(); // close all other features
+          resetAllModes();
           setIsModalOpen(true);
         }
       },
@@ -625,7 +588,7 @@ const SchedulerView: React.FC<SchedulerViewProps> = ({ user }) => {
           toast.warn("Schedule already approved. Cannot modify.");
         } else {
           const newSwapMode = !swapMode;
-          resetAllModes(); // close everything before toggling
+          resetAllModes();
           setSwapMode(newSwapMode);
           setSelectedSwap(null);
           setShowSwapInstructions(newSwapMode);
@@ -636,7 +599,7 @@ const SchedulerView: React.FC<SchedulerViewProps> = ({ user }) => {
       key: "Send Messages",
       icon: <FaEnvelope style={{ fontSize: "20px" }} />,
       action: () => {
-        resetAllModes(); // ensure only this dropdown is open
+        resetAllModes();
         setShowEnvelopeDropdown(true);
       },
       ref: envelopeRef,
@@ -672,7 +635,6 @@ const SchedulerView: React.FC<SchedulerViewProps> = ({ user }) => {
     totalPages = Math.max(1, Math.ceil(rooms.length / maxRoomColumns));
   }
 
-  // ✅ Show loading state
   if (isLoadingData) {
     return (
       <div style={{
@@ -827,7 +789,6 @@ const SchedulerView: React.FC<SchedulerViewProps> = ({ user }) => {
               {key.charAt(0).toUpperCase() + key.slice(1)}
             </span>
 
-            {/* Envelope Dropdown */}
             {key === "Send Messages" && showEnvelopeDropdown && (
               <div className="envelope-dropdown">
                 <button
@@ -1075,7 +1036,6 @@ const SchedulerView: React.FC<SchedulerViewProps> = ({ user }) => {
                 groupedData[key].push(exam);
               });
 
-              // ✅ ADD THIS: Log grouped data
               console.log(`📦 Grouped data for ${date}:`, Object.keys(groupedData).length, 'room groups');
               Object.entries(groupedData).forEach(([key, exams]) => {
                 console.log(`   ${key}: ${exams.length} exam(s)`);
@@ -1170,48 +1130,43 @@ const SchedulerView: React.FC<SchedulerViewProps> = ({ user }) => {
                                   return false;
                                 }
 
-                                // ✅ FIX: Parse the FULL ISO timestamp, not just time portion
-                                const examStartTime = new Date(e.exam_start_time);
-                                const examEndTime = new Date(e.exam_end_time);
+                                // ✅ FIX: Extract time directly from ISO string (HH:MM format)
+                                const examStartTimeStr = e.exam_start_time.slice(11, 16);
+                                const examEndTimeStr = e.exam_end_time.slice(11, 16);
 
-                                // Extract minutes from midnight of the exam date
-                                const examStart = examStartTime.getUTCHours() * 60 + examStartTime.getUTCMinutes();
-                                const examEnd = examEndTime.getUTCHours() * 60 + examEndTime.getUTCMinutes();
+                                const [examStartHour, examStartMin] = examStartTimeStr.split(':').map(Number);
+                                const [examEndHour, examEndMin] = examEndTimeStr.split(':').map(Number);
+                                
+                                const examStart = examStartHour * 60 + examStartMin;
+                                const examEnd = examEndHour * 60 + examEndMin;
 
                                 const slotStart = Number(slot.start24.split(":")[0]) * 60 + Number(slot.start24.split(":")[1]);
                                 const slotEnd = Number(slot.end24.split(":")[0]) * 60 + Number(slot.end24.split(":")[1]);
 
                                 const matches = (examStart < slotEnd) && (examEnd > slotStart);
 
-                                // ✅ Debug log for first room only
-                                if (rowIndex < 3 && room === pageRooms[0]) {
-                                  console.log(`🔍 Slot ${slot.start24}-${slot.end24} (${slotStart}-${slotEnd}min) vs Exam ${examStart}-${examEnd}min (${e.exam_start_time.slice(11, 16)}-${e.exam_end_time.slice(11, 16)}): ${matches ? '✅' : '❌'}`);
-                                }
-
                                 return matches;
                               });
 
                               if (!exam) return <td key={room}></td>;
 
-                              const examStartTime = new Date(exam.exam_start_time!);
-                              const examEndTime = new Date(exam.exam_end_time!);
+                              // ✅ FIX: Extract time directly from ISO string
+                              const examStartTimeStr = exam.exam_start_time!.slice(11, 16);
+                              const examEndTimeStr = exam.exam_end_time!.slice(11, 16);
 
-                              const startMinutes = examStartTime.getUTCHours() * 60 + examStartTime.getUTCMinutes();
-                              const endMinutes = examEndTime.getUTCHours() * 60 + examEndTime.getUTCMinutes();
+                              const [examStartHour, examStartMin] = examStartTimeStr.split(':').map(Number);
+                              const [examEndHour, examEndMin] = examEndTimeStr.split(':').map(Number);
 
-                              const examStartHour = examStartTime.getUTCHours();
-                              const examStartMin = examStartTime.getUTCMinutes();
-                              const examStartTotalMin = examStartHour * 60 + examStartMin;
+                              const startMinutes = examStartHour * 60 + examStartMin;
+                              const endMinutes = examEndHour * 60 + examEndMin;
 
                               const startSlotIndex = timeSlots.findIndex(slot => {
                                 const slotStart = Number(slot.start24.split(":")[0]) * 60 + Number(slot.start24.split(":")[1]);
                                 const slotEnd = Number(slot.end24.split(":")[0]) * 60 + Number(slot.end24.split(":")[1]);
-                                return examStartTotalMin >= slotStart && examStartTotalMin < slotEnd;
+                                return startMinutes >= slotStart && startMinutes < slotEnd;
                               });
 
                               const rowSpan = Math.ceil((endMinutes - startMinutes) / 30);
-
-                              console.log(`📏 Exam ${exam.examdetails_id}: ${examStartTime.toISOString().slice(11, 16)}-${examEndTime.toISOString().slice(11, 16)} → start=${startMinutes}min, end=${endMinutes}min, rowSpan=${rowSpan}, startSlotIndex=${startSlotIndex}`);
 
                               for (let i = 0; i < rowSpan; i++) {
                                 if (startSlotIndex + i < timeSlots.length) {
@@ -1274,7 +1229,6 @@ const SchedulerView: React.FC<SchedulerViewProps> = ({ user }) => {
                                             const sectionInstructorId = exam.instructor_id;
                                             const availableUserPool = allCollegeUsers.length > 0 ? allCollegeUsers : users;
 
-                                            // Get all instructors for the same course & program
                                             const candidateInstructors = availableUserPool.filter((instr) =>
                                               examData.some(
                                                 (ex) =>
@@ -1292,7 +1246,6 @@ const SchedulerView: React.FC<SchedulerViewProps> = ({ user }) => {
                                               ? alternativeInstructors
                                               : availableUserPool.filter(u => u.user_id !== sectionInstructorId);
 
-                                            // Filter out users with conflicting schedules
                                             const availableUsers = eligibleUsers.filter((p) => {
                                               const assignedExams = examData.filter(
                                                 (ex) =>
@@ -1322,13 +1275,12 @@ const SchedulerView: React.FC<SchedulerViewProps> = ({ user }) => {
                                           styles={{ menu: (provided) => ({ ...provided, zIndex: 9999 }) }}
                                         />
                                       ) : (
-                                        // ✅ FIX: Always show proctor name, even in non-edit mode
                                         <span style={{ marginLeft: '5px' }}>
                                           {exam.proctor_id ? getUserName(exam.proctor_id) : "Not Assigned"}
                                         </span>
                                       )}
                                     </p>
-                                    <p>{formatTo12Hour(exam.exam_start_time!.slice(11, 16))} - {formatTo12Hour(exam.exam_end_time!.slice(11, 16))}</p>
+                                    <p>{formatTo12Hour(examStartTimeStr)} - {formatTo12Hour(examEndTimeStr)}</p>
                                   </div>
                                 </td>
                               );
@@ -1459,48 +1411,41 @@ const SchedulerView: React.FC<SchedulerViewProps> = ({ user }) => {
                                     return false;
                                   }
 
-                                  // ✅ FIX: Parse the FULL ISO timestamp, not just time portion
-                                  const examStartTime = new Date(e.exam_start_time);
-                                  const examEndTime = new Date(e.exam_end_time);
+                                  const examStartTimeStr = e.exam_start_time.slice(11, 16);
+                                  const examEndTimeStr = e.exam_end_time.slice(11, 16);
 
-                                  // Extract minutes from midnight of the exam date
-                                  const examStart = examStartTime.getUTCHours() * 60 + examStartTime.getUTCMinutes();
-                                  const examEnd = examEndTime.getUTCHours() * 60 + examEndTime.getUTCMinutes();
+                                  const [examStartHour, examStartMin] = examStartTimeStr.split(':').map(Number);
+                                  const [examEndHour, examEndMin] = examEndTimeStr.split(':').map(Number);
+                                  
+                                  const examStart = examStartHour * 60 + examStartMin;
+                                  const examEnd = examEndHour * 60 + examEndMin;
 
                                   const slotStart = Number(slot.start24.split(":")[0]) * 60 + Number(slot.start24.split(":")[1]);
                                   const slotEnd = Number(slot.end24.split(":")[0]) * 60 + Number(slot.end24.split(":")[1]);
 
                                   const matches = (examStart < slotEnd) && (examEnd > slotStart);
 
-                                  // ✅ Debug log for first room only
-                                  if (rowIndex < 3 && room === pageRooms[0]) {
-                                    console.log(`🔍 Slot ${slot.start24}-${slot.end24} (${slotStart}-${slotEnd}min) vs Exam ${examStart}-${examEnd}min (${e.exam_start_time.slice(11, 16)}-${e.exam_end_time.slice(11, 16)}): ${matches ? '✅' : '❌'}`);
-                                  }
-
                                   return matches;
                                 });
 
                                 if (!exam) return <td key={room}></td>;
 
-                                const examStartTime = new Date(exam.exam_start_time!);
-                                const examEndTime = new Date(exam.exam_end_time!);
+                                const examStartTimeStr = exam.exam_start_time!.slice(11, 16);
+                                const examEndTimeStr = exam.exam_end_time!.slice(11, 16);
 
-                                const startMinutes = examStartTime.getUTCHours() * 60 + examStartTime.getUTCMinutes();
-                                const endMinutes = examEndTime.getUTCHours() * 60 + examEndTime.getUTCMinutes();
+                                const [examStartHour, examStartMin] = examStartTimeStr.split(':').map(Number);
+                                const [examEndHour, examEndMin] = examEndTimeStr.split(':').map(Number);
 
-                                const examStartHour = examStartTime.getUTCHours();
-                                const examStartMin = examStartTime.getUTCMinutes();
-                                const examStartTotalMin = examStartHour * 60 + examStartMin;
+                                const startMinutes = examStartHour * 60 + examStartMin;
+                                const endMinutes = examEndHour * 60 + examEndMin;
 
                                 const startSlotIndex = timeSlots.findIndex(slot => {
                                   const slotStart = Number(slot.start24.split(":")[0]) * 60 + Number(slot.start24.split(":")[1]);
                                   const slotEnd = Number(slot.end24.split(":")[0]) * 60 + Number(slot.end24.split(":")[1]);
-                                  return examStartTotalMin >= slotStart && examStartTotalMin < slotEnd;
+                                  return startMinutes >= slotStart && startMinutes < slotEnd;
                                 });
 
                                 const rowSpan = Math.ceil((endMinutes - startMinutes) / 30);
-
-                                console.log(`📏 Exam ${exam.examdetails_id}: ${examStartTime.toISOString().slice(11, 16)}-${examEndTime.toISOString().slice(11, 16)} → start=${startMinutes}min, end=${endMinutes}min, rowSpan=${rowSpan}, startSlotIndex=${startSlotIndex}`);
 
                                 for (let i = 0; i < rowSpan; i++) {
                                   if (startSlotIndex + i < timeSlots.length) {
@@ -1563,7 +1508,6 @@ const SchedulerView: React.FC<SchedulerViewProps> = ({ user }) => {
                                               const sectionInstructorId = exam.instructor_id;
                                               const availableUserPool = allCollegeUsers.length > 0 ? allCollegeUsers : users;
 
-                                              // Get all instructors for the same course & program
                                               const candidateInstructors = availableUserPool.filter((instr) =>
                                                 examData.some(
                                                   (ex) =>
@@ -1581,7 +1525,6 @@ const SchedulerView: React.FC<SchedulerViewProps> = ({ user }) => {
                                                 ? alternativeInstructors
                                                 : availableUserPool.filter(u => u.user_id !== sectionInstructorId);
 
-                                              // Filter out users with conflicting schedules
                                               const availableUsers = eligibleUsers.filter((p) => {
                                                 const assignedExams = examData.filter(
                                                   (ex) =>
@@ -1611,13 +1554,12 @@ const SchedulerView: React.FC<SchedulerViewProps> = ({ user }) => {
                                             styles={{ menu: (provided) => ({ ...provided, zIndex: 9999 }) }}
                                           />
                                         ) : (
-                                          // ✅ FIX: Always show proctor name, even in non-edit mode
                                           <span style={{ marginLeft: '5px' }}>
                                             {exam.proctor_id ? getUserName(exam.proctor_id) : "Not Assigned"}
                                           </span>
                                         )}
                                       </p>
-                                      <p>{formatTo12Hour(exam.exam_start_time!.slice(11, 16))} - {formatTo12Hour(exam.exam_end_time!.slice(11, 16))}</p>
+                                      <p>{formatTo12Hour(examStartTimeStr)} - {formatTo12Hour(examEndTimeStr)}</p>
                                     </div>
                                   </td>
                                 );
@@ -1637,9 +1579,7 @@ const SchedulerView: React.FC<SchedulerViewProps> = ({ user }) => {
           <AddScheduleForm
             user={user}
             onScheduleCreated={async () => {
-              // Force immediate refresh with proper filtering
               try {
-                // ✅ FIX: Add college_name filter
                 const params: any = {};
                 if (schedulerCollegeName && schedulerCollegeName !== "Add schedule first") {
                   params.college_name = schedulerCollegeName;
@@ -1659,17 +1599,14 @@ const SchedulerView: React.FC<SchedulerViewProps> = ({ user }) => {
         </Modal>
       </div>
 
-      {/* SMS Modal */}
       <Modal isOpen={showSmsModal} onClose={() => setShowSmsModal(false)}>
         <SmsSender user={user} onClose={() => setShowSmsModal(false)} collegeName={collegeName} />
       </Modal>
 
-      {/* Email Modal */}
       <Modal isOpen={showEmailModal} onClose={() => setShowEmailModal(false)}>
         <EmailSender user={user} onClose={() => setShowEmailModal(false)} collegeName={collegeName} />
       </Modal>
 
-      {/* Dean Modal */}
       <Modal isOpen={showDeanModal} onClose={() => setShowDeanModal(false)}>
         <DeanSend
           onClose={() => setShowDeanModal(false)}
@@ -1685,7 +1622,6 @@ const SchedulerView: React.FC<SchedulerViewProps> = ({ user }) => {
         />
       </Modal>
 
-      {/* Export Modal */}
       <Modal isOpen={showExportModal} onClose={() => setShowExportModal(false)}>
         <ExportSchedule onClose={() => setShowExportModal(false)} collegeName={collegeName} />
       </Modal>

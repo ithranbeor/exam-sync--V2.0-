@@ -433,13 +433,88 @@ const SchedulerPlottingSchedule: React.FC<SchedulerProps> = ({ user, onScheduleC
     courseDateAssignment: Map<string, string>
   ): Chromosome => {
     const chromosome: Chromosome = [];
-    const courseTimeSlotAssignments = new Map<string, Map<string, string>>();
     const roomTimeRanges = new Map<string, Array<{ start: number; end: number }>>();
     const proctorTimeRanges = new Map<string, Array<{ start: number; end: number }>>();
-    const scheduledSections = new Set<number>(); 
-    
+    const scheduledSections = new Set<number>();
     const globalTimeSlotYearLevels = new Map<string, Map<string, Set<string>>>();
 
+    // ✅ NEW: Group sections by course and night class status
+    const sectionsByCourseType = new Map<string, any[]>();
+    allSections.forEach(section => {
+      const isNightClass = section.is_night_class === "YES";
+      const courseKey = isNightClass ? `${section.course_id}_NIGHT` : section.course_id;
+      
+      if (!sectionsByCourseType.has(courseKey)) {
+        sectionsByCourseType.set(courseKey, []);
+      }
+      sectionsByCourseType.get(courseKey)!.push(section);
+    });
+
+    // ✅ NEW: Assign one time slot per course type
+    const courseTypeTimeSlots = new Map<string, { date: string; timeSlot: string }>();
+    
+    sectionsByCourseType.forEach((sections, courseKey) => {
+      const firstSection = sections[0];
+      const isNightClass = firstSection.is_night_class === "YES";
+      
+      // Get valid times for this course type
+      const validTimesForCourse = isNightClass 
+        ? eveningTimeSlots.filter(t => {
+            const [h, m] = t.split(":").map(Number);
+            const end = (h * 60 + m) + totalDurationMinutes;
+            return end <= 21 * 60;
+          })
+        : validTimes.filter(t => !eveningTimeSlots.includes(t));
+
+      // Assign date for this course
+      const courseId = firstSection.course_id;
+      let date = courseDateAssignment.get(courseId);
+      if (!date || !sortedDates.includes(date)) {
+        date = sortedDates[Math.floor(Math.random() * sortedDates.length)];
+        courseDateAssignment.set(courseId, date);
+      }
+
+      // Find a time slot that works for ALL sections of this course
+      let foundTimeSlot = false;
+      const maxAttempts = validTimesForCourse.length * 3;
+      
+      for (let attempt = 0; attempt < maxAttempts && !foundTimeSlot; attempt++) {
+        const candidateTime = validTimesForCourse[Math.floor(Math.random() * validTimesForCourse.length)];
+        const startMinutes = timeToMinutes(candidateTime);
+        const endMinutes = startMinutes + totalDurationMinutes;
+        
+        // Check if we have enough rooms for all sections at this time
+        let availableRoomCount = 0;
+        
+        for (const section of sections) {
+          const suitableRooms = sectionRoomsMap.get(section.modality_id) || [];
+          
+          for (const room of suitableRooms) {
+            const roomDateKey = `${date}|${room}`;
+            const existingRanges = roomTimeRanges.get(roomDateKey) || [];
+            
+            if (!existingRanges.some(range => rangesOverlap(startMinutes, endMinutes, range.start, range.end))) {
+              availableRoomCount++;
+              break; // Found a room for this section
+            }
+          }
+        }
+        
+        // If we have enough rooms for all sections, use this time slot
+        if (availableRoomCount >= sections.length) {
+          courseTypeTimeSlots.set(courseKey, { date, timeSlot: candidateTime });
+          foundTimeSlot = true;
+        }
+      }
+      
+      // Fallback: use random time if we couldn't find perfect slot
+      if (!foundTimeSlot && validTimesForCourse.length > 0) {
+        const timeSlot = validTimesForCourse[Math.floor(Math.random() * validTimesForCourse.length)];
+        courseTypeTimeSlots.set(courseKey, { date, timeSlot });
+      }
+    });
+
+    // ✅ NEW: Schedule all sections using their assigned course time slot
     allSections.forEach(section => {
       if (scheduledSections.has(section.modality_id)) {
         return;
@@ -450,136 +525,74 @@ const SchedulerPlottingSchedule: React.FC<SchedulerProps> = ({ user, onScheduleC
         return;
       }
 
-      const yearLevel = extractYearLevel(section.section_name);
-      const courseId = section.course_id;
-      const programId = section.program_id;
       const isNightClass = section.is_night_class === "YES";
-
-      const validTimesForSection = isNightClass 
-        ? eveningTimeSlots.filter(t => {
-            const [h, m] = t.split(":").map(Number);
-            const end = (h * 60 + m) + totalDurationMinutes;
-            return end <= 21 * 60;
-          })
-        : validTimes.filter(t => !eveningTimeSlots.includes(t));
-
-      let date = courseDateAssignment.get(courseId);
-      if (!date || !sortedDates.includes(date)) {
-        date = sortedDates[Math.floor(Math.random() * sortedDates.length)];
-        courseDateAssignment.set(courseId, date);
+      const courseKey = isNightClass ? `${section.course_id}_NIGHT` : section.course_id;
+      
+      // ✅ Get the pre-assigned time slot for this course
+      const assignment = courseTypeTimeSlots.get(courseKey);
+      if (!assignment) {
+        console.warn(`No time slot assigned for course ${courseKey}`);
+        return;
       }
 
+      const { date, timeSlot } = assignment;
+      const startMinutes = timeToMinutes(timeSlot);
+      const endMinutes = startMinutes + totalDurationMinutes;
+
+      // Find available room for this section at the assigned time
+      let roomId = "";
+      const suitableRooms = sectionRoomsMap.get(section.modality_id) || [];
+      
+      for (const room of suitableRooms) {
+        const roomDateKey = `${date}|${room}`;
+        const existingRanges = roomTimeRanges.get(roomDateKey) || [];
+        
+        if (!existingRanges.some(range => rangesOverlap(startMinutes, endMinutes, range.start, range.end))) {
+          roomId = room;
+          
+          // Mark room as occupied
+          if (!roomTimeRanges.has(roomDateKey)) roomTimeRanges.set(roomDateKey, []);
+          roomTimeRanges.get(roomDateKey)!.push({ start: startMinutes, end: endMinutes });
+          break;
+        }
+      }
+
+      // Fallback if no room found
+      if (!roomId && suitableRooms.length > 0) {
+        roomId = suitableRooms[Math.floor(Math.random() * suitableRooms.length)];
+      }
+
+      // Year level tracking
+      const yearLevel = extractYearLevel(section.section_name);
+      const programId = section.program_id;
       const program = programs.find(p => p.program_id === programId);
       const departmentId = program ? String(program.department_id) : "unknown";
       const department = departments.find(d => String(d.department_id) === departmentId);
       const collegeId = department ? String(department.college_id) : "unknown";
 
-      const courseKey = isNightClass ? `${courseId}_NIGHT` : courseId;
-      
-      if (!courseTimeSlotAssignments.has(courseKey)) {
-        courseTimeSlotAssignments.set(courseKey, new Map());
+      const examSlots: string[] = [];
+      for (let offset = 0; offset < totalDurationMinutes; offset += 30) {
+        const slotMinutes = startMinutes + offset;
+        const h = Math.floor(slotMinutes / 60);
+        const m = slotMinutes % 60;
+        examSlots.push(`${String(h).padStart(2, "0")}:${String(m).padStart(2, "0")}`);
       }
 
-      // ✅ FIX: Find a time slot that has available rooms
-      let timeSlot: string = "";
-      let roomId: string = "";
-      
-      // Get preferred time slot if course already has one
-      const preferredTime = courseTimeSlotAssignments.get(courseKey)?.get(date);
-      
-      // Try to find a time slot with available room
-      let foundSlot = false;
-      const maxAttempts = validTimesForSection.length * 2;
-      
-      for (let attempt = 0; attempt < maxAttempts && !foundSlot; attempt++) {
-        // First try preferred time if it exists and we haven't tried many times
-        if (preferredTime && attempt === 0) {
-          timeSlot = preferredTime;
-        } else {
-          timeSlot = validTimesForSection[Math.floor(Math.random() * validTimesForSection.length)];
+      for (const slot of examSlots) {
+        const globalKey = `${date}|${slot}`;
+        if (!globalTimeSlotYearLevels.has(globalKey)) {
+          globalTimeSlotYearLevels.set(globalKey, new Map());
         }
-        
-        const startMinutes = timeToMinutes(timeSlot);
-        const endMinutes = startMinutes + totalDurationMinutes;
-        
-        // Check year level conflicts
-        let hasYearConflict = false;
-        const examSlots: string[] = [];
-        for (let offset = 0; offset < totalDurationMinutes; offset += 30) {
-          const slotMinutes = startMinutes + offset;
-          const h = Math.floor(slotMinutes / 60);
-          const m = slotMinutes % 60;
-          examSlots.push(`${String(h).padStart(2, "0")}:${String(m).padStart(2, "0")}`);
+        const collegeYearMap = globalTimeSlotYearLevels.get(globalKey)!;
+        if (!collegeYearMap.has(collegeId)) {
+          collegeYearMap.set(collegeId, new Set());
         }
-        
-        for (const slot of examSlots) {
-          const globalKey = `${date}|${slot}`;
-          if (globalTimeSlotYearLevels.has(globalKey)) {
-            const collegeYearMap = globalTimeSlotYearLevels.get(globalKey)!;
-            if (collegeYearMap.has(collegeId) && collegeYearMap.get(collegeId)!.has(yearLevel)) {
-              hasYearConflict = true;
-              break;
-            }
-          }
-        }
-        
-        if (hasYearConflict) continue;
-        
-        // ✅ CRITICAL FIX: Find available room for this time slot
-        const suitableRooms = sectionRoomsMap.get(section.modality_id) || [];
-        for (const room of suitableRooms) {
-          const roomDateKey = `${date}|${room}`;
-          const existingRanges = roomTimeRanges.get(roomDateKey) || [];
-          if (!existingRanges.some(range => rangesOverlap(startMinutes, endMinutes, range.start, range.end))) {
-            // Found available room!
-            roomId = room;
-            foundSlot = true;
-            
-            // Mark room as occupied
-            if (!roomTimeRanges.has(roomDateKey)) roomTimeRanges.set(roomDateKey, []);
-            roomTimeRanges.get(roomDateKey)!.push({ start: startMinutes, end: endMinutes });
-            
-            // Mark year level time slot
-            for (const slot of examSlots) {
-              const globalKey = `${date}|${slot}`;
-              if (!globalTimeSlotYearLevels.has(globalKey)) {
-                globalTimeSlotYearLevels.set(globalKey, new Map());
-              }
-              const collegeYearMap = globalTimeSlotYearLevels.get(globalKey)!;
-              if (!collegeYearMap.has(collegeId)) {
-                collegeYearMap.set(collegeId, new Set());
-              }
-              collegeYearMap.get(collegeId)!.add(yearLevel);
-            }
-            
-            // Save this time slot for the course
-            if (!courseTimeSlotAssignments.get(courseKey)!.has(date)) {
-              courseTimeSlotAssignments.get(courseKey)!.set(date, timeSlot);
-            }
-            
-            break;
-          }
-        }
-      }
-      
-      // Fallback if no room found
-      if (!roomId) {
-        const suitableRooms = sectionRoomsMap.get(section.modality_id) || [];
-        if (suitableRooms.length > 0) {
-          roomId = suitableRooms[Math.floor(Math.random() * suitableRooms.length)];
-        }
-        // Use preferred or random time
-        if (!timeSlot) {
-          timeSlot = preferredTime || validTimesForSection[Math.floor(Math.random() * validTimesForSection.length)];
-        }
+        collegeYearMap.get(collegeId)!.add(yearLevel);
       }
 
-      const startMinutes = timeToMinutes(timeSlot);
-      const endMinutes = startMinutes + totalDurationMinutes;
-
-      // ✅ PROCTOR ASSIGNMENT
+      // Proctor assignment
       let proctorId = -1;
-
+      
       if (isNightClass && section.instructor_id) {
         const availableProctors = getAvailableProctors(date, timeSlot);
         if (availableProctors.includes(section.instructor_id)) {
@@ -596,9 +609,7 @@ const SchedulerPlottingSchedule: React.FC<SchedulerProps> = ({ user, onScheduleC
       if (proctorId === -1) {
         const availableProctors = getAvailableProctors(date, timeSlot);
         
-        if (availableProctors.length === 0) {
-          console.warn(`No available proctors for ${date} at ${timeSlot}`);
-        } else {
+        if (availableProctors.length > 0) {
           for (const proctor of availableProctors) {
             const proctorDateKey = `${date}|${proctor}`;
             const existingRanges = proctorTimeRanges.get(proctorDateKey) || [];
@@ -610,13 +621,13 @@ const SchedulerPlottingSchedule: React.FC<SchedulerProps> = ({ user, onScheduleC
             }
           }
           
-          if (proctorId === -1 && availableProctors.length > 0) {
+          if (proctorId === -1) {
             proctorId = availableProctors[Math.floor(Math.random() * availableProctors.length)];
           }
         }
       }
 
-      // ✅ ALWAYS ADD TO CHROMOSOME
+      // Add to chromosome
       scheduledSections.add(section.modality_id);
       chromosome.push({ sectionId: section.modality_id, date, timeSlot, roomId, proctorId });
     });
@@ -818,13 +829,17 @@ const SchedulerPlottingSchedule: React.FC<SchedulerProps> = ({ user, onScheduleC
     getAvailableProctors: (date: string, time: string) => number[],
     mutationRate: number
   ): Chromosome => {
-    const courseDateMap = new Map<string, string>();
+    // ✅ NEW: Build course-to-timeslot map to preserve course consistency
+    const courseTypeTimeSlots = new Map<string, { date: string; timeSlot: string }>();
+    
     chromosome.forEach(gene => {
       const section = sectionMap.get(gene.sectionId);
       if (section) {
-        const courseId = section.course_id;
-        if (!courseDateMap.has(courseId)) {
-          courseDateMap.set(courseId, gene.date);
+        const isNightClass = section.is_night_class === "YES";
+        const courseKey = isNightClass ? `${section.course_id}_NIGHT` : section.course_id;
+        
+        if (!courseTypeTimeSlots.has(courseKey)) {
+          courseTypeTimeSlots.set(courseKey, { date: gene.date, timeSlot: gene.timeSlot });
         }
       }
     });
@@ -834,12 +849,11 @@ const SchedulerPlottingSchedule: React.FC<SchedulerProps> = ({ user, onScheduleC
         const section = sectionMap.get(gene.sectionId);
         if (!section) return { ...gene };
 
-        const courseId = section.course_id;
         const isNightClass = section.is_night_class === "YES";
+        const courseKey = isNightClass ? `${section.course_id}_NIGHT` : section.course_id;
         const mutationType = Math.floor(Math.random() * 4);
         const suitableRooms = sectionRoomsMap.get(gene.sectionId) || [];
 
-        // Determine valid time slots for this section
         const validTimesForSection = isNightClass 
           ? eveningTimeSlots.filter(t => {
               const [h, m] = t.split(":").map(Number);
@@ -850,14 +864,13 @@ const SchedulerPlottingSchedule: React.FC<SchedulerProps> = ({ user, onScheduleC
           : validTimes;
 
         if (mutationType === 0 && Math.random() < 0.3) {
-          // Mutate date
+          // ✅ Mutate date - update for entire course
           const newDate = sortedDates[Math.floor(Math.random() * sortedDates.length)];
-          courseDateMap.set(courseId, newDate);
+          courseTypeTimeSlots.set(courseKey, { date: newDate, timeSlot: gene.timeSlot });
           
           const availableProctors = getAvailableProctors(newDate, gene.timeSlot);
           let newProctorId = -1;
           
-          // Prioritize instructor for night classes
           if (isNightClass && section.instructor_id && availableProctors.includes(section.instructor_id)) {
             newProctorId = section.instructor_id;
           } else {
@@ -868,13 +881,13 @@ const SchedulerPlottingSchedule: React.FC<SchedulerProps> = ({ user, onScheduleC
           
           return { ...gene, date: newDate, proctorId: newProctorId };
         } else if (mutationType === 1) {
-          // Mutate time slot
+          // ✅ Mutate time slot - update for entire course
           const newTimeSlot = validTimesForSection[Math.floor(Math.random() * validTimesForSection.length)];
-          const availableProctors = getAvailableProctors(gene.date, newTimeSlot);
+          courseTypeTimeSlots.set(courseKey, { date: gene.date, timeSlot: newTimeSlot });
           
+          const availableProctors = getAvailableProctors(gene.date, newTimeSlot);
           let newProctorId = -1;
           
-          // Prioritize instructor for night classes
           if (isNightClass && section.instructor_id && availableProctors.includes(section.instructor_id)) {
             newProctorId = section.instructor_id;
           } else {
@@ -885,17 +898,16 @@ const SchedulerPlottingSchedule: React.FC<SchedulerProps> = ({ user, onScheduleC
           
           return { ...gene, timeSlot: newTimeSlot, proctorId: newProctorId };
         } else if (mutationType === 2) {
-          // Mutate room
+          // Mutate room only (doesn't affect other sections)
           const newRoomId = suitableRooms.length > 0
             ? suitableRooms[Math.floor(Math.random() * suitableRooms.length)]
             : "";
           return { ...gene, roomId: newRoomId };
         } else {
-          // Mutate proctor
+          // Mutate proctor only (doesn't affect other sections)
           const availableProctors = getAvailableProctors(gene.date, gene.timeSlot);
           let newProctorId = -1;
           
-          // Prioritize instructor for night classes
           if (isNightClass && section.instructor_id && availableProctors.includes(section.instructor_id)) {
             newProctorId = section.instructor_id;
           } else {
@@ -957,7 +969,7 @@ const SchedulerPlottingSchedule: React.FC<SchedulerProps> = ({ user, onScheduleC
     const TIME_SLOT_RANGES: Record<string, string[]> = {
       "7 AM - 1 PM (Morning)": ["07:00", "07:30", "08:00", "08:30", "09:00", "09:30", "10:00", "10:30", "11:00", "11:30", "12:00", "12:30"],
       "1 PM - 6 PM (Afternoon)": ["13:00", "13:30", "14:00", "14:30", "15:00", "15:30", "16:00", "16:30", "17:00", "17:30"],
-      "6 PM - 9 PM (Evening)": ["18:00", "18:30", "19:00", "19:30", "20:00", "20:30"]  // ✅ Ends at 20:30, NOT 21:00
+      "6 PM - 9 PM (Evening)": ["18:00", "18:30", "19:00", "19:30", "20:00", "20:30"]
     };
 
     // ✅ CRITICAL: Get all available time slots from TIME_SLOT_RANGES
@@ -1416,8 +1428,8 @@ const SchedulerPlottingSchedule: React.FC<SchedulerProps> = ({ user, onScheduleC
         section: section.section_name
       });
 
-      const startTimestamp = `${date}T${timeSlot}:00Z`;
-      const endTimestamp = `${date}T${endTime}:00Z`;
+      const startTimestamp = `${date}T${timeSlot}:00`;
+      const endTimestamp = `${date}T${endTime}:00`;
 
       const sectionObj = sectionCourses.find(
         sc => sc.program_id === section.program_id &&
