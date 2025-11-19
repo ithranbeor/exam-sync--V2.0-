@@ -22,7 +22,7 @@ api.interceptors.request.use(
     }
 
     if (token) {
-      config.headers.set('Authorization', `Bearer ${token}`);
+      config.headers.set('Authorization', `Token ${token}`);
     }
 
     return config;

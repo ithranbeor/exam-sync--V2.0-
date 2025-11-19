@@ -1244,20 +1244,37 @@ def confirm_password_change(request):
 def create_account_with_password(request):
     """
     Create a new account with hashed password.
+    Expects: user_id, first_name, last_name, email_address, contact_number, password (optional)
+    If no password provided, generates default: LastName@user_id
     """
-    serializer = TblUsersSerializer(data=request.data)
-
-    if not request.data.get('password'):
-        return Response({'error': 'Password is required'}, status=status.HTTP_400_BAD_REQUEST)
-
-    if serializer.is_valid():
-        user = serializer.save()
-        user.password = make_password(request.data['password'])
-        user.save()
-
-        return Response(UserSerializer(user).data, status=status.HTTP_201_CREATED)
-    return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
-
+    try:
+        data = request.data.copy()
+        
+        # Generate default password if not provided
+        if not data.get('password'):
+            last_name = data.get('last_name', '')
+            user_id = data.get('user_id', '')
+            data['password'] = f"{last_name}@{user_id}"
+        
+        print(f"📥 Creating account for user {data.get('user_id')} with data: {data}")
+        
+        serializer = TblUsersSerializer(data=data)
+        if serializer.is_valid():
+            user = serializer.save()
+            print(f"✅ Account created successfully: {user.user_id}")
+            return Response(UserSerializer(user).data, status=status.HTTP_201_CREATED)
+        
+        print(f"❌ Serializer validation errors: {serializer.errors}")
+        return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
+        
+    except Exception as e:
+        print(f"❌ Error creating account: {str(e)}")
+        import traceback
+        traceback.print_exc()
+        return Response({
+            'error': str(e),
+            'detail': 'Failed to create account'
+        }, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
 
 # ============================================================
 # USERS LIST
