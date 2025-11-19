@@ -5,6 +5,7 @@ import { ToastContainer, toast } from 'react-toastify';
 import * as XLSX from 'xlsx';
 import 'react-toastify/dist/ReactToastify.css';
 import '../styles/accounts.css';
+import '../styles/colleges.css';
 
 interface UserAccount {
   user_id: number;
@@ -88,10 +89,8 @@ export const UserManagement: React.FC<UserManagementProps> = ({ user }) => {
   const [isEditMode, setIsEditMode] = useState(false);
   const [selectedUserId, setSelectedUserId] = useState<number | null>(null);
   const [editingRole, setEditingRole] = useState<UserRole | null>(null);
-  const [isDeletingAll, setIsDeletingAll] = useState(false);
-
-  const [multiSelectMode, setMultiSelectMode] = useState(false);
-  const [selectedAccounts, setSelectedAccounts] = useState<number[]>([]);
+  const [isBulkDeletingAccounts, setIsBulkDeletingAccounts] = useState(false);
+  const [selectedAccountIds, setSelectedAccountIds] = useState<Set<number>>(new Set());
 
   const [newAccount, setNewAccount] = useState<UserAccount>({
     user_id: 0,
@@ -297,46 +296,45 @@ export const UserManagement: React.FC<UserManagementProps> = ({ user }) => {
       await api.delete(`/accounts/${id}/`);
       toast.success('Account and associated roles deleted');
       fetchData();
+      setSelectedAccountIds(prev => {
+        const next = new Set(prev);
+        next.delete(id);
+        return next;
+      });
     } catch (err: any) {
       console.error(err);
       toast.error('Error deleting account');
     }
   };
 
-  const handleDeleteAllByCollege = async () => {
-    if (!selectedCollege) {
-        toast.warning('Please select a college first.');
-        return;
+  const handleBulkDeleteSelected = async () => {
+    const ids = Array.from(selectedAccountIds);
+    if (ids.length === 0) {
+      toast.info('No accounts selected');
+      return;
     }
+    if (!globalThis.confirm(`Delete ${ids.length} selected account(s)? This cannot be undone.`)) return;
 
-    if (!confirm(`Are you sure you want to delete all accounts for this college? This action cannot be undone.`)) return;
-
+    setIsBulkDeletingAccounts(true);
     try {
-        setIsDeletingAll(true);
-        // Filter userRoles for the selected college
-        const accountsToDelete = userRoles
-        .filter(r => r.college_id === selectedCollege)
-        .map(r => r.user);
-
-        // Remove duplicates
-        const uniqueUserIds = Array.from(new Set(accountsToDelete));
-
-        // For each user, delete their roles first, then the account
-        for (const userId of uniqueUserIds) {
-          const userRolesToDelete = userRoles.filter(r => r.user === userId);
+      await Promise.all(
+        ids.map(async (id) => {
+          const userRolesToDelete = userRoles.filter(r => r.user === id);
           await Promise.all(
             userRolesToDelete.map(role => api.delete(`/tbl_user_role/${role.user_role_id}/`))
           );
-          await api.delete(`/accounts/${userId}/`);
-        }
+          await api.delete(`/accounts/${id}/`);
+        })
+      );
 
-        toast.success(`Deleted ${uniqueUserIds.length} account(s) and their roles from the selected college.`);
-        fetchData();
-    } catch (err: any) {
-        console.error(err);
-        toast.error('Error deleting accounts by college.');
+      toast.success(`Deleted ${ids.length} account(s) and their roles`);
+      setSelectedAccountIds(new Set());
+      fetchData();
+    } catch (err) {
+      console.error(err);
+      toast.error('Error deleting selected accounts');
     } finally {
-      setIsDeletingAll(false);
+      setIsBulkDeletingAccounts(false);
     }
   };
 
@@ -840,6 +838,48 @@ export const UserManagement: React.FC<UserManagementProps> = ({ user }) => {
     return matchesSearch && matchesCollege;
   });
 
+  useEffect(() => {
+    setSelectedAccountIds(prev => {
+      const next = new Set<number>();
+      filteredAccounts.forEach(acc => {
+        if (prev.has(acc.user_id)) {
+          next.add(acc.user_id);
+        }
+      });
+      return next;
+    });
+  }, [filteredAccounts]);
+
+  const isAllSelected = (() => {
+    if (filteredAccounts.length === 0) return false;
+    return filteredAccounts.every(acc => selectedAccountIds.has(acc.user_id));
+  })();
+
+  const toggleSelectAll = () => {
+    if (filteredAccounts.length === 0) return;
+    setSelectedAccountIds(prev => {
+      const next = new Set(prev);
+      if (isAllSelected) {
+        filteredAccounts.forEach(acc => next.delete(acc.user_id));
+      } else {
+        filteredAccounts.forEach(acc => next.add(acc.user_id));
+      }
+      return next;
+    });
+  };
+
+  const toggleSelectAccount = (userId: number) => {
+    setSelectedAccountIds(prev => {
+      const next = new Set(prev);
+      if (next.has(userId)) {
+        next.delete(userId);
+      } else {
+        next.add(userId);
+      }
+      return next;
+    });
+  };
+
   // Add new account role
   const addNewAccountRole = () => {
     setNewAccountRoles(prev => [...prev, {
@@ -891,11 +931,12 @@ export const UserManagement: React.FC<UserManagementProps> = ({ user }) => {
   };
 
   return (
-    <div className="accounts-container">
-      <div className="accounts-header">
-        <h2 className="accounts-title">User Management</h2>
+    <div className="colleges-container accounts-container">
+      <div className="colleges-header">
+        <h2 className="colleges-title">User Management</h2>
         <div className="search-bar">
           <input
+            type="text"
             placeholder="Search by ID, name, email, or role..."
             value={searchTerm}
             onChange={(e) => setSearchTerm(e.target.value)}
@@ -904,117 +945,82 @@ export const UserManagement: React.FC<UserManagementProps> = ({ user }) => {
         </div>
       </div>
 
-      <div className="accounts-actions">
-        <button
-          type="button"
-          className="action-button add-new"
-          onClick={() => {
-            setIsEditMode(false);
-            setShowAccountModal(true);
-            setNewAccount({
-              user_id: 0,
-              first_name: '',
-              last_name: '',
-              middle_name: '',
-              email_address: '',
-              contact_number: '',
-              status: 'Active',
-              created_at: new Date().toISOString(),
-            });
-            setNewAccountRoles([{
-              role_id: 0,
-              college_id: null,
-              department_id: null,
-              date_start: null,
-              date_ended: null
-            }]);
-          }}
-        >
-          <FaPlus/>
-        </button>
-
-        <button
-          type="button"
-          className="action-button import"
-          onClick={() => setShowImportAccountsModal(true)}
-        >
-          <FaFileImport/>
-        </button>
-
-        <button
-        type="button"
-        className="action-button delete"
-        style={{ backgroundColor: multiSelectMode ? '#d9534f' : '#f0ad4e', color: 'white', justifyContent: 'center', alignContent: 'center', fontSize: 'small', display: 'flex', borderRadius: '50px' }}
-        onClick={() => {
-            if (multiSelectMode && selectedAccounts.length > 0) {
-              // Delete selected accounts
-              if (!confirm(`Delete ${selectedAccounts.length} selected account(s)?`)) return;
-
-              Promise.all(
-                selectedAccounts.map(async id => {
-                  // Delete roles first
-                  const userRolesToDelete = userRoles.filter(r => r.user === id);
-                  await Promise.all(
-                    userRolesToDelete.map(role => api.delete(`/tbl_user_role/${role.user_role_id}/`))
-                  );
-                  // Then delete account
-                  return api.delete(`/accounts/${id}/`);
-                })
-              )
-                  .then(() => {
-                  toast.success(`${selectedAccounts.length} account(s) and their roles deleted.`);
-                  fetchData();
-                  setSelectedAccounts([]);
-                  })
-                  .catch(err => {
-                  console.error(err);
-                  toast.error('Error deleting selected accounts.');
-                  });
-            }
-            setMultiSelectMode(!multiSelectMode);
-        }}
-        >
-        {multiSelectMode ? 'Delete Selected' : 'Select Accounts'}
-        </button>
-
-        <button
-          type="button"
-          className="action-button delete"
-          onClick={handleDeleteAllByCollege}
-          disabled={isDeletingAll}
-          style={{
-            backgroundColor: '#d9534f',
-            color: 'white',
-            justifyContent: 'center',
-            alignContent: 'center',
-            fontSize: 'small',
-            display: 'flex',
-            borderRadius: '50px',
-            opacity: isDeletingAll ? 0.7 : 1,
-            cursor: isDeletingAll ? "not-allowed" : "pointer",
-          }}
-        >
-          {isDeletingAll ? "Deleting…" : "Delete All by College"}
-        </button>
-        
-        <div className="input-group">
-          <select
-            value={selectedCollege}
-            onChange={(e) => setSelectedCollege(e.target.value)}
-            style={{backgroundColor: 'white', color: 'black', justifyContent: 'center', padding: '8px', alignContent: 'center', fontSize: 'small', display: 'flex', borderRadius: '50px' }}
+      <div className="colleges-actions">
+        <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+          <button
+            type="button"
+            className="action-button add-new"
+            onClick={() => {
+              setIsEditMode(false);
+              setShowAccountModal(true);
+              setNewAccount({
+                user_id: 0,
+                first_name: '',
+                last_name: '',
+                middle_name: '',
+                email_address: '',
+                contact_number: '',
+                status: 'Active',
+                created_at: new Date().toISOString(),
+              });
+              setNewAccountRoles([{
+                role_id: 0,
+                college_id: null,
+                department_id: null,
+                date_start: null,
+                date_ended: null
+              }]);
+            }}
           >
-            <option value="">All Colleges</option>
-            {colleges.map(college => (
-              <option key={college.college_id} value={college.college_id}>
-                {college.college_name}
-              </option>
-            ))}
-          </select>
+            <FaPlus/>
+          </button>
+
+          <button
+            type="button"
+            className="action-button import"
+            onClick={() => setShowImportAccountsModal(true)}
+          >
+            <FaFileImport/>
+          </button>
+
+          <div className="input-group" style={{ marginBottom: 0 }}>
+            <select
+              value={selectedCollege}
+              onChange={(e) => setSelectedCollege(e.target.value)}
+              style={{
+                backgroundColor: 'white',
+                color: '#333',
+                padding: '8px 15px',
+                fontSize: '0.9rem',
+                borderRadius: '50px',
+                border: '1px solid #ccc'
+              }}
+            >
+              <option value="">All Colleges</option>
+              {colleges.map(college => (
+                <option key={college.college_id} value={college.college_id}>
+                  {college.college_name}
+                </option>
+              ))}
+            </select>
+          </div>
+        </div>
+
+        <div style={{ marginLeft: 'auto', display: 'flex', alignItems: 'center', gap: 8 }}>
+          <button
+            type="button"
+            className="action-button delete"
+            onClick={handleBulkDeleteSelected}
+            disabled={isBulkDeletingAccounts || selectedAccountIds.size === 0}
+            title={selectedAccountIds.size > 0 ? `Delete ${selectedAccountIds.size} selected` : 'Delete selected'}
+          >
+            <FaTrash/>
+          </button>
         </div>
       </div>
 
-      <div className="accounts-table-container">
-        <table className="accounts-table">
+      <div className="colleges-table-container">
+        <table className="accounts-table colleges-table">
           <thead>
             <tr>
               <th>#</th>
@@ -1025,7 +1031,20 @@ export const UserManagement: React.FC<UserManagementProps> = ({ user }) => {
               <th>Role/s</th>
               <th>Status</th>
               <th>Created</th>
-              <th>Actions</th>
+              <th>
+                <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                  <span>Actions</span>
+                  <input
+                    type="checkbox"
+                    checked={isAllSelected}
+                    onChange={toggleSelectAll}
+                    disabled={loading || filteredAccounts.length === 0}
+                    aria-label="Select all accounts"
+                    title="Select all"
+                    style={{ marginLeft: 'auto' }}
+                  />
+                </div>
+              </th>
             </tr>
           </thead>
           <tbody>
@@ -1044,22 +1063,13 @@ export const UserManagement: React.FC<UserManagementProps> = ({ user }) => {
             ) : (
                 filteredAccounts.map((account, index) => {
                     const accountRoles = getUserRoles(account.user_id);
-                    const isSelected = selectedAccounts.includes(account.user_id);
+                    const isSelected = selectedAccountIds.has(account.user_id);
 
                     return (
                     <tr
                         key={account.user_id}
                         style={{
                         backgroundColor: isSelected ? '#f8d7da' : 'transparent',
-                        cursor: multiSelectMode ? 'pointer' : 'default'
-                        }}
-                        onClick={() => {
-                        if (!multiSelectMode) return;
-                        setSelectedAccounts(prev =>
-                            prev.includes(account.user_id)
-                            ? prev.filter(id => id !== account.user_id)
-                            : [...prev, account.user_id]
-                        );
                         }}
                     >
                         <td>{index + 1}</td>
@@ -1083,20 +1093,25 @@ export const UserManagement: React.FC<UserManagementProps> = ({ user }) => {
                         {account.status}
                         </td>
                         <td>{new Date(account.created_at).toLocaleDateString()}</td>
-                        <td className="action-buttons">
-                        {!multiSelectMode && (
-                            <button
+                        <td className="action-buttons" style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                          <button
                             type="button"
                             className="action-button import"
                             style={{ fontSize: '0.85em', padding: '5px 10px' }}
                             onClick={() => {
-                                setSelectedUserId(account.user_id);
-                                setShowDetailsModal(true);
+                              setSelectedUserId(account.user_id);
+                              setShowDetailsModal(true);
                             }}
-                            >
+                          >
                             View
-                            </button>
-                        )}
+                          </button>
+                          <input
+                            type="checkbox"
+                            checked={selectedAccountIds.has(account.user_id)}
+                            onChange={() => toggleSelectAccount(account.user_id)}
+                            aria-label={`Select account ${account.user_id}`}
+                            style={{ marginLeft: 'auto' }}
+                          />
                         </td>
                     </tr>
                     );
