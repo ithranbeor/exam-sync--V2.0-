@@ -287,8 +287,13 @@ body {
   color: var(--color-error);
   font-size: 14px;
   margin-top: 5px;
-  text-align: left;
-  flex-grow: 1;
+  text-align: right;
+  min-height: 18px;
+  min-width: 40%;
+}
+
+.error-text.hidden {
+  visibility: hidden;
 }
 
 /* Admin/Settings Toggle Button (Bottom-right) */

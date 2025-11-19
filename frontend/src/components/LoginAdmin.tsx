@@ -147,6 +147,12 @@ const LoginAdmin: React.FC = () => {
               </div>
             </div>
 
+            <div className="form-error-row">
+              <span className={`error-text ${error ? '' : 'hidden'}`}>
+                {error || '‎'}
+              </span>
+            </div>
+
             <div className="remember-me-container">
               <input
                 type="checkbox"
@@ -156,8 +162,6 @@ const LoginAdmin: React.FC = () => {
               />
               <label htmlFor="rememberMe">Remember me</label>
             </div>
-
-            {error && <p className="error-text">{error}</p>}
 
             <button type="submit" className="login-button" disabled={loading}>
               {loading ? <span className="spinner"></span> : "Login"}

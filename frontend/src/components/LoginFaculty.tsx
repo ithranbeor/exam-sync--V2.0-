@@ -223,7 +223,9 @@ const LoginFaculty: React.FC = () => {
                 />
                 <span className="checkmark"></span>
             </label>
-            {error && <p className="error-text">{error}</p>}
+            <span className={`error-text ${error ? '' : 'hidden'}`}>
+              {error || '‎'}
+            </span>
         </div>
         
         {/* Login Button */}
