@@ -70,6 +70,20 @@
   color: #333;
 }
 
+.summary-box {
+  background: #f8f9fa;
+  border: 1px solid #e0e0e0;
+  border-radius: 10px;
+  padding: 16px;
+  color: #111;
+  line-height: 1.5;
+}
+
+.summary-box p {
+  margin: 6px 0;
+  color: inherit;
+}
+
 .subject-input {
   padding: 8px;
   border: 1px solid #ccc;
