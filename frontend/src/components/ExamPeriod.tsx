@@ -1,6 +1,6 @@
 // deno-lint-ignore-file no-explicit-any
 import React, { useEffect, useState } from 'react';
-import { FaTrash, FaEdit, FaSearch,  FaPlus, FaFileImport } from 'react-icons/fa';
+import { FaTrash, FaEdit, FaSearch,  FaPlus } from 'react-icons/fa';
 import { api } from '../lib/apiClient.ts';
 import * as XLSX from 'xlsx';
 import { ToastContainer, toast } from 'react-toastify';
@@ -45,6 +45,7 @@ const ExamPeriodComponent: React.FC = () => {
   const [showFilters, setShowFilters] = useState(false);
   const [loading, setLoading] = useState(true); // new state
   const [selectedDates, setSelectedDates] = useState<Date[]>([]);
+  const [selectedExamIds, setSelectedExamIds] = useState<Set<number>>(new Set());
 
   const [newExam, setNewExam] = useState<ExamPeriod>({
     start_date: '',
@@ -172,6 +173,7 @@ const ExamPeriodComponent: React.FC = () => {
 
       setShowModal(false);
       setSelectedDates([]);
+      setSelectedExamIds(new Set());
     } catch (err) {
       console.error(err);
       toast.error('Failed to save exam period');
@@ -180,15 +182,62 @@ const ExamPeriodComponent: React.FC = () => {
     }
   };
 
-  const handleDelete = async (id: number) => {
-    try {
-      await api.delete(`/tbl_examperiod/${id}/`);
-      toast.success('Exam period deleted');
-      fetchAll();
-    } catch (err) {
-      console.error(err);
-      toast.error('Delete failed');
-    }
+  const filtered = examPeriods.filter(e =>
+    (!search || e.academic_year.toLowerCase().includes(search.toLowerCase())) &&
+    (!filterYear || e.academic_year === filterYear) &&
+    (!filterCategory || e.exam_category === filterCategory) &&
+    (!filterTerm || e.term_id.toString() === filterTerm) &&
+    (!filterDept || e.department_id === filterDept) &&
+    (!filterCollege || e.college_id === filterCollege) &&
+    (e.start_date)
+  );
+
+  useEffect(() => {
+    setSelectedExamIds(prev => {
+      const validIds = new Set<number>();
+      examPeriods.forEach(ep => {
+        if (ep.examperiod_id && prev.has(ep.examperiod_id)) {
+          validIds.add(ep.examperiod_id);
+        }
+      });
+      return validIds;
+    });
+  }, [examPeriods]);
+
+  const toggleSelect = (id?: number) => {
+    if (!id) return;
+    setSelectedExamIds(prev => {
+      const next = new Set(prev);
+      if (next.has(id)) {
+        next.delete(id);
+      } else {
+        next.add(id);
+      }
+      return next;
+    });
+  };
+
+  const isAllSelected = (() => {
+    const selectable = filtered.filter(ep => typeof ep.examperiod_id === 'number');
+    if (selectable.length === 0) return false;
+    return selectable.every(ep => ep.examperiod_id && selectedExamIds.has(ep.examperiod_id));
+  })();
+
+  const toggleSelectAll = () => {
+    const selectable = filtered.filter(ep => typeof ep.examperiod_id === 'number');
+    if (selectable.length === 0) return;
+    setSelectedExamIds(() => {
+      if (isAllSelected) {
+        return new Set();
+      }
+      const next = new Set<number>();
+      selectable.forEach(ep => {
+        if (ep.examperiod_id) {
+          next.add(ep.examperiod_id);
+        }
+      });
+      return next;
+    });
   };
 
   const handleImport = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -231,16 +280,6 @@ const ExamPeriodComponent: React.FC = () => {
     };
     reader.readAsBinaryString(file);
   };
-
-  const filtered = examPeriods.filter(e =>
-    (!search || e.academic_year.toLowerCase().includes(search.toLowerCase())) &&
-    (!filterYear || e.academic_year === filterYear) &&
-    (!filterCategory || e.exam_category === filterCategory) &&
-    (!filterTerm || e.term_id.toString() === filterTerm) &&
-    (!filterDept || e.department_id === filterDept) &&
-    (!filterCollege || e.college_id === filterCollege) &&
-    (e.start_date)
-  );
 
   function toLocalDateString(d: Date): string {
     // Pad month/day
@@ -294,38 +333,42 @@ const ExamPeriodComponent: React.FC = () => {
         </div>
       </div>
 
-      <div className="colleges-actions">
-        <button type='button' className="action-button add-new" onClick={() => {
-          setEditMode(false);
-          setNewExam({
-            start_date: '',
-            end_date: '',
-            academic_year: '',
-            exam_category: '',
-            term_id: 0,
-            department_id: '',
-            college_id: null,
-          });
-          setSelectedDates([]);
-          setShowModal(true);
-        }}><FaPlus/></button>
-        <button
-          type='button'
-          className="action-button delete"
-          onClick={async () => {
-            if (!globalThis.confirm('Are you sure you want to delete all exam periods?')) return;
-            try {
-              await api.delete('/tbl_examperiod');
-              toast.success('All exam periods deleted');
-              fetchAll();
-            } catch (err) {
-              console.error(err);
-              toast.error('Failed to delete all exam periods');
-            }
-          }}
-        >
-          <FaTrash/>
-        </button>
+      <div className="colleges-actions" style={{ display: 'flex', width: '100%', alignItems: 'center' }}>
+        <div>
+          <button type='button' className="action-button add-new" onClick={() => {
+            setEditMode(false);
+            setNewExam({
+              start_date: '',
+              end_date: '',
+              academic_year: '',
+              exam_category: '',
+              term_id: 0,
+              department_id: '',
+              college_id: null,
+            });
+            setSelectedDates([]);
+            setShowModal(true);
+          }}><FaPlus/></button>
+        </div>
+        <div style={{ marginLeft: 'auto' }}>
+          <button
+            type='button'
+            className="action-button delete"
+            onClick={async () => {
+              if (!globalThis.confirm('Are you sure you want to delete all exam periods?')) return;
+              try {
+                await api.delete('/tbl_examperiod');
+                toast.success('All exam periods deleted');
+                fetchAll();
+              } catch (err) {
+                console.error(err);
+                toast.error('Failed to delete all exam periods');
+              }
+            }}
+          >
+            <FaTrash/>
+          </button>
+        </div>
       </div>
 
       <div className="colleges-table-container">
@@ -340,7 +383,20 @@ const ExamPeriodComponent: React.FC = () => {
               <th>Term</th>
               <th>Department</th>
               <th>College</th>
-              <th>Actions</th>
+              <th>
+                <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                  <span>Actions</span>
+                  <input
+                    type="checkbox"
+                    checked={isAllSelected}
+                    onChange={toggleSelectAll}
+                    disabled={loading || filtered.length === 0}
+                    aria-label="Select all exam periods"
+                    title="Select all"
+                    style={{ marginLeft: 'auto' }}
+                  />
+                </div>
+              </th>
             </tr>
           </thead>
           <tbody>
@@ -367,7 +423,7 @@ const ExamPeriodComponent: React.FC = () => {
                   <td>{terms.find(t => t.term_id === e.term_id)?.term_name}</td>
                   <td>{e.department_id}</td>
                   <td>{e.college_id}</td>
-                  <td className="action-buttons">
+                  <td className="action-buttons" style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
                     <button type='button' className="icon-button edit-button" onClick={() => {
                       setEditMode(true);
                       setNewExam(e);
@@ -376,7 +432,13 @@ const ExamPeriodComponent: React.FC = () => {
                       ]);
                       setShowModal(true);
                     }}><FaEdit /></button>
-                    <button type='button' className="icon-button delete-button" onClick={() => handleDelete(e.examperiod_id!)}><FaTrash /></button>
+                    <input
+                      type="checkbox"
+                      checked={!!e.examperiod_id && selectedExamIds.has(e.examperiod_id)}
+                      onChange={() => toggleSelect(e.examperiod_id)}
+                      aria-label="Select exam period"
+                      style={{ marginLeft: 'auto' }}
+                    />
                   </td>
                 </tr>
               ))
