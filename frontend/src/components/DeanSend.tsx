@@ -31,47 +31,63 @@ const DeanSender: React.FC<DeanSenderProps> = ({
   const [remarks, setRemarks] = useState("");
   const [loading, setLoading] = useState(false);
   const [deanName, setDeanName] = useState<string | null>(null);
+  const [deanUserId, setDeanUserId] = useState<number | null>(null);
 
   useEffect(() => {
     const fetchDeanName = async () => {
       if (!user?.user_id) return;
 
       try {
-        // Get scheduler's college
-        const { data: userRole, error: roleError } = await supabase
-          .from("tbl_user_role")
-          .select("college_id")
-          .eq("user_id", user.user_id)
-          .eq("role_id", 3)
-          .single();
+        console.log("🔍 Fetching dean for user:", user.user_id);
 
-        if (roleError || !userRole) return;
+        // Get scheduler's college using tbl_user_role
+        const userRoleResponse = await api.get('/tbl_user_role', {
+          params: {
+            user_id: user.user_id,
+            role_id: 3 // Scheduler role
+          }
+        });
 
-        // Get dean's user_id
-        const { data: deanRole, error: deanError } = await supabase
-          .from("tbl_user_role")
-          .select("user_id")
-          .eq("college_id", userRole.college_id)
-          .eq("role_id", 1)
-          .single();
+        console.log("📋 Scheduler roles:", userRoleResponse.data);
 
-        if (deanError || !deanRole) return;
-
-        // Fetch dean info
-        const { data: deanData, error: userError } = await supabase
-          .from("tbl_users")
-          .select("first_name, last_name")
-          .eq("user_id", deanRole.user_id)
-          .single();
-
-        if (userError || !deanData) {
-          setDeanName("Unknown Dean");
-        } else {
-          setDeanName(`${deanData.first_name} ${deanData.last_name}`);
+        if (!userRoleResponse.data || userRoleResponse.data.length === 0) {
+          console.error("❌ No scheduler role found");
+          setDeanName("No College Assigned");
+          return;
         }
+
+        const schedulerCollegeId = userRoleResponse.data[0].college_id;
+        console.log("🏛️ Scheduler's college ID:", schedulerCollegeId);
+
+        // Get dean's role using the same college
+        const deanRoleResponse = await api.get('/tbl_user_role', {
+          params: {
+            college_id: schedulerCollegeId,
+            role_id: 1 // Dean role
+          }
+        });
+
+        console.log("👔 Dean roles:", deanRoleResponse.data);
+
+        if (!deanRoleResponse.data || deanRoleResponse.data.length === 0) {
+          console.error("❌ No dean found for college");
+          setDeanName("No Dean Assigned");
+          return;
+        }
+
+        const deanRole = deanRoleResponse.data[0];
+        setDeanUserId(deanRole.user_id);
+
+        // Fetch dean's user information
+        const deanUserResponse = await api.get(`/users/${deanRole.user_id}/`);
+        console.log("👤 Dean user data:", deanUserResponse.data);
+
+        const deanData = deanUserResponse.data;
+        setDeanName(`${deanData.first_name} ${deanData.last_name}`);
+
       } catch (err) {
-        console.error("Error fetching dean info:", err);
-        setDeanName("Unknown Dean");
+        console.error("❌ Error fetching dean info:", err);
+        setDeanName("Error Loading Dean");
       }
     };
 
@@ -87,34 +103,14 @@ const DeanSender: React.FC<DeanSenderProps> = ({
       toast.warn("No schedules to send");
       return;
     }
+    if (!deanUserId) {
+      toast.error("Dean not found for your college");
+      return;
+    }
 
     setLoading(true);
     try {
-      // Find scheduler's college
-      const { data: userRole, error: roleError } = await supabase
-        .from("tbl_user_role")
-        .select("college_id")
-        .eq("user_id", user.user_id)
-        .eq("role_id", 3)
-        .single();
-
-      if (roleError || !userRole) {
-        toast.error("Could not determine your college");
-        return;
-      }
-
-      // Find dean for same college
-      const { data: deanRole, error: deanError } = await supabase
-        .from("tbl_user_role")
-        .select("user_id")
-        .eq("college_id", userRole.college_id)
-        .eq("role_id", 1)
-        .single();
-
-      if (deanError || !deanRole) {
-        toast.error("No dean found for your college");
-        return;
-      }
+      console.log("📤 Sending schedule to dean...");
 
       // Prepare schedule data
       const scheduleData = {
@@ -124,7 +120,7 @@ const DeanSender: React.FC<DeanSenderProps> = ({
         semester: semesterName,
         academic_year: yearName,
         building: buildingName,
-        total_schedules: filteredExamData.length,
+        remarks: remarks || "No remarks",
         schedules: filteredExamData.map((exam) => ({
           course_id: exam.course_id,
           section_name: exam.section_name,
@@ -137,43 +133,27 @@ const DeanSender: React.FC<DeanSenderProps> = ({
         })),
       };
 
-      const requestId = crypto.randomUUID();
-
-      // Insert request record
-      const { error: insertError } = await supabase
-        .from("tbl_scheduleapproval")
-        .insert({
-          request_id: requestId,
-          submitted_by: user.user_id,
-          dean_user_id: deanRole.user_id,
-          college_name: collegeName,
-          schedule_data: scheduleData,
-          remarks: remarks || "No remarks",
-          status: "pending",
-          submitted_at: new Date().toLocaleString("en-US", { timeZone: "Asia/Manila" }),
-        });
-
-      if (insertError) throw insertError;
-
-      // Send dean notification
-      await supabase.from("tbl_notification").insert({
-        user_id: deanRole.user_id,
-        sender_id: user.user_id,
-        title: "New Schedule Approval Request",
-        message: `${user.first_name} ${user.last_name} submitted a schedule for ${collegeName}.`,
-        type: "schedule_approval",
-        status: "unread",
-        link_url: "/dean-requests",
-        is_seen: false,
-        priority: 1,
-        created_at: new Date().toISOString(),
+      console.log("📦 Schedule payload:", {
+        user_id: user.user_id,
+        dean_user_id: deanUserId,
+        college_name: collegeName,
+        total_schedules: scheduleData.schedules.length
       });
 
-      toast.success("Schedule sent to dean!");
+      // Send to backend endpoint
+      const response = await api.post('/send_schedule_to_dean/', {
+        user_id: user.user_id,
+        ...scheduleData
+      });
+
+      console.log("✅ Response:", response.data);
+
+      toast.success("Schedule sent to dean successfully!");
       onClose();
-    } catch (err) {
-      console.error(err);
-      toast.error("Failed to send to dean");
+    } catch (err: any) {
+      console.error("❌ Error sending to dean:", err);
+      console.error("Error response:", err.response?.data);
+      toast.error(err.response?.data?.error || "Failed to send to dean");
     } finally {
       setLoading(false);
     }
@@ -208,7 +188,7 @@ const DeanSender: React.FC<DeanSenderProps> = ({
         <button type='button'
           onClick={handleSendToDean}
           className="btn-send"
-          disabled={loading}
+          disabled={loading || !deanUserId}
         >
           {loading ? "Sending..." : "Send to Dean"}
         </button>
