@@ -52,20 +52,41 @@ const DeanRequests: React.FC<SchedulerViewProps> = ({ user }) => {
   const [rejectionReason, setRejectionReason] = useState('');
   const [showRejectionModal, setShowRejectionModal] = useState(false);
   const [collegeName, setCollegeName] = useState<string | null>(null);
-
-  // Added states for editing status
   const [editStatus, setEditStatus] = useState(false);
   const [newStatus, setNewStatus] = useState<string>('pending');
 
   useEffect(() => {
     const fetchCollege = async () => {
       if (!user?.user_id) return;
+      
       try {
-        const res = await api.get(`/user/${user.user_id}/college/`);
-        setCollegeName(res.data.college_name);
+        console.log("🔍 Fetching college for dean:", user.user_id);
+
+        // Get dean's college from user_role
+        const userRoleResponse = await api.get('/tbl_user_role', {
+          params: {
+            user_id: user.user_id,
+            role_id: 1 // Dean role
+          }
+        });
+
+        console.log("📋 Dean roles:", userRoleResponse.data);
+
+        if (!userRoleResponse.data || userRoleResponse.data.length === 0) {
+          toast.error('No dean role found for user');
+          return;
+        }
+
+        const deanCollegeId = userRoleResponse.data[0].college_id;
+        
+        // Fetch college details
+        const collegeResponse = await api.get(`/tbl_college/${deanCollegeId}/`);
+        console.log("🏛️ Dean's college:", collegeResponse.data);
+        
+        setCollegeName(collegeResponse.data.college_name);
       } catch (err) {
-        console.error('Error fetching dean college:', err);
-        toast.error('Failed to load dean college info.');
+        console.error('❌ Error fetching dean college:', err);
+        toast.error('Failed to load college information');
       }
     };
     fetchCollege();
@@ -73,27 +94,43 @@ const DeanRequests: React.FC<SchedulerViewProps> = ({ user }) => {
 
   useEffect(() => {
     if (!collegeName) return;
+    
     const fetchRequests = async () => {
       try {
+        console.log("📥 Fetching pending requests for college:", collegeName);
+        
         const res = await api.get('/tbl_scheduleapproval/', {
-          params: { status: 'pending', college_name: collegeName },
+          params: { 
+            status: 'pending',
+            college_name: collegeName 
+          },
         });
-        const mapped = res.data.map((row: any) => ({
-          request_id: row.request_id,
-          sender_name: `${row.submitted_by.first_name} ${row.submitted_by.last_name}`,
-          subject: 'Exam Schedule Request',
-          remarks: row.remarks,
-          schedule_data: row.schedule_data,
-          submitted_at: new Date(row.submitted_at).toLocaleString(),
-          status: row.status,
-          college_name: row.college_name,
-        }));
+
+        console.log("📦 Raw response:", res.data);
+
+        const mapped = res.data.map((row: any) => {
+          console.log("Processing row:", row);
+          
+          return {
+            request_id: row.request_id,
+            sender_name: row.submitted_by_name || `${row.submitted_by?.first_name || ''} ${row.submitted_by?.last_name || ''}`.trim() || 'Unknown',
+            subject: 'Exam Schedule Request',
+            remarks: row.remarks,
+            schedule_data: row.schedule_data,
+            submitted_at: new Date(row.submitted_at || row.created_at).toLocaleString(),
+            status: row.status,
+            college_name: row.college_name,
+          };
+        });
+
+        console.log("✅ Mapped requests:", mapped);
         setRequests(mapped);
       } catch (err) {
-        console.error('Error fetching pending requests:', err);
-        toast.error('Failed to load pending requests.');
+        console.error('❌ Error fetching pending requests:', err);
+        toast.error('Failed to load pending requests');
       }
     };
+    
     fetchRequests();
     const interval = setInterval(fetchRequests, 10000);
     return () => clearInterval(interval);
@@ -101,53 +138,64 @@ const DeanRequests: React.FC<SchedulerViewProps> = ({ user }) => {
 
   useEffect(() => {
     if (!collegeName) return;
+    
     const fetchHistory = async () => {
       try {
         const res = await api.get('/tbl_scheduleapproval/', {
-          params: { status: ['approved', 'rejected'], college_name: collegeName, limit: 50 },
+          params: { 
+            college_name: collegeName,
+            limit: 50 
+          },
         });
-        const mapped = res.data.map((row: any) => ({
-          request_id: row.request_id,
-          sender_name: `${row.submitted_by.first_name} ${row.submitted_by.last_name}`,
-          subject: 'Exam Schedule Request',
-          remarks: row.remarks,
-          schedule_data: row.schedule_data,
-          submitted_at: new Date(row.submitted_at).toLocaleString(),
-          status: row.status,
-          college_name: row.college_name,
-        }));
+
+        const mapped = res.data
+          .filter((row: any) => row.status !== 'pending')
+          .map((row: any) => ({
+            request_id: row.request_id,
+            sender_name: row.submitted_by_name || `${row.submitted_by?.first_name || ''} ${row.submitted_by?.last_name || ''}`.trim() || 'Unknown',
+            subject: 'Exam Schedule Request',
+            remarks: row.remarks,
+            schedule_data: row.schedule_data,
+            submitted_at: new Date(row.submitted_at || row.created_at).toLocaleString(),
+            status: row.status,
+            college_name: row.college_name,
+          }));
+
         setHistory(mapped);
       } catch (err) {
-        console.error('Error fetching history:', err);
+        console.error('❌ Error fetching history:', err);
       }
     };
+    
     fetchHistory();
   }, [collegeName, requests]);
 
-  // ✅ Delete one request
   const handleDelete = async (req: DeanRequest) => {
     const confirmed = globalThis.confirm(`Delete this request for ${req.college_name}?`);
     if (!confirmed) return;
+    
     try {
       await api.delete(`/tbl_scheduleapproval/${req.request_id}/`);
       setRequests(prev => prev.filter(r => r.request_id !== req.request_id));
       setHistory(prev => prev.filter(r => r.request_id !== req.request_id));
-      toast.success('Request deleted.');
+      toast.success('Request deleted');
       setSelectedRequest(null);
     } catch (err) {
       console.error('Delete failed:', err);
-      toast.error('Failed to delete request.');
+      toast.error('Failed to delete request');
     }
   };
 
-  // ✅ Update request status manually
   const handleUpdateStatus = async () => {
     if (!selectedRequest) return;
+    
     try {
-      await api.patch(`/tbl_scheduleapproval/${selectedRequest.request_id}/`, {
+      await api.put(`/tbl_scheduleapproval/${selectedRequest.request_id}/`, {
         status: newStatus,
       });
+      
       toast.success(`Status updated to ${newStatus.toUpperCase()}`);
+      
       setHistory(prev =>
         prev.map(r =>
           r.request_id === selectedRequest.request_id ? { ...r, status: newStatus } : r
@@ -158,14 +206,14 @@ const DeanRequests: React.FC<SchedulerViewProps> = ({ user }) => {
           r.request_id === selectedRequest.request_id ? { ...r, status: newStatus } : r
         )
       );
+      
       setEditStatus(false);
     } catch (err) {
       console.error('Update status failed:', err);
-      toast.error('Failed to update status.');
+      toast.error('Failed to update status');
     }
   };
 
-  // Approve & Reject (same as before)
   const handleReject = (req: DeanRequest) => {
     setSelectedRequest(req);
     setShowRejectionModal(true);
@@ -177,12 +225,14 @@ const DeanRequests: React.FC<SchedulerViewProps> = ({ user }) => {
       toast.warn('Please provide a reason for rejection');
       return;
     }
+    
     setProcessingRequest(true);
     try {
-      await api.patch(`/tbl_scheduleapproval/${selectedRequest.request_id}/`, {
+      await api.put(`/tbl_scheduleapproval/${selectedRequest.request_id}/`, {
         status: 'rejected',
         remarks: rejectionReason,
       });
+      
       toast.success(`Schedule for ${selectedRequest.schedule_data?.college_name} rejected`);
       setRequests(prev => prev.filter(r => r.request_id !== selectedRequest.request_id));
       setHistory(prev => [{ ...selectedRequest, status: 'rejected', remarks: rejectionReason }, ...prev]);
@@ -191,7 +241,7 @@ const DeanRequests: React.FC<SchedulerViewProps> = ({ user }) => {
       setSelectedRequest(null);
     } catch (err) {
       console.error('Rejection error:', err);
-      toast.error('Failed to reject schedule.');
+      toast.error('Failed to reject schedule');
     } finally {
       setProcessingRequest(false);
     }
@@ -199,18 +249,23 @@ const DeanRequests: React.FC<SchedulerViewProps> = ({ user }) => {
 
   const handleApprove = async (req: DeanRequest) => {
     if (processingRequest) return;
+    
     const confirmed = globalThis.confirm(`Approve the schedule for ${req.schedule_data?.college_name}?`);
     if (!confirmed) return;
+    
     setProcessingRequest(true);
     try {
-      await api.patch(`/tbl_scheduleapproval/${req.request_id}/`, { status: 'approved' });
+      await api.put(`/tbl_scheduleapproval/${req.request_id}/`, { 
+        status: 'approved' 
+      });
+      
       toast.success(`Schedule for ${req.schedule_data?.college_name} approved successfully!`);
       setRequests(prev => prev.filter(r => r.request_id !== req.request_id));
       setHistory(prev => [{ ...req, status: 'approved' }, ...prev]);
       setSelectedRequest(null);
     } catch (err) {
       console.error('Approval error:', err);
-      toast.error('Failed to approve schedule.');
+      toast.error('Failed to approve schedule');
     } finally {
       setProcessingRequest(false);
     }
@@ -219,18 +274,21 @@ const DeanRequests: React.FC<SchedulerViewProps> = ({ user }) => {
   const handleDeleteAll = async () => {
     const confirmed = globalThis.confirm('Delete ALL requests from your college?');
     if (!confirmed || !collegeName) return;
+    
     try {
-      await api.delete(`/tbl_scheduleapproval/`, { params: { college_name: collegeName } });
+      await api.delete('/tbl_scheduleapproval/', { 
+        params: { college_name: collegeName } 
+      });
+      
       setRequests([]);
       setHistory([]);
-      toast.success('All requests deleted.');
+      toast.success('All requests deleted');
     } catch (err) {
       console.error('Delete all failed:', err);
-      toast.error('Failed to delete all requests.');
+      toast.error('Failed to delete all requests');
     }
   };
 
-  // Render cards
   const renderCards = (arr: DeanRequest[]) => {
     if (arr.length === 0)
       return (
@@ -319,26 +377,22 @@ const DeanRequests: React.FC<SchedulerViewProps> = ({ user }) => {
 
       {showHistory ? renderCards(history) : renderCards(requests)}
 
-      {/* Selected Request Modal */}
       {selectedRequest && (
         <div className="deanreq-modal-overlay" onClick={() => setSelectedRequest(null)}>
           <div className="deanreq-modal-pane" onClick={e => e.stopPropagation()}>
             <h3>From: {selectedRequest.sender_name}</h3>
             <h4>{selectedRequest.schedule_data?.college_name || selectedRequest.subject}</h4>
 
-            {/* 🔽 ACTIONS SECTION */}
             <div className="deanreq-actions" style={{ marginTop: '20px', display: 'flex', gap: '10px', justifyContent: 'flex-end' }}>
               {selectedRequest && (
-                <>
-                  <button
-                    type="button"
-                    className="deanreq-btn deny"
-                    style={{ backgroundColor: '#d32f2f', color: 'white' }}
-                    onClick={() => handleDelete(selectedRequest)}
-                  >
-                    Delete
-                  </button>
-                </>
+                <button
+                  type="button"
+                  className="deanreq-btn deny"
+                  style={{ backgroundColor: '#d32f2f', color: 'white' }}
+                  onClick={() => handleDelete(selectedRequest)}
+                >
+                  Delete
+                </button>
               )}
 
               {selectedRequest.status !== "pending" && !editStatus && (
@@ -389,7 +443,6 @@ const DeanRequests: React.FC<SchedulerViewProps> = ({ user }) => {
                 </>
               )}
 
-              {/* Existing Close + Approve/Reject buttons */}
               <button type="button" onClick={() => setSelectedRequest(null)} className="deanreq-btn cancel">
                 Close
               </button>
@@ -409,7 +462,6 @@ const DeanRequests: React.FC<SchedulerViewProps> = ({ user }) => {
         </div>
       )}
 
-      {/* Rejection Modal */}
       {showRejectionModal && (
         <div className="deanreq-modal-overlay" onClick={() => setShowRejectionModal(false)}>
           <div className="deanreq-modal-pane" onClick={e => e.stopPropagation()}>
