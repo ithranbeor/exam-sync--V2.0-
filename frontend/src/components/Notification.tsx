@@ -33,9 +33,10 @@ type Notification = {
 const Notification: React.FC<UserProps> = ({ user }) => {
   const [notifications, setNotifications] = useState<Notification[]>([]);
   const [loading, setLoading] = useState(true);
+  const [selectedNotificationIds, setSelectedNotificationIds] = useState<Set<number>>(new Set());
+  const [isBulkDeleting, setIsBulkDeleting] = useState(false);
   const navigate = useNavigate();
 
-  // Fetch notifications
   const fetchNotifications = async () => {
     if (!user?.user_id) {
       setLoading(false);
@@ -73,6 +74,18 @@ const Notification: React.FC<UserProps> = ({ user }) => {
     return () => clearInterval(interval);
   }, [user]);
 
+  useEffect(() => {
+    setSelectedNotificationIds(prev => {
+      const next = new Set<number>();
+      notifications.forEach(n => {
+        if (prev.has(n.notification_id)) {
+          next.add(n.notification_id);
+        }
+      });
+      return next;
+    });
+  }, [notifications]);
+
   // Handle click on notification
   const handleNotificationClick = async (notif: Notification) => {
     try {
@@ -93,17 +106,6 @@ const Notification: React.FC<UserProps> = ({ user }) => {
       }
     } catch (err) {
       console.error("Error marking notification as read:", err);
-    }
-  };
-
-  // Delete one notification
-  const handleDelete = async (notification_id: number) => {
-    if (!user?.user_id) return;
-    try {
-      await api.delete(`/notifications/${notification_id}/delete/`);
-      setNotifications(prev => prev.filter(n => n.notification_id !== notification_id));
-    } catch (err) {
-      console.error("Error deleting notification:", err);
     }
   };
 
@@ -134,6 +136,48 @@ const Notification: React.FC<UserProps> = ({ user }) => {
   };
 
   const unreadCount = notifications.filter(n => !n.is_seen).length;
+  const isAllSelected = notifications.length > 0 && selectedNotificationIds.size === notifications.length;
+
+  const toggleSelect = (notificationId: number) => {
+    setSelectedNotificationIds(prev => {
+      const next = new Set(prev);
+      if (next.has(notificationId)) {
+        next.delete(notificationId);
+      } else {
+        next.add(notificationId);
+      }
+      return next;
+    });
+  };
+
+  const toggleSelectAll = () => {
+    if (isAllSelected) {
+      setSelectedNotificationIds(new Set());
+      return;
+    }
+    setSelectedNotificationIds(new Set(notifications.map(n => n.notification_id)));
+  };
+
+  const handleBulkDeleteSelected = async () => {
+    const ids = Array.from(selectedNotificationIds);
+    if (ids.length === 0) {
+      window.alert('No notifications selected.');
+      return;
+    }
+    if (!window.confirm(`Delete ${ids.length} selected notification${ids.length === 1 ? '' : 's'}? This action cannot be undone.`)) {
+      return;
+    }
+    setIsBulkDeleting(true);
+    try {
+      await Promise.allSettled(ids.map(id => api.delete(`/notifications/${id}/delete/`)));
+      setSelectedNotificationIds(new Set());
+      fetchNotifications();
+    } catch (err) {
+      console.error('Bulk delete notifications error:', err);
+    } finally {
+      setIsBulkDeleting(false);
+    }
+  };
 
   if (loading) {
     return (
@@ -148,13 +192,29 @@ const Notification: React.FC<UserProps> = ({ user }) => {
     <div className="notification-container">
       <div className="notification-banner">
         <span>Notifications</span>
-        <div style={{ marginLeft: 'auto', display: 'flex', gap: '8px' }}>
+        <div style={{ marginLeft: 'auto', display: 'flex', alignItems: 'center', gap: '12px' }}>
+          <button
+            className="notif-btn"
+            title="Delete selected"
+            onClick={handleBulkDeleteSelected}
+            disabled={selectedNotificationIds.size === 0 || isBulkDeleting}
+          >
+            <FaTrash />
+          </button>
           <button className="notif-btn" title="Mark all as unread" onClick={handleMarkAllUnread}>
             <FaEnvelopeOpenText />
           </button>
           <button className="notif-btn" title="Delete all" onClick={handleDeleteAll}>
             <FaTrashAlt />
           </button>
+          <input
+            type="checkbox"
+            className="notif-select-all-checkbox"
+            checked={isAllSelected}
+            onChange={toggleSelectAll}
+            disabled={notifications.length === 0}
+            aria-label="Select all notifications"
+          />
         </div>
       </div>
 
@@ -177,8 +237,7 @@ const Notification: React.FC<UserProps> = ({ user }) => {
               backgroundColor: notif.is_seen ? '#f9f9f9' : '#fff',
               fontWeight: notif.is_seen ? 'normal' : 'bold',
               borderLeft: notif.is_seen ? '3px solid #ccc' : '3px solid #092C4C',
-              cursor: 'pointer',
-              position: 'relative'
+              cursor: 'pointer'
             }}
           >
             <div className="notif-left">
@@ -204,18 +263,15 @@ const Notification: React.FC<UserProps> = ({ user }) => {
               {notif.message}
             </div>
 
-            <div className="notif-date">{new Date(notif.created_at).toLocaleString()}</div>
-
-            <button
-              className="notif-delete-btn"
-              title="Delete notification"
-              onClick={(e) => {
-                e.stopPropagation();
-                handleDelete(notif.notification_id);
-              }}
-            >
-              <FaTrash />
-            </button>
+            <div className="notif-right" onClick={(e) => e.stopPropagation()}>
+              <div className="notif-date">{new Date(notif.created_at).toLocaleString()}</div>
+              <input
+                type="checkbox"
+                checked={selectedNotificationIds.has(notif.notification_id)}
+                onChange={() => toggleSelect(notif.notification_id)}
+                aria-label={`Select notification from ${notif.sender_name || 'System'}`}
+              />
+            </div>
           </div>
         ))
       )}
