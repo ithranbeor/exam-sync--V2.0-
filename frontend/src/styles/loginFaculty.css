@@ -23,6 +23,10 @@ body {
   position: relative;
   overflow: hidden;
   color: var(--color-white);
+  text-align: center;
+  gap: 20px;
+  padding: 20px;
+  box-sizing: border-box;
 }
 
 /* Background Gradient (Mimicking the image) */
@@ -53,14 +57,12 @@ body {
 
 /* Logo Section (Center) */
 .logo-section {
-  position: absolute;
-  top: 60%;
-  left: 50%;
-  transform: translate(-50%, -50%);
+  position: relative;
   display: flex;
   flex-direction: column;
   align-items: center;
-  z-index: 2; /* Logo slightly above the form */
+  z-index: 2;
+  gap: 8px;
 }
 
 .e-graphic-logo {
@@ -70,28 +72,26 @@ body {
 }
 
 .examsync-logo {
-  width: 300px; /* Adjust size as needed */
-  height: 300px;
+  width: 220px;
+  height: 220px;
   filter: drop-shadow(0 0 5px rgba(245, 238, 238, 0.5));
-  position: absolute;
-  bottom: 100%;
+  position: relative;
 }
 
 .logo-text {
-  font-size: 16px;
-  font-weight: 500;
+  font-size: 22px;
+  font-weight: 600;
   color: var(--color-bright-yellow);
-  margin-top: 5px;
+  letter-spacing: 4px;
 }
 
 /* Login Form Card (Overlapping the bottom of the logo) */
 .login-form-card {
-  position: absolute;
-  top: 50%; /* Adjust as needed */
+  position: relative;
   width: 90%;
-  max-width: 350px;
-  padding: 40px 30px 0px;
-  background: rgba(255, 255, 255, 0); /* Invisible background */
+  max-width: 360px;
+  padding: 10px 30px 0px;
+  background: transparent;
   display: flex;
   flex-direction: column;
   align-items: center;
@@ -129,7 +129,10 @@ body {
 }
 
 .input-field input::placeholder {
-  color: rgba(255, 255, 255, 0.7);
+  color: rgba(255, 255, 255, 0.65);
+  font-size: 0.65rem;
+  letter-spacing: 0.5px;
+  text-align: center;
 }
 
 .input-field label {
@@ -241,47 +244,35 @@ body {
 }
 
 
-/* Login Submit Button (Circular and prominent) */
+/* Login Submit Button */
 .submit-button {
-  width: 30px;
-  height: 50px;
-  border-radius: 50%;
-  background-color: transparent;
-  color: white;
+  width: 100%;
+  max-width: 360px;
+  min-height: 40px;
+  padding: 10px 15px;
+  border-radius: 8px;
   border: none;
+  background-color: rgba(248, 192, 0, 0.9);
+  color: var(--color-dark-blue);
+  font-size: 1rem;
+  font-weight: 600;
   cursor: pointer;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  font-size: 50px;
-  transition: background-color 0.3s ease, transform 0.1s ease;
-  box-shadow: 0 4px 10px rgba(0, 0, 0, 0.3);
-  position: absolute;
-  top: 100%;
-}
-
-.submit-buttons {
-  color: rgba(248, 192, 0, 0.5);
-  background-color: transparent;
-  font-size: 50px;
-  position: absolute;
-  top: 90%;
-  border-radius: 100%;
+  transition: background-color 0.2s ease, transform 0.1s ease;
+  margin-top: 10px;
 }
 
 .submit-button:hover {
-  background-color: var(--color-soft-yellow);
+  background-color: rgba(248, 192, 0, 1);
 }
 
 .submit-button:active {
-  transform: scale(0.95);
+  transform: scale(0.98);
 }
 
 .submit-button:disabled {
-  background-color: rgba(248, 192, 0, 0.5);
+  opacity: 0.6;
   cursor: not-allowed;
 }
-
 /* Error Text */
 .error-text {
   color: var(--color-error);
