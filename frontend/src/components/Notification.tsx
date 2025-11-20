@@ -192,6 +192,9 @@ const Notification: React.FC<UserProps> = ({ user }) => {
     <div className="notification-container">
       <div className="notification-banner">
         <span>Notifications</span>
+        {unreadCount > 0 && (
+          <span className="notif-badge">{unreadCount}</span>
+        )}
         <div style={{ marginLeft: 'auto', display: 'flex', alignItems: 'center', gap: '12px' }}>
           <button
             className="notif-btn"

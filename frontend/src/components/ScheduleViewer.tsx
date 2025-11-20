@@ -295,7 +295,25 @@ const SchedulerView: React.FC<SchedulerViewProps> = ({ user }) => {
           );
           const latestApproval = sortedData[0];
 
-          setApprovalStatus(latestApproval.status as 'pending' | 'approved' | 'rejected');
+          const previousStatus = approvalStatus;
+          const newStatus = latestApproval.status as 'pending' | 'approved' | 'rejected';
+          
+          // ✅ Show toast notification when status changes
+          if (previousStatus && previousStatus !== newStatus) {
+            if (newStatus === 'approved') {
+              toast.success('🎉 Your schedule has been approved by the dean!', {
+                autoClose: 5000,
+                position: 'top-center'
+              });
+            } else if (newStatus === 'rejected') {
+              toast.error(`❌ Your schedule was rejected. Reason: ${latestApproval.remarks || 'No reason provided'}`, {
+                autoClose: 7000,
+                position: 'top-center'
+              });
+            }
+          }
+
+          setApprovalStatus(newStatus);
           setRemarks(latestApproval.remarks ?? null);
         } else {
           setApprovalStatus(null);
@@ -311,7 +329,7 @@ const SchedulerView: React.FC<SchedulerViewProps> = ({ user }) => {
     checkApprovalStatus();
     const interval = setInterval(checkApprovalStatus, 5000);
     return () => clearInterval(interval);
-  }, [user, collegeName]);
+  }, [user, collegeName, approvalStatus]); 
 
   const handleProctorChange = async (examId: number, proctorId: number) => {
     try {

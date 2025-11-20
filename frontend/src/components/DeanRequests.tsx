@@ -19,6 +19,8 @@ type DeanRequest = {
     academic_year: string;
     building: string;
     total_schedules: number;
+    // optional id of the user who submitted the schedule (added to match backend responses)
+    submitted_by_id?: number;
     schedules: Array<{
       course_id: string;
       section_name: string;
@@ -57,7 +59,10 @@ const DeanRequests: React.FC<SchedulerViewProps> = ({ user }) => {
 
   useEffect(() => {
     const fetchCollege = async () => {
-      if (!user?.user_id) return;
+      if (!user?.user_id) {
+        console.log("❌ No user_id provided");
+        return;
+      }
       
       try {
         console.log("🔍 Fetching college for dean:", user.user_id);
@@ -70,20 +75,32 @@ const DeanRequests: React.FC<SchedulerViewProps> = ({ user }) => {
           }
         });
 
-        console.log("📋 Dean roles:", userRoleResponse.data);
+        console.log("📋 Dean roles response:", userRoleResponse.data);
 
         if (!userRoleResponse.data || userRoleResponse.data.length === 0) {
+          console.error('❌ No dean role found for user:', user.user_id);
           toast.error('No dean role found for user');
           return;
         }
 
-        const deanCollegeId = userRoleResponse.data[0].college_id;
+        const deanRole = userRoleResponse.data[0];
+        console.log("✅ Dean role found:", deanRole);
+        
+        const deanCollegeId = deanRole.college_id;
+        console.log("🏛️ Dean college_id:", deanCollegeId);
+        
+        if (!deanCollegeId) {
+          console.error('❌ Dean role has no college_id');
+          toast.error('Dean role has no college assigned');
+          return;
+        }
         
         // Fetch college details
         const collegeResponse = await api.get(`/tbl_college/${deanCollegeId}/`);
         console.log("🏛️ Dean's college:", collegeResponse.data);
         
         setCollegeName(collegeResponse.data.college_name);
+        console.log("✅ College name set:", collegeResponse.data.college_name);
       } catch (err) {
         console.error('❌ Error fetching dean college:', err);
         toast.error('Failed to load college information');
@@ -93,7 +110,10 @@ const DeanRequests: React.FC<SchedulerViewProps> = ({ user }) => {
   }, [user]);
 
   useEffect(() => {
-    if (!collegeName) return;
+    if (!collegeName) {
+      console.log("⏸️ Skipping request fetch - no college name yet");
+      return;
+    }
     
     const fetchRequests = async () => {
       try {
@@ -107,9 +127,15 @@ const DeanRequests: React.FC<SchedulerViewProps> = ({ user }) => {
         });
 
         console.log("📦 Raw response:", res.data);
+        console.log(`✅ Found ${res.data.length} pending requests`);
 
         const mapped = res.data.map((row: any) => {
-          console.log("Processing row:", row);
+          console.log("Processing row:", {
+            request_id: row.request_id,
+            status: row.status,
+            college_name: row.college_name,
+            submitted_by: row.submitted_by_name
+          });
           
           return {
             request_id: row.request_id,
@@ -141,12 +167,16 @@ const DeanRequests: React.FC<SchedulerViewProps> = ({ user }) => {
     
     const fetchHistory = async () => {
       try {
+        console.log("📥 Fetching history for college:", collegeName);
+        
         const res = await api.get('/tbl_scheduleapproval/', {
           params: { 
             college_name: collegeName,
             limit: 50 
           },
         });
+
+        console.log("📦 History response:", res.data.length, "records");
 
         const mapped = res.data
           .filter((row: any) => row.status !== 'pending')
@@ -161,6 +191,7 @@ const DeanRequests: React.FC<SchedulerViewProps> = ({ user }) => {
             college_name: row.college_name,
           }));
 
+        console.log("✅ Filtered history:", mapped.length, "records");
         setHistory(mapped);
       } catch (err) {
         console.error('❌ Error fetching history:', err);
@@ -219,6 +250,36 @@ const DeanRequests: React.FC<SchedulerViewProps> = ({ user }) => {
     setShowRejectionModal(true);
   };
 
+  const sendNotificationToScheduler = async (
+    schedulerId: number,
+    deanUserId: number,
+    status: 'approved' | 'rejected',
+    collegeName: string,
+    remarks?: string
+  ) => {
+    try {
+      const notificationData = {
+        user_id: schedulerId,
+        sender_id: deanUserId,
+        title: `Schedule ${status === 'approved' ? 'Approved' : 'Rejected'}`,
+        message: status === 'approved'
+          ? `Your schedule submission for ${collegeName} has been approved by the dean.`
+          : `Your schedule submission for ${collegeName} has been rejected. Reason: ${remarks || 'No reason provided'}`,
+        type: 'schedule_response',
+        status: 'unread',
+        link_url: '/scheduler',
+        is_seen: false,
+        priority: status === 'rejected' ? 2 : 1,
+      };
+
+      await api.post('/notifications/create/', notificationData);
+      console.log(`✅ Notification sent to scheduler ${schedulerId}`);
+    } catch (error) {
+      console.error('❌ Failed to send notification to scheduler:', error);
+    }
+  };
+
+  // Update the handleReject function
   const confirmRejection = async () => {
     if (!selectedRequest) return;
     if (!rejectionReason.trim()) {
@@ -228,10 +289,25 @@ const DeanRequests: React.FC<SchedulerViewProps> = ({ user }) => {
     
     setProcessingRequest(true);
     try {
+      // Update approval status
       await api.put(`/tbl_scheduleapproval/${selectedRequest.request_id}/`, {
         status: 'rejected',
         remarks: rejectionReason,
       });
+      
+      // Send notification to scheduler
+      const schedulerUserId = selectedRequest.schedule_data?.submitted_by_id || 
+                            (await api.get(`/tbl_scheduleapproval/${selectedRequest.request_id}/`)).data.submitted_by;
+      
+      if (schedulerUserId && user?.user_id) {
+        await sendNotificationToScheduler(
+          schedulerUserId,
+          user.user_id,
+          'rejected',
+          selectedRequest.schedule_data?.college_name || 'Unknown College',
+          rejectionReason
+        );
+      }
       
       toast.success(`Schedule for ${selectedRequest.schedule_data?.college_name} rejected`);
       setRequests(prev => prev.filter(r => r.request_id !== selectedRequest.request_id));
@@ -247,6 +323,7 @@ const DeanRequests: React.FC<SchedulerViewProps> = ({ user }) => {
     }
   };
 
+  // Update the handleApprove function
   const handleApprove = async (req: DeanRequest) => {
     if (processingRequest) return;
     
@@ -255,9 +332,23 @@ const DeanRequests: React.FC<SchedulerViewProps> = ({ user }) => {
     
     setProcessingRequest(true);
     try {
+      // Update approval status
       await api.put(`/tbl_scheduleapproval/${req.request_id}/`, { 
         status: 'approved' 
       });
+      
+      // Send notification to scheduler
+      const schedulerUserId = req.schedule_data?.submitted_by_id || 
+                            (await api.get(`/tbl_scheduleapproval/${req.request_id}/`)).data.submitted_by;
+      
+      if (schedulerUserId && user?.user_id) {
+        await sendNotificationToScheduler(
+          schedulerUserId,
+          user.user_id,
+          'approved',
+          req.schedule_data?.college_name || 'Unknown College'
+        );
+      }
       
       toast.success(`Schedule for ${req.schedule_data?.college_name} approved successfully!`);
       setRequests(prev => prev.filter(r => r.request_id !== req.request_id));
