@@ -11,9 +11,13 @@ BASE_DIR = Path(__file__).resolve().parent.parent
 # ──────────────────────────────────────────────
 SECRET_KEY = config('SECRET_KEY')
 DEBUG = config('DEBUG', default=False, cast=bool)
-FRONTEND_URL = config('FRONTEND_URL', default="http://localhost:5173")
+FRONTEND_URL = config('FRONTEND_URL', default="https://exam-sync-frontend.onrender.com")
 
-ALLOWED_HOSTS = ["*"]
+ALLOWED_HOSTS = [
+    "exam-sync-v2-0-mwnp.onrender.com",
+    "localhost",
+    "127.0.0.1",
+]
 
 # ──────────────────────────────────────────────
 # INSTALLED APPS
@@ -40,8 +44,8 @@ INSTALLED_APPS = [
 # ──────────────────────────────────────────────
 MIDDLEWARE = [
     "django.middleware.security.SecurityMiddleware",
-    "whitenoise.middleware.WhiteNoiseMiddleware",  # must come before corsheaders
-    "corsheaders.middleware.CorsMiddleware",
+    "whitenoise.middleware.WhiteNoiseMiddleware",
+    "corsheaders.middleware.CorsMiddleware",  # Must be before CommonMiddleware
     "django.contrib.sessions.middleware.SessionMiddleware",
     "django.middleware.common.CommonMiddleware",
     "django.middleware.csrf.CsrfViewMiddleware",
@@ -51,12 +55,40 @@ MIDDLEWARE = [
 ]
 
 # ──────────────────────────────────────────────
-# CORS / CSRF CONFIG
+# CORS / CSRF CONFIG - CRITICAL FIX
 # ──────────────────────────────────────────────
-CORS_ALLOW_ALL_ORIGINS = True
+CORS_ALLOWED_ORIGINS = [
+    "https://exam-sync-frontend.onrender.com",
+    "http://localhost:5173",
+    "http://127.0.0.1:5173",
+]
+
 CORS_ALLOW_CREDENTIALS = True
 
+CORS_ALLOW_METHODS = [
+    "DELETE",
+    "GET",
+    "OPTIONS",
+    "PATCH",
+    "POST",
+    "PUT",
+]
+
+CORS_ALLOW_HEADERS = [
+    "accept",
+    "accept-encoding",
+    "authorization",
+    "content-type",
+    "dnt",
+    "origin",
+    "user-agent",
+    "x-csrftoken",
+    "x-requested-with",
+]
+
 CSRF_TRUSTED_ORIGINS = [
+    "https://exam-sync-frontend.onrender.com",
+    "https://exam-sync-v2-0-mwnp.onrender.com",
     "http://localhost:5173",
     "http://127.0.0.1:5173",
 ]
@@ -91,8 +123,8 @@ DATABASES = {
         "CONN_MAX_AGE": 600,
         "OPTIONS": {
             "application_name": "DjangoApp",
-            # Disable SSL and shorten timeout for faster local dev
-            **({} if DEBUG else {"sslmode": "require", "connect_timeout": 10}),
+            "sslmode": "require",
+            "connect_timeout": 10,
         },
     }
 }
@@ -117,7 +149,7 @@ REST_FRAMEWORK = {
 # ──────────────────────────────────────────────
 STATIC_URL = "/static/"
 STATIC_ROOT = os.path.join(BASE_DIR, "staticfiles")
-STATICFILES_DIRS = [BASE_DIR / "static"]
+STATICFILES_DIRS = [BASE_DIR / "static"] if (BASE_DIR / "static").exists() else []
 STATICFILES_STORAGE = "whitenoise.storage.CompressedManifestStaticFilesStorage"
 
 # ──────────────────────────────────────────────
@@ -161,20 +193,12 @@ DEFAULT_AUTO_FIELD = "django.db.models.BigAutoField"
 APPEND_SLASH = False
 
 # ──────────────────────────────────────────────
-# DEBUG TOOLBAR (optional for local)
-# ──────────────────────────────────────────────
-if DEBUG:
-    INSTALLED_APPS += ["debug_toolbar"]
-    MIDDLEWARE.insert(0, "debug_toolbar.middleware.DebugToolbarMiddleware")
-    INTERNAL_IPS = ["127.0.0.1"]
-
-# ──────────────────────────────────────────────
 # TEMPLATES
 # ──────────────────────────────────────────────
 TEMPLATES = [
     {
         "BACKEND": "django.template.backends.django.DjangoTemplates",
-        "DIRS": [BASE_DIR / "templates"],  # optional, create folder if you need custom templates
+        "DIRS": [BASE_DIR / "templates"],
         "APP_DIRS": True,
         "OPTIONS": {
             "context_processors": [
@@ -186,4 +210,3 @@ TEMPLATES = [
         },
     },
 ]
-
