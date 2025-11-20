@@ -11,7 +11,7 @@ BASE_DIR = Path(__file__).resolve().parent.parent
 # ──────────────────────────────────────────────
 SECRET_KEY = config('SECRET_KEY')
 DEBUG = config('DEBUG', default=False, cast=bool)
-FRONTEND_URL = config('FRONTEND_URL', default="https://exam-sync-frontend.onrender.com")
+FRONTEND_URL = config('FRONTEND_URL', default="https://exam-sync-v2-0-lkat.onrender.com")
 
 ALLOWED_HOSTS = [
     "exam-sync-v2-0-mwnp.onrender.com",
@@ -58,7 +58,7 @@ MIDDLEWARE = [
 # CORS / CSRF CONFIG - CRITICAL FIX
 # ──────────────────────────────────────────────
 CORS_ALLOWED_ORIGINS = [
-    "https://exam-sync-frontend.onrender.com",
+    "https://exam-sync-v2-0-lkat.onrender.com",
     "http://localhost:5173",
     "http://127.0.0.1:5173",
 ]
@@ -87,7 +87,7 @@ CORS_ALLOW_HEADERS = [
 ]
 
 CSRF_TRUSTED_ORIGINS = [
-    "https://exam-sync-frontend.onrender.com",
+    "https://exam-sync-v2-0-lkat.onrender.com",
     "https://exam-sync-v2-0-mwnp.onrender.com",
     "http://localhost:5173",
     "http://127.0.0.1:5173",
