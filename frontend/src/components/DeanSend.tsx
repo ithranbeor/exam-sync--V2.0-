@@ -99,10 +99,19 @@ const DeanSender: React.FC<DeanSenderProps> = ({
       toast.error("User not found");
       return;
     }
-    if (filteredExamData.length === 0) {
-      toast.warn("No schedules to send");
+    
+    // ✅ Better validation
+    if (!collegeName || collegeName === "Add schedule first") {
+      toast.error("College information is missing");
       return;
     }
+    
+    if (filteredExamData.length === 0) {
+      toast.warn("No schedules to send");
+      console.log("📊 Debug - filteredExamData:", filteredExamData);
+      return;
+    }
+    
     if (!deanUserId) {
       toast.error("Dean not found for your college");
       return;
@@ -111,49 +120,94 @@ const DeanSender: React.FC<DeanSenderProps> = ({
     setLoading(true);
     try {
       console.log("📤 Sending schedule to dean...");
+      console.log("👤 User ID:", user.user_id);
+      console.log("👔 Dean User ID:", deanUserId);
+      console.log("📋 College:", collegeName);
+      console.log("📚 Total schedules:", filteredExamData.length);
+
+      // ✅ Validate schedule data
+      const validSchedules = filteredExamData.filter(exam => 
+        exam.course_id && 
+        exam.exam_date && 
+        exam.exam_start_time && 
+        exam.exam_end_time &&
+        exam.room_id
+      );
+
+      if (validSchedules.length === 0) {
+        toast.error("All schedules are incomplete");
+        return;
+      }
+
+      if (validSchedules.length < filteredExamData.length) {
+        toast.warn(`${filteredExamData.length - validSchedules.length} incomplete schedules will be skipped`);
+      }
 
       // Prepare schedule data
       const scheduleData = {
+        user_id: user.user_id,  // ✅ Must include user_id at top level
         college_name: collegeName,
-        exam_period: examPeriodName,
-        term: termName,
-        semester: semesterName,
-        academic_year: yearName,
-        building: buildingName,
+        exam_period: examPeriodName || "Not specified",
+        term: termName || "Not specified",
+        semester: semesterName || "Not specified",
+        academic_year: yearName || "Not specified",
+        building: buildingName || "Not specified",
         remarks: remarks || "No remarks",
-        schedules: filteredExamData.map((exam) => ({
+        schedules: validSchedules.map((exam) => ({
           course_id: exam.course_id,
-          section_name: exam.section_name,
+          section_name: exam.section_name || "N/A",
           exam_date: exam.exam_date,
           exam_start_time: exam.exam_start_time,
           exam_end_time: exam.exam_end_time,
           room_id: exam.room_id,
+          building_name: exam.building_name || buildingName,
           instructor: getUserName(exam.instructor_id),
           proctor: getUserName(exam.proctor_id),
         })),
       };
 
-      console.log("📦 Schedule payload:", {
-        user_id: user.user_id,
-        dean_user_id: deanUserId,
-        college_name: collegeName,
-        total_schedules: scheduleData.schedules.length
+      console.log("📦 Payload:", {
+        user_id: scheduleData.user_id,
+        college_name: scheduleData.college_name,
+        total_schedules: scheduleData.schedules.length,
+        first_schedule: scheduleData.schedules[0]
       });
 
-      // Send to backend endpoint
-      const response = await api.post('/send_schedule_to_dean/', {
-        user_id: user.user_id,
-        ...scheduleData
-      });
+      // ✅ Send to backend
+      const response = await api.post('/send_schedule_to_dean/', scheduleData);
 
       console.log("✅ Response:", response.data);
 
-      toast.success("Schedule sent to dean successfully!");
-      onClose();
+      toast.success(
+        `Schedule sent successfully! (${validSchedules.length} exams sent to ${response.data.dean_name || 'dean'})`
+      );
+      
+      // Delay closing to show success message
+      setTimeout(() => {
+        onClose();
+      }, 1500);
+      
     } catch (err: any) {
       console.error("❌ Error sending to dean:", err);
-      console.error("Error response:", err.response?.data);
-      toast.error(err.response?.data?.error || "Failed to send to dean");
+      console.error("❌ Error response:", err.response?.data);
+      console.error("❌ Error status:", err.response?.status);
+      
+      // ✅ Better error messages
+      let errorMessage = "Failed to send to dean";
+      
+      if (err.response?.status === 401) {
+        errorMessage = "Authentication error. Please log in again.";
+      } else if (err.response?.status === 404) {
+        errorMessage = err.response?.data?.error || "Dean or college not found";
+      } else if (err.response?.data?.error) {
+        errorMessage = err.response.data.error;
+      } else if (err.response?.data?.detail) {
+        errorMessage = err.response.data.detail;
+      } else if (err.message) {
+        errorMessage = err.message;
+      }
+      
+      toast.error(errorMessage);
     } finally {
       setLoading(false);
     }
@@ -170,6 +224,28 @@ const DeanSender: React.FC<DeanSenderProps> = ({
           <p><strong>Dean:</strong> {deanName || "Loading..."}</p>
           <p><strong>College:</strong> {collegeName}</p>
           <p><strong>Total Exams:</strong> {filteredExamData.length}</p>
+          
+          {/* ✅ Show warnings */}
+          {filteredExamData.length === 0 && (
+            <p style={{ color: 'orange', marginTop: '10px', fontSize: '14px' }}>
+              ⚠️ No schedules available
+            </p>
+          )}
+          
+          {filteredExamData.length > 0 && (() => {
+            const incomplete = filteredExamData.filter(exam => 
+              !exam.course_id || !exam.exam_date || 
+              !exam.exam_start_time || !exam.exam_end_time || !exam.room_id
+            );
+            if (incomplete.length > 0) {
+              return (
+                <p style={{ color: 'orange', marginTop: '10px', fontSize: '14px' }}>
+                  ⚠️ {incomplete.length} incomplete schedule(s) will be skipped
+                </p>
+              );
+            }
+            return null;
+          })()}
         </div>
 
         <div className="message-section" style={{ marginTop: "15px" }}>
@@ -184,11 +260,14 @@ const DeanSender: React.FC<DeanSenderProps> = ({
       </div>
 
       <div className="message-sender-footer">
-        <button type='button' onClick={onClose} className="btn-cancel">Cancel</button>
-        <button type='button'
+        <button type='button' onClick={onClose} className="btn-cancel">
+          Cancel
+        </button>
+        <button 
+          type='button'
           onClick={handleSendToDean}
           className="btn-send"
-          disabled={loading || !deanUserId}
+          disabled={loading || !deanUserId || filteredExamData.length === 0}
         >
           {loading ? "Sending..." : "Send to Dean"}
         </button>

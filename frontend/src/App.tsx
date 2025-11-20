@@ -1,5 +1,5 @@
 // src/App.tsx
-import React from 'react';
+//import React from 'react';
 import { Routes, Route } from 'react-router-dom';
 import LoginFaculty from './components/LoginFaculty.tsx';
 import LoginAdmin from './components/LoginAdmin.tsx';

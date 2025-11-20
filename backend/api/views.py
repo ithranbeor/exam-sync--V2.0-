@@ -123,6 +123,7 @@ def send_email_notification(request):
     return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
 
 @api_view(['GET'])
+@permission_classes([AllowAny])
 def notification_list(request, user_id):
     """
     Get all notifications for a user, ordered by priority and created_at
@@ -135,6 +136,7 @@ def notification_list(request, user_id):
     return Response(serializer.data)
 
 @api_view(['POST'])
+@permission_classes([AllowAny])
 def notification_create(request):
     """
     Create a new notification
@@ -146,6 +148,7 @@ def notification_create(request):
     return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
 
 @api_view(['PATCH'])
+@permission_classes([AllowAny])
 def notification_update(request, pk):
     """
     Update a notification (e.g., mark as seen)
@@ -162,6 +165,7 @@ def notification_update(request, pk):
     return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
 
 @api_view(['DELETE'])
+@permission_classes([AllowAny])
 def notification_delete(request, pk):
     """
     Delete a notification
@@ -173,33 +177,64 @@ def notification_delete(request, pk):
     except TblNotification.DoesNotExist:
         return Response({"error": "Notification not found"}, status=status.HTTP_404_NOT_FOUND)
     
-@api_view(['POST'])
-def send_schedule_to_dean(request):
+# Update the send_schedule_to_dean function in views.py
 
+@api_view(['POST'])
+@permission_classes([AllowAny])
+def send_schedule_to_dean(request):
+    """
+    Send schedule approval request to dean
+    """
     serializer = ScheduleSendSerializer(data=request.data)
     if not serializer.is_valid():
+        print("❌ Validation errors:", serializer.errors)
         return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
 
-    user_id = request.data.get("user_id")  # from frontend
+    user_id = request.data.get("user_id")
     if not user_id:
         return Response({"error": "Missing user_id"}, status=status.HTTP_400_BAD_REQUEST)
 
     try:
+        print(f"📥 Received request from user_id: {user_id}")
+        print(f"📋 College: {serializer.validated_data.get('college_name')}")
+
         # 1️⃣ Find scheduler's college (role_id = 3)
         scheduler_role = TblUserRole.objects.filter(user_id=user_id, role_id=3).first()
         if not scheduler_role:
-            return Response({"error": "User is not a scheduler or has no college"}, status=status.HTTP_404_NOT_FOUND)
+            print(f"❌ No scheduler role found for user {user_id}")
+            return Response(
+                {"error": "User is not a scheduler or has no college"}, 
+                status=status.HTTP_404_NOT_FOUND
+            )
+
+        print(f"✅ Found scheduler role - College ID: {scheduler_role.college_id}")
 
         # 2️⃣ Find dean in the same college (role_id = 1)
-        dean_role = TblUserRole.objects.filter(college_id=scheduler_role.college_id, role_id=1).first()
+        dean_role = TblUserRole.objects.filter(
+            college_id=scheduler_role.college_id, 
+            role_id=1
+        ).first()
+        
         if not dean_role:
-            return Response({"error": "No dean found for this college"}, status=status.HTTP_404_NOT_FOUND)
+            print(f"❌ No dean found for college {scheduler_role.college_id}")
+            return Response(
+                {"error": "No dean found for this college"}, 
+                status=status.HTTP_404_NOT_FOUND
+            )
+
+        print(f"✅ Found dean role - User ID: {dean_role.user_id}")
 
         dean_user = TblUsers.objects.filter(user_id=dean_role.user_id).first()
         if not dean_user:
-            return Response({"error": "Dean user record not found"}, status=status.HTTP_404_NOT_FOUND)
+            print(f"❌ Dean user record not found for user_id {dean_role.user_id}")
+            return Response(
+                {"error": "Dean user record not found"}, 
+                status=status.HTTP_404_NOT_FOUND
+            )
 
-        # 3️⃣ Create schedule approval record
+        print(f"✅ Found dean user: {dean_user.first_name} {dean_user.last_name}")
+
+        # 3️⃣ Create schedule approval record with scheduler's user_id
         request_id = uuid4()
         schedule_data = {
             "college_name": serializer.validated_data["college_name"],
@@ -210,23 +245,32 @@ def send_schedule_to_dean(request):
             "building": serializer.validated_data["building"],
             "total_schedules": len(serializer.validated_data["schedules"]),
             "schedules": serializer.validated_data["schedules"],
+            "submitted_by_id": user_id,  # ✅ ADD THIS - Store scheduler's ID
         }
 
-        TblScheduleapproval.objects.create(
+        print(f"📦 Creating schedule approval record...")
+        approval = TblScheduleapproval.objects.create(
             request_id=request_id,
-            submitted_by_id=user_id,
+            submitted_by_id=user_id,  # ✅ This is the scheduler's user_id
             dean_user_id=dean_role.user_id,
             college_name=serializer.validated_data["college_name"],
             schedule_data=schedule_data,
             remarks=serializer.validated_data.get("remarks", "No remarks"),
             status="pending",
             submitted_at=timezone.now(),
+            created_at=timezone.now(),
         )
+        print(f"✅ Created approval record: {request_id}")
+        print(f"   - Status: {approval.status}")
+        print(f"   - College: {approval.college_name}")
+        print(f"   - Dean ID: {approval.dean_user_id}")
+        print(f"   - Scheduler ID: {approval.submitted_by_id}")  # ✅ Log this
 
         # 4️⃣ Send dean notification
-        TblNotification.objects.create(
+        print(f"📧 Creating notification for dean user_id: {dean_role.user_id}")
+        notification = TblNotification.objects.create(
             user_id=dean_role.user_id,
-            sender_id=user_id,
+            sender_id=user_id,  # ✅ This is the scheduler
             title="New Schedule Approval Request",
             message=f"Scheduler submitted a schedule for {serializer.validated_data['college_name']}.",
             type="schedule_approval",
@@ -236,21 +280,61 @@ def send_schedule_to_dean(request):
             priority=1,
             created_at=timezone.now(),
         )
+        print(f"✅ Created notification: {notification.notification_id}")
+        print(f"   - For user: {notification.user_id}")
+        print(f"   - From user: {notification.sender_id}")
+        print(f"   - Title: {notification.title}")
 
         return Response(
-            {"message": "Schedule successfully sent to Dean."},
+            {
+                "message": "Schedule successfully sent to Dean.",
+                "request_id": str(request_id),
+                "dean_name": f"{dean_user.first_name} {dean_user.last_name}",
+                "dean_user_id": dean_user.user_id,
+                "scheduler_user_id": user_id,  # ✅ Return scheduler ID
+                "total_schedules": len(serializer.validated_data["schedules"]),
+                "college_name": serializer.validated_data["college_name"],
+                "status": "pending"
+            },
             status=status.HTTP_201_CREATED
         )
 
     except Exception as e:
-        print("Error sending schedule:", e)
-        return Response({"error": str(e)}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+        print(f"💥 Error sending schedule: {str(e)}")
+        import traceback
+        traceback.print_exc()
+        return Response(
+            {"error": str(e), "detail": "Internal server error"}, 
+            status=status.HTTP_500_INTERNAL_SERVER_ERROR
+        )
     
 @api_view(['GET', 'POST'])
 @permission_classes([AllowAny])
 def tbl_scheduleapproval_list(request):
     if request.method == 'GET':
+        # ✅ FIX: Add query parameter filtering
         approvals = TblScheduleapproval.objects.select_related('submitted_by').all().order_by('-created_at')
+        
+        # Filter by status (e.g., 'pending', 'approved', 'rejected')
+        status = request.GET.get('status')
+        if status:
+            approvals = approvals.filter(status=status)
+        
+        # Filter by college_name
+        college_name = request.GET.get('college_name')
+        if college_name:
+            approvals = approvals.filter(college_name=college_name)
+        
+        # Optional: Filter by limit
+        limit = request.GET.get('limit')
+        if limit:
+            try:
+                approvals = approvals[:int(limit)]
+            except ValueError:
+                pass
+        
+        print(f"🔍 Fetching approvals - status: {status}, college: {college_name}, count: {approvals.count()}")
+        
         serializer = TblScheduleapprovalSerializer(approvals, many=True)
         return Response(serializer.data)
 
