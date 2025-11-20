@@ -1,33 +1,30 @@
-# exam-sync-v2/backend/render.yaml
-
 services:
   - type: web
-    name: exam-sync-backend
+    name: examsync-backend
     runtime: python
     plan: free
-    region: singapore
-    buildCommand: "pip install -r requirements.txt && python manage.py collectstatic --no-input"
-    startCommand: "gunicorn backend.wsgi:application --bind 0.0.0.0:$PORT --workers 2 --timeout 120"
+    buildCommand: "./build.sh"
+    startCommand: "gunicorn backend.wsgi:application"
     envVars:
       - key: PYTHON_VERSION
-        value: "3.13.4"
+        value: 3.11.0
       - key: SECRET_KEY
-        value: "django-insecure-66zj4z^+-6zsvac)9a5wau(k5_a!nc6z)fkl08*e^jg(h-$7qz"
+        sync: false
       - key: DEBUG
-        value: "False"
+        value: False
       - key: DB_NAME
-        value: "examsync_v2_db_2fcb"
+        sync: false
       - key: DB_USER
-        value: "examsync_v2_db_2fcb_user"
+        sync: false
       - key: DB_PASSWORD
-        value: "MYuvLXo1mSa7GZgvyscQXk1qOt8cdTZa"
+        sync: false
       - key: DB_HOST
-        value: "dpg-d4akqsuuk2gs739hee8g-a.singapore-postgres.render.com"
+        sync: false
       - key: DB_PORT
-        value: "5432"
+        value: 5432
       - key: EMAIL_HOST_USER
-        value: "examsync.notify@gmail.com"
+        sync: false
       - key: EMAIL_HOST_PASSWORD
-        value: "okcmslpkvhpbvuox"
+        sync: false
       - key: FRONTEND_URL
-        value: "https://exam-sync-frontend.onrender.com"
+        sync: false
