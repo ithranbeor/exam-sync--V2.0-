@@ -23,10 +23,6 @@ body {
   position: relative;
   overflow: hidden;
   color: var(--color-white);
-  text-align: center;
-  gap: 20px;
-  padding: 20px;
-  box-sizing: border-box;
 }
 
 /* Background Gradient (Mimicking the image) */
@@ -57,12 +53,14 @@ body {
 
 /* Logo Section (Center) */
 .logo-section {
-  position: relative;
+  position: absolute;
+  top: 60%;
+  left: 50%;
+  transform: translate(-50%, -50%);
   display: flex;
   flex-direction: column;
   align-items: center;
-  z-index: 2;
-  gap: 8px;
+  z-index: 2; /* Logo slightly above the form */
 }
 
 .e-graphic-logo {
@@ -72,26 +70,28 @@ body {
 }
 
 .examsync-logo {
-  width: 220px;
-  height: 220px;
+  width: 300px; /* Adjust size as needed */
+  height: 300px;
   filter: drop-shadow(0 0 5px rgba(245, 238, 238, 0.5));
-  position: relative;
+  position: absolute;
+  bottom: 100%;
 }
 
 .logo-text {
-  font-size: 22px;
-  font-weight: 600;
+  font-size: 16px;
+  font-weight: 500;
   color: var(--color-bright-yellow);
-  letter-spacing: 4px;
+  margin-top: 5px;
 }
 
 /* Login Form Card (Overlapping the bottom of the logo) */
 .login-form-card {
-  position: relative;
+  position: absolute;
+  top: 50%; /* Adjust as needed */
   width: 90%;
-  max-width: 360px;
-  padding: 10px 30px 0px;
-  background: transparent;
+  max-width: 350px;
+  padding: 40px 30px 0px;
+  background: rgba(255, 255, 255, 0); /* Invisible background */
   display: flex;
   flex-direction: column;
   align-items: center;
@@ -129,10 +129,7 @@ body {
 }
 
 .input-field input::placeholder {
-  color: rgba(255, 255, 255, 0.65);
-  font-size: 0.65rem;
-  letter-spacing: 0.5px;
-  text-align: center;
+  color: rgba(255, 255, 255, 0.7);
 }
 
 .input-field label {
@@ -244,47 +241,54 @@ body {
 }
 
 
-/* Login Submit Button */
+/* Login Submit Button (Circular and prominent) */
 .submit-button {
-  width: 100%;
-  max-width: 360px;
-  min-height: 40px;
-  padding: 10px 15px;
-  border-radius: 8px;
+  width: 30px;
+  height: 50px;
+  border-radius: 50%;
+  background-color: transparent;
+  color: white;
   border: none;
-  background-color: rgba(248, 192, 0, 0.9);
-  color: var(--color-dark-blue);
-  font-size: 1rem;
-  font-weight: 600;
   cursor: pointer;
-  transition: background-color 0.2s ease, transform 0.1s ease;
-  margin-top: 10px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 50px;
+  transition: background-color 0.3s ease, transform 0.1s ease;
+  box-shadow: 0 4px 10px rgba(0, 0, 0, 0.3);
+  position: absolute;
+  top: 100%;
+}
+
+.submit-buttons {
+  color: rgba(248, 192, 0, 0.5);
+  background-color: transparent;
+  font-size: 50px;
+  position: absolute;
+  top: 90%;
+  border-radius: 100%;
 }
 
 .submit-button:hover {
-  background-color: rgba(248, 192, 0, 1);
+  background-color: var(--color-soft-yellow);
 }
 
 .submit-button:active {
-  transform: scale(0.98);
+  transform: scale(0.95);
 }
 
 .submit-button:disabled {
-  opacity: 0.6;
+  background-color: rgba(248, 192, 0, 0.5);
   cursor: not-allowed;
 }
+
 /* Error Text */
 .error-text {
   color: var(--color-error);
   font-size: 14px;
   margin-top: 5px;
-  text-align: right;
-  min-height: 18px;
-  min-width: 40%;
-}
-
-.error-text.hidden {
-  visibility: hidden;
+  text-align: left;
+  flex-grow: 1;
 }
 
 /* Admin/Settings Toggle Button (Bottom-right) */

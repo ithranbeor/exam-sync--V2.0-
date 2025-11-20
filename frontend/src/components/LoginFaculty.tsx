@@ -2,7 +2,7 @@
 import React, { useState, useCallback, useRef, useMemo } from "react";
 import { useNavigate } from "react-router-dom";
 import { api } from "../lib/apiClient.ts";
-import { FaEye, FaEyeSlash, FaPlayCircle } from "react-icons/fa";
+import { FaEye, FaEyeSlash } from "react-icons/fa";
 import { IoSettingsSharp } from "react-icons/io5"; // For the bottom-right settings/admin icon
 import "../styles/loginFaculty.css";
 // Assuming you have an image for the logo, e.g., 'examsync-logo.png' in a public path
