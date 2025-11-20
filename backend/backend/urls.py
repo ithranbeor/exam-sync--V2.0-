@@ -1,6 +1,7 @@
-# exam-sync-v2/backend/backend/urls.py
+# exam-sync-v2/backend/backend/url.py
 
-from django.urls import path
+from django.urls import path, re_path
+from django.views.generic import RedirectView
 from api import views
 
 urlpatterns = [
@@ -15,6 +16,7 @@ urlpatterns = [
     path('api/request-password-change/', views.request_password_change, name='request_password_change'),
     path('api/confirm-password-change/', views.confirm_password_change, name='confirm_password_change'),
     path('api/send-proctor-emails/', views.send_proctor_emails, name='send_proctor_emails'),
+
 
     # Tables
     path('api/tbl_examperiod', views.tbl_examperiod_list, name='tbl_examperiod_list'),
@@ -65,4 +67,7 @@ urlpatterns = [
     path('api/send-email/', views.send_email_notification, name='send_email_notification'),
     path('api/tbl_available_rooms/', views.tbl_available_rooms_list, name='tbl_available_rooms_list'),
     path('api/tbl_available_rooms/<str:room_id>/<str:college_id>/', views.tbl_available_rooms_delete, name='tbl_available_rooms_delete'),
+
+    # Redirect frontend routes to React
+    re_path(r'^(?!api/).*$', RedirectView.as_view(url='https://exam-sync-frontend.onrender.com/', permanent=False)),
 ]
