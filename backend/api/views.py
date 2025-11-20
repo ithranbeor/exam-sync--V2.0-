@@ -1278,6 +1278,7 @@ def send_proctor_emails(request):
             {'error': str(e), 'detail': 'Failed to send emails'}, 
             status=status.HTTP_500_INTERNAL_SERVER_ERROR
         )
+    
 # ------------------------------
 # PASSWORD RESET - STEP 2: Confirm new password
 # ------------------------------
