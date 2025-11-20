@@ -1195,6 +1195,91 @@ def request_password_change(request):
     except Exception as e:
         return Response({'error': f'Failed to send email: {str(e)}'}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
 
+@api_view(['POST'])
+@permission_classes([AllowAny])
+def send_proctor_emails(request):
+    """
+    Send real Gmail emails to proctors with their personalized schedules
+    """
+    try:
+        emails_data = request.data.get('emails', [])
+        sender_id = request.data.get('sender_id')
+        
+        if not emails_data:
+            return Response(
+                {'error': 'No emails to send'}, 
+                status=status.HTTP_400_BAD_REQUEST
+            )
+        
+        sent_count = 0
+        failed_emails = []
+        
+        for email_data in emails_data:
+            proctor_email = email_data.get('email')
+            proctor_name = email_data.get('name')
+            subject = email_data.get('subject')
+            message = email_data.get('message')
+            
+            if not all([proctor_email, subject, message]):
+                failed_emails.append({
+                    'email': proctor_email,
+                    'reason': 'Missing required fields'
+                })
+                continue
+            
+            try:
+                # Send actual email via Gmail SMTP
+                send_mail(
+                    subject=subject,
+                    message=message,
+                    from_email=settings.DEFAULT_FROM_EMAIL,
+                    recipient_list=[proctor_email],
+                    fail_silently=False,
+                )
+                
+                # Also create in-app notification for record
+                TblNotification.objects.create(
+                    user_id=email_data.get('user_id'),
+                    sender_id=sender_id,
+                    title=subject,
+                    message=message,
+                    type='email',
+                    status='sent',
+                    is_seen=False,
+                    priority=2,
+                    created_at=timezone.now()
+                )
+                
+                sent_count += 1
+                print(f"✅ Email sent to {proctor_name} ({proctor_email})")
+                
+            except Exception as e:
+                print(f"❌ Failed to send email to {proctor_email}: {str(e)}")
+                failed_emails.append({
+                    'email': proctor_email,
+                    'name': proctor_name,
+                    'reason': str(e)
+                })
+        
+        response_data = {
+            'sent_count': sent_count,
+            'total_count': len(emails_data),
+            'success': sent_count > 0
+        }
+        
+        if failed_emails:
+            response_data['failed_emails'] = failed_emails
+        
+        return Response(response_data, status=status.HTTP_200_OK)
+        
+    except Exception as e:
+        print(f"💥 Error in send_proctor_emails: {str(e)}")
+        import traceback
+        traceback.print_exc()
+        return Response(
+            {'error': str(e), 'detail': 'Failed to send emails'}, 
+            status=status.HTTP_500_INTERNAL_SERVER_ERROR
+        )
 # ------------------------------
 # PASSWORD RESET - STEP 2: Confirm new password
 # ------------------------------

@@ -1240,7 +1240,6 @@ export const UserManagement: React.FC<UserManagementProps> = ({ user }) => {
         <div className="modal-overlay">
           <div className="modal" style={{ maxWidth: '700px', maxHeight: '90vh', overflowY: 'auto' }}>
             <h4 style={{ textAlign: 'center' }}>{isEditMode ? 'Edit Account' : 'Add New Account'}</h4>
-
             {['user_id', 'first_name', 'last_name', 'middle_name', 'email_address', 'contact_number'].map((field) => (
               <div key={field} className="input-group">
                 <label htmlFor={field}>
@@ -1248,13 +1247,23 @@ export const UserManagement: React.FC<UserManagementProps> = ({ user }) => {
                 </label>
                 <input
                   id={field}
-                  type={field === 'user_id' ? 'number' : 'text'}
+                  type={field === 'user_id' ? 'text' : 'text'}
                   value={(newAccount as any)[field] ?? ''}
                   onChange={(e) =>
-                    setNewAccount((prev) => ({
-                      ...prev,
-                      [field]: field === 'user_id' ? Number(e.target.value) : e.target.value,
-                    }))
+                    setNewAccount((prev) => {
+                      let newValue;
+                      if (field === 'user_id') {
+                        const val = e.target.value.trim();
+                        newValue = val === '' ? null : Number(val);
+                      } else {
+                        newValue = e.target.value;
+                      }
+
+                      return {
+                        ...prev,
+                        [field]: newValue,
+                      };
+                    })
                   }
                   disabled={isEditMode && field === 'user_id'}
                 />
@@ -1300,8 +1309,8 @@ export const UserManagement: React.FC<UserManagementProps> = ({ user }) => {
                           background: '#d9534f',
                           color: 'white',
                           border: 'none',
-                          borderRadius: '50%',
-                          width: '25px',
+                          borderRadius: '50px',
+                          width: '50px',
                           height: '25px',
                           cursor: 'pointer',
                           display: 'flex',

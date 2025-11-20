@@ -2,7 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { api } from '../lib/apiClient.ts';
 import '../styles/notification.css';
-import { FaCheckCircle, FaTimesCircle, FaTrash, FaTrashAlt, FaEnvelopeOpenText } from "react-icons/fa";
+import { FaCheckCircle, FaTimesCircle, FaTrash, FaEnvelopeOpenText } from "react-icons/fa";
 
 interface UserProps {
   user: {
@@ -109,19 +109,6 @@ const Notification: React.FC<UserProps> = ({ user }) => {
     }
   };
 
-  // Delete all notifications for current user
-  const handleDeleteAll = async () => {
-    if (!user?.user_id) return;
-    if (!window.confirm('Delete all your notifications?')) return;
-
-    try {
-      await api.delete(`/notifications/${user.user_id}/delete-all/`); // Optional: create a delete-all endpoint
-      setNotifications([]);
-    } catch (err) {
-      console.error("Error deleting all notifications:", err);
-    }
-  };
-
   // Mark all as unread
   const handleMarkAllUnread = async () => {
     if (!user?.user_id) return;
@@ -195,7 +182,10 @@ const Notification: React.FC<UserProps> = ({ user }) => {
         {unreadCount > 0 && (
           <span className="notif-badge">{unreadCount}</span>
         )}
-        <div style={{ marginLeft: 'auto', display: 'flex', alignItems: 'center', gap: '12px' }}>
+        <div style={{ marginLeft: 'auto', display: 'flex', alignItems: 'center', gap: '1px' }}>
+          <button className="notif-btn" title="Mark all as unread" onClick={handleMarkAllUnread}>
+            <FaEnvelopeOpenText />
+          </button>
           <button
             className="notif-btn"
             title="Delete selected"
@@ -204,15 +194,10 @@ const Notification: React.FC<UserProps> = ({ user }) => {
           >
             <FaTrash />
           </button>
-          <button className="notif-btn" title="Mark all as unread" onClick={handleMarkAllUnread}>
-            <FaEnvelopeOpenText />
-          </button>
-          <button className="notif-btn" title="Delete all" onClick={handleDeleteAll}>
-            <FaTrashAlt />
-          </button>
+
           <input
             type="checkbox"
-            className="notif-select-all-checkbox"
+            className="notif-btn"
             checked={isAllSelected}
             onChange={toggleSelectAll}
             disabled={notifications.length === 0}
