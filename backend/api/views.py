@@ -1332,25 +1332,31 @@ def login_faculty(request):
     try:
         user = TblUsers.objects.get(user_id=user_id)
         print(f"🔍 Attempting login for {user_id}")
+        print(f"User status: {user.status}")
+        print(f"User password hash exists: {bool(user.password)}")
 
-        # Check account status
-        print(f"User status from DB: {user.status}")
-        if user.status and user.status.lower() != 'active':
-            print("❌ Account inactive")
-            return Response({'message': 'Account is not active'}, status=status.HTTP_401_UNAUTHORIZED)
+        # ✅ FIX: Better status check
+        if user.status:
+            status_value = user.status.strip().lower() if isinstance(user.status, str) else str(user.status).lower()
+            if status_value != 'active':
+                print(f"❌ Account status is: {user.status}")
+                return Response({'message': 'Account is not active'}, status=status.HTTP_401_UNAUTHORIZED)
 
-        # Check password hash
+        # Check password
+        if not user.password:
+            print("❌ No password hash found - user needs password set")
+            return Response({'message': 'Invalid credentials'}, status=status.HTTP_401_UNAUTHORIZED)
+
         if not check_password(password, user.password):
             print("❌ Password mismatch")
             return Response({'message': 'Invalid credentials'}, status=status.HTTP_401_UNAUTHORIZED)
 
-        # Token generation
-        token = secrets.token_hex(16)
-
-        # Get roles (case-insensitive)
+        # Get roles
         user_roles = TblUserRole.objects.filter(user=user, status__iexact='active')
         roles_data = UserRoleSerializer(user_roles, many=True).data
-        print("✅ Roles found:", roles_data)
+        
+        # ✅ FIX: Generate proper token (if needed)
+        token = secrets.token_hex(16)
 
         return Response({
             'token': token,
@@ -1362,12 +1368,13 @@ def login_faculty(request):
         }, status=status.HTTP_200_OK)
 
     except TblUsers.DoesNotExist:
-        print("❌ No such user found")
+        print(f"❌ User not found: {user_id}")
         return Response({'message': 'Invalid credentials'}, status=status.HTTP_401_UNAUTHORIZED)
-
     except Exception as e:
-        print("💥 Server error:", str(e))
-        return
+        print(f"💥 Server error: {str(e)}")
+        import traceback
+        traceback.print_exc()
+        return Response({'error': str(e)}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
 
 # ============================================================
 # PASSWORD RESET CONFIRMATION
