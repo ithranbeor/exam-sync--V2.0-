@@ -22,7 +22,6 @@ body {
 
 .left-panel {
   flex: 7;
-  background-image: url('../assets/newBG.svg');
   background-size: cover;
   background-repeat: no-repeat; 
   display: flex;
