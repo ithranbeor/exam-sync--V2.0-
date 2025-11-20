@@ -2,31 +2,9 @@ import { defineConfig } from 'vite'
 import react from '@vitejs/plugin-react'
 import path from 'path'
 
+// ✅ Simple config - Vite automatically copies public/ to build output
 export default defineConfig({
-  plugins: [
-    react(),
-    // ✅ Plugin to copy _redirects file to build output
-    {
-      name: 'copy-redirects',
-      closeBundle() {
-        // Copy _redirects to build output for Render
-        const fs = require('fs');
-        const srcPath = path.resolve(__dirname, 'public/_redirects');
-        const destPath = path.resolve(__dirname, 'build/_redirects');
-        
-        try {
-          if (fs.existsSync(srcPath)) {
-            fs.copyFileSync(srcPath, destPath);
-            console.log('✅ Copied _redirects to build folder');
-          } else {
-            console.warn('⚠️  _redirects file not found in public/');
-          }
-        } catch (err) {
-          console.error('❌ Error copying _redirects:', err);
-        }
-      }
-    }
-  ],
+  plugins: [react()],
   build: {
     outDir: 'build', // Render expects this
     sourcemap: false,
@@ -51,5 +29,7 @@ export default defineConfig({
       '@': path.resolve(__dirname, 'src'),
       '@assets': path.resolve(__dirname, 'src/assets')
     }
-  }
+  },
+  // ✅ Vite will copy everything from public/ to build/ automatically
+  publicDir: 'public'
 })
