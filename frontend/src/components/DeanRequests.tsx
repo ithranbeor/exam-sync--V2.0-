@@ -1,9 +1,10 @@
 import React, { useState, useEffect } from 'react';
 import { api } from '../lib/apiClient.ts';
 import '../styles/deanrequests.css';
-import { FaArchive, FaCheckCircle, FaTimesCircle, FaTrash } from "react-icons/fa";
+import { FaArchive, FaCheckCircle, FaTimesCircle, FaChevronLeft } from "react-icons/fa";
 import { toast, ToastContainer } from 'react-toastify';
 import 'react-toastify/dist/ReactToastify.css';
+import DeanScheduleViewer from '../components/DeanScheduleViewer.tsx';
 
 type DeanRequest = {
   request_id: string;
@@ -19,7 +20,6 @@ type DeanRequest = {
     academic_year: string;
     building: string;
     total_schedules: number;
-    // optional id of the user who submitted the schedule (added to match backend responses)
     submitted_by_id?: number;
     schedules: Array<{
       course_id: string;
@@ -28,6 +28,7 @@ type DeanRequest = {
       exam_start_time: string;
       exam_end_time: string;
       room_id: string;
+      building_name: string;
       instructor: string;
       proctor: string;
     }>;
@@ -56,6 +57,7 @@ const DeanRequests: React.FC<SchedulerViewProps> = ({ user }) => {
   const [collegeName, setCollegeName] = useState<string | null>(null);
   const [editStatus, setEditStatus] = useState(false);
   const [newStatus, setNewStatus] = useState<string>('pending');
+  const [showScheduleViewer, setShowScheduleViewer] = useState(false);
 
   useEffect(() => {
     const fetchCollege = async () => {
@@ -67,11 +69,10 @@ const DeanRequests: React.FC<SchedulerViewProps> = ({ user }) => {
       try {
         console.log("🔍 Fetching college for dean:", user.user_id);
 
-        // Get dean's college from user_role
         const userRoleResponse = await api.get('/tbl_user_role', {
           params: {
             user_id: user.user_id,
-            role_id: 1 // Dean role
+            role_id: 1
           }
         });
 
@@ -95,7 +96,6 @@ const DeanRequests: React.FC<SchedulerViewProps> = ({ user }) => {
           return;
         }
         
-        // Fetch college details
         const collegeResponse = await api.get(`/tbl_college/${deanCollegeId}/`);
         console.log("🏛️ Dean's college:", collegeResponse.data);
         
@@ -279,7 +279,6 @@ const DeanRequests: React.FC<SchedulerViewProps> = ({ user }) => {
     }
   };
 
-  // Update the handleReject function
   const confirmRejection = async () => {
     if (!selectedRequest) return;
     if (!rejectionReason.trim()) {
@@ -289,13 +288,11 @@ const DeanRequests: React.FC<SchedulerViewProps> = ({ user }) => {
     
     setProcessingRequest(true);
     try {
-      // Update approval status
       await api.put(`/tbl_scheduleapproval/${selectedRequest.request_id}/`, {
         status: 'rejected',
         remarks: rejectionReason,
       });
       
-      // Send notification to scheduler
       const schedulerUserId = selectedRequest.schedule_data?.submitted_by_id || 
                             (await api.get(`/tbl_scheduleapproval/${selectedRequest.request_id}/`)).data.submitted_by;
       
@@ -323,7 +320,6 @@ const DeanRequests: React.FC<SchedulerViewProps> = ({ user }) => {
     }
   };
 
-  // Update the handleApprove function
   const handleApprove = async (req: DeanRequest) => {
     if (processingRequest) return;
     
@@ -332,12 +328,10 @@ const DeanRequests: React.FC<SchedulerViewProps> = ({ user }) => {
     
     setProcessingRequest(true);
     try {
-      // Update approval status
       await api.put(`/tbl_scheduleapproval/${req.request_id}/`, { 
         status: 'approved' 
       });
       
-      // Send notification to scheduler
       const schedulerUserId = req.schedule_data?.submitted_by_id || 
                             (await api.get(`/tbl_scheduleapproval/${req.request_id}/`)).data.submitted_by;
       
@@ -354,29 +348,12 @@ const DeanRequests: React.FC<SchedulerViewProps> = ({ user }) => {
       setRequests(prev => prev.filter(r => r.request_id !== req.request_id));
       setHistory(prev => [{ ...req, status: 'approved' }, ...prev]);
       setSelectedRequest(null);
+      setShowScheduleViewer(false);
     } catch (err) {
       console.error('Approval error:', err);
       toast.error('Failed to approve schedule');
     } finally {
       setProcessingRequest(false);
-    }
-  };
-
-  const handleDeleteAll = async () => {
-    const confirmed = globalThis.confirm('Delete ALL requests from your college?');
-    if (!confirmed || !collegeName) return;
-    
-    try {
-      await api.delete('/tbl_scheduleapproval/', { 
-        params: { college_name: collegeName } 
-      });
-      
-      setRequests([]);
-      setHistory([]);
-      toast.success('All requests deleted');
-    } catch (err) {
-      console.error('Delete all failed:', err);
-      toast.error('Failed to delete all requests');
     }
   };
 
@@ -392,7 +369,10 @@ const DeanRequests: React.FC<SchedulerViewProps> = ({ user }) => {
       <div
         key={req.request_id}
         className="deanreq-card"
-        onClick={() => setSelectedRequest(req)}
+        onClick={() => {
+          setSelectedRequest(req);
+          setShowScheduleViewer(false);
+        }}
         style={{
           borderLeft: req.status === 'approved'
             ? '4px solid #4CAF50'
@@ -450,14 +430,6 @@ const DeanRequests: React.FC<SchedulerViewProps> = ({ user }) => {
         >
           <FaArchive />
         </span>
-        <button
-          type="button"
-          className="deanreq-btn deny"
-          style={{ float: 'right', background: 'none', border: 'none', color: '#7b0909ff' }}
-          onClick={handleDeleteAll}
-        >
-          <FaTrash />
-        </button>
       </div>
 
       <p className="deanreq-message">
@@ -468,38 +440,207 @@ const DeanRequests: React.FC<SchedulerViewProps> = ({ user }) => {
 
       {showHistory ? renderCards(history) : renderCards(requests)}
 
-      {selectedRequest && (
-        <div className="deanreq-modal-overlay" onClick={() => setSelectedRequest(null)}>
-          <div className="deanreq-modal-pane" onClick={e => e.stopPropagation()}>
-            <h3>From: {selectedRequest.sender_name}</h3>
-            <h4>{selectedRequest.schedule_data?.college_name || selectedRequest.subject}</h4>
+     {selectedRequest && (
+        <div
+          className="deanreq-modal-overlay"
+          onClick={() => {
+            setSelectedRequest(null);
+            setShowScheduleViewer(false);
+          }}
+        >
+          <div
+            className="deanreq-modal-pane"
+            onClick={(e) => e.stopPropagation()}
+            style={{
+              maxWidth: showScheduleViewer ? "95vw" : "600px",
+              width: showScheduleViewer ? "90%" : "auto",
+              maxHeight: "90vh",
+              overflow: "auto",
+            }}
+          >
+            {/* HEADER */}
+            {!showScheduleViewer ? (
+              <h3>From: {selectedRequest.sender_name}</h3>
+            ) : (
+              <div
+                style={{
+                  display: "flex",
+                  justifyContent: "space-between",
+                  alignItems: "center",
+                  marginBottom: "20px",
+                  borderBottom: "2px solid #092C4C",
+                  paddingBottom: "10px",
+                }}
+              >
+                <h3 style={{ margin: 0 }}>Schedule Preview</h3>
 
-            <div className="deanreq-actions" style={{ marginTop: '20px', display: 'flex', gap: '10px', justifyContent: 'flex-end' }}>
-              {selectedRequest && (
+                {/* Back Button */}
                 <button
                   type="button"
-                  className="deanreq-btn deny"
-                  style={{ backgroundColor: '#d32f2f', color: 'white' }}
-                  onClick={() => handleDelete(selectedRequest)}
-                >
-                  Delete
-                </button>
-              )}
-
-              {selectedRequest.status !== "pending" && !editStatus && (
-                <button
-                  type="button"
-                  className="deanreq-btn"
-                  style={{ backgroundColor: "#FF9800", color: "white" }}
-                  onClick={() => {
-                    setEditStatus(true);
-                    setNewStatus(selectedRequest.status || "pending");
+                  onClick={() => setShowScheduleViewer(false)}
+                  style={{
+                    padding: "5px 10px",
+                    background: "#666",
+                    color: "white",
+                    border: "none",
+                    borderRadius: "100px",
+                    cursor: "pointer",
+                    fontWeight: "bold",
                   }}
                 >
-                  Edit Status
+                  <FaChevronLeft />
                 </button>
+              </div>
+            )}
+
+            {/* BODY */}
+            {!showScheduleViewer ? (
+              <>
+                <h4>
+                  {selectedRequest.schedule_data?.college_name ||
+                    selectedRequest.subject}
+                </h4>
+
+                {selectedRequest.schedule_data && (
+                  <div
+                    style={{
+                      marginTop: "15px",
+                      padding: "15px",
+                      background: "#f5f5f5",
+                      borderRadius: "8px",
+                    }}
+                  >
+                    <p>
+                      <strong>Exam Period:</strong>{" "}
+                      {selectedRequest.schedule_data.exam_period}
+                    </p>
+                    <p>
+                      <strong>Term:</strong> {selectedRequest.schedule_data.term}
+                    </p>
+                    <p>
+                      <strong>Semester:</strong>{" "}
+                      {selectedRequest.schedule_data.semester}
+                    </p>
+                    <p>
+                      <strong>Academic Year:</strong>{" "}
+                      {selectedRequest.schedule_data.academic_year}
+                    </p>
+                    <p>
+                      <strong>Total Schedules:</strong>{" "}
+                      {selectedRequest.schedule_data.total_schedules}
+                    </p>
+
+                    <button
+                      type="button"
+                      onClick={() => setShowScheduleViewer(true)}
+                      style={{
+                        marginTop: "10px",
+                        padding: "5px 10px",
+                        background: "#092C4C",
+                        color: "white",
+                        border: "none",
+                        borderRadius: "6px",
+                        cursor: "pointer",
+                        display: "flex",
+                        alignItems: "center",
+                        gap: "8px",
+                        fontSize: "10px",
+                        fontWeight: "bold",
+                      }}
+                    >
+                      View Schedule
+                    </button>
+                  </div>
+                )}
+              </>
+            ) : (
+              selectedRequest.schedule_data && (
+                <DeanScheduleViewer scheduleData={selectedRequest.schedule_data} />
+              )
+            )}
+
+            {/* ACTION BAR (Shown Once Only) */}
+            <div
+              style={{
+                marginTop: "20px",
+                display: "flex",
+                gap: "10px",
+                justifyContent: "flex-end",
+                borderTop: showScheduleViewer ? "2px solid #ddd" : "none",
+                paddingTop: showScheduleViewer ? "15px" : "0",
+              }}
+            >
+              {/* IF NOT EDITING STATUS */}
+              {!editStatus && (
+                <>
+                  {/* Close button only in main view */}
+                  {!showScheduleViewer && (
+                    <button
+                      type="button"
+                      onClick={() => setSelectedRequest(null)}
+                      className="deanreq-btn1 cancel"
+                    >
+                      Close
+                    </button>
+                  )}
+
+                  {/* Delete only in main view */}
+                  {!showScheduleViewer && (
+                    <button
+                      type="button"
+                      className="deanreq-btn1 deny"
+                      style={{ backgroundColor: "#d32f2f", color: "white" }}
+                      onClick={() => handleDelete(selectedRequest)}
+                    >
+                      Delete
+                    </button>
+                  )}
+
+                  {/* Edit Status only if not pending */}
+                  {!showScheduleViewer &&
+                    selectedRequest.status !== "pending" &&
+                    (
+                      <button
+                        type="button"
+                        className="deanreq-btn"
+                        style={{
+                          backgroundColor: "#FF9800",
+                          color: "white",
+                          borderRadius: "50px",
+                        }}
+                        onClick={() => {
+                          setEditStatus(true);
+                          setNewStatus(selectedRequest.status || "pending");
+                        }}
+                      >
+                        Edit Status
+                      </button>
+                    )}
+
+                  {/* Approve / Reject (only ONCE) */}
+                  {selectedRequest.status === "pending" && (
+                    <>
+                      <button
+                        type="button"
+                        onClick={() => handleReject(selectedRequest)}
+                        className="deanreq-btn1 deny"
+                      >
+                        Reject
+                      </button>
+
+                      <button
+                        type="button"
+                        onClick={() => handleApprove(selectedRequest)}
+                        className="deanreq-btn1 approve"
+                      >
+                        Approve
+                      </button>
+                    </>
+                  )}
+                </>
               )}
 
+              {/* IF EDITING STATUS — SHOW ONLY EDIT UI */}
               {editStatus && (
                 <>
                   <select
@@ -508,7 +649,9 @@ const DeanRequests: React.FC<SchedulerViewProps> = ({ user }) => {
                     style={{
                       padding: "6px",
                       borderRadius: "4px",
-                      border: "1px solid #ccc"
+                      border: "1px solid #ccc",
+                      background: "white",
+                      color: "black",
                     }}
                   >
                     <option value="pending">Pending</option>
@@ -533,21 +676,6 @@ const DeanRequests: React.FC<SchedulerViewProps> = ({ user }) => {
                   </button>
                 </>
               )}
-
-              <button type="button" onClick={() => setSelectedRequest(null)} className="deanreq-btn cancel">
-                Close
-              </button>
-
-              {selectedRequest.status === 'pending' && (
-                <>
-                  <button type="button" onClick={() => handleReject(selectedRequest)} className="deanreq-btn deny">
-                    Reject
-                  </button>
-                  <button type="button" onClick={() => handleApprove(selectedRequest)} className="deanreq-btn approve">
-                    Approve
-                  </button>
-                </>
-              )}
             </div>
           </div>
         </div>
@@ -562,6 +690,7 @@ const DeanRequests: React.FC<SchedulerViewProps> = ({ user }) => {
               onChange={e => setRejectionReason(e.target.value)}
               placeholder="Enter reason for rejection..."
               rows={5}
+              style={{ width: '100%', padding: '10px', borderRadius: '6px', border: '1px solid #ccc' }}
             />
             <div style={{ marginTop: '20px', display: 'flex', gap: '10px', justifyContent: 'flex-end' }}>
               <button type='button' onClick={() => setShowRejectionModal(false)} className="deanreq-btn cancel">

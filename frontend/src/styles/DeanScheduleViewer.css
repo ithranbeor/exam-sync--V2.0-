@@ -1,0 +1,186 @@
+/* DeanScheduleViewer.css */
+
+.dean-schedule-viewer {
+  width: 100%;
+  max-width: 1200px;
+  margin: 0 auto;
+  padding: 20px;
+  background: #f9f9f9;
+  border-radius: 12px;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
+}
+
+.dean-schedule-header {
+  text-align: center;
+  margin-bottom: 20px;
+}
+
+.dean-schedule-logo {
+  width: 150px;
+  height: 120px;
+  margin-bottom: 1px;
+}
+
+.dean-schedule-title {
+  font-size: 24px;
+  color: #333;
+  font-family: serif;
+  margin-bottom: 1px;
+}
+
+.dean-schedule-subtitle {
+  font-size: 12px;
+  color: #555;
+  font-family: serif;
+  margin-bottom: 1px;
+}
+
+.dean-schedule-college {
+  font-size: 22px;
+  color: #333;
+  font-family: serif;
+  font-weight: bold;
+  margin: 1px 0;
+}
+
+.dean-schedule-info {
+  font-size: 16px;
+  color: #333;
+  font-family: serif;
+  margin: 1px 0;
+}
+
+.dean-schedule-period {
+  font-size: 16px;
+  color: #333;
+  font-family: serif;
+  margin-top: 1px;
+}
+
+.dean-schedule-pagination {
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  gap: 20px;
+  margin: 2px 0;
+  padding: 10px;
+  background: white;
+  border-radius: 8px;
+}
+
+.dean-page-btn {
+  padding: 8px 10px;
+  background: #092C4C;
+  color: white;
+  border: none;
+  border-radius: 20px;
+  cursor: pointer;
+  font-weight: bold;
+  transition: all 0.3s ease;
+}
+
+.dean-page-btn:hover:not(:disabled) {
+  background: #0a3d66;
+  transform: translateY(-2px);
+}
+
+.dean-page-btn:disabled {
+  background: #ccc;
+  cursor: not-allowed;
+  opacity: 0.5;
+}
+
+.dean-schedule-container {
+  overflow-x: auto;
+  margin-top: 20px;
+}
+
+.dean-schedule-date-section {
+  margin-bottom: 30px;
+}
+
+.dean-exam-table {
+  width: 100%;
+  border-collapse: collapse;
+  background: white;
+  font-size: 12px;
+  margin-bottom: 20px;
+}
+
+.dean-exam-table th {
+  background: #092C4C;
+  color: white;
+  padding: 12px 8px;
+  text-align: center;
+  border: 1px solid #ddd;
+  font-weight: bold;
+  font-size: 13px;
+}
+
+.dean-exam-table td {
+  border: 1px solid #ddd;
+  padding: 4px;
+  text-align: center;
+  vertical-align: top;
+  min-width: 120px;
+}
+
+.dean-exam-table tbody tr:nth-child(even) {
+  background: #f9f9f9;
+}
+
+.dean-schedule-cell {
+  padding: 8px;
+  border-radius: 6px;
+  font-size: 11px;
+  line-height: 1.4;
+  height: 100%;
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+}
+
+.dean-schedule-cell p {
+  margin: 2px 0;
+  font-size: 11px;
+}
+
+.dean-schedule-cell strong {
+  font-size: 12px;
+  font-weight: bold;
+}
+
+/* Responsive design */
+@media (max-width: 1200px) {
+  .dean-schedule-viewer {
+    padding: 15px;
+  }
+
+  .dean-schedule-title {
+    font-size: 20px;
+  }
+
+  .dean-schedule-college {
+    font-size: 18px;
+  }
+}
+
+@media print {
+  .dean-schedule-pagination {
+    display: none;
+  }
+
+  .dean-schedule-viewer {
+    box-shadow: none;
+    padding: 0;
+  }
+
+  .dean-exam-table {
+    font-size: 10px;
+  }
+
+  .dean-schedule-cell {
+    font-size: 9px;
+  }
+}

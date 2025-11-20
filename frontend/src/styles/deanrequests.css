@@ -152,6 +152,42 @@
   background-color: #8e0000;
 }
 
+.deanreq-btn1 {
+  padding: 8px 16px;
+  border-radius: 100px;
+  border: none;
+  cursor: pointer;
+  font-weight: bold;
+  transition: 0.2s;
+  font-size: small;
+}
+.deanreq-btn1.approve {
+  background-color: #2e7d32;
+  color: white;
+}
+
+.deanreq-btn1.approve:hover {
+  background-color: #1b5e20;
+}
+
+.deanreq-btn1.deny {
+  background-color: #c62828;
+  color: white;
+}
+
+.deanreq-btn1.deny:hover {
+  background-color: #8e0000;
+}
+
+.deanreq-btn1.cancel {
+  background-color: #02063f;
+  color: white;
+}
+
+.deanreq-btn1.cancel:hover {
+  background-color: #040c7c;
+}
+
 @keyframes fadeIn {
   from {
     opacity: 0;
