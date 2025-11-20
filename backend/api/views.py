@@ -177,8 +177,6 @@ def notification_delete(request, pk):
     except TblNotification.DoesNotExist:
         return Response({"error": "Notification not found"}, status=status.HTTP_404_NOT_FOUND)
     
-# Update the send_schedule_to_dean function in views.py
-
 @api_view(['POST'])
 @permission_classes([AllowAny])
 def send_schedule_to_dean(request):
