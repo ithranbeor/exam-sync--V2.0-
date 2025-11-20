@@ -25,7 +25,7 @@ interface AccountsProps {
   } | null;
 }
 
-export const Accounts: React.FC<AccountsProps> = ({ user }) => {
+export const Accounts: React.FC<AccountsProps> = () => {
   const [accounts, setAccounts] = useState<UserAccount[]>([]);
   const [searchTerm, setSearchTerm] = useState('');
   const [showModal, setShowModal] = useState(false);

@@ -67,7 +67,7 @@ interface NewAccountRole {
   date_ended: string | null;
 }
 
-export const UserManagement: React.FC<UserManagementProps> = ({ user }) => {
+export const UserManagement: React.FC<UserManagementProps> = ({}) => {
   const [accounts, setAccounts] = useState<UserAccount[]>([]);
   const [roles, setRoles] = useState<Role[]>([]);
   const [colleges, setColleges] = useState<College[]>([]);

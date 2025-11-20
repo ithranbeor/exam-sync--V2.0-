@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from "react";
+/**import React, { useEffect, useState } from "react";
 import { useRef } from "react";
 import {FaTrash,FaTrashRestore,FaEnvelope,FaEnvelopeOpen,FaPlus,FaRegStar,FaEnvelopeSquare,FaPaperclip} from "react-icons/fa";
 import { HiPaperAirplane } from "react-icons/hi2";
@@ -463,7 +463,7 @@ const Inbox: React.FC<{ user: any }> = ({ user }) => {
 
   return (
     <div className="inbox-layout">
-      {/* Sidebar */}
+      {/* Sidebar *//*}
       <div className="inbox-sidebar">
         <h3>Menu</h3>
         <ul>
@@ -490,7 +490,7 @@ const Inbox: React.FC<{ user: any }> = ({ user }) => {
         </ul>
       </div>
 
-      {/* Main */}
+      {/* Main */ /*}
       <div className="inbox-container">
         <div className="inbox-banner">
           <span>
@@ -523,7 +523,7 @@ const Inbox: React.FC<{ user: any }> = ({ user }) => {
           <button type="button" className="delete-all-btn" onClick={deleteAll}>Delete All</button>
         )}
 
-        {/* Messages List */}
+        {/* Messages List *//*} 
         {(viewDeleted ? deletedMessages : viewSent ? sentMessages : viewImportant ? messages.filter(m => m.is_important) : messages).map(msg => {
           // Get the most recent message (last reply or original)
           const lastMessage = msg.replies?.length
@@ -587,18 +587,16 @@ const Inbox: React.FC<{ user: any }> = ({ user }) => {
                 <span className="inbox-sender">{participants}</span>
               </div>
 
-              {/* Center: subject + preview */}
+              {/* Center: subject + preview *//*}
               <div className="inbox-center" style={{ flex: 1, marginLeft: "16px" }}>
                 <strong>{msg.subject || "(No Subject)"}</strong>{" "}
                 <span className="inbox-preview">– {previewText}</span>
               </div>
 
-              {/* Right: date */}
               <div className="inbox-date" style={{ flex: "0 0 auto", marginLeft: "16px" }}>
                 {formatMessageDate(msg.created_at)} 
               </div>
 
-              {/* Delete/restore buttons */}
               {deleteMode && !viewDeleted && !viewSent && (
                 <button type="button" className="row-delete-btn" onClick={() => deleteMessage(msg.message_id)}>
                   <FaTrash />
@@ -634,7 +632,6 @@ const Inbox: React.FC<{ user: any }> = ({ user }) => {
               onClick={e => e.stopPropagation()}
               style={{ display: "flex", flexDirection: "column", height: "90vh", width: "100vh" }}
             >
-              {/* Header */}
               <div className="modal-header">
                 <div className="sender-info">
                   <div className="subject-title">
@@ -658,7 +655,6 @@ const Inbox: React.FC<{ user: any }> = ({ user }) => {
                 </button>
               </div>
 
-              {/* Messages container */}
               <div
                 style={{
                   flex: 1,
@@ -667,7 +663,6 @@ const Inbox: React.FC<{ user: any }> = ({ user }) => {
                   marginBottom: "12px",
                 }}
               >
-                {/* Original message */}
                 <div
                   className={`chat-message ${
                     selectedMsg.sender?.user_id === user.user_id ? "sent" : "received"
@@ -719,7 +714,6 @@ const Inbox: React.FC<{ user: any }> = ({ user }) => {
                   </div>
                 </div>
 
-                {/* Replies */}
                 {selectedMsg.replies?.map(reply => (
                   <div
                     key={reply.reply_id}
@@ -774,11 +768,9 @@ const Inbox: React.FC<{ user: any }> = ({ user }) => {
                   </div>
                 ))}
 
-                {/* Invisible marker for auto-scroll */}
                 <div ref={messagesEndRef} />
               </div>
 
-              {/* Fixed Textarea at bottom */}
 
               <div className="input-text-container" style={{ position: "relative", display: "flex", flexDirection: "column", gap: "6px" }}>
                 <div style={{ display: "flex", alignItems: "center" }}>
@@ -871,7 +863,6 @@ const Inbox: React.FC<{ user: any }> = ({ user }) => {
                   </button>
                 </div>
 
-                {/* Attachments preview */}
                 {(attachments ?? []).length > 0 && (
                   <div
                     className="attachments-preview"
@@ -933,17 +924,14 @@ const Inbox: React.FC<{ user: any }> = ({ user }) => {
           </div>
         )}
 
-        {/* Compose Modal */}
         {showCompose && (
           <div className="compose-modal-overlay" onClick={() => setShowCompose(false)}>
             <div className="compose-modal-pane" onClick={e => e.stopPropagation()}>
-              {/* Header */}
               <div className="compose-modal-header">
                 <h3>Compose Message</h3>
                 <button type= 'button' onClick={() => setShowCompose(false)}>✕</button>
               </div>
 
-              {/* Form Body */}
               <div className="compose-modal-body">
                 <input
                   type="text"
@@ -960,7 +948,6 @@ const Inbox: React.FC<{ user: any }> = ({ user }) => {
                   className="compose-modal-input"
                 />
 
-                {/* Textarea with buttons inside */}
                 <div className="compose-modal-textarea-wrapper">
                   <textarea
                     placeholder="Type your message..."
@@ -974,7 +961,6 @@ const Inbox: React.FC<{ user: any }> = ({ user }) => {
                     className="compose-modal-textarea"
                   />
 
-                  {/* Attachment button inside textarea */}
                   <label htmlFor="compose-modal-attachment" className="compose-modal-attachment-label">
                     <FaPaperclip />
                   </label>
@@ -986,7 +972,6 @@ const Inbox: React.FC<{ user: any }> = ({ user }) => {
                     onChange={handleFileChange}
                   />
 
-                  {/* Send button inside textarea */}
                   <button
                     type="button"
                     onClick={handleSend}
@@ -995,7 +980,6 @@ const Inbox: React.FC<{ user: any }> = ({ user }) => {
                     <HiPaperAirplane />
                   </button>
 
-                  {/* Attachments preview inside textarea area */}
                   {attachments.length > 0 && (
                     <div className="compose-modal-attachments-preview-inside">
                       {attachments.map((file, idx) => (
@@ -1025,4 +1009,4 @@ const Inbox: React.FC<{ user: any }> = ({ user }) => {
   );
 };
 
-export default Inbox;
+export default Inbox;*/
