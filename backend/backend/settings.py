@@ -14,6 +14,7 @@ DEBUG = config('DEBUG', default=False, cast=bool)
 FRONTEND_URL = config('FRONTEND_URL', default="https://exam-sync-v2-0-lkat.onrender.com")
 
 ALLOWED_HOSTS = [
+    "https://exam-sync-v2-0-lkat.onrender.com", 
     "exam-sync-v2-0-mwnp.onrender.com",
     "localhost",
     "127.0.0.1",
