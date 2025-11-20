@@ -1283,7 +1283,7 @@ def login_faculty(request):
 
     except Exception as e:
         print("💥 Server error:", str(e))
-        return Response({'message': f'Server error: {str(e)}'}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+        return
 
 # ============================================================
 # PASSWORD RESET CONFIRMATION
