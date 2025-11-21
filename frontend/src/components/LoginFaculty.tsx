@@ -167,8 +167,7 @@ const LoginFaculty: React.FC = () => {
       {/* Logo Section */}
       <div className="logo-section">
         <div className="e-graphic-logo">
-          {/* Logo image from the picture, ideally a transparent PNG/SVG */}
-          <img src="/logo/Exam.png" alt="ExamSync Logo" />
+          <img src="/logo/Exam.png" alt="ExamSync Logo" className="examsync-logo" />
           <p className="logo-text">ExamSync</p>
         </div>
       </div>
