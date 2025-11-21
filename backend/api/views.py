@@ -42,6 +42,7 @@ from django.conf import settings
 from django.db import transaction
 from django.utils import timezone
 from uuid import uuid4
+from threading import Thread
 
 import secrets
 from django.core.cache import cache
@@ -1166,15 +1167,12 @@ def request_password_change(request):
         return Response({'error': 'No account found with this email.'}, status=status.HTTP_404_NOT_FOUND)
 
     try:
-        # Generate a secure random token
         token = secrets.token_urlsafe(32)
         uid = str(user.pk)
 
-        # Save token in cache for 15 minutes
         cache_key = f"password_reset_{uid}"
         cache.set(cache_key, token, timeout=15 * 60)
 
-        # Build frontend reset URL
         reset_link = f"{settings.FRONTEND_URL}/reset-password?uid={uid}&token={token}"
 
         subject = "Password Reset Request"
@@ -1186,12 +1184,26 @@ def request_password_change(request):
             f"Best,\nExamSync Team"
         )
 
-        send_mail(subject, message, settings.DEFAULT_FROM_EMAIL, [email])
+        def send_email_async():
+            try:
+                send_mail(subject, message, settings.DEFAULT_FROM_EMAIL, [email])
+                print(f"✅ Password reset email sent to {email}")
+            except Exception as e:
+                print(f"❌ Failed to send email: {str(e)}")
 
-        return Response({'message': 'Password reset link sent successfully!'}, status=status.HTTP_200_OK)
+        # Start background thread
+        Thread(target=send_email_async).start()
+
+        # ✅ Return immediately without waiting for email
+        return Response({
+            'message': 'Password reset link will be sent to your email shortly!'
+        }, status=status.HTTP_200_OK)
 
     except Exception as e:
-        return Response({'error': f'Failed to send email: {str(e)}'}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+        print(f"❌ Error in password reset: {str(e)}")
+        return Response({
+            'error': 'Failed to process password reset request.'
+        }, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
 
 @api_view(['POST'])
 @permission_classes([AllowAny])
@@ -1403,6 +1415,104 @@ def confirm_password_change(request):
     print(f"✅ Password successfully changed for user {user.user_id}")
     return Response({"message": "Password changed successfully!"}, status=status.HTTP_200_OK)
 
+# ============================================================
+# CHANGE PROCTOR
+# ============================================================
+@api_view(['POST'])
+@permission_classes([AllowAny])
+def user_avatar_upload(request, user_id):
+    """
+    Upload user avatar image
+    """
+    try:
+        user = TblUsers.objects.get(user_id=user_id)
+    except TblUsers.DoesNotExist:
+        return Response({'error': 'User not found'}, status=status.HTTP_404_NOT_FOUND)
+    
+    # Get uploaded file
+    avatar_file = request.FILES.get('avatar')
+    if not avatar_file:
+        return Response({'error': 'No file provided'}, status=status.HTTP_400_BAD_REQUEST)
+    
+    # Validate file type
+    allowed_types = ['image/jpeg', 'image/jpg', 'image/png', 'image/gif', 'image/webp']
+    if avatar_file.content_type not in allowed_types:
+        return Response({
+            'error': 'Invalid file type. Allowed: JPEG, PNG, GIF, WEBP'
+        }, status=status.HTTP_400_BAD_REQUEST)
+    
+    # Validate file size (max 5MB)
+    if avatar_file.size > 5 * 1024 * 1024:
+        return Response({
+            'error': 'File too large. Maximum size is 5MB'
+        }, status=status.HTTP_400_BAD_REQUEST)
+    
+    try:
+        # Import required libraries
+        import base64
+        from io import BytesIO
+        from PIL import Image
+        
+        # Open and resize image
+        img = Image.open(avatar_file)
+        
+        # Convert to RGB if needed (for PNG with transparency)
+        if img.mode in ('RGBA', 'LA', 'P'):
+            background = Image.new('RGB', img.size, (255, 255, 255))
+            if img.mode == 'P':
+                img = img.convert('RGBA')
+            background.paste(img, mask=img.split()[-1] if img.mode == 'RGBA' else None)
+            img = background
+        
+        # Resize to max 400x400 while maintaining aspect ratio
+        img.thumbnail((400, 400), Image.Resampling.LANCZOS)
+        
+        # Save to BytesIO
+        buffer = BytesIO()
+        img.save(buffer, format='JPEG', quality=85, optimize=True)
+        buffer.seek(0)
+        
+        # Convert to base64 data URL
+        img_base64 = base64.b64encode(buffer.read()).decode('utf-8')
+        avatar_url = f"data:image/jpeg;base64,{img_base64}"
+        
+        # Update user avatar
+        user.avatar_url = avatar_url
+        user.save()
+        
+        return Response({
+            'message': 'Avatar uploaded successfully',
+            'avatar_url': avatar_url
+        }, status=status.HTTP_200_OK)
+        
+    except Exception as e:
+        print(f"❌ Error processing avatar: {str(e)}")
+        import traceback
+        traceback.print_exc()
+        return Response({
+            'error': 'Failed to process image',
+            'detail': str(e)
+        }, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+
+
+@api_view(['DELETE'])
+@permission_classes([AllowAny])
+def user_avatar_delete(request, user_id):
+    """
+    Delete user avatar
+    """
+    try:
+        user = TblUsers.objects.get(user_id=user_id)
+    except TblUsers.DoesNotExist:
+        return Response({'error': 'User not found'}, status=status.HTTP_404_NOT_FOUND)
+    
+    # Clear avatar
+    user.avatar_url = None
+    user.save()
+    
+    return Response({
+        'message': 'Avatar deleted successfully'
+    }, status=status.HTTP_200_OK)
 
 # ============================================================
 # CREATE ACCOUNT (HASHES PASSWORD)

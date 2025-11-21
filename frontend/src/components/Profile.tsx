@@ -123,7 +123,8 @@ const Profile: React.FC<ProfileProps> = ({ user }) => {
   const handleDeleteAvatar = async () => {
     if (!user?.user_id) return;
     try {
-      await api.delete(`/users/${user.user_id}/avatar/`);
+      // ✅ CHANGED: Use /delete/ endpoint instead
+      await api.delete(`/users/${user.user_id}/avatar/delete/`);
       setProfile(prev => prev && { ...prev, avatar_url: null });
       setPreview(null);
       toast.success('Avatar deleted.');

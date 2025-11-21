@@ -16,7 +16,8 @@ urlpatterns = [
     path('api/request-password-change/', views.request_password_change, name='request_password_change'),
     path('api/confirm-password-change/', views.confirm_password_change, name='confirm_password_change'),
     path('api/send-proctor-emails/', views.send_proctor_emails, name='send_proctor_emails'),
-
+    path('api/users/<int:user_id>/avatar/', views.user_avatar_upload, name='user_avatar_upload'),
+    path('api/users/<int:user_id>/avatar/delete/', views.user_avatar_delete, name='user_avatar_delete'),
 
     # Tables
     path('api/tbl_examperiod', views.tbl_examperiod_list, name='tbl_examperiod_list'),
