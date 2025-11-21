@@ -14,8 +14,8 @@ DEBUG = config('DEBUG', default=False, cast=bool)
 FRONTEND_URL = config('FRONTEND_URL', default="https://exam-sync-v2-0-lkat.onrender.com")
 
 ALLOWED_HOSTS = [
-    "https://exam-sync-v2-0-lkat.onrender.com", 
-    "exam-sync-v2-0-mwnp.onrender.com",
+    "exam-sync-v2-0-lkat.onrender.com",  
+    "exam-sync-v2-0-mwnp.onrender.com", 
     "localhost",
     "127.0.0.1",
 ]
@@ -62,7 +62,6 @@ CORS_ALLOWED_ORIGINS = [
     "https://exam-sync-v2-0-lkat.onrender.com",
     "http://localhost:5173",
     "http://127.0.0.1:5173",
-    "http://192.168.1.17:5173",
 ]
 
 CORS_ALLOW_CREDENTIALS = True
@@ -93,7 +92,6 @@ CSRF_TRUSTED_ORIGINS = [
     "https://exam-sync-v2-0-mwnp.onrender.com",
     "http://localhost:5173",
     "http://127.0.0.1:5173",
-    "http://192.168.1.17:5173",
 ]
 
 # ──────────────────────────────────────────────
