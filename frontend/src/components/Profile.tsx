@@ -158,7 +158,6 @@ const Profile: React.FC<ProfileProps> = ({ user }) => {
     }
   };
 
-  /** 🔹 Request password change (email-based only) */
   const handlePasswordChange = async () => {
     if (!profile?.email_address) {
       toast.error('Missing email address.');
@@ -190,7 +189,7 @@ const Profile: React.FC<ProfileProps> = ({ user }) => {
       <div className="profile-section profile-info-card">
         <div className="profile-avatar-wrapper">
           <img
-            src={preview || '../../static/Images/default-pp.jpg'}
+            src={preview || '/images/default-pp.jpg'}
             alt="Profile Avatar"
             className="profile-avatar"
           />
