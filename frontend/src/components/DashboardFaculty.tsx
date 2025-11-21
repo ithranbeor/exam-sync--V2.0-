@@ -89,7 +89,7 @@ const DashboardFaculty = () => {
         setUser({
           ...data,
           full_name: `${data.first_name} ${data.middle_name ?? ''} ${data.last_name}`.trim(),
-          avatar_url: data.avatar_url || '../../static/Images/default-pp.jpg',
+          avatar_url: data.avatar_url || '/images/default-pp.jpg',
         });
       } catch (err) {
         console.error('Error loading user info:', err);
@@ -97,7 +97,7 @@ const DashboardFaculty = () => {
         setUser({
           ...stored,
           full_name: `${stored.first_name} ${stored.middle_name ?? ''} ${stored.last_name}`.trim(),
-          avatar_url: stored.avatar_url || '../../static/Images/default-pp.jpg',
+          avatar_url: stored.avatar_url || '/images/default-pp.jpg',
         });
       }
     };
@@ -166,7 +166,7 @@ const DashboardFaculty = () => {
           >
             <div className="sidebar-header">
               <div className="sidebar-logo">
-                <img src="../../static/logo/Exam.png" alt="Logo" className="logo-img" />
+                <img src="/logo/Exam.png" alt="Logo" className="logo-img" />
                 {isSidebarOpen && <span className="logo-text">ExamSync</span>}
               </div>
             </div>
@@ -213,7 +213,7 @@ const DashboardFaculty = () => {
                   <h3 className="myModal-title">Are you sure you want to logout?</h3>
                   <div className="myModal-actions">
                     <button type='button' onClick={handleLogoutConfirm} className="myModal-btn myModal-btn-confirm">Logout</button>
-                    <button type='button'  onClick={() => setShowLogoutModal(false)} className="myModal-btn myModal-btn-cancel">Cancel</button>
+                    <button type='button' onClick={() => setShowLogoutModal(false)} className="myModal-btn myModal-btn-cancel">Cancel</button>
                   </div>
                 </div>
               </div>
@@ -268,7 +268,7 @@ const DashboardFaculty = () => {
           {activeMenu === 'exam-Schedule' && <ProctorViewExam />}
           {activeMenu === 'notification' && <Notification user={user} />}
           {activeMenu === 'set-Modality' && <BayanihanModality user={user} />}
-          {activeMenu === 'plot-Schedule' && <SchedulerPlotSchedule user={user}/>}
+          {activeMenu === 'plot-Schedule' && <SchedulerPlotSchedule user={user} />}
           {activeMenu === 'proctors-Availability' && <SchedulerAvailability user={user} />}
           {activeMenu === 'Request' && <DeanRequests user={user} />}
           {activeMenu === 'Room-Management' && <RoomManagement user={user} />}

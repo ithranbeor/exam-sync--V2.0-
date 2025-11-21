@@ -1047,7 +1047,7 @@ const SchedulerView: React.FC<SchedulerViewProps> = ({ user }) => {
             <div className="scheduler-view-container">
               <div className="header" style={{ textAlign: "center", marginBottom: "20px" }}>
                 <img
-                  src="../../static/logo/USTPlogo.png"
+                  src="/logo/USTPlogo.png"
                   alt="School Logo"
                   style={{ width: '200px', height: '160px', marginBottom: '5px' }}
                 />

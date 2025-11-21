@@ -106,7 +106,7 @@ const LoginAdmin: React.FC = () => {
             <p className="good-morning">{getGreeting()}</p>
           </div>
           <div className="logo">
-            <img src="../../static/logo/Exam.png" alt="ExamSync Logo" />
+            <img src="/logo/Exam.png" alt="ExamSync Logo" />
           </div>
         </div>
 

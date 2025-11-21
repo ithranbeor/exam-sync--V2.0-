@@ -68,14 +68,14 @@ const DashboardAdmin: React.FC = () => {
         setUser({
           ...data,
           full_name: `${data.first_name} ${data.middle_name ?? ''} ${data.last_name}`.trim(),
-          avatar_url: data.avatar_url || '../../static/Images/default-pp.jpg',
+          avatar_url: data.avatar_url || '/images/default-pp.jpg',
         });
       } catch (err) {
         console.error(err);
         setUser({
           ...stored,
           full_name: `${stored.first_name} ${stored.middle_name ?? ''} ${stored.last_name}`.trim(),
-          avatar_url: stored.avatar_url || '../../static/Images/default-pp.jpg',
+          avatar_url: stored.avatar_url || '/images/default-pp.jpg',
         });
       }
     };
@@ -161,7 +161,7 @@ const DashboardAdmin: React.FC = () => {
           onMouseLeave={() => setIsSidebarOpen(false)}
         >
           <div className="sidebar-header">
-            <img src="../../static/logo/Exam.png" alt="Logo" className="logo-img" />
+            <img src="/logo/Exam.png" alt="Logo" className="logo-img" />
             {isSidebarOpen && <span className="logo-text">ExamSync</span>}
           </div>
           <nav className="sidebar-nav">

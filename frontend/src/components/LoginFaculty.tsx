@@ -37,7 +37,7 @@ const LoginFaculty: React.FC = () => {
 
   const showPasswordRef = useRef(false);
   const [, forceRerender] = useState(false);
-  
+
   // Memoize the greeting to avoid re-calculating on every render
   const greeting = useMemo(() => getGreeting(), []);
 
@@ -50,7 +50,7 @@ const LoginFaculty: React.FC = () => {
     showPasswordRef.current = !showPasswordRef.current;
     forceRerender((x) => !x);
   }, []);
-  
+
   const toggleLoginRole = useCallback(() => {
     setIsFacultyLogin(prev => !prev);
     setError(""); // Clear error when switching roles
@@ -92,37 +92,37 @@ const LoginFaculty: React.FC = () => {
         }
 
         let assignedRole = activeRoles[0]; // Default to the first active role
-        
+
         // Logic for Admin/Faculty differentiation
         if (isFacultyLogin) {
-            // For Faculty login, prioritize 'admin' if available, otherwise first role
-            assignedRole = activeRoles.includes("admin")
-                ? "admin"
-                : activeRoles[0];
+          // For Faculty login, prioritize 'admin' if available, otherwise first role
+          assignedRole = activeRoles.includes("admin")
+            ? "admin"
+            : activeRoles[0];
         } else {
-            // For Admin login, it must be 'admin'
-            if (!activeRoles.includes("admin")) {
-                setError("You must have an 'admin' role to log in as Admin.");
-                return;
-            }
-            assignedRole = "admin";
+          // For Admin login, it must be 'admin'
+          if (!activeRoles.includes("admin")) {
+            setError("You must have an 'admin' role to log in as Admin.");
+            return;
+          }
+          assignedRole = "admin";
         }
 
         // Determine dashboard based on assigned role
         const dashboard = roleToDashboardMap[assignedRole];
-        
+
         // Additional check to ensure faculty doesn't land on admin dashboard and vice versa
-        if (!dashboard || 
-           (!isFacultyLogin && dashboard !== "/admin-dashboard") || 
-           (isFacultyLogin && dashboard === "/admin-dashboard" && assignedRole !== "admin")) {
-           // This handles cases where a non-admin user might try to use the admin path 
-           // or vice versa, but we'll simplify: just check if a dashboard exists
-           if (!dashboard) {
-               setError(`No dashboard found for role: ${assignedRole}`);
-               return;
-           }
+        if (!dashboard ||
+          (!isFacultyLogin && dashboard !== "/admin-dashboard") ||
+          (isFacultyLogin && dashboard === "/admin-dashboard" && assignedRole !== "admin")) {
+          // This handles cases where a non-admin user might try to use the admin path 
+          // or vice versa, but we'll simplify: just check if a dashboard exists
+          if (!dashboard) {
+            setError(`No dashboard found for role: ${assignedRole}`);
+            return;
+          }
         }
-        
+
         const userData = {
           user_id: authData.user_id,
           email_address: authData.email,
@@ -163,16 +163,12 @@ const LoginFaculty: React.FC = () => {
           <p>{greeting}!</p>
         </div>
       </div>
-      
+
       {/* Logo Section */}
       <div className="logo-section">
         <div className="e-graphic-logo">
           {/* Logo image from the picture, ideally a transparent PNG/SVG */}
-          <img 
-            src="../../static/logo/Exam.png" 
-            alt="ExamSync Logo" 
-            className="examsync-logo"
-          />
+          <img src="/logo/Exam.png" alt="ExamSync Logo" />
           <p className="logo-text">ExamSync</p>
         </div>
       </div>
@@ -208,32 +204,32 @@ const LoginFaculty: React.FC = () => {
           />
           <label htmlFor="password">Password</label>
           <span className="toggle-password" onClick={togglePassword}>
-            {showPasswordRef.current ? <FaEyeSlash style={{color: 'white'}} /> : <FaEye style={{color: 'white'}} />}
+            {showPasswordRef.current ? <FaEyeSlash style={{ color: 'white' }} /> : <FaEye style={{ color: 'white' }} />}
           </span>
         </div>
-        
+
         {/* Remember Me & Error */}
         <div className="form-actions">
-            <label className="modern-checkbox-container">
-                Remember me
-                <input
-                    type="checkbox"
-                    checked={rememberMe}
-                    onChange={(e) => setRememberMe(e.target.checked)}
-                />
-                <span className="checkmark"></span>
-            </label>
-            <span className={`error-text ${error ? '' : 'hidden'}`}>
-              {error || '‎'}
-            </span>
+          <label className="modern-checkbox-container">
+            Remember me
+            <input
+              type="checkbox"
+              checked={rememberMe}
+              onChange={(e) => setRememberMe(e.target.checked)}
+            />
+            <span className="checkmark"></span>
+          </label>
+          <span className={`error-text ${error ? '' : 'hidden'}`}>
+            {error || '‎'}
+          </span>
         </div>
-        
+
         {/* Login Button */}
-        <button 
-            type="submit" 
-            className="submit-button" 
-            disabled={loading}
-            aria-label={`Log in as ${isFacultyLogin ? 'Faculty' : 'Admin'}`}
+        <button
+          type="submit"
+          className="submit-button"
+          disabled={loading}
+          aria-label={`Log in as ${isFacultyLogin ? 'Faculty' : 'Admin'}`}
         >
           {loading ? <span className="spinner"></span> : 'Login'}
         </button>
