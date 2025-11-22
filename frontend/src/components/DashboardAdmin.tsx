@@ -4,7 +4,7 @@ import { useNavigate } from 'react-router-dom';
 import { api } from '../lib/apiClient.ts';
 import { 
   FaHome, FaUsers, FaBuilding, FaBook, FaCalendarAlt, 
-  FaUser, FaSignOutAlt, FaPenAlt 
+  FaUser, FaSignOutAlt, FaPenAlt, FaBars, FaTimes
 } from 'react-icons/fa';
 import { PiBuildingApartmentFill, PiBuildingsFill  } from "react-icons/pi";
 import { FaBookAtlas, FaBookJournalWhills } from "react-icons/fa6";
@@ -53,6 +53,7 @@ const DashboardAdmin: React.FC = () => {
   const [isSidebarOpen, setIsSidebarOpen] = useState(false);
   const [currentDateTime, setCurrentDateTime] = useState(new Date());
   const [showLogoutModal, setShowLogoutModal] = useState(false);
+  const [isMobile, setIsMobile] = useState(window.innerWidth <= 1024);
   const navigate = useNavigate();
 
   // Load logged-in user
@@ -88,10 +89,62 @@ const DashboardAdmin: React.FC = () => {
     return () => clearInterval(timer);
   }, []);
 
+  /** 📱 Handle window resize for responsive behavior */
+  useEffect(() => {
+    let resizeTimer: NodeJS.Timeout;
+    
+    const handleResize = () => {
+      // Debounce resize events for better performance
+      clearTimeout(resizeTimer);
+      resizeTimer = setTimeout(() => {
+        const nowMobile = window.innerWidth <= 1024;
+        const wasMobile = isMobile;
+        
+        // Update mobile state
+        setIsMobile(nowMobile);
+        
+        // When switching between mobile and desktop: reset sidebar state
+        if (wasMobile !== nowMobile) {
+          setIsSidebarOpen(false);
+        }
+      }, 150); // 150ms debounce
+    };
+
+    // Initial check
+    const initialMobile = window.innerWidth <= 1024;
+    setIsMobile(initialMobile);
+    
+    window.addEventListener('resize', handleResize);
+    return () => {
+      clearTimeout(resizeTimer);
+      window.removeEventListener('resize', handleResize);
+    };
+  }, [isMobile]);
+
   const handleLogout = () => {
     localStorage.removeItem('user');
     sessionStorage.removeItem('user');
     navigate('/');
+  };
+
+  /** 🍔 Toggle sidebar (for mobile/tablet) */
+  const toggleSidebar = () => {
+    setIsSidebarOpen(!isSidebarOpen);
+  };
+
+  /** 📱 Handle menu item click - close sidebar on mobile/tablet */
+  const handleMenuClick = (menuKey: string) => {
+    setActiveMenu(menuKey);
+    if (isMobile) {
+      setIsSidebarOpen(false);
+    }
+  };
+
+  /** 🖱️ Handle sidebar hover (desktop only) */
+  const handleSidebarHover = (isEntering: boolean) => {
+    if (!isMobile) {
+      setIsSidebarOpen(isEntering);
+    }
   };
 
   const formattedTime = currentDateTime.toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit', hour12: true });
@@ -155,10 +208,30 @@ const DashboardAdmin: React.FC = () => {
   return (
     <div className="app-container">
       <div className="main-content-wrapper">
+        {/* Hamburger Menu Button (Mobile/Tablet) */}
+        {isMobile && (
+          <button
+            type="button"
+            className="menu-toggle-btn"
+            onClick={toggleSidebar}
+            aria-label="Toggle menu"
+          >
+            {isSidebarOpen ? <FaTimes /> : <FaBars />}
+          </button>
+        )}
+
+        {/* Sidebar Backdrop (Mobile/Tablet) */}
+        {isMobile && (
+          <div
+            className={`sidebar-backdrop ${isSidebarOpen ? 'active' : ''}`}
+            onClick={() => setIsSidebarOpen(false)}
+          />
+        )}
+
         <aside
           className={`sidebar ${isSidebarOpen ? 'open' : 'closed'}`}
-          onMouseEnter={() => setIsSidebarOpen(true)}
-          onMouseLeave={() => setIsSidebarOpen(false)}
+          onMouseEnter={() => handleSidebarHover(true)}
+          onMouseLeave={() => handleSidebarHover(false)}
         >
           <div className="sidebar-header">
             <button 
@@ -184,30 +257,21 @@ const DashboardAdmin: React.FC = () => {
             <ul>
               {adminSidebarItems.map(({ key, label, icon }) => (
                 <li key={key} className={activeMenu === key ? 'active' : ''}>
-                  <button type="button" onClick={() => setActiveMenu(key)}>
+                  <button type="button" onClick={() => handleMenuClick(key)}>
                     {icon} {isSidebarOpen && <span>{label}</span>}
                   </button>
                 </li>
               ))}
               <li>
-                <button type="button" onClick={() => setShowLogoutModal(true)}>
+                <button type="button" onClick={() => {
+                  setShowLogoutModal(true);
+                  if (isMobile) setIsSidebarOpen(false);
+                }}>
                   <FaSignOutAlt /> {isSidebarOpen && <span>Logout</span>}
                 </button>
               </li>
             </ul>
           </nav>
-
-          {showLogoutModal && (
-            <div className="myModal-overlay">
-              <div className="myModal-box">
-                <h3>Are you sure you want to logout?</h3>
-                <div className="myModal-actions">
-                  <button type='button' className="myModal-btn myModal-btn-confirm" onClick={handleLogout}>Logout</button>
-                  <button type='button' className="myModal-btn myModal-btn-cancel" onClick={() => setShowLogoutModal(false)}>Cancel</button>
-                </div>
-              </div>
-            </div>
-          )}
         </aside>
 
         <main className={`main-content ${isSidebarOpen ? 'sidebar-open' : 'sidebar-closed'}`}>
@@ -217,6 +281,18 @@ const DashboardAdmin: React.FC = () => {
           {renderContent()}
         </main>
       </div>
+
+      {showLogoutModal && (
+        <div className="myModal-overlay" onClick={() => setShowLogoutModal(false)}>
+          <div className="myModal-box" onClick={(e) => e.stopPropagation()}>
+            <h3 className="myModal-title">Are you sure you want to logout?</h3>
+            <div className="myModal-actions">
+              <button type='button' className="myModal-btn myModal-btn-confirm" onClick={handleLogout}>Logout</button>
+              <button type='button' className="myModal-btn myModal-btn-cancel" onClick={() => setShowLogoutModal(false)}>Cancel</button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 };
