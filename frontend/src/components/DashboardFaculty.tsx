@@ -303,18 +303,6 @@ const DashboardFaculty = () => {
                 </li>
               </ul>
             </nav>
-
-            {showLogoutModal && (
-              <div className="myModal-overlay">
-                <div className="myModal-box">
-                  <h3 className="myModal-title">Are you sure you want to logout?</h3>
-                  <div className="myModal-actions">
-                    <button type='button' onClick={handleLogoutConfirm} className="myModal-btn myModal-btn-confirm">Logout</button>
-                    <button type='button' onClick={() => setShowLogoutModal(false)} className="myModal-btn myModal-btn-cancel">Cancel</button>
-                  </div>
-                </div>
-              </div>
-            )}
           </aside>
         )}
 
@@ -373,6 +361,18 @@ const DashboardFaculty = () => {
           {activeMenu === 'Room-Management' && <RoomManagement user={user} />}
         </main>
       </div>
+
+      {showLogoutModal && (
+        <div className="myModal-overlay" onClick={() => setShowLogoutModal(false)}>
+          <div className="myModal-box" onClick={(e) => e.stopPropagation()}>
+            <h3 className="myModal-title">Are you sure you want to logout?</h3>
+            <div className="myModal-actions">
+              <button type='button' onClick={handleLogoutConfirm} className="myModal-btn myModal-btn-confirm">Logout</button>
+              <button type='button' onClick={() => setShowLogoutModal(false)} className="myModal-btn myModal-btn-cancel">Cancel</button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 };
