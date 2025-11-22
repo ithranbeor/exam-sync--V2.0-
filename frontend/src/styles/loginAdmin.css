@@ -1,234 +1,524 @@
+/* Color Variables based on the image's gradient and elements */
+:root {
+  --color-dark-blue: #0d1b3f;
+  --color-vibrant-blue: #1c4b8b;
+  --color-bright-yellow: #f8c000;
+  --color-soft-yellow: #fdd835;
+  --color-white: #ffffff;
+  --color-error: #ff5252;
+}
+
 body {
   margin: 0;
-  font-family: Arial, sans-serif;
-  display: flex;
-  justify-content: center;
-  align-items: center;
-  min-height: 100vh;
-  width: 100vw;
-  overflow: hidden;
-  background-color: #f0f2f5;
+  font-family: sans-serif; /* Use a common font */
 }
 
-.main-container {
+.login-container {
   display: flex;
-  width: 100vw;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
   height: 100vh;
-  box-shadow: none;
-  border-radius: 0;
-  overflow: hidden;
-  background-color: #fff;
-}
-
-.left-panel {
-  flex: 7;
-  background-size: cover;
-  background-repeat: no-repeat; 
-  display: flex;
-  justify-content: center;
-  align-items: center;
+  width: 100vw;
   position: relative;
   overflow: hidden;
+  color: var(--color-white);
 }
 
-.right-panel {
-  flex: 3;
-  padding: 40px 60px;
+/* Background Gradient (Mimicking the image) */
+.background-gradient {
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  background: linear-gradient(
+    135deg,
+    var(--color-vibrant-blue) 0%,
+    var(--color-dark-blue) 40%,
+    var(--color-bright-yellow) 100%
+  );
+  z-index: 0;
+}
+
+/* Greeting Text Position (Top-left) */
+.greeting-text {
+  position: absolute;
+  top: 30px;
+  left: 30px;
+  font-size: 24px;
+  font-weight: 500;
+  z-index: 10;
+}
+
+/* Logo Section (Top) */
+.logo-section {
+  position: absolute;
+  top: 3%;
+  left: 50%;
+  transform: translateX(-50%);
   display: flex;
   flex-direction: column;
-  justify-content: center;
   align-items: center;
-  color: #333;
+  z-index: 1;
+}
+
+.e-graphic-logo {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+}
+
+.examsync-logo {
+  width: 400px; /* Even larger logo for desktop */
+  height: 400px;
+  filter: drop-shadow(0 0 5px rgba(245, 238, 238, 0.5));
+  position: relative;
+}
+
+.logo-text {
+  font-size: 16px;
+  font-weight: 500;
+  color: var(--color-bright-yellow);
+  margin-top: 5px;
+}
+
+/* Login Form Card (Center) */
+.login-form-card {
+  position: absolute;
+  top: 65%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  width: 90%;
+  max-width: 350px;
+  padding: 40px 30px 60px;
+  background: rgba(255, 255, 255, 0); /* Invisible background */
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  border-radius: 10px;
+  z-index: 10;
+}
+
+.login-form-card h2 {
+  font-size: 24px;
+  margin-bottom: 20px;
+  font-weight: 400;
+  color: var(--color-white);
   text-align: center;
-  gap: 30px;
 }
 
-.header-section {
-  display: flex;
-  flex-direction: column;
-  justify-content: center;
+/* Input Fields (Styled to look like the image's inputs) */
+.input-field {
+  position: relative;
   width: 100%;
-  align-items: center;
-  gap: 10px;
-}
-
-.greeting p {
-  margin: 0;
-  font-size: 1.8rem;
-  color: #092C4C;
-  font-weight: bold;
-}
-
-.greeting .good-morning {
-  font-size: 1.8rem;
-  font-weight: bold;
-  color: #ffa000;
-}
-
-.logo img {
-  height: 120px;
-}
-
-.login-section {
-  width: 100%;
-  max-width: 360px;
-  margin: 0 auto;
-}
-
-.login-section h2 {
-  font-size: 1.5rem;
-  color: #092C4C;
   margin-bottom: 25px;
-  text-align: center; 
-  font-weight: normal;
-  font-weight: bold;
 }
 
-.faculty-text {
-  color: #ffa000;
-  font-weight: bold;
-}
-
-.login-form {
-  display: flex;
-  flex-direction: column;
-  gap: 15px;
+.input-field input {
   width: 100%;
-}
-
-.input-group {
-  display: flex;
-  flex-direction: column;
-  align-items: flex-start;
-}
-
-.input-group label {
-  font-size: 0.9rem;
-  color: #092C4C;
-  margin-bottom: 5px;
-  font-weight: bold;
-}
-
-.login-input {
-  padding: 10px 15px;
-  border: 1px solid #ddd;
-  border-radius: 5px;
-  font-size: 1rem;
-  width: calc(100% - 3px);
-  box-sizing: border-box;
-  color: #092C4C;
-  background-color: #ffffff;
-}
-
-.login-input::placeholder {
-  color: #6d829c;
-  font-size: 0.65rem;
-  letter-spacing: 0.5px;
-  text-align: center;
-}
-
-.remember-me-container {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  margin-top: 10px;
-  font-size: 0.9rem;
-  color: #092C4C;
-}
-
-.remember-me-container input[type="checkbox"] {
-  accent-color: #092C4C;
-}
-
-.login-button {
-  width: 100%;
-  padding: 10px 15px;
-  min-height: 40px;
-  background-color: #ffa000;
-  color: white;
+  padding: 15px 15px;
+  background: rgba(250, 250, 250, 0.2); /* Semi-transparent background */
   border: none;
-  border-radius: 8px;
-  cursor: pointer;
-  font-size: 1rem;
-  font-weight: bold;
-  margin-top: 10px;
-  transition: background-color 0.3s ease, transform 0.1s ease;
-}
-
-.login-button:hover {
-  background-color: #ffb733;
-}
-
-.login-button:active {
-  transform: scale(0.98);
-}
-.admin-login-link {
-  width: 100%;
-  text-align: center;
-  margin-top: 10px;
-  padding: 0;
-  background-color: transparent;
-  border: none;
-}
-.admin-login-link 
-button {
-    border: 1px solid transparent;
-    padding: 0.6em 1.2em;
-    font-size: 1em;
-    font-weight: 500;
-    font-family: inherit;
-    background-color: #ffa000;
-    cursor: pointer;
-    transition: border-color 0.25s;
-    border-top-left-radius: 15px;
-    border-bottom-right-radius: 15px;
-}
-
-.admin-login-link a {
-  color: white;
-  text-decoration: none;
-  font-size: 1.0rem;
-  font-weight: bold;
-  transition: color 0.3s ease;
-  display: inline-block;
-  width: 100%;
-  text-align: center;
+  border-radius: 10px;
+  color: var(--color-white);
+  font-size: 16px;
+  outline: none;
   box-sizing: border-box;
-}
-.password-wrapper {
-  position: relative;
-  width: 100%;
+  transition: all 0.3s ease;
+  height: 40px;
 }
 
-.password-wrapper input {
-  width: 100%;
-  padding-right: 4px;
+.input-field input::placeholder {
+  color: rgba(255, 255, 255, 0.7);
+}
+
+.input-field label {
+  position: absolute;
+  top: 10px;
+  left: 15px;
+  color: rgba(255, 255, 255, 0.7);
+  font-size: 16px;
+  pointer-events: none;
+  transition: all 0.3s ease;
+  transform-origin: left top;
+}
+
+.input-field input:focus,
+.input-field input:not(:placeholder-shown) {
+  background: rgba(255, 255, 255, 0.1);
+}
+
+.input-field input:focus ~ label,
+.input-field input:not(:placeholder-shown) ~ label {
+  transform: translateY(-25px) scale(0.7);
+  color: var(--color-soft-yellow);
+}
+
+/* Password Field Specifics */
+.password-field input {
+  padding-right: 50px; /* Space for the eye icon */
 }
 
 .toggle-password {
   position: absolute;
-  right: 10px;
-  top: 60%;
+  top: 50%;
+  right: 15px;
   transform: translateY(-50%);
   cursor: pointer;
-  color: #092C4C;
-  font-size: 1.1rem;
+  color: rgba(255, 255, 255, 0.7);
+  z-index: 1;
 }
 
-.form-error-row {
-  width: 100%;
+.form-actions {
+    width: 100%;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 20px;
+}
+
+/* Modern Remember Me Checkbox */
+.modern-checkbox-container {
+  display: block;
+  position: relative;
+  padding-left: 25px;
+  margin-right: 15px;
+  cursor: pointer;
+  font-size: 14px;
+  color: rgba(255, 255, 255, 0.8);
+  -webkit-user-select: none;
+  -moz-user-select: none;
+  -ms-user-select: none;
+  user-select: none;
+}
+
+.modern-checkbox-container input {
+  position: absolute;
+  opacity: 0;
+  cursor: pointer;
+  height: 0;
+  width: 0;
+}
+
+.checkmark {
+  position: absolute;
+  top: 0;
+  left: 0;
+  height: 18px;
+  width: 18px;
+  background-color: rgba(255, 255, 255, 0.3);
+  border-radius: 4px;
+}
+
+.modern-checkbox-container:hover input ~ .checkmark {
+  background-color: rgba(255, 255, 255, 0.5);
+}
+
+.modern-checkbox-container input:checked ~ .checkmark {
+  background-color: var(--color-soft-yellow);
+}
+
+.checkmark:after {
+  content: "";
+  position: absolute;
+  display: none;
+}
+
+.modern-checkbox-container input:checked ~ .checkmark:after {
+  display: block;
+}
+
+.modern-checkbox-container .checkmark:after {
+  left: 6px;
+  top: 3px;
+  width: 3px;
+  height: 8px;
+  border: solid white;
+  border-width: 0 2px 2px 0;
+  -webkit-transform: rotate(45deg);
+  -ms-transform: rotate(45deg);
+  transform: rotate(45deg);
+}
+
+/* Login Submit Button (Circular and prominent) */
+.submit-button {
+  width: 50px;
+  height: 50px;
+  border-radius: 50%;
+  background-color: transparent;
+  color: white;
+  border: none;
+  cursor: pointer;
   display: flex;
-  justify-content: flex-end;
-  min-height: 18px;
+  align-items: center;
+  justify-content: center;
+  font-size: 50px;
+  transition: background-color 0.3s ease, transform 0.1s ease;
+  box-shadow: 0 4px 10px rgba(0, 0, 0, 0.3);
+  position: relative;
+  margin-top: 10px;
 }
 
-.form-error-row .error-text {
-  color: #d93025;
-  font-size: 0.85rem;
-  margin: 4px 0 0;
-  text-align: right;
+.submit-button:hover {
+  background-color: var(--color-soft-yellow);
 }
 
-.error-text.hidden {
-  visibility: hidden;
+.submit-button:active {
+  transform: scale(0.95);
+}
+
+.submit-button:disabled {
+  background-color: rgba(248, 192, 0, 0.5);
+  cursor: not-allowed;
+}
+
+/* Error Text */
+.error-text {
+  color: var(--color-error);
+  font-size: 14px;
+  margin-top: 5px;
+  text-align: left;
+  flex-grow: 1;
+}
+
+/* Admin/Settings Toggle Button (Bottom-right) */
+.admin-toggle-button {
+  position: absolute;
+  bottom: 20px;
+  right: 20px;
+  width: 50px;
+  height: 50px;
+  border-radius: 50%;
+  background-color: rgba(255, 255, 255, 0.15); /* Slightly visible */
+  color: var(--color-white);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  transition: background-color 0.3s ease;
+  z-index: 10;
+}
+
+.admin-toggle-button:hover {
+  background-color: rgba(255, 255, 255, 0.3);
+}
+
+/* Loading Spinner */
+@keyframes spin {
+  0% { transform: rotate(0deg); }
+  100% { transform: rotate(360deg); }
+}
+
+.spinner {
+  border: 4px solid rgba(0, 0, 0, 0.1);
+  border-top: 4px solid var(--color-dark-blue);
+  border-radius: 50%;
+  width: 20px;
+  height: 20px;
+  animation: spin 1s linear infinite;
+}
+
+/* === MOBILE RESPONSIVENESS (Small phones) === */
+@media (max-width: 480px) {
+  .greeting-text {
+    font-size: 18px;
+    top: 20px;
+    left: 20px;
+  }
+
+  .logo-section {
+    top: 5%;
+  }
+
+  .examsync-logo {
+    width: 150px;
+    height: 150px;
+  }
+
+  .logo-text {
+    font-size: 12px;
+  }
+
+  .login-form-card {
+    top: 50%;
+    transform: translate(-50%, -50%);
+    width: 95%;
+    max-width: 280px;
+    padding: 30px 20px 50px;
+  }
+
+  .login-form-card h2 {
+    font-size: 18px;
+    margin-bottom: 15px;
+  }
+
+  .input-field {
+    margin-bottom: 20px;
+  }
+
+  .input-field input {
+    font-size: 14px;
+    padding: 12px 12px;
+    height: 36px;
+  }
+
+  .input-field label {
+    font-size: 14px;
+    top: 8px;
+    left: 12px;
+  }
+
+  .input-field input:focus ~ label,
+  .input-field input:not(:placeholder-shown) ~ label {
+    transform: translateY(-22px) scale(0.65);
+  }
+
+  .form-actions {
+    margin-bottom: 15px;
+  }
+
+  .modern-checkbox-container {
+    font-size: 12px;
+    padding-left: 20px;
+  }
+
+  .checkmark {
+    height: 16px;
+    width: 16px;
+  }
+
+  .submit-button {
+    width: 45px;
+    height: 45px;
+    font-size: 40px;
+  }
+
+  .admin-toggle-button {
+    width: 45px;
+    height: 45px;
+    bottom: 15px;
+    right: 15px;
+  }
+
+  .error-text {
+    font-size: 12px;
+  }
+}
+
+/* === TABLET RESPONSIVENESS (768px and up) === */
+@media (min-width: 481px) and (max-width: 1024px) {
+  .greeting-text {
+    font-size: 22px;
+    top: 25px;
+    left: 25px;
+  }
+
+  .logo-section {
+    top: 8%;
+  }
+
+  .examsync-logo {
+    width: 280px;
+    height: 280px;
+  }
+
+  .login-form-card {
+    top: 65%;
+    transform: translate(-50%, -50%);
+    width: 90%;
+    max-width: 380px;
+    padding: 40px 30px 60px;
+  }
+
+  .login-form-card h2 {
+    font-size: 22px;
+    margin-bottom: 18px;
+  }
+
+  .input-field input {
+    font-size: 15px;
+    padding: 13px 13px;
+  }
+
+  .submit-button {
+    width: 50px;
+    height: 50px;
+  }
+}
+
+/* === DESKTOP RESPONSIVENESS (1025px and up) === */
+@media (min-width: 1025px) {
+  .greeting-text {
+    font-size: 26px;
+    top: 35px;
+    left: 35px;
+  }
+
+  .logo-section {
+    top: 5%;
+    margin-bottom: 20px;
+    z-index: 1;
+  }
+
+  .examsync-logo {
+    width: 280px;
+    height: 280px;
+  }
+
+  .logo-text {
+    font-size: 20px;
+    margin-top: 10px;
+  }
+
+  .login-form-card {
+    top: 70%;
+    transform: translate(-50%, -50%);
+    width: 90%;
+    max-width: 400px;
+    padding: 45px 35px 70px;
+    z-index: 15;
+  }
+
+  .login-form-card h2 {
+    font-size: 26px;
+    margin-bottom: 22px;
+  }
+
+  .input-field {
+    margin-bottom: 28px;
+  }
+
+  .input-field input {
+    font-size: 16px;
+    padding: 15px 15px;
+    height: 42px;
+  }
+
+  .form-actions {
+    margin-bottom: 22px;
+  }
+
+  .modern-checkbox-container {
+    font-size: 15px;
+  }
+
+  .submit-button {
+    width: 55px;
+    height: 55px;
+    font-size: 55px;
+  }
+
+  .submit-button:hover {
+    background-color: var(--color-soft-yellow);
+  }
+
+  .admin-toggle-button {
+    width: 55px;
+    height: 55px;
+  }
+
+  .error-text {
+    font-size: 15px;
+  }
 }

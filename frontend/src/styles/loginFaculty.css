@@ -51,16 +51,16 @@ body {
   z-index: 10;
 }
 
-/* Logo Section (Center) */
+/* Logo Section (Top) */
 .logo-section {
   position: absolute;
-  top: 60%;
+  top: 3%;
   left: 50%;
-  transform: translate(-50%, -50%);
+  transform: translateX(-50%);
   display: flex;
   flex-direction: column;
   align-items: center;
-  z-index: 2; /* Logo slightly above the form */
+  z-index: 1;
 }
 
 .e-graphic-logo {
@@ -70,11 +70,10 @@ body {
 }
 
 .examsync-logo {
-  width: 300px; /* Adjust size as needed */
-  height: 300px;
+  width: 400px; /* Even larger logo for desktop */
+  height: 400px;
   filter: drop-shadow(0 0 5px rgba(245, 238, 238, 0.5));
-  position: absolute;
-  bottom: 100%;
+  position: relative;
 }
 
 .logo-text {
@@ -84,13 +83,15 @@ body {
   margin-top: 5px;
 }
 
-/* Login Form Card (Overlapping the bottom of the logo) */
+/* Login Form Card (Center) */
 .login-form-card {
   position: absolute;
-  top: 50%; /* Adjust as needed */
+  top: 65%;
+  left: 50%;
+  transform: translate(-50%, -50%);
   width: 90%;
   max-width: 350px;
-  padding: 40px 30px 0px;
+  padding: 40px 30px 60px;
   background: rgba(255, 255, 255, 0); /* Invisible background */
   display: flex;
   flex-direction: column;
@@ -240,10 +241,9 @@ body {
   transform: rotate(45deg);
 }
 
-
 /* Login Submit Button (Circular and prominent) */
 .submit-button {
-  width: 30px;
+  width: 50px;
   height: 50px;
   border-radius: 50%;
   background-color: transparent;
@@ -256,17 +256,8 @@ body {
   font-size: 50px;
   transition: background-color 0.3s ease, transform 0.1s ease;
   box-shadow: 0 4px 10px rgba(0, 0, 0, 0.3);
-  position: absolute;
-  top: 100%;
-}
-
-.submit-buttons {
-  color: rgba(248, 192, 0, 0.5);
-  background-color: transparent;
-  font-size: 50px;
-  position: absolute;
-  top: 90%;
-  border-radius: 100%;
+  position: relative;
+  margin-top: 10px;
 }
 
 .submit-button:hover {
@@ -328,9 +319,206 @@ body {
   animation: spin 1s linear infinite;
 }
 
-/* === Responsiveness / Larger Screens === */
-@media (min-width: 600px) {
-    .login-form-card {
-        bottom: 15%; /* Lift the form slightly for desktop view */
-    }
+/* === MOBILE RESPONSIVENESS (Small phones) === */
+@media (max-width: 480px) {
+  .greeting-text {
+    font-size: 18px;
+    top: 20px;
+    left: 20px;
+  }
+
+  .logo-section {
+    top: 5%;
+  }
+
+  .examsync-logo {
+    width: 150px;
+    height: 150px;
+  }
+
+  .logo-text {
+    font-size: 12px;
+  }
+
+  .login-form-card {
+    top: 50%;
+    transform: translate(-50%, -50%);
+    width: 95%;
+    max-width: 280px;
+    padding: 30px 20px 50px;
+  }
+
+  .login-form-card h2 {
+    font-size: 18px;
+    margin-bottom: 15px;
+  }
+
+  .input-field {
+    margin-bottom: 20px;
+  }
+
+  .input-field input {
+    font-size: 14px;
+    padding: 12px 12px;
+    height: 36px;
+  }
+
+  .input-field label {
+    font-size: 14px;
+    top: 8px;
+    left: 12px;
+  }
+
+  .input-field input:focus ~ label,
+  .input-field input:not(:placeholder-shown) ~ label {
+    transform: translateY(-22px) scale(0.65);
+  }
+
+  .form-actions {
+    margin-bottom: 15px;
+  }
+
+  .modern-checkbox-container {
+    font-size: 12px;
+    padding-left: 20px;
+  }
+
+  .checkmark {
+    height: 16px;
+    width: 16px;
+  }
+
+  .submit-button {
+    width: 45px;
+    height: 45px;
+    font-size: 40px;
+  }
+
+  .admin-toggle-button {
+    width: 45px;
+    height: 45px;
+    bottom: 15px;
+    right: 15px;
+  }
+
+  .error-text {
+    font-size: 12px;
+  }
+}
+
+/* === TABLET RESPONSIVENESS (768px and up) === */
+@media (min-width: 481px) and (max-width: 1024px) {
+  .greeting-text {
+    font-size: 22px;
+    top: 25px;
+    left: 25px;
+  }
+
+  .logo-section {
+    top: 8%;
+  }
+
+  .examsync-logo {
+    width: 280px;
+    height: 280px;
+  }
+
+  .login-form-card {
+    top: 65%;
+    transform: translate(-50%, -50%);
+    width: 90%;
+    max-width: 380px;
+    padding: 40px 30px 60px;
+  }
+
+  .login-form-card h2 {
+    font-size: 22px;
+    margin-bottom: 18px;
+  }
+
+  .input-field input {
+    font-size: 15px;
+    padding: 13px 13px;
+  }
+
+  .submit-button {
+    width: 50px;
+    height: 50px;
+  }
+}
+
+/* === DESKTOP RESPONSIVENESS (1025px and up) === */
+@media (min-width: 1025px) {
+  .greeting-text {
+    font-size: 26px;
+    top: 35px;
+    left: 35px;
+  }
+
+  .logo-section {
+    top: 5%;
+    margin-bottom: 20px;
+    z-index: 1;
+  }
+
+  .examsync-logo {
+    width: 280px;
+    height: 280px;
+  }
+
+  .logo-text {
+    font-size: 20px;
+    margin-top: 10px;
+  }
+
+  .login-form-card {
+    top: 70%;
+    transform: translate(-50%, -50%);
+    width: 90%;
+    max-width: 400px;
+    padding: 45px 35px 70px;
+    z-index: 15;
+  }
+
+  .login-form-card h2 {
+    font-size: 26px;
+    margin-bottom: 22px;
+  }
+
+  .input-field {
+    margin-bottom: 28px;
+  }
+
+  .input-field input {
+    font-size: 16px;
+    padding: 15px 15px;
+    height: 42px;
+  }
+
+  .form-actions {
+    margin-bottom: 22px;
+  }
+
+  .modern-checkbox-container {
+    font-size: 15px;
+  }
+
+  .submit-button {
+    width: 55px;
+    height: 55px;
+    font-size: 55px;
+  }
+
+  .submit-button:hover {
+    background-color: var(--color-soft-yellow);
+  }
+
+  .admin-toggle-button {
+    width: 55px;
+    height: 55px;
+  }
+
+  .error-text {
+    font-size: 15px;
+  }
 }
