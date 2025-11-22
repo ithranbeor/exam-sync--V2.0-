@@ -161,8 +161,24 @@ const DashboardAdmin: React.FC = () => {
           onMouseLeave={() => setIsSidebarOpen(false)}
         >
           <div className="sidebar-header">
-            <img src="/logo/Exam.png" alt="Logo" className="logo-img" />
-            {isSidebarOpen && <span className="logo-text">ExamSync</span>}
+            <button 
+              type="button" 
+              className="sidebar-logo-button"
+              onClick={() => setActiveMenu('dashboard')}
+              style={{ 
+                background: 'none', 
+                border: 'none', 
+                cursor: 'pointer', 
+                display: 'flex', 
+                alignItems: 'center', 
+                gap: '10px',
+                padding: 0,
+                width: '100%'
+              }}
+            >
+              <img src="/logo/Exam.png" alt="Logo" className="logo-img" />
+              {isSidebarOpen && <span className="logo-text">ExamSync</span>}
+            </button>
           </div>
           <nav className="sidebar-nav">
             <ul>

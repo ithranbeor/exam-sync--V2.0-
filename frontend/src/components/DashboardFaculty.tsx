@@ -4,7 +4,8 @@ import { useNavigate } from 'react-router-dom';
 import { api } from '../lib/apiClient.ts';
 import {
   FaHome, FaCalendar, FaClock, FaClipboardList, FaBell, FaUser,
-  FaSignOutAlt, FaBuilding, FaPenAlt, FaCalendarPlus, FaUsers, FaUserShield
+  FaSignOutAlt, FaBuilding, FaPenAlt, FaCalendarPlus, FaUsers, FaUserShield,
+  FaBars, FaTimes
 } from 'react-icons/fa';
 import { BsFillSendPlusFill } from "react-icons/bs";
 import '../styles/dashboardFaculty.css';
@@ -68,6 +69,7 @@ const DashboardFaculty = () => {
   const [user, setUser] = useState<any>(null);
   const [roles, setRoles] = useState<string[]>([]);
   const [showLogoutModal, setShowLogoutModal] = useState(false);
+  const [isMobile, setIsMobile] = useState(window.innerWidth <= 1024);
   const navigate = useNavigate();
 
   /** 🧩 Load user info from API */
@@ -128,6 +130,38 @@ const DashboardFaculty = () => {
     fetchUserRoles();
   }, [user]);
 
+  /** 📱 Handle window resize for responsive behavior */
+  useEffect(() => {
+    let resizeTimer: NodeJS.Timeout;
+    
+    const handleResize = () => {
+      // Debounce resize events for better performance
+      clearTimeout(resizeTimer);
+      resizeTimer = setTimeout(() => {
+        const nowMobile = window.innerWidth <= 1024;
+        const wasMobile = isMobile;
+        
+        // Update mobile state
+        setIsMobile(nowMobile);
+        
+        // When switching between mobile and desktop: reset sidebar state
+        if (wasMobile !== nowMobile) {
+          setIsSidebarOpen(false);
+        }
+      }, 150); // 150ms debounce
+    };
+
+    // Initial check
+    const initialMobile = window.innerWidth <= 1024;
+    setIsMobile(initialMobile);
+    
+    window.addEventListener('resize', handleResize);
+    return () => {
+      clearTimeout(resizeTimer);
+      window.removeEventListener('resize', handleResize);
+    };
+  }, [isMobile]);
+
 
 
   /** 🧭 Merge sidebar items - Admin gets all features */
@@ -138,6 +172,26 @@ const DashboardFaculty = () => {
         .map(item => [item.key, item])
     ).values()
   );
+
+  /** 🍔 Toggle sidebar (for mobile/tablet) */
+  const toggleSidebar = () => {
+    setIsSidebarOpen(!isSidebarOpen);
+  };
+
+  /** 📱 Handle menu item click - close sidebar on mobile/tablet */
+  const handleMenuClick = (menuKey: string) => {
+    setActiveMenu(menuKey);
+    if (isMobile) {
+      setIsSidebarOpen(false);
+    }
+  };
+
+  /** 🖱️ Handle sidebar hover (desktop only) */
+  const handleSidebarHover = (isEntering: boolean) => {
+    if (!isMobile) {
+      setIsSidebarOpen(isEntering);
+    }
+  };
 
   const handleLogoutConfirm = () => {
     localStorage.removeItem('user');
@@ -158,23 +212,59 @@ const DashboardFaculty = () => {
   return (
     <div className="app-container">
       <div className="main-content-wrapper">
+        {/* Hamburger Menu Button (Mobile/Tablet) */}
+        {roles.length > 0 && isMobile && (
+          <button
+            type="button"
+            className="menu-toggle-btn"
+            onClick={toggleSidebar}
+            aria-label="Toggle menu"
+          >
+            {isSidebarOpen ? <FaTimes /> : <FaBars />}
+          </button>
+        )}
+
+        {/* Sidebar Backdrop (Mobile/Tablet) */}
+        {roles.length > 0 && isMobile && (
+          <div
+            className={`sidebar-backdrop ${isSidebarOpen ? 'active' : ''}`}
+            onClick={() => setIsSidebarOpen(false)}
+          />
+        )}
+
         {roles.length > 0 && (
           <aside
             className={`sidebar ${isSidebarOpen ? 'open' : 'closed'}`}
-            onMouseEnter={() => setIsSidebarOpen(true)}
-            onMouseLeave={() => setIsSidebarOpen(false)}
+            onMouseEnter={() => handleSidebarHover(true)}
+            onMouseLeave={() => handleSidebarHover(false)}
           >
             <div className="sidebar-header">
-              <div className="sidebar-logo">
-                <img src="/logo/Exam.png" alt="Logo" className="logo-img" />
-                {isSidebarOpen && <span className="logo-text">ExamSync</span>}
-              </div>
+              <button 
+                type="button" 
+                className="sidebar-logo-button"
+                onClick={() => setActiveMenu('dashboard')}
+                style={{ 
+                  background: 'none', 
+                  border: 'none', 
+                  cursor: 'pointer', 
+                  display: 'flex', 
+                  alignItems: 'center', 
+                  gap: '10px',
+                  padding: 0,
+                  width: '100%'
+                }}
+              >
+                <div className="sidebar-logo">
+                  <img src="/logo/Exam.png" alt="Logo" className="logo-img" />
+                  {isSidebarOpen && <span className="logo-text">ExamSync</span>}
+                </div>
+              </button>
             </div>
 
             <nav className="sidebar-nav">
               <ul>
                 <li className={activeMenu === 'dashboard' ? 'active' : ''}>
-                  <button type="button" onClick={() => setActiveMenu('dashboard')}>
+                  <button type="button" onClick={() => handleMenuClick('dashboard')}>
                     <FaHome {...iconStyle} />
                     {isSidebarOpen && <span>Dashboard</span>}
                   </button>
@@ -182,7 +272,7 @@ const DashboardFaculty = () => {
 
                 {mergedSidebarItems.map(({ key, label, icon }) => (
                   <li key={key} className={activeMenu === key ? 'active' : ''}>
-                    <button type="button" onClick={() => setActiveMenu(key)}>
+                    <button type="button" onClick={() => handleMenuClick(key)}>
                       {icon}
                       {isSidebarOpen && <span>{label}</span>}
                     </button>
@@ -192,14 +282,17 @@ const DashboardFaculty = () => {
                 <div className="sidebar-divider"></div>
 
                 <li className={activeMenu === 'profile' ? 'active' : ''}>
-                  <button type='button' onClick={() => setActiveMenu('profile')}>
+                  <button type='button' onClick={() => handleMenuClick('profile')}>
                     <FaUser {...iconStyle} />
                     {isSidebarOpen && <span>Profile</span>}
                   </button>
                 </li>
 
                 <li>
-                  <button type='button' onClick={() => setShowLogoutModal(true)}>
+                  <button type='button' onClick={() => {
+                    setShowLogoutModal(true);
+                    if (isMobile) setIsSidebarOpen(false);
+                  }}>
                     <FaSignOutAlt />
                     {isSidebarOpen && <span>Logout</span>}
                   </button>

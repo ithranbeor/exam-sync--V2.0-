@@ -48,6 +48,7 @@ button.set-button {
 button.view-button {
     background-color: #F2994A;
 }
+
 .top-bar h2 {
   margin: 0;
   color: var(--text-color); 
@@ -66,18 +67,20 @@ button.view-button {
   color: white;
   width: var(--sidebar-closed-width);
   min-width: var(--sidebar-closed-width);
-  transition: width var(--transition-speed) var(--transition-timing-function);
+  transition: width var(--transition-speed) var(--transition-timing-function),
+              transform var(--transition-speed) var(--transition-timing-function);
   display: flex;
   flex-direction: column;
   position: fixed;
   height: 100vh;
   top: 0;
   left: 0;
-  z-index: 100;
+  z-index: 1000;
   overflow-y: auto;
   scrollbar-width: none; 
   -ms-overflow-style: none;
 }
+
 .sidebar::-webkit-scrollbar {
   display: none; 
 }
@@ -120,7 +123,8 @@ button.view-button {
     max-width var(--transition-speed) var(--transition-timing-function);
 }
 
-.sidebar.open .logo-text {
+.sidebar.open .logo-text,
+.sidebar:hover .logo-text {
   opacity: 1;
   max-width: 150px;
 }
@@ -172,7 +176,6 @@ button.view-button {
     background-color: color-mix(in srgb, var(--active-menu-bg) 80%, black);
 }
 
-
 .sidebar-nav button span,
 .sidebar-footer a span {
   max-width: 0;
@@ -186,7 +189,9 @@ button.view-button {
 }
 
 .sidebar.open .sidebar-nav button span,
-.sidebar.open .sidebar-footer a span {
+.sidebar.open .sidebar-footer a span,
+.sidebar:hover .sidebar-nav button span,
+.sidebar:hover .sidebar-footer a span {
   max-width: 150px;
   opacity: 1;
   margin-left: 10px;
@@ -251,10 +256,54 @@ button.view-button {
     padding-left: 5px;
 }
 
-
 .sidebar.open .sidebar-footer button { 
   justify-content: flex-start;
   padding-left: 15px;
+}
+
+/* Hamburger menu button */
+.menu-toggle-btn {
+  display: none;
+  position: fixed;
+  top: 15px;
+  left: 15px;
+  z-index: 1001;
+  background-color: var(--dark-blue-bg);
+  color: white;
+  border: none;
+  border-radius: 8px;
+  padding: 10px 12px;
+  cursor: pointer;
+  font-size: 1.2rem;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.2);
+  transition: background-color 0.2s ease;
+}
+
+.menu-toggle-btn:hover {
+  background-color: var(--menu-hover-bg);
+}
+
+.menu-toggle-btn:active {
+  transform: scale(0.95);
+}
+
+/* Sidebar backdrop overlay for mobile */
+.sidebar-backdrop {
+  display: none;
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background-color: rgba(0, 0, 0, 0.5);
+  z-index: 999;
+  opacity: 0;
+  transition: opacity var(--transition-speed) var(--transition-timing-function);
+}
+
+.sidebar-backdrop.active {
+  display: block;
+  opacity: 1;
 }
 
 .main-content {
@@ -405,16 +454,15 @@ button.view-button {
 .try-thing-card {
   display: flex;
   flex-direction: column;
-  justify-content: flex-start; /* let content stack naturally */
+  justify-content: flex-start;
   align-items: stretch;
   text-align: center;
   padding: 15px;
   background-color: transparent; 
   border-radius: 15px;
   height: 100%;
-  overflow: hidden; /* make sure inner content doesn’t overflow */
+  overflow: hidden;
 }
-
 
 .try-thing-footer {
   margin-top: auto;
@@ -470,10 +518,12 @@ button.view-button {
     transition: background-color 0.3s ease;
     border-radius: 5px; 
 }
+
 .sidebar-footer button:hover {
     background-color: var(--menu-hover-bg); 
     padding-left: 5px;
 }
+
 /* Backdrop */
 .myModal-overlay {
   position: fixed;
@@ -527,20 +577,22 @@ button.view-button {
 
 /* Confirm button — e.g. Logout */
 .myModal-btn-confirm {
-  background-color: #F2994A; /* green */
+  background-color: #F2994A;
   color: #fff;
 }
+
 .myModal-btn-confirm:hover {
-  background-color: #e47514; /* darker green on hover */
+  background-color: #e47514;
 }
 
 /* Cancel button */
 .myModal-btn-cancel {
-  background-color: #f0f0f0; /* light grey */
+  background-color: #f0f0f0;
   color: #333;
 }
+
 .myModal-btn-cancel:hover {
-  background-color: #e0e0e0; /* darker grey on hover */
+  background-color: #e0e0e0;
 }
 
 /* Animation */
@@ -552,5 +604,375 @@ button.view-button {
   to {
     opacity: 1;
     transform: translateY(0);
+  }
+}
+
+/* ======================= MOBILE RESPONSIVENESS (max-width: 768px) ======================= */
+@media (max-width: 768px) {
+  :root {
+    --sidebar-width: 250px;
+    --sidebar-closed-width: 0px;
+  }
+
+  /* Show hamburger menu button on mobile */
+  .menu-toggle-btn {
+    display: block;
+  }
+
+  /* Sidebar starts off-screen on mobile */
+  .sidebar {
+    width: var(--sidebar-width);
+    transform: translateX(-100%);
+    z-index: 1000;
+  }
+
+  /* Sidebar slides in when open on mobile */
+  .sidebar.open {
+    transform: translateX(0);
+  }
+
+  /* Show backdrop when sidebar is open on mobile */
+  .sidebar-backdrop.active {
+    display: block;
+  }
+
+  /* Disable hover effects on mobile */
+  .sidebar:hover {
+    transform: translateX(-100%);
+  }
+
+  .sidebar.open:hover {
+    transform: translateX(0);
+  }
+
+  /* Main content takes full width on mobile */
+  .main-content {
+    margin-left: 0;
+    padding: 15px;
+    padding-top: 60px; /* Space for hamburger button */
+    height: auto;
+    overflow-y: auto;
+  }
+
+  .main-content.sidebar-open {
+    margin-left: 0;
+  }
+
+  .logo-img {
+    width: 35px;
+    height: 35px;
+  }
+
+  .sidebar-nav {
+    padding-top: 15px;
+  }
+
+  .sidebar-nav li {
+    margin-bottom: 3px;
+  }
+
+  .sidebar-nav button {
+    padding: 8px 12px;
+    font-size: 0.9rem;
+  }
+
+  .content-header h1 {
+    font-size: 1.4rem;
+    margin-bottom: 15px;
+  }
+
+  .dashboard-grid {
+    grid-template-columns: 1fr;
+    gap: 15px;
+  }
+
+  .welcome-card {
+    grid-column: span 1;
+  }
+
+  .welcome-card h3 {
+    font-size: 1.3rem;
+  }
+
+  .welcome-card p {
+    font-size: 1.1rem;
+  }
+
+  .datetime-card {
+    padding: 12px;
+  }
+
+  .date-display-simple {
+    font-size: 1rem;
+  }
+
+  .time-display {
+    font-size: 2rem;
+  }
+
+  .time-display .ampm {
+    font-size: 0.8rem;
+  }
+
+  .faculty-avatar {
+    width: 60px;
+    height: 60px;
+  }
+
+  .faculty-info-card h4 {
+    font-size: 1rem;
+  }
+
+  .faculty-info-card p {
+    font-size: 0.85rem;
+  }
+
+  .full-width-section h2 {
+    font-size: 1.3rem;
+  }
+
+  .try-things-grid {
+    grid-template-columns: 1fr;
+    height: auto;
+    gap: 15px;
+  }
+
+  .try-thing-card {
+    padding: 12px;
+  }
+
+  .card {
+    padding: 15px;
+  }
+
+  .myModal-box {
+    max-width: 90%;
+    padding: 1.2rem 1.5rem;
+  }
+
+  .myModal-title {
+    font-size: 1rem;
+  }
+
+  .myModal-btn {
+    padding: 0.4rem 1rem;
+    font-size: 0.9rem;
+  }
+
+  .icon {
+    width: 18px;
+    height: 18px;
+  }
+}
+
+/* ======================= TABLET RESPONSIVENESS (769px - 1024px) ======================= */
+@media (min-width: 769px) and (max-width: 1024px) {
+  :root {
+    --sidebar-width: 220px;
+    --sidebar-closed-width: 0px;
+  }
+
+  /* Show hamburger menu button on tablet */
+  .menu-toggle-btn {
+    display: block;
+  }
+
+  /* Sidebar starts off-screen on tablet */
+  .sidebar {
+    width: var(--sidebar-width);
+    transform: translateX(-100%);
+  }
+
+  /* Sidebar slides in when open on tablet */
+  .sidebar.open {
+    transform: translateX(0);
+  }
+
+  /* Show backdrop when sidebar is open on tablet */
+  .sidebar-backdrop.active {
+    display: block;
+  }
+
+  /* Disable hover effects on tablet - use click toggle instead */
+  .sidebar:hover {
+    transform: translateX(-100%);
+  }
+
+  .sidebar.open:hover {
+    transform: translateX(0);
+  }
+
+  /* Main content takes full width on tablet when sidebar is closed */
+  .main-content {
+    margin-left: 0;
+    padding: 18px;
+    padding-top: 60px; /* Space for hamburger button */
+  }
+
+  .main-content.sidebar-open {
+    margin-left: 0;
+  }
+
+  .content-header h1 {
+    font-size: 1.6rem;
+    margin-bottom: 18px;
+  }
+
+  .dashboard-grid {
+    grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
+    gap: 18px;
+  }
+
+  .welcome-card {
+    grid-column: span 2;
+  }
+
+  .welcome-card h3 {
+    font-size: 1.5rem;
+  }
+
+  .welcome-card p {
+    font-size: 1.3rem;
+  }
+
+  .date-display-simple {
+    font-size: 1.1rem;
+  }
+
+  .time-display {
+    font-size: 2.5rem;
+  }
+
+  .faculty-avatar {
+    width: 70px;
+    height: 70px;
+  }
+
+  .full-width-section h2 {
+    font-size: 1.5rem;
+  }
+
+  .try-things-grid {
+    grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
+    height: auto;
+  }
+
+  .card {
+    padding: 18px;
+  }
+
+  .sidebar-nav button {
+    padding: 9px 14px;
+  }
+
+  .icon {
+    width: 19px;
+    height: 19px;
+  }
+}
+
+/* ======================= DESKTOP RESPONSIVENESS (min-width: 1025px) ======================= */
+@media (min-width: 1025px) {
+  :root {
+    --sidebar-width: 250px;
+    --sidebar-closed-width: 50px;
+  }
+
+  /* Hide hamburger menu button on desktop */
+  .menu-toggle-btn {
+    display: none;
+  }
+
+  /* Hide backdrop on desktop */
+  .sidebar-backdrop {
+    display: none !important;
+  }
+
+  .sidebar {
+    width: var(--sidebar-closed-width);
+    transform: translateX(0); /* Reset transform for desktop */
+  }
+
+  /* Desktop: hover to expand sidebar */
+  .sidebar:hover {
+    width: var(--sidebar-width);
+  }
+
+  /* Desktop: also support click toggle */
+  .sidebar.open {
+    width: var(--sidebar-width);
+  }
+
+  .main-content {
+    margin-left: var(--sidebar-closed-width);
+    transition: margin-left var(--transition-speed) var(--transition-timing-function);
+    padding: 20px;
+    padding-top: 20px; /* Reset padding-top for desktop */
+  }
+
+  .main-content.sidebar-open {
+    margin-left: var(--sidebar-width);
+  }
+
+  /* Desktop: adjust main content when sidebar is hovered */
+  .sidebar:hover ~ .main-content {
+    margin-left: var(--sidebar-width);
+  }
+
+  .content-header h1 {
+    font-size: 1.8rem;
+    margin-bottom: 20px;
+  }
+
+  .dashboard-grid {
+    grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+    gap: 20px;
+  }
+
+  .welcome-card {
+    grid-column: span 2;
+  }
+
+  .welcome-card h3 {
+    font-size: 1.7rem;
+  }
+
+  .welcome-card p {
+    font-size: 1.6rem;
+  }
+
+  .date-display-simple {
+    font-size: 1.2rem;
+  }
+
+  .time-display {
+    font-size: 3rem;
+  }
+
+  .faculty-avatar {
+    width: 80px;
+    height: 80px;
+  }
+
+  .full-width-section h2 {
+    font-size: 1.6rem;
+  }
+
+  .try-things-grid {
+    grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+    height: 80vh;
+  }
+
+  .card {
+    padding: 20px;
+  }
+
+  .sidebar-nav button {
+    padding: 10px 15px;
+  }
+
+  .icon {
+    width: 20px;
+    height: 20px;
   }
 }
