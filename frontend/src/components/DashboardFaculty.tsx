@@ -5,7 +5,7 @@ import { api } from '../lib/apiClient.ts';
 import {
   FaHome, FaCalendar, FaClock, FaClipboardList, FaBell, FaUser,
   FaSignOutAlt, FaBuilding, FaPenAlt, FaCalendarPlus, FaUsers, FaUserShield,
-  FaBars, FaTimes
+  FaBars, FaTimes, FaEye, FaClipboardCheck
 } from 'react-icons/fa';
 import { BsFillSendPlusFill } from "react-icons/bs";
 import '../styles/dashboardFaculty.css';
@@ -20,6 +20,8 @@ import SchedulerPlotSchedule from "./ScheduleViewer.tsx";
 import SchedulerAvailability from "./SchedulerAvailability.tsx";
 import DeanRequests from "./DeanRequests.tsx";
 import RoomManagement from './RoomManagement.tsx';
+import ProctorMonitoring from './ProctorMonitoring.tsx';
+import ProctorAttendance from './ProctorAttendance.tsx';
 
 const iconStyle = { className: 'icon', size: 20 };
 
@@ -28,6 +30,7 @@ const roleSidebarMap: Record<string, { key: string, label: string, icon: JSX.Ele
     { key: 'exam-Date', label: 'Exam Date', icon: <FaCalendar {...iconStyle} /> },
     { key: 'set-Availability', label: 'Set Availability', icon: <FaClock {...iconStyle} /> },
     { key: 'exam-Schedule', label: 'View Exam Schedule', icon: <FaClipboardList {...iconStyle} /> },
+    { key: 'proctor-Attendance', label: 'Proctor Attendance', icon: <FaClipboardCheck {...iconStyle} /> },
     { key: 'notification', label: 'Notification', icon: <FaBell {...iconStyle} /> },
   ],
   scheduler: [
@@ -35,6 +38,7 @@ const roleSidebarMap: Record<string, { key: string, label: string, icon: JSX.Ele
     { key: 'plot-Schedule', label: 'Plot Schedule', icon: <FaCalendarPlus {...iconStyle} /> },
     { key: 'exam-Schedule', label: 'View Exam Schedule', icon: <FaClipboardList {...iconStyle} /> },
     { key: 'proctors-Availability', label: 'Available Proctor', icon: <FaUsers {...iconStyle} /> },
+    { key: 'proctor-Monitoring', label: 'Proctor Monitoring', icon: <FaEye {...iconStyle} /> },
     { key: 'notification', label: 'Notification', icon: <FaBell {...iconStyle} /> },
     { key: 'Room-Management', label: 'Room Management', icon: <FaBuilding {...iconStyle} /> },
   ],
@@ -359,10 +363,12 @@ const DashboardFaculty = () => {
           {activeMenu === 'profile' && <Profile user={user} />}
           {activeMenu === 'set-Availability' && <ProctorSetAvailability user={user} />}
           {activeMenu === 'exam-Schedule' && <ProctorViewExam />}
+          {activeMenu === 'proctor-Attendance' && <ProctorAttendance user={user} />}
           {activeMenu === 'notification' && <Notification user={user} />}
           {activeMenu === 'set-Modality' && <BayanihanModality user={user} />}
           {activeMenu === 'plot-Schedule' && <SchedulerPlotSchedule user={user} />}
           {activeMenu === 'proctors-Availability' && <SchedulerAvailability user={user} />}
+          {activeMenu === 'proctor-Monitoring' && <ProctorMonitoring user={user} />}
           {activeMenu === 'Request' && <DeanRequests user={user} />}
           {activeMenu === 'Room-Management' && <RoomManagement user={user} />}
         </main>
