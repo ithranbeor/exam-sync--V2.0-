@@ -10,7 +10,7 @@ interface UserProps {
   } | null;
 }
 
-const ProctorMonitoring: React.FC<UserProps> = ({ user }) => {
+const ProctorMonitoring: React.FC<UserProps> = ({ }) => {
   // user will be used for future functionality
   return (
     <div className="proctor-monitoring-container">
