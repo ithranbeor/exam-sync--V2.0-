@@ -1,3 +1,9 @@
+/* src/styles/bayanihanModality.css */
+
+/* ============================================
+   BASE STYLES (Desktop First)
+   ============================================ */
+
 body {
   margin: 0;
   font-family: 'Segoe UI', sans-serif;
@@ -33,18 +39,19 @@ body {
   width: 100%;
   box-sizing: border-box;
 }
+
 .availability-card {
-    background-color: #ffffff;
-    border: 1px solid #ced4da;
-    border-radius: 50px;
-    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.08);
-    padding: 30px;
-    width: 1000px;
-    max-width: 95%;
-    box-sizing: border-box;
-    display: flex;
-    flex-direction: column;
-    transition: transform 0.2s ease, box-shadow 0.2s ease;
+  background-color: #ffffff;
+  border: 1px solid #ced4da;
+  border-radius: 50px;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.08);
+  padding: 30px;
+  width: 1000px;
+  max-width: 95%;
+  box-sizing: border-box;
+  display: flex;
+  flex-direction: column;
+  transition: transform 0.2s ease, box-shadow 0.2s ease;
 }
 
 .card-header-set {
@@ -94,6 +101,7 @@ body {
   font-size: 1em;
   background-color: #f9f9f9;
   transition: border 0.2s ease;
+  box-sizing: border-box;
 }
 
 .custom-select:focus,
@@ -113,7 +121,7 @@ textarea {
   grid-column: span 2;
   background-color: #ffb800;
   color: white;
-  padding: 5px 0;
+  padding: 12px 0;
   border: none;
   border-radius: 50px;
   font-size: 1.05em;
@@ -123,6 +131,8 @@ textarea {
   justify-self: center;
   box-shadow: 0 4px 10px rgba(255, 184, 0, 0.25);
   transition: background-color 0.2s ease, transform 0.1s ease;
+  touch-action: manipulation;
+  min-height: 44px;
 }
 
 .submit-button:hover {
@@ -134,34 +144,16 @@ textarea {
   transform: scale(0.98);
 }
 
-@media (max-width: 768px) {
-  .bayanihan-container {
-    padding: 20px 15px;
-  }
-
-  .bayanihan-form {
-    grid-template-columns: 1fr;
-  }
-
-  .submit-button {
-    grid-column: span 1;
-    width: 100%;
-  }
-}
 .form-group.full-width {
   grid-column: span 2;
 }
 
-@media (max-width: 768px) {
-  .form-group.full-width {
-    grid-column: span 1;
-  }
-}
 .custom-select[multiple] {
   height: auto;
   min-height: 120px;
   padding: 10px;
 }
+
 .availability-grid {
   display: grid;
   grid-template-columns: 1fr 1fr;
@@ -185,6 +177,7 @@ textarea {
   cursor: pointer;
   font-size: 1em;
   color: #343a40;
+  box-sizing: border-box;
 }
 
 .dropdown-menu {
@@ -210,7 +203,10 @@ textarea {
   font-size: 0.95em;
   color: #333;
   cursor: pointer;
+  touch-action: manipulation;
+  min-height: 44px;
 }
+
 .react-select__option[title]::after {
   content: attr(title);
   display: none;
@@ -222,9 +218,11 @@ textarea {
   font-size: 12px;
   white-space: nowrap;
 }
+
 .react-select__option:hover::after {
   display: block;
 }
+
 .timeslot-container {
   display: flex;
   flex-direction: column;
@@ -238,6 +236,7 @@ textarea {
   margin-top: 8px;
   margin-bottom: 12px;
 }
+
 /* === BUILDING–ROOM STYLES === */
 
 .building-header {
@@ -251,6 +250,8 @@ textarea {
   border-radius: 10px;
   background: #ffb800;
   color: white;
+  flex-wrap: wrap;
+  gap: 10px;
 }
 
 .building-header button {
@@ -263,6 +264,8 @@ textarea {
   font-size: 0.85rem;
   font-weight: 500;
   transition: all 0.2s ease;
+  touch-action: manipulation;
+  min-height: 36px;
 }
 
 .building-header button:hover {
@@ -294,6 +297,8 @@ textarea {
   flex-direction: column;
   align-items: center;
   justify-content: center;
+  touch-action: manipulation;
+  min-height: 80px;
 }
 
 /* States */
@@ -359,6 +364,8 @@ textarea {
   cursor: pointer;
   margin-top: 6px;
   transition: all 0.2s ease;
+  touch-action: manipulation;
+  min-height: 28px;
 }
 
 .occupancy-box {
@@ -389,10 +396,11 @@ textarea {
   border-radius: 16px;
   width: 100%;
   max-width: 720px;
-  max-height: 100%;
+  max-height: 90vh;
   overflow-y: auto;
   box-shadow: 0 8px 24px rgba(0, 0, 0, 0.2);
   font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+  box-sizing: border-box;
 }
 
 /* Timeslot container inside occupancy modal */
@@ -400,8 +408,8 @@ textarea {
   display: flex;
   flex-direction: column;
   gap: 4px;
-  max-height: 400px;  /* fit nicely inside modal */
-  overflow-y: auto;   /* scroll inside modal */
+  max-height: 400px;
+  overflow-y: auto;
   padding: 8px;
 }
 
@@ -417,6 +425,8 @@ textarea {
   box-shadow: 0 2px 6px rgba(0,0,0,0.05);
   transition: all 0.2s ease;
   font-size: 0.9rem;
+  flex-wrap: wrap;
+  gap: 8px;
 }
 
 /* Occupied / Vacant distinction */
@@ -449,6 +459,8 @@ textarea {
   color: white;
   cursor: pointer;
   transition: background 0.2s;
+  touch-action: manipulation;
+  min-height: 24px;
 }
 
 .room-box .view-occupancy:hover {
@@ -459,40 +471,9 @@ textarea {
   background-color: #e8f5e9;
   color: #2e7d32;
 }
-.occupancy-timeslots {
-  display: flex;
-  flex-direction: column;
-  gap: 4px;
-  max-height: 400px;
-  overflow-y: auto;
-  padding: 8px;
-}
 
-.timeslot-entry {
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-  padding: 4px 8px;
-  border-radius: 4px;
-  font-size: 0.9rem;
-  font-family: Arial, sans-serif;
-}
-
-.timeslot-entry.occupied {
-  background-color: #ffcccc; /* light red */
-  border: 1px solid #ff6666;
-}
-
-.timeslot-entry.vacant {
-  background-color: #ccffcc; /* light green */
-  border: 1px dashed #66cc66;
-}
-
-.timeslot-status {
-  font-weight: bold;
-}
 .modal-overlay {
-  position: fixed;      /* stay fixed, not scrolling */
+  position: fixed;
   top: 0;
   left: 0;
   width: 100%;
@@ -502,7 +483,11 @@ textarea {
   justify-content: center;
   align-items: center;
   z-index: 1000;
+  padding: 20px;
+  box-sizing: border-box;
+  overflow-y: auto;
 }
+
 .no-rooms {
   text-align: center;
   color: #999;
@@ -510,6 +495,7 @@ textarea {
   margin-top: 20px;
   grid-column: 1 / -1;
 }
+
 .spinner {
   width: 16px;
   height: 16px;
@@ -524,10 +510,24 @@ textarea {
 @keyframes spin {
   to { transform: rotate(360deg); }
 }
+
 button.open-modal-btn {
-    color: white;
-    background: #ffb800;
+  color: white;
+  background: #ffb800;
+  touch-action: manipulation;
+  min-height: 44px;
+  padding: 10px 20px;
+  border: none;
+  border-radius: 8px;
+  cursor: pointer;
+  font-weight: bold;
+  transition: background-color 0.3s ease;
 }
+
+button.open-modal-btn:hover {
+  background: #e6a700;
+}
+
 .selected-rooms {
   display: flex;
   flex-wrap: wrap;
@@ -536,11 +536,392 @@ button.open-modal-btn {
 }
 
 .room-card {
-  background-color: #ffffff; /* card color */
+  background-color: #ffffff;
   color: #ffb800;
   padding: 1px 5px;
   border-radius: 12px;
   font-weight: 500;
   box-shadow: 0 2px 6px rgba(0,0,0,0.15);
   font-size: small;
+}
+
+.close-modal {
+  background-color: #6c757d;
+  color: white;
+  padding: 10px 20px;
+  border: none;
+  border-radius: 8px;
+  cursor: pointer;
+  font-weight: bold;
+  transition: background-color 0.3s ease;
+  touch-action: manipulation;
+  min-height: 44px;
+}
+
+.close-modal:hover {
+  background-color: #5a6268;
+}
+
+.modal-actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 10px;
+  margin-top: 20px;
+  flex-wrap: wrap;
+}
+
+.modal-actions button {
+  touch-action: manipulation;
+  min-height: 44px;
+}
+
+/* ============================================
+   TABLET STYLES (768px - 1024px)
+   ============================================ */
+
+@media screen and (max-width: 1024px) {
+  .bayanihan-container {
+    padding: 25px 18px;
+  }
+
+  .bayanihan-header-title {
+    font-size: 1.6em;
+  }
+
+  .bayanihan-card {
+    padding: 25px;
+  }
+
+  .availability-card {
+    padding: 25px;
+    border-radius: 30px;
+  }
+
+  .bayanihan-form {
+    gap: 18px 25px;
+  }
+
+  .modal-contents-modality {
+    padding: 1.5rem;
+    max-width: 90%;
+  }
+
+  .room-grid {
+    grid-template-columns: repeat(auto-fill, minmax(100px, 1fr));
+    gap: 10px;
+  }
+
+  .availability-grid {
+    gap: 15px;
+  }
+}
+
+/* ============================================
+   MOBILE STYLES (< 768px)
+   ============================================ */
+
+@media screen and (max-width: 768px) {
+  .bayanihan-container {
+    padding: 15px 12px;
+  }
+
+  .bayanihan-header-title {
+    font-size: 1.4em;
+    margin-bottom: 20px;
+    text-align: center;
+  }
+
+  .bayanihan-card {
+    padding: 20px 15px;
+    border-radius: 10px;
+  }
+
+  .availability-card {
+    padding: 20px 15px;
+    border-radius: 20px;
+    width: 100%;
+    max-width: 100%;
+  }
+
+  .card-header-set {
+    font-size: 1.1em;
+    padding: 8px 12px;
+    margin-bottom: 15px;
+  }
+
+  .subtitle {
+    font-size: 0.9em;
+    margin-bottom: 20px;
+  }
+
+  .bayanihan-form {
+    grid-template-columns: 1fr;
+    gap: 15px;
+  }
+
+  .form-group.full-width {
+    grid-column: span 1;
+  }
+
+  .submit-button {
+    grid-column: span 1;
+    width: 100%;
+    padding: 14px 0;
+    font-size: 1em;
+    min-height: 48px;
+  }
+
+  .custom-select,
+  .form-group textarea {
+    padding: 12px;
+    font-size: 16px; /* Prevents zoom on iOS */
+    border-radius: 6px;
+  }
+
+  .form-group label {
+    font-size: 0.9em;
+    margin-bottom: 6px;
+  }
+
+  .availability-grid {
+    grid-template-columns: 1fr;
+    gap: 15px;
+  }
+
+  .full-width {
+    grid-column: span 1;
+  }
+
+  .dropdown-input {
+    padding: 12px;
+    font-size: 16px; /* Prevents zoom on iOS */
+  }
+
+  .dropdown-item {
+    padding: 10px 12px;
+    font-size: 0.9em;
+    min-height: 48px;
+  }
+
+  .building-header {
+    flex-direction: column;
+    align-items: stretch;
+    font-size: 0.95rem;
+    padding: 10px;
+  }
+
+  .building-header button {
+    width: 100%;
+    padding: 8px 12px;
+    font-size: 0.9rem;
+    min-height: 40px;
+  }
+
+  .room-grid {
+    grid-template-columns: repeat(auto-fill, minmax(90px, 1fr));
+    gap: 10px;
+    margin-top: 10px;
+  }
+
+  .room-box {
+    padding: 12px 8px;
+    font-size: 0.85rem;
+    min-height: 70px;
+  }
+
+  .room-label {
+    font-size: 0.8rem;
+    margin-bottom: 4px;
+  }
+
+  .view-occupancy {
+    padding: 6px 10px;
+    font-size: 0.7rem;
+    min-height: 32px;
+    width: 100%;
+    margin-top: 8px;
+  }
+
+  .modal-overlay {
+    padding: 10px;
+    align-items: flex-start;
+    padding-top: 20px;
+  }
+
+  .modal-contents-modality {
+    padding: 1.5rem 1rem;
+    border-radius: 12px;
+    max-width: 100%;
+    width: 100%;
+    max-height: 85vh;
+  }
+
+  .modal-contents-modality h3 {
+    font-size: 1.2rem;
+    margin-bottom: 15px;
+  }
+
+  .occupancy-timeslots {
+    max-height: 300px;
+    padding: 6px;
+  }
+
+  .timeslot-entry {
+    padding: 8px 10px;
+    font-size: 0.85rem;
+    flex-direction: column;
+    align-items: flex-start;
+  }
+
+  .timeslot-status {
+    font-size: 0.75rem;
+  }
+
+  .timeslot-time {
+    font-size: 0.8rem;
+  }
+
+  .modal-actions {
+    flex-direction: column;
+    gap: 10px;
+    margin-top: 15px;
+  }
+
+  .modal-actions button,
+  .close-modal {
+    width: 100%;
+    padding: 12px;
+    font-size: 16px;
+    min-height: 48px;
+  }
+
+  .selected-rooms {
+    gap: 8px;
+    margin-top: 12px;
+  }
+
+  .room-card {
+    padding: 4px 8px;
+    font-size: 0.85rem;
+  }
+
+  .no-rooms {
+    font-size: 13px;
+    margin-top: 15px;
+  }
+}
+
+/* ============================================
+   SMALL MOBILE STYLES (< 480px)
+   ============================================ */
+
+@media screen and (max-width: 480px) {
+  .bayanihan-container {
+    padding: 12px 10px;
+  }
+
+  .bayanihan-header-title {
+    font-size: 1.2em;
+    margin-bottom: 15px;
+  }
+
+  .bayanihan-card {
+    padding: 15px 12px;
+  }
+
+  .availability-card {
+    padding: 15px 12px;
+    border-radius: 15px;
+  }
+
+  .card-header-set {
+    font-size: 1em;
+    padding: 6px 10px;
+  }
+
+  .bayanihan-form {
+    gap: 12px;
+  }
+
+  .custom-select,
+  .form-group textarea {
+    padding: 10px;
+    font-size: 16px;
+  }
+
+  .room-grid {
+    grid-template-columns: repeat(auto-fill, minmax(80px, 1fr));
+    gap: 8px;
+  }
+
+  .room-box {
+    padding: 10px 6px;
+    font-size: 0.8rem;
+    min-height: 65px;
+  }
+
+  .room-label {
+    font-size: 0.75rem;
+  }
+
+  .view-occupancy {
+    font-size: 0.65rem;
+    padding: 4px 8px;
+    min-height: 28px;
+  }
+
+  .modal-contents-modality {
+    padding: 1rem;
+  }
+
+  .modal-contents-modality h3 {
+    font-size: 1.1rem;
+  }
+
+  .building-header {
+    font-size: 0.9rem;
+    padding: 8px;
+  }
+}
+
+/* ============================================
+   LANDSCAPE MOBILE ORIENTATION
+   ============================================ */
+
+@media screen and (max-width: 768px) and (orientation: landscape) {
+  .bayanihan-container {
+    padding: 15px;
+  }
+
+  .modal-contents-modality {
+    max-height: 90vh;
+  }
+
+  .occupancy-timeslots {
+    max-height: 350px;
+  }
+}
+
+/* ============================================
+   PRINT STYLES
+   ============================================ */
+
+@media print {
+  .bayanihan-container {
+    background-color: white;
+    padding: 0;
+  }
+
+  .submit-button,
+  .view-occupancy,
+  .building-header button,
+  .close-modal,
+  .modal-overlay {
+    display: none;
+  }
+
+  .bayanihan-card {
+    box-shadow: none;
+    border: 1px solid #ddd;
+  }
 }

@@ -1,6 +1,6 @@
 // deno-lint-ignore-file no-explicit-any
-import React, { useEffect, useState } from 'react';
-import { FaSearch, FaTrash, FaEdit, FaDownload, FaEye, FaPlus, FaFileImport } from 'react-icons/fa';
+import React, { useEffect, useState, useRef } from 'react';
+import { FaSearch, FaTrash, FaEdit, FaDownload, FaEye, FaPlus, FaFileImport, FaChevronLeft, FaChevronRight } from 'react-icons/fa';
 import { ToastContainer, toast } from 'react-toastify';
 import * as XLSX from 'xlsx';
 import { api } from '../lib/apiClient.ts'; // <-- Axios instance
@@ -38,6 +38,9 @@ const Buildings: React.FC = () => {
   });
   const [selectedBuildingName, setSelectedBuildingName] = useState('');
   const [selectedBuildingIds, setSelectedBuildingIds] = useState<Set<string>>(new Set());
+  const [canScrollLeft, setCanScrollLeft] = useState(false);
+  const [canScrollRight, setCanScrollRight] = useState(false);
+  const tableContainerRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
     if (showModal || showImport) return; // pause refresh while editing/importing
@@ -100,6 +103,51 @@ const Buildings: React.FC = () => {
   };
 
   const clearSelection = () => setSelectedBuildingIds(new Set());
+
+  // Handle scroll position and update button states
+  useEffect(() => {
+    const checkScroll = () => {
+      const container = tableContainerRef.current;
+      if (!container) return;
+
+      const { scrollLeft, scrollWidth, clientWidth } = container;
+      setCanScrollLeft(scrollLeft > 0);
+      setCanScrollRight(scrollLeft < scrollWidth - clientWidth - 1);
+      
+      // Update scroll indicator classes
+      container.classList.toggle('scrollable-left', scrollLeft > 0);
+      container.classList.toggle('scrollable-right', scrollLeft < scrollWidth - clientWidth - 1);
+    };
+
+    const container = tableContainerRef.current;
+    if (container) {
+      checkScroll();
+      container.addEventListener('scroll', checkScroll);
+      window.addEventListener('resize', checkScroll);
+    }
+
+    return () => {
+      if (container) {
+        container.removeEventListener('scroll', checkScroll);
+        window.removeEventListener('resize', checkScroll);
+      }
+    };
+  }, [buildings, searchTerm, loading]);
+
+  const scrollTable = (direction: 'left' | 'right') => {
+    const container = tableContainerRef.current;
+    if (!container) return;
+
+    const scrollAmount = container.clientWidth * 0.8;
+    const scrollTo = direction === 'left' 
+      ? container.scrollLeft - scrollAmount 
+      : container.scrollLeft + scrollAmount;
+    
+    container.scrollTo({
+      left: scrollTo,
+      behavior: 'smooth'
+    });
+  };
 
   const openRoomModal = (buildingId: string) => {
     const building = buildings.find((b) => b.building_id === buildingId);
@@ -271,8 +319,30 @@ const Buildings: React.FC = () => {
         </div>
       </div>
 
-      <div className="colleges-table-container">
-        <table className="colleges-table">
+      <div className="table-scroll-wrapper">
+        <div className="table-scroll-hint">
+          <FaChevronLeft /> Swipe or use buttons to scroll <FaChevronRight />
+        </div>
+        <button
+          type="button"
+          className="table-scroll-buttons scroll-left"
+          onClick={() => scrollTable('left')}
+          disabled={!canScrollLeft}
+          aria-label="Scroll left"
+        >
+          <FaChevronLeft />
+        </button>
+        <button
+          type="button"
+          className="table-scroll-buttons scroll-right"
+          onClick={() => scrollTable('right')}
+          disabled={!canScrollRight}
+          aria-label="Scroll right"
+        >
+          <FaChevronRight />
+        </button>
+        <div className="colleges-table-container" ref={tableContainerRef}>
+          <table className="colleges-table">
           <thead>
             <tr>
               <th>#</th>
@@ -348,6 +418,7 @@ const Buildings: React.FC = () => {
             )}
           </tbody>
         </table>
+        </div>
       </div>
 
       {/* Add/Edit Modal */}

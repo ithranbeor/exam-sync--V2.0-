@@ -1,6 +1,6 @@
 // deno-lint-ignore-file no-explicit-any
-import React, { useEffect, useState } from 'react';
-import { FaTrash, FaEdit, FaSearch,  FaPlus } from 'react-icons/fa';
+import React, { useEffect, useState, useRef } from 'react';
+import { FaTrash, FaEdit, FaSearch,  FaPlus, FaChevronLeft, FaChevronRight } from 'react-icons/fa';
 import { api } from '../lib/apiClient.ts';
 import * as XLSX from 'xlsx';
 import { ToastContainer, toast } from 'react-toastify';
@@ -46,6 +46,9 @@ const ExamPeriodComponent: React.FC = () => {
   const [loading, setLoading] = useState(true); // new state
   const [selectedDates, setSelectedDates] = useState<Date[]>([]);
   const [selectedExamIds, setSelectedExamIds] = useState<Set<number>>(new Set());
+  const [canScrollLeft, setCanScrollLeft] = useState(false);
+  const [canScrollRight, setCanScrollRight] = useState(false);
+  const tableContainerRef = useRef<HTMLDivElement>(null);
 
   const [newExam, setNewExam] = useState<ExamPeriod>({
     start_date: '',
@@ -240,6 +243,51 @@ const ExamPeriodComponent: React.FC = () => {
     });
   };
 
+  // Handle scroll position and update button states
+  useEffect(() => {
+    const checkScroll = () => {
+      const container = tableContainerRef.current;
+      if (!container) return;
+
+      const { scrollLeft, scrollWidth, clientWidth } = container;
+      setCanScrollLeft(scrollLeft > 0);
+      setCanScrollRight(scrollLeft < scrollWidth - clientWidth - 1);
+      
+      // Update scroll indicator classes
+      container.classList.toggle('scrollable-left', scrollLeft > 0);
+      container.classList.toggle('scrollable-right', scrollLeft < scrollWidth - clientWidth - 1);
+    };
+
+    const container = tableContainerRef.current;
+    if (container) {
+      checkScroll();
+      container.addEventListener('scroll', checkScroll);
+      window.addEventListener('resize', checkScroll);
+    }
+
+    return () => {
+      if (container) {
+        container.removeEventListener('scroll', checkScroll);
+        window.removeEventListener('resize', checkScroll);
+      }
+    };
+  }, [examPeriods, search, filterYear, filterCategory, filterTerm, filterDept, filterCollege, loading]);
+
+  const scrollTable = (direction: 'left' | 'right') => {
+    const container = tableContainerRef.current;
+    if (!container) return;
+
+    const scrollAmount = container.clientWidth * 0.8;
+    const scrollTo = direction === 'left' 
+      ? container.scrollLeft - scrollAmount 
+      : container.scrollLeft + scrollAmount;
+    
+    container.scrollTo({
+      left: scrollTo,
+      behavior: 'smooth'
+    });
+  };
+
   const handleImport = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (!file) return;
@@ -381,8 +429,30 @@ const ExamPeriodComponent: React.FC = () => {
         </div>
       </div>
 
-      <div className="colleges-table-container">
-        <table className="colleges-table">
+      <div className="table-scroll-wrapper">
+        <div className="table-scroll-hint">
+          <FaChevronLeft /> Swipe or use buttons to scroll <FaChevronRight />
+        </div>
+        <button
+          type="button"
+          className="table-scroll-buttons scroll-left"
+          onClick={() => scrollTable('left')}
+          disabled={!canScrollLeft}
+          aria-label="Scroll left"
+        >
+          <FaChevronLeft />
+        </button>
+        <button
+          type="button"
+          className="table-scroll-buttons scroll-right"
+          onClick={() => scrollTable('right')}
+          disabled={!canScrollRight}
+          aria-label="Scroll right"
+        >
+          <FaChevronRight />
+        </button>
+        <div className="colleges-table-container" ref={tableContainerRef}>
+          <table className="colleges-table">
           <thead>
             <tr>
               <th>#</th>
@@ -455,6 +525,7 @@ const ExamPeriodComponent: React.FC = () => {
             )}
           </tbody>
         </table>
+        </div>
       </div>
 
       {showModal && (

@@ -1,5 +1,5 @@
 // deno-lint-ignore-file no-explicit-any
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect, useRef, useMemo } from 'react';
 import { FaTrash, FaEdit, FaSearch, FaDownload,  FaPlus, FaFileImport, FaChevronLeft, FaChevronRight } from 'react-icons/fa';
 import { api } from '../lib/apiClient.ts';
 import { ToastContainer, toast } from 'react-toastify';
@@ -117,14 +117,16 @@ const Departments: React.FC = () => {
     setSearchTerm(e.target.value);
   };
 
-  const filteredDepartments = departments.filter((dept) => {
-    const collegeName = dept.college?.college_name || '';
-    return (
-      dept.department_name.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      dept.department_id.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      collegeName.toLowerCase().includes(searchTerm.toLowerCase())
-    );
-  });
+  const filteredDepartments = useMemo(() => {
+    return departments.filter((dept) => {
+      const collegeName = dept.college?.college_name || '';
+      return (
+        dept.department_name.toLowerCase().includes(searchTerm.toLowerCase()) ||
+        dept.department_id.toLowerCase().includes(searchTerm.toLowerCase()) ||
+        collegeName.toLowerCase().includes(searchTerm.toLowerCase())
+      );
+    });
+  }, [departments, searchTerm]);
 
   const toggleSelect = (id: string) => {
     setSelectedIds((prev) => {

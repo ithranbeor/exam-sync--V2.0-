@@ -1,5 +1,5 @@
-import React, { useEffect, useState } from 'react';
-import { FaSearch, FaPen, FaTrash, FaCalendarAlt, FaLock, FaLockOpen, FaDownload,  FaPlus, FaFileImport, FaTimes } from 'react-icons/fa';
+import React, { useEffect, useState, useRef, useMemo, useCallback } from 'react';
+import { FaSearch, FaPen, FaTrash, FaCalendarAlt, FaLock, FaLockOpen, FaDownload,  FaPlus, FaFileImport, FaTimes, FaChevronLeft, FaChevronRight } from 'react-icons/fa';
 import { api } from '../lib/apiClient.ts';
 import { ToastContainer, toast } from 'react-toastify';
 import * as XLSX from 'xlsx';
@@ -91,6 +91,9 @@ export const UserManagement: React.FC<UserManagementProps> = ({}) => {
   const [editingRole, setEditingRole] = useState<UserRole | null>(null);
   const [isBulkDeletingAccounts, setIsBulkDeletingAccounts] = useState(false);
   const [selectedAccountIds, setSelectedAccountIds] = useState<Set<number>>(new Set());
+  const [canScrollLeft, setCanScrollLeft] = useState(false);
+  const [canScrollRight, setCanScrollRight] = useState(false);
+  const tableContainerRef = useRef<HTMLDivElement>(null);
 
   const [newAccount, setNewAccount] = useState<UserAccount>({
     user_id: 0,
@@ -809,34 +812,36 @@ export const UserManagement: React.FC<UserManagementProps> = ({}) => {
   };
 
   // Get roles for a user
-  const getUserRoles = (userId: number) => {
+  const getUserRoles = useCallback((userId: number) => {
     return userRoles.filter(r => r.user === userId);
-  };
+  }, [userRoles]);
 
   // Enhanced filtering with college and search
-  const filteredAccounts = accounts.filter(account => {
-    const fullName = `${account.first_name} ${account.last_name} ${account.middle_name || ''}`.toLowerCase();
-    const userId = account.user_id.toString();
-    const email = account.email_address.toLowerCase();
-    const search = searchTerm.toLowerCase();
+  const filteredAccounts = useMemo(() => {
+    return accounts.filter(account => {
+      const fullName = `${account.first_name} ${account.last_name} ${account.middle_name || ''}`.toLowerCase();
+      const userId = account.user_id.toString();
+      const email = account.email_address.toLowerCase();
+      const search = searchTerm.toLowerCase();
 
-    // Get user's roles
-    const accountRoles = getUserRoles(account.user_id);
-    const roleNames = accountRoles.map(r => r.role_name?.toLowerCase() || '').join(' ');
+      // Get user's roles
+      const accountRoles = getUserRoles(account.user_id);
+      const roleNames = accountRoles.map(r => r.role_name?.toLowerCase() || '').join(' ');
 
-    // Check if matches search term (ID, name, email, or role)
-    const matchesSearch = !searchTerm || 
-      userId.includes(search) || 
-      fullName.includes(search) || 
-      email.includes(search) ||
-      roleNames.includes(search);
+      // Check if matches search term (ID, name, email, or role)
+      const matchesSearch = !searchTerm || 
+        userId.includes(search) || 
+        fullName.includes(search) || 
+        email.includes(search) ||
+        roleNames.includes(search);
 
-    // Check if matches college filter
-    const matchesCollege = !selectedCollege || 
-      accountRoles.some(r => r.college_id === selectedCollege);
+      // Check if matches college filter
+      const matchesCollege = !selectedCollege || 
+        accountRoles.some(r => r.college_id === selectedCollege);
 
-    return matchesSearch && matchesCollege;
-  });
+      return matchesSearch && matchesCollege;
+    });
+  }, [accounts, searchTerm, selectedCollege, getUserRoles]);
 
   useEffect(() => {
     setSelectedAccountIds(prev => {
@@ -877,6 +882,51 @@ export const UserManagement: React.FC<UserManagementProps> = ({}) => {
         next.add(userId);
       }
       return next;
+    });
+  };
+
+  // Handle scroll position and update button states
+  useEffect(() => {
+    const checkScroll = () => {
+      const container = tableContainerRef.current;
+      if (!container) return;
+
+      const { scrollLeft, scrollWidth, clientWidth } = container;
+      setCanScrollLeft(scrollLeft > 0);
+      setCanScrollRight(scrollLeft < scrollWidth - clientWidth - 1);
+      
+      // Update scroll indicator classes
+      container.classList.toggle('scrollable-left', scrollLeft > 0);
+      container.classList.toggle('scrollable-right', scrollLeft < scrollWidth - clientWidth - 1);
+    };
+
+    const container = tableContainerRef.current;
+    if (container) {
+      checkScroll();
+      container.addEventListener('scroll', checkScroll);
+      window.addEventListener('resize', checkScroll);
+    }
+
+    return () => {
+      if (container) {
+        container.removeEventListener('scroll', checkScroll);
+        window.removeEventListener('resize', checkScroll);
+      }
+    };
+  }, [accounts, searchTerm, selectedCollege, loading]);
+
+  const scrollTable = (direction: 'left' | 'right') => {
+    const container = tableContainerRef.current;
+    if (!container) return;
+
+    const scrollAmount = container.clientWidth * 0.8;
+    const scrollTo = direction === 'left' 
+      ? container.scrollLeft - scrollAmount 
+      : container.scrollLeft + scrollAmount;
+    
+    container.scrollTo({
+      left: scrollTo,
+      behavior: 'smooth'
     });
   };
 
@@ -1019,8 +1069,30 @@ export const UserManagement: React.FC<UserManagementProps> = ({}) => {
         </div>
       </div>
 
-      <div className="colleges-table-container">
-        <table className="accounts-table colleges-table">
+      <div className="table-scroll-wrapper">
+        <div className="table-scroll-hint">
+          <FaChevronLeft /> Swipe or use buttons to scroll <FaChevronRight />
+        </div>
+        <button
+          type="button"
+          className="table-scroll-buttons scroll-left"
+          onClick={() => scrollTable('left')}
+          disabled={!canScrollLeft}
+          aria-label="Scroll left"
+        >
+          <FaChevronLeft />
+        </button>
+        <button
+          type="button"
+          className="table-scroll-buttons scroll-right"
+          onClick={() => scrollTable('right')}
+          disabled={!canScrollRight}
+          aria-label="Scroll right"
+        >
+          <FaChevronRight />
+        </button>
+        <div className="colleges-table-container" ref={tableContainerRef}>
+          <table className="accounts-table colleges-table">
           <thead>
             <tr>
               <th>#</th>
@@ -1119,6 +1191,7 @@ export const UserManagement: React.FC<UserManagementProps> = ({}) => {
             )}
             </tbody>
         </table>
+        </div>
       </div>
 
       {/* User Details Modal */}
