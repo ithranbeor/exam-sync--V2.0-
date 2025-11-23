@@ -690,6 +690,14 @@ button.view-button {
     grid-column: span 1;
   }
 
+  .datetime-card {
+    grid-column: span 1;
+  }
+
+  .faculty-info-card {
+    grid-column: span 1;
+  }
+
   .welcome-card h3 {
     font-size: 1.3rem;
   }
@@ -731,6 +739,7 @@ button.view-button {
     font-size: 1.3rem;
   }
 
+  /* FIXED: Tables stack vertically on mobile */
   .try-things-grid {
     grid-template-columns: 1fr;
     height: auto;
@@ -739,6 +748,7 @@ button.view-button {
 
   .try-thing-card {
     padding: 12px;
+    height: auto;
   }
 
   .card {
@@ -827,6 +837,14 @@ button.view-button {
     grid-column: span 2;
   }
 
+  .datetime-card {
+    grid-column: span 1;
+  }
+
+  .faculty-info-card {
+    grid-column: span 1;
+  }
+
   .welcome-card h3 {
     font-size: 1.5rem;
   }
@@ -852,8 +870,14 @@ button.view-button {
     font-size: 1.5rem;
   }
 
+  /* FIXED: Option to stack tables on tablet if needed */
   .try-things-grid {
-    grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
+    grid-template-columns: 1fr;
+    height: auto;
+    gap: 15px;
+  }
+
+  .try-thing-card {
     height: auto;
   }
 
@@ -933,6 +957,14 @@ button.view-button {
     grid-column: span 2;
   }
 
+  .datetime-card {
+    grid-column: span 1;
+  }
+
+  .faculty-info-card {
+    grid-column: span 1;
+  }
+
   .welcome-card h3 {
     font-size: 1.7rem;
   }
@@ -958,9 +990,15 @@ button.view-button {
     font-size: 1.6rem;
   }
 
+  /* Desktop: Keep side-by-side layout */
   .try-things-grid {
-    grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+    grid-template-columns: repeat(2, 1fr);
     height: 80vh;
+    gap: 20px;
+  }
+
+  .try-thing-card {
+    height: 100%;
   }
 
   .card {
