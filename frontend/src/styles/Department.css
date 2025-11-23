@@ -1,6 +1,11 @@
 /* src/styles/Department.css */
 
-.departments-container {
+/* ============================================
+   BASE STYLES (Desktop First)
+   ============================================ */
+
+.departments-container,
+.colleges-container {
   padding: 20px;
   font-family: Arial, sans-serif;
   background-color: #f5f5f5;
@@ -9,14 +14,18 @@
   flex-direction: column;
 }
 
-.departments-header {
+.departments-header,
+.colleges-header {
   display: flex;
   justify-content: space-between;
   align-items: center;
   margin-bottom: 20px;
+  flex-wrap: wrap;
+  gap: 15px;
 }
 
-.departments-title {
+.departments-title,
+.colleges-title {
   font-size: 24px;
   color: #333;
   margin: 0;
@@ -28,8 +37,9 @@
   border: 1px solid #FAB417;
   border-radius: 5px;
   overflow: hidden;
-  background-color: #FFF; 
+  background-color: #FFF;
   box-shadow: 0 1px 2px rgba(0, 0, 0, 0.05);
+  min-width: 250px;
 }
 
 .search-bar input {
@@ -49,14 +59,18 @@
   font-size: 16px;
   color: #FAB417;
   background-color: #f0f0f0;
+  min-width: 40px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
 }
 
 .search-bar .search-button:hover {
   background-color: #e6e6e6;
 }
 
-
-.departments-actions {
+.departments-actions,
+.colleges-actions {
   display: flex;
   gap: 10px;
   margin-bottom: 20px;
@@ -71,10 +85,23 @@
   transition: background-color 0.3s ease, transform 0.1s ease;
   color: white;
   font-weight: bold;
+  touch-action: manipulation;
 }
 
 .action-button:active {
-    transform: translateY(1px);
+  transform: translateY(1px);
+}
+
+.departments-actions .action-button,
+.colleges-actions .action-button {
+  width: 38px;
+  height: 38px;
+  border-radius: 50%;
+  padding: 0;
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  font-size: 16px;
 }
 
 .action-button.add-new {
@@ -93,44 +120,112 @@
   background-color: #e6a700;
 }
 
-.departments-table-container {
+.action-button.delete {
+  background-color: #d63e3e;
+}
+
+.action-button.delete:hover {
+  background-color: #b83333;
+}
+
+.departments-table-container,
+.colleges-table-container {
   background-color: #fff;
   border-radius: 8px;
   overflow: hidden;
   box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+  overflow-x: auto;
+  -webkit-overflow-scrolling: touch;
+  position: relative;
+  scroll-behavior: smooth;
 }
 
-.departments-table {
+/* Scroll indicator shadows - show when content is scrollable */
+.departments-table-container::before,
+.departments-table-container::after,
+.colleges-table-container::before,
+.colleges-table-container::after {
+  content: '';
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  width: 30px;
+  pointer-events: none;
+  z-index: 1;
+  opacity: 0;
+  transition: opacity 0.3s ease;
+}
+
+.departments-table-container::before,
+.colleges-table-container::before {
+  left: 0;
+  background: linear-gradient(to right, rgba(255, 255, 255, 0.95), transparent);
+}
+
+.departments-table-container::after,
+.colleges-table-container::after {
+  right: 0;
+  background: linear-gradient(to left, rgba(255, 255, 255, 0.95), transparent);
+}
+
+.departments-table-container.scrollable-left::before,
+.colleges-table-container.scrollable-left::before {
+  opacity: 1;
+}
+
+.departments-table-container.scrollable-right::after,
+.colleges-table-container.scrollable-right::after {
+  opacity: 1;
+}
+
+.departments-table,
+.colleges-table {
   width: 100%;
   border-collapse: collapse;
+  min-width: 600px;
 }
 
 .departments-table th,
-.departments-table td {
+.departments-table td,
+.colleges-table th,
+.colleges-table td {
   padding: 12px 15px;
   text-align: left;
   border-bottom: 1px solid #eee;
 }
 
-.departments-table thead {
+.departments-table thead,
+.colleges-table thead {
   background-color: #333d52;
   color: white;
 }
 
-.departments-table th:first-child {
+.departments-table th,
+.colleges-table th {
+  background-color: #333d52;
+  color: white;
+  font-weight: bold;
+  white-space: nowrap;
+}
+
+.departments-table th:first-child,
+.colleges-table th:first-child {
   width: 50px;
   text-align: center;
 }
 
-.departments-table td:first-child {
-    text-align: center;
+.departments-table td:first-child,
+.colleges-table td:first-child {
+  text-align: center;
 }
 
-.departments-table tbody tr:nth-child(even) {
+.departments-table tbody tr:nth-child(even),
+.colleges-table tbody tr:nth-child(even) {
   background-color: #f8f8f8;
 }
 
-.departments-table tbody tr:hover {
+.departments-table tbody tr:hover,
+.colleges-table tbody tr:hover {
   background-color: #f0f0f0;
 }
 
@@ -138,6 +233,8 @@
   display: flex;
   gap: 5px;
   justify-content: center;
+  align-items: center;
+  flex-wrap: wrap;
 }
 
 .icon-button {
@@ -150,10 +247,13 @@
   align-items: center;
   justify-content: center;
   transition: color 0.2s ease, transform 0.1s ease;
+  touch-action: manipulation;
+  min-width: 32px;
+  min-height: 32px;
 }
 
 .icon-button:active {
-    transform: translateY(1px);
+  transform: translateY(1px);
 }
 
 .icon-button.delete-button {
@@ -172,11 +272,21 @@
   color: #0056b3;
 }
 
+.departments-table th input[type="checkbox"],
+.departments-table td.action-buttons input[type="checkbox"],
+.colleges-table th input[type="checkbox"],
+.colleges-table td.action-buttons input[type="checkbox"] {
+  width: 17px;
+  height: 17px;
+  cursor: pointer;
+  touch-action: manipulation;
+}
+
 .no-data-message {
-    text-align: center;
-    padding: 20px;
-    color: #666;
-    font-style: italic;
+  text-align: center;
+  padding: 20px;
+  color: #666;
+  font-style: italic;
 }
 
 .save-changes-footer {
@@ -194,4 +304,572 @@
 
 .action-button.save-changes:hover {
   background-color: #e6a700;
+}
+
+/* Modal Styles */
+.modal-overlay {
+  position: fixed;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  background: rgba(51, 51, 51, 0.6);
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  z-index: 999;
+  padding: 20px;
+  box-sizing: border-box;
+  overflow-y: auto;
+}
+
+.modal {
+  background: #fff;
+  padding: 20px;
+  width: 100%;
+  max-width: 400px;
+  border-radius: 8px;
+  box-shadow: 0 5px 15px rgba(0,0,0,0.3);
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.modal h3 {
+  margin: 0;
+  font-size: 20px;
+  color: #ffb800;
+  align-self: center;
+  margin-bottom: 10px;
+}
+
+.modal input,
+.modal textarea,
+.modal select {
+  width: 100%;
+  padding: 8px;
+  font-size: 14px;
+  border: 2px solid #092C4C;
+  background-color: transparent;
+  border-radius: 5px;
+  color: black;
+  box-sizing: border-box;
+}
+
+.modal textarea {
+  resize: vertical;
+  min-height: 80px;
+}
+
+.input-group {
+  position: relative;
+  margin-bottom: 16px;
+}
+
+.input-group label {
+  display: block;
+  margin-bottom: 6px;
+  font-weight: 500;
+  color: #333;
+  font-size: 14px;
+}
+
+.modal-actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 10px;
+  flex-wrap: wrap;
+  margin-top: 10px;
+}
+
+.modal-actions button {
+  background-color: rgb(6, 5, 64);
+  color: white;
+  font-weight: bold;
+  border: none;
+  border-radius: 10px;
+  padding: 8px 16px;
+  cursor: pointer;
+  touch-action: manipulation;
+  min-height: 44px;
+  font-size: 14px;
+}
+
+.modal-actions button:hover {
+  background-color: rgb(8, 7, 80);
+}
+
+.modal-button {
+  padding: 8px 16px;
+  border: none;
+  border-radius: 5px;
+  cursor: pointer;
+  font-weight: bold;
+  transition: background-color 0.3s ease;
+  touch-action: manipulation;
+  min-height: 44px;
+  width: 100%;
+  margin-bottom: 10px;
+}
+
+.modal-button.download {
+  background-color: #9f760c;
+  color: white;
+}
+
+.modal-button.download:hover {
+  background-color: #e6a700;
+}
+
+.modal-button.save {
+  background-color: #9f760c;
+  color: white;
+}
+
+.modal-button.save:hover {
+  background-color: #e6a700;
+}
+
+.modal-button.cancel {
+  background-color: #092C4C;
+  color: white;
+}
+
+.modal-button.cancel:hover {
+  background-color: #193e60;
+}
+
+/* ============================================
+   TABLE SCROLL BUTTONS
+   ============================================ */
+
+.table-scroll-wrapper {
+  position: relative;
+  margin-bottom: 20px;
+}
+
+.table-scroll-buttons {
+  display: none;
+  position: absolute;
+  top: 50%;
+  transform: translateY(-50%);
+  z-index: 10;
+  background: rgba(255, 255, 255, 0.95);
+  border: 2px solid #ffb800;
+  border-radius: 50%;
+  width: 44px;
+  height: 44px;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.15);
+  transition: all 0.3s ease;
+  touch-action: manipulation;
+}
+
+.table-scroll-buttons:hover {
+  background: #ffb800;
+  color: white;
+  transform: translateY(-50%) scale(1.1);
+}
+
+.table-scroll-buttons:active {
+  transform: translateY(-50%) scale(0.95);
+}
+
+.table-scroll-buttons.scroll-left {
+  left: 10px;
+}
+
+.table-scroll-buttons.scroll-right {
+  right: 10px;
+}
+
+.table-scroll-buttons:disabled {
+  opacity: 0.3;
+  cursor: not-allowed;
+  pointer-events: none;
+}
+
+.table-scroll-buttons svg {
+  font-size: 18px;
+  color: #ffb800;
+  transition: color 0.3s ease;
+}
+
+.table-scroll-buttons:hover svg {
+  color: white;
+}
+
+.table-scroll-buttons:disabled svg {
+  color: #999;
+}
+
+/* Scroll hint text */
+.table-scroll-hint {
+  display: none;
+  text-align: center;
+  padding: 8px;
+  font-size: 12px;
+  color: #666;
+  background: #f8f8f8;
+  border-radius: 4px;
+  margin-bottom: 8px;
+}
+
+.table-scroll-hint svg {
+  margin: 0 4px;
+  vertical-align: middle;
+}
+
+/* ============================================
+   TABLET STYLES (768px - 1024px)
+   ============================================ */
+
+@media screen and (max-width: 1024px) {
+  .departments-container,
+  .colleges-container {
+    padding: 15px;
+  }
+
+  .departments-title,
+  .colleges-title {
+    font-size: 22px;
+  }
+
+  .search-bar {
+    min-width: 200px;
+  }
+
+  .search-bar input {
+    width: 200px;
+  }
+
+  .departments-table th,
+  .departments-table td,
+  .colleges-table th,
+  .colleges-table td {
+    padding: 10px 12px;
+    font-size: 14px;
+  }
+
+  .modal {
+    max-width: 380px;
+    padding: 18px;
+  }
+}
+
+/* ============================================
+   MOBILE STYLES (< 768px)
+   ============================================ */
+
+@media screen and (max-width: 768px) {
+  .departments-container,
+  .colleges-container {
+    padding: 12px;
+    min-height: calc(100vh - 50px);
+  }
+
+  .departments-header,
+  .colleges-header {
+    flex-direction: column;
+    align-items: stretch;
+    margin-bottom: 15px;
+    gap: 12px;
+  }
+
+  .departments-title,
+  .colleges-title {
+    font-size: 20px;
+    text-align: center;
+  }
+
+  .search-bar {
+    width: 100%;
+    min-width: 100%;
+    border-radius: 8px;
+  }
+
+  .search-bar input {
+    width: 100%;
+    flex: 1;
+    padding: 10px 12px;
+    font-size: 16px; /* Prevents zoom on iOS */
+  }
+
+  .search-bar .search-button {
+    padding: 10px 12px;
+    font-size: 18px;
+  }
+
+  .departments-actions,
+  .colleges-actions {
+    margin-bottom: 15px;
+  }
+
+  .departments-actions .action-button,
+  .colleges-actions .action-button {
+    width: 44px;
+    height: 44px;
+    font-size: 18px;
+  }
+
+  .departments-table-container,
+  .colleges-table-container {
+    border-radius: 6px;
+    box-shadow: 0 1px 4px rgba(0, 0, 0, 0.1);
+  }
+
+  /* Show scroll buttons on mobile */
+  .table-scroll-wrapper {
+    position: relative;
+  }
+
+  .table-scroll-buttons {
+    display: flex;
+  }
+
+  .table-scroll-hint {
+    display: block;
+  }
+
+  .departments-table,
+  .colleges-table {
+    min-width: 500px;
+    font-size: 14px;
+  }
+
+  .departments-table th,
+  .colleges-table th {
+    padding: 10px 8px;
+    font-size: 12px;
+  }
+
+  .departments-table td,
+  .colleges-table td {
+    padding: 10px 8px;
+    font-size: 13px;
+  }
+
+  .departments-table th:first-child,
+  .colleges-table th:first-child {
+    width: 40px;
+    padding: 10px 5px;
+  }
+
+  .departments-table td:first-child,
+  .colleges-table td:first-child {
+    padding: 10px 5px;
+  }
+
+  .icon-button {
+    min-width: 36px;
+    min-height: 36px;
+    font-size: 18px;
+    padding: 6px;
+  }
+
+  .departments-table th input[type="checkbox"],
+  .departments-table td.action-buttons input[type="checkbox"],
+  .colleges-table th input[type="checkbox"],
+  .colleges-table td.action-buttons input[type="checkbox"] {
+    width: 20px;
+    height: 20px;
+  }
+
+  .action-buttons {
+    gap: 8px;
+    flex-wrap: wrap;
+  }
+
+  .modal-overlay {
+    padding: 10px;
+    align-items: flex-start;
+    padding-top: 20px;
+  }
+
+  .modal {
+    max-width: 100%;
+    width: 100%;
+    padding: 20px 16px;
+    border-radius: 12px;
+    margin: 0;
+  }
+
+  .modal h3 {
+    font-size: 18px;
+    margin-bottom: 15px;
+  }
+
+  .modal input,
+  .modal textarea,
+  .modal select {
+    width: 100%;
+    padding: 10px;
+    font-size: 16px; /* Prevents zoom on iOS */
+    border-radius: 6px;
+  }
+
+  .input-group {
+    margin-bottom: 18px;
+  }
+
+  .input-group label {
+    font-size: 14px;
+    margin-bottom: 8px;
+  }
+
+  .modal-actions {
+    flex-direction: column-reverse;
+    gap: 10px;
+    margin-top: 10px;
+  }
+
+  .modal-actions button {
+    width: 100%;
+    padding: 12px 16px;
+    font-size: 16px;
+    min-height: 48px;
+  }
+
+  .modal-button {
+    width: 100%;
+    padding: 12px 16px;
+    font-size: 16px;
+    min-height: 48px;
+  }
+
+  .save-changes-footer {
+    padding-top: 15px;
+  }
+
+  .action-button.save-changes {
+    width: 100%;
+    padding: 14px 20px;
+    font-size: 16px;
+    min-height: 48px;
+  }
+}
+
+/* ============================================
+   SMALL MOBILE STYLES (< 480px)
+   ============================================ */
+
+@media screen and (max-width: 480px) {
+  .departments-container,
+  .colleges-container {
+    padding: 10px;
+  }
+
+  .departments-title,
+  .colleges-title {
+    font-size: 18px;
+  }
+
+  .departments-table,
+  .colleges-table {
+    min-width: 450px;
+    font-size: 13px;
+  }
+
+  .departments-table th,
+  .colleges-table th {
+    padding: 8px 6px;
+    font-size: 11px;
+  }
+
+  .departments-table td,
+  .colleges-table td {
+    padding: 8px 6px;
+    font-size: 12px;
+  }
+
+  .departments-actions .action-button,
+  .colleges-actions .action-button {
+    width: 40px;
+    height: 40px;
+    font-size: 16px;
+  }
+
+  .modal {
+    padding: 16px 12px;
+  }
+
+  .modal h3 {
+    font-size: 16px;
+  }
+}
+
+/* ============================================
+   LANDSCAPE MOBILE ORIENTATION
+   ============================================ */
+
+@media screen and (max-width: 768px) and (orientation: landscape) {
+  .departments-container,
+  .colleges-container {
+    padding: 10px;
+  }
+
+  .departments-header,
+  .colleges-header {
+    flex-direction: row;
+    align-items: center;
+  }
+
+  .departments-title,
+  .colleges-title {
+    font-size: 18px;
+    text-align: left;
+  }
+
+  .search-bar {
+    width: auto;
+    min-width: 200px;
+  }
+
+  .search-bar input {
+    width: 180px;
+  }
+
+  .modal-overlay {
+    align-items: center;
+    padding: 20px;
+  }
+
+  .modal {
+    max-width: 500px;
+  }
+}
+
+/* ============================================
+   PRINT STYLES
+   ============================================ */
+
+@media print {
+  .departments-container,
+  .colleges-container {
+    background-color: white;
+    padding: 0;
+  }
+
+  .departments-header,
+  .colleges-header,
+  .departments-actions,
+  .colleges-actions,
+  .search-bar,
+  .action-buttons {
+    display: none;
+  }
+
+  .departments-table-container,
+  .colleges-table-container {
+    box-shadow: none;
+    border: 1px solid #ddd;
+  }
+
+  .departments-table th,
+  .colleges-table th {
+    background-color: #f5f5f5 !important;
+    color: #000 !important;
+  }
 }
