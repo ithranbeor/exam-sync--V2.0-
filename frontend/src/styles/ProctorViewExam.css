@@ -102,17 +102,20 @@
   border: 1px solid #dee2e6;
   text-align: center;
   font-size: 0.9em;
+  color: black;
 }
 
 .time-header,
 .time-cell {
   background-color: #f8f9fa;
   font-weight: bold;
+  color: black;
 }
 
 .day-header,
 .building-header {
   background-color: #f7f7f7;
+  color: black;
 }
 
 .building-group-header {
@@ -122,6 +125,7 @@
   padding: 12px;
   font-size: 1em;
   border: 1px solid #dee2e6;
+  color: black;
 }
 
 .current-time-slot {
@@ -131,10 +135,12 @@
 
 .empty-cell {
   background-color: #fff;
+  color: black;
 }
 
 .occupied-cell {
   background-color: #ffe8a1;
+  color: black;
 }
 
 .semester-selection-bottom {
@@ -170,4 +176,30 @@
 
 .error-message {
   color: #d9534f;
+}
+
+/* Custom select dropdown styling */
+.custom-select {
+  padding: 8px 12px;
+  border-radius: 8px;
+  border: 1px solid #ccc;
+  background-color: white;
+  font-size: 0.95em;
+  color: black !important;
+  cursor: pointer;
+  appearance: none;
+  -webkit-appearance: none;
+  -moz-appearance: none;
+  transition: border-color 0.2s ease, box-shadow 0.2s ease;
+}
+
+.custom-select:focus {
+  outline: none;
+  border-color: #f7b731;
+  box-shadow: 0 0 0 0.2rem rgba(247, 183, 49, 0.25);
+}
+
+.custom-select option {
+  color: black;
+  background-color: white;
 }

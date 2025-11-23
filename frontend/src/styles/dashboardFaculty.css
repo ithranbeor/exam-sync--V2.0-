@@ -464,6 +464,31 @@ button.view-button {
   overflow: hidden;
 }
 
+/* Ensure grid cells in ProctorViewExam have black text */
+.try-thing-card .cell,
+.try-thing-card .time-header,
+.try-thing-card .time-cell,
+.try-thing-card .day-header,
+.try-thing-card .building-header,
+.try-thing-card .building-group-header,
+.try-thing-card .empty-cell,
+.try-thing-card .occupied-cell,
+.try-thing-card .schedule-cell {
+  color: black !important;
+}
+
+/* Ensure dropdown selects have black text */
+.try-thing-card .custom-select,
+.try-thing-card select {
+  color: black !important;
+}
+
+.try-thing-card .custom-select option,
+.try-thing-card select option {
+  color: black !important;
+  background-color: white !important;
+}
+
 .try-thing-footer {
   margin-top: auto;
   display: flex;
@@ -772,6 +797,163 @@ button.view-button {
   .icon {
     width: 18px;
     height: 18px;
+  }
+}
+
+/* ======================= SMALL TABLET RESPONSIVENESS (770px - 924px) ======================= */
+@media (min-width: 770px) and (max-width: 924px) {
+  :root {
+    --sidebar-width: 220px;
+    --sidebar-closed-width: 0px;
+  }
+
+  /* Show hamburger menu button on small tablet */
+  .menu-toggle-btn {
+    display: block;
+  }
+
+  /* Sidebar starts off-screen */
+  .sidebar {
+    width: var(--sidebar-width);
+    transform: translateX(-100%);
+  }
+
+  /* Sidebar slides in when open */
+  .sidebar.open {
+    transform: translateX(0);
+  }
+
+  /* Show backdrop when sidebar is open */
+  .sidebar-backdrop.active {
+    display: block;
+  }
+
+  /* Main content takes full width */
+  .main-content {
+    margin-left: 0;
+    padding: 18px;
+    padding-top: 60px;
+    overflow-x: hidden;
+  }
+
+  .main-content.sidebar-open {
+    margin-left: 0;
+  }
+
+  /* Stack table cards vertically */
+  .try-things-grid {
+    grid-template-columns: 1fr;
+    height: auto;
+    gap: 15px;
+  }
+
+  .try-thing-card {
+    height: auto;
+    padding: 12px;
+    overflow: hidden;
+  }
+
+  /* Make tables responsive */
+  .try-thing-card table {
+    width: 100%;
+    border-collapse: collapse;
+    font-size: 13px;
+    color: black !important;
+  }
+
+  .try-thing-card table thead {
+    display: none;
+  }
+
+  .try-thing-card table tbody tr {
+    display: block;
+    margin-bottom: 12px;
+    border: 1px solid #ddd;
+    border-radius: 6px;
+    overflow: hidden;
+    box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+    background: white;
+  }
+
+  .try-thing-card table td {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 8px 12px;
+    border-bottom: 1px solid #eee;
+    min-height: 35px;
+    color: black !important;
+  }
+
+  .try-thing-card table th {
+    color: black !important;
+    background-color: #f5f5f5;
+  }
+
+  .try-thing-card table tbody tr td span {
+    color: black !important;
+  }
+
+  .try-thing-card table tbody tr td div {
+    color: black !important;
+  }
+
+  .try-thing-card {
+    color: black !important;
+  }
+
+  /* Style action buttons in rows */
+  .try-thing-card .action-buttons {
+    display: flex;
+    gap: 6px;
+    justify-content: flex-start;
+  }
+
+  .try-thing-card .icon-button {
+    font-size: 16px;
+    padding: 4px;
+  }
+
+  .content-header h1 {
+    font-size: 1.5rem;
+  }
+
+  .dashboard-grid {
+    grid-template-columns: 1fr;
+    gap: 15px;
+  }
+
+  .welcome-card {
+    grid-column: span 1;
+  }
+
+  .datetime-card {
+    grid-column: span 1;
+  }
+
+  .faculty-info-card {
+    grid-column: span 1;
+  }
+
+  .card {
+    padding: 15px;
+  }
+
+  .welcome-card h3 {
+    font-size: 1.3rem;
+  }
+
+  .welcome-card p {
+    font-size: 1rem;
+  }
+
+  .time-display {
+    font-size: 2.2rem;
+  }
+
+  .faculty-avatar {
+    width: 65px;
+    height: 65px;
   }
 }
 
