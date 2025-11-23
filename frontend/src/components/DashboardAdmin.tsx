@@ -98,15 +98,14 @@ const DashboardAdmin: React.FC = () => {
       clearTimeout(resizeTimer);
       resizeTimer = setTimeout(() => {
         const nowMobile = window.innerWidth <= 1024;
-        const wasMobile = isMobile;
         
-        // Update mobile state
-        setIsMobile(nowMobile);
-        
-        // When switching between mobile and desktop: reset sidebar state
-        if (wasMobile !== nowMobile) {
-          setIsSidebarOpen(false);
-        }
+        setIsMobile(prevMobile => {
+          // When switching between mobile and desktop: reset sidebar state
+          if (prevMobile !== nowMobile) {
+            setIsSidebarOpen(false);
+          }
+          return nowMobile;
+        });
       }, 150); // 150ms debounce
     };
 
@@ -119,7 +118,7 @@ const DashboardAdmin: React.FC = () => {
       clearTimeout(resizeTimer);
       window.removeEventListener('resize', handleResize);
     };
-  }, [isMobile]);
+  }, []); // Empty dependency array - only run on mount/unmount
 
   const handleLogout = () => {
     localStorage.removeItem('user');
