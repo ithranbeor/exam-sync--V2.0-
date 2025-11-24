@@ -49,7 +49,7 @@ const ResetPassword: React.FC = () => {
 
       if (res.status === 200) {
         toast.success('Password reset successful!');
-        setTimeout(() => navigate('/admin-login'), 2000);
+        setTimeout(() => navigate('/'), 2000);
       } else {
         toast.error('Failed to reset password.');
       }
