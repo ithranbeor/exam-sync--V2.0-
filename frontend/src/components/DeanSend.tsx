@@ -108,7 +108,6 @@ const DeanSender: React.FC<DeanSenderProps> = ({
     
     if (filteredExamData.length === 0) {
       toast.warn("No schedules to send");
-      console.log("📊 Debug - filteredExamData:", filteredExamData);
       return;
     }
     
@@ -119,12 +118,6 @@ const DeanSender: React.FC<DeanSenderProps> = ({
 
     setLoading(true);
     try {
-      console.log("📤 Sending schedule to dean...");
-      console.log("👤 User ID:", user.user_id);
-      console.log("👔 Dean User ID:", deanUserId);
-      console.log("📋 College:", collegeName);
-      console.log("📚 Total schedules:", filteredExamData.length);
-
       // ✅ Validate schedule data
       const validSchedules = filteredExamData.filter(exam => 
         exam.course_id && 

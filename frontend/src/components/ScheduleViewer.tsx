@@ -103,9 +103,6 @@ const SchedulerView: React.FC<SchedulerViewProps> = ({ user }) => {
 
       const realUserId = user.user_id;
 
-      console.log('========================================');
-      console.log('Scheduler User ID:', realUserId);
-
       try {
         const schedulerRolesResponse = await api.get('/tbl_user_role', {
           params: {
@@ -122,11 +119,9 @@ const SchedulerView: React.FC<SchedulerViewProps> = ({ user }) => {
         }
 
         const schedulerCollegeId = schedulerRoles[0].college_id;
-        console.log('Scheduler College ID:', schedulerCollegeId);
 
         const collegeResponse = await api.get(`/tbl_college/${schedulerCollegeId}/`);
         const collegeName = collegeResponse.data?.college_name;
-        console.log('Scheduler College Name:', collegeName);
         setSchedulerCollegeName(collegeName || "");
 
         const departmentsResponse = await api.get('/departments/', {
@@ -137,7 +132,6 @@ const SchedulerView: React.FC<SchedulerViewProps> = ({ user }) => {
 
         const departments = departmentsResponse.data;
         const departmentIds = departments?.map((d: any) => d.department_id) || [];
-        console.log('Department IDs under college:', departmentIds);
 
         const proctorRolesResponse = await api.get('/tbl_user_role', {
           params: {
@@ -153,8 +147,6 @@ const SchedulerView: React.FC<SchedulerViewProps> = ({ user }) => {
           return;
         }
 
-        console.log('Total proctors fetched:', proctorRoles.length);
-
         const matchingUserIds = new Set<number>();
 
         proctorRoles.forEach((p: any) => {
@@ -162,15 +154,12 @@ const SchedulerView: React.FC<SchedulerViewProps> = ({ user }) => {
 
           if (p.college_id && String(p.college_id) === String(schedulerCollegeId)) {
             matches = true;
-            console.log(`✓ Match (Direct College): User ${p.user_id} - College: ${p.college_id}`);
           }
           else if (p.department_id && departmentIds.includes(p.department_id)) {
             matches = true;
-            console.log(`✓ Match (Department): User ${p.user_id} - Dept: ${p.department_id}`);
           }
 
           if (!matches) {
-            console.log(`✗ No Match: User ${p.user_id} - College: ${p.college_id || 'null'}, Dept: ${p.department_id || 'null'}`);
           }
 
           if (matches) {
@@ -178,22 +167,9 @@ const SchedulerView: React.FC<SchedulerViewProps> = ({ user }) => {
           }
         });
 
-        console.log('Matching User IDs:', Array.from(matchingUserIds));
-
-        if (matchingUserIds.size === 0) {
-          console.log('No matching proctors found');
-          setAllCollegeUsers([]);
-          setProctors([]);
-          setIsLoadingData(false);
-          return;
-        }
-
         const usersResponse = await api.get('/users/');
         const allUsers = usersResponse.data;
         const userDetails = allUsers.filter((u: any) => matchingUserIds.has(u.user_id));
-
-        console.log('Final filtered users:', userDetails?.length || 0);
-        console.log('========================================');
 
         setAllCollegeUsers(userDetails || []);
         setProctors(userDetails || []);
@@ -228,7 +204,6 @@ const SchedulerView: React.FC<SchedulerViewProps> = ({ user }) => {
         setIsLoadingData(false);
         setCollegeDataReady(true);
       } catch (error) {
-        console.error("Error fetching scheduler data:", error);
         setIsLoadingData(false);
       }
     };
@@ -252,7 +227,6 @@ const SchedulerView: React.FC<SchedulerViewProps> = ({ user }) => {
         ]);
 
         if (examsResponse.data) {
-          console.log(`✅ Fetched ${examsResponse.data.length} schedules`);
 
           const invalidSchedules = examsResponse.data.filter((e: ExamDetail) =>
             !e.room_id || !e.exam_start_time || !e.exam_end_time
@@ -450,25 +424,12 @@ const SchedulerView: React.FC<SchedulerViewProps> = ({ user }) => {
 
   useEffect(() => {
     if (searchFilteredData.length > 0) {
-      console.log('📊 Total schedules in searchFilteredData:', searchFilteredData.length);
-      console.log('📅 Unique dates:', uniqueDates);
-      console.log('🏫 Total rooms:', Array.from(new Set(searchFilteredData.map(e => e.room_id))).length);
-
       const invalidSchedules = searchFilteredData.filter(e =>
         !e.room_id || !e.exam_start_time || !e.exam_end_time || !e.exam_date
       );
 
       if (invalidSchedules.length > 0) {
-        console.error('❌ Incomplete schedules:', invalidSchedules);
       }
-
-      uniqueDates.forEach(date => {
-        const dateSchedules = searchFilteredData.filter(e => e.exam_date === date);
-        console.log(`📅 ${date}: ${dateSchedules.length} schedules`);
-
-        const roomsForDate = Array.from(new Set(dateSchedules.map(e => e.room_id)));
-        console.log(`   🏫 Rooms: ${roomsForDate.join(', ')}`);
-      });
     }
   }, [searchFilteredData, uniqueDates]);
 
@@ -546,8 +507,6 @@ const SchedulerView: React.FC<SchedulerViewProps> = ({ user }) => {
         toast.warn(`No schedules found for ${schedulerCollegeName}`);
         return;
       }
-
-      console.log(`🗑️ Batch deleting ${examsToDelete.length} schedules for "${schedulerCollegeName}"`);
 
       const response = await api.post('/tbl_examdetails/batch-delete/', {
         college_name: schedulerCollegeName
@@ -1106,11 +1065,6 @@ const SchedulerView: React.FC<SchedulerViewProps> = ({ user }) => {
                 groupedData[key].push(exam);
               });
 
-              console.log(`📦 Grouped data for ${date}:`, Object.keys(groupedData).length, 'room groups');
-              Object.entries(groupedData).forEach(([key, exams]) => {
-                console.log(`   ${key}: ${exams.length} exam(s)`);
-              });
-
               return (
                 <div
                   key={`${date}-${p}`}
@@ -1349,11 +1303,6 @@ const SchedulerView: React.FC<SchedulerViewProps> = ({ user }) => {
                 const key = `${date}-${exam.room_id}`;
                 if (!groupedData[key]) groupedData[key] = [];
                 groupedData[key].push(exam);
-              });
-
-              console.log(`📦 Grouped data for ${date}:`, Object.keys(groupedData).length, 'room groups');
-              Object.entries(groupedData).forEach(([key, exams]) => {
-                console.log(`   ${key}: ${exams.length} exam(s)`);
               });
 
               return (

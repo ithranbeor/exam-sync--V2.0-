@@ -57,22 +57,12 @@ const EmailSender: React.FC<EmailSenderProps> = ({
       try {
         if (!user?.user_id) return;
 
-        console.log("🔍 EmailSender - Approval Status:", approvalStatus);
-        console.log("📊 EmailSender - Exam Data Count:", examData?.length || 0);
-        console.log("🏛️ EmailSender - College Name:", collegeName);
-
-        if (approvalStatus === 'approved' && examData && examData.length > 0) {
-          console.log("✅ Loading proctors from APPROVED schedule for college:", collegeName);
-          
-          // 🔒 CRITICAL: Filter exam data by scheduler's college FIRST
+        if (approvalStatus === 'approved' && examData.length > 0) {
           const collegeExamData = examData.filter(
             exam => exam.college_name === collegeName
           );
 
-          console.log(`🔍 Filtered to ${collegeExamData.length} exams for college: ${collegeName}`);
-
           if (collegeExamData.length === 0) {
-            console.warn("⚠️ No exams found for this college in approved schedule");
             toast.warn(`No exams found for ${collegeName} in the approved schedule`);
             setUsers([]);
             return;
@@ -80,13 +70,9 @@ const EmailSender: React.FC<EmailSenderProps> = ({
 
           const proctorIds = Array.from(
             new Set(
-              collegeExamData
-                .map(exam => exam.proctor_id)
-                .filter(Boolean)
+              collegeExamData.map(exam => exam.proctor_id).filter(Boolean)
             )
           ) as number[];
-
-          console.log(`👥 Proctor IDs from ${collegeName}:`, proctorIds);
 
           if (proctorIds.length === 0) {
             toast.warn(`No proctors assigned in the approved schedule for ${collegeName}`);
@@ -101,8 +87,6 @@ const EmailSender: React.FC<EmailSenderProps> = ({
             proctorIds.includes(u.user_id)
           );
 
-          console.log(`✅ Found ${proctorUsers.length} proctor users for ${collegeName}:`, 
-            proctorUsers.map((p: User) => `${p.first_name} ${p.last_name}`));
           setUsers(proctorUsers);
 
           const scheduleMap: Record<number, ProctorSchedule[]> = {};
@@ -121,14 +105,11 @@ const EmailSender: React.FC<EmailSenderProps> = ({
               course_id: exam.course_id,
               section_name: exam.section_name
             }));
-
-            console.log(`📅 ${proctor.first_name} ${proctor.last_name}: ${scheduleMap[proctor.user_id].length} exam(s) for ${collegeName}`);
           });
 
           setProctorSchedules(scheduleMap);
 
         } else {
-          console.log("⚠️ Using fallback: Loading all proctors from college");
           const schedulerRolesResponse = await api.get('/tbl_user_role', {
             params: {
               user_id: user.user_id,
@@ -169,7 +150,6 @@ const EmailSender: React.FC<EmailSenderProps> = ({
           setUsers(proctorUsers || []);
         }
       } catch (err) {
-        console.error("Error loading users:", err);
         toast.error("Failed to load users");
       }
     };
@@ -222,13 +202,7 @@ const EmailSender: React.FC<EmailSenderProps> = ({
     }
 
     emailBody += `Please ensure you arrive at least 15 minutes before the exam starts.\n\n`;
-    emailBody +=
-      `Best regards,\n` +
-      `${(schedulerFullName)}\n` +
-      `Scheduler, ${collegeName}\n` +
-      `${schedulerEmail}`;
-
-    return emailBody;
+    emailBody += `${schedulerFullName}\nScheduler, ${collegeName}\n${schedulerEmail}`;
 
     return emailBody;
   };
@@ -239,8 +213,10 @@ const EmailSender: React.FC<EmailSenderProps> = ({
       return;
     }
 
-    if (!selectedUsers.every(u => u.email_address)) {
-      toast.error("Some proctors don't have email addresses!");
+    const missingEmails = selectedUsers.filter(u => !u.email_address);
+    if (missingEmails.length > 0) {
+      const names = missingEmails.map(u => `${u.first_name} ${u.last_name}`).join(", ");
+      toast.error(`These proctors don't have email addresses: ${names}`);
       return;
     }
 
@@ -252,14 +228,8 @@ const EmailSender: React.FC<EmailSenderProps> = ({
     setLoading(true);
 
     try {
-      // Prepare emails data for real Gmail sending
       const emailsData = selectedUsers.map((proctor) => {
         const personalizedBody = generateProctorEmailBody(proctor);
-
-        console.log(`Preparing email for ${proctor.first_name} ${proctor.last_name}`);
-        console.log(`   Email: ${proctor.email_address}`);
-        console.log(`   Schedules: ${proctorSchedules[proctor.user_id]?.length || 0}`);
-
         return {
           user_id: proctor.user_id,
           email: proctor.email_address,
@@ -269,36 +239,66 @@ const EmailSender: React.FC<EmailSenderProps> = ({
         };
       });
 
-      // 📧 Send real Gmail emails via backend
-      console.log(`📬 Sending ${emailsData.length} real Gmail emails...`);
-      
+      console.log("📧 Sending emails:", {
+        count: emailsData.length,
+        sender_id: user?.user_id
+      });
+
       const response = await api.post('/send-proctor-emails/', {
         emails: emailsData,
         sender_id: user?.user_id
       });
 
-      const { sent_count, failed_emails } = response.data;
+      console.log("✅ Email response:", response.data);
 
-      if (sent_count > 0) {
-        toast.success(`Successfully sent ${sent_count} email(s) to Gmail!`);
-        console.log(`Successfully sent ${sent_count} Gmail emails`);
+      // ✅ Handle asynchronous response
+      if (response.data.status === "Emails are being processed") {
+        toast.success(
+          `Sending ${response.data.total_count} email(s) in background. You'll be notified when complete.`,
+          { autoClose: 5000 }
+        );
+        
+        // Close modal after short delay
+        setTimeout(onClose, 2000);
+      } else {
+        // Fallback for old response format (if backend changes)
+        const { sent_count, failed_emails, total_count } = response.data;
+
+        if (sent_count > 0) {
+          toast.success(
+            sent_count === total_count
+              ? `Successfully sent ${sent_count} email(s)`
+              : `Sent ${sent_count} of ${total_count} emails`,
+            { autoClose: 5000 }
+          );
+        }
+
+        if (failed_emails && failed_emails.length > 0) {
+          const failureDetails = failed_emails
+            .map((fail: any) => `• ${fail.name}: ${fail.reason}`)
+            .join('\n');
+
+          toast.error(
+            `${failed_emails.length} email(s) failed:\n${failureDetails}`,
+            { autoClose: 8000, style: { whiteSpace: 'pre-line' } }
+          );
+        }
+
+        if (sent_count === total_count) {
+          setTimeout(onClose, 2000);
+        }
       }
 
-      if (failed_emails && failed_emails.length > 0) {
-        console.error("❌ Failed emails:", failed_emails);
-        toast.warn(`${failed_emails.length} email(s) failed to send`);
-        failed_emails.forEach((fail: any) => {
-          console.error(`   - ${fail.name} (${fail.email}): ${fail.reason}`);
-        });
-      }
-
-      if (sent_count === emailsData.length) {
-        onClose(); // Only close if all succeeded
-      }
-
-    } catch (err: any) {
-      console.error("Error sending emails:", err);
-      toast.error(err?.response?.data?.error || "Failed to send emails");
+    } catch (error: any) {
+      console.error("❌ Email send error:", error);
+      
+      // Extract error message
+      const errorMsg = error.response?.data?.error || 
+                      error.response?.data?.detail || 
+                      error.message || 
+                      "Failed to send emails";
+      
+      toast.error(`Email Error: ${errorMsg}`, { autoClose: 8000 });
     } finally {
       setLoading(false);
     }
@@ -412,7 +412,7 @@ const EmailSender: React.FC<EmailSenderProps> = ({
             rows={6}
           />
           <div className="char-count">{body.length} characters</div>
-          
+
           {approvalStatus === 'approved' && (
             <p style={{ fontSize: '11px', color: '#666', marginTop: '5px' }}>
               Note: Real Gmail emails will be sent with personalized exam schedules

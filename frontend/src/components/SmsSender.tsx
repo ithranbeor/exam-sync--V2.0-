@@ -56,10 +56,6 @@ const SmsSender: React.FC<SmsSenderProps> = ({
       try {
         if (!user?.user_id) return;
 
-        console.log("🔍 SmsSender - Approval Status:", approvalStatus);
-        console.log("📊 SmsSender - Exam Data Count:", examData?.length || 0);
-        console.log("🏛️ SmsSender - College Name:", collegeName);
-
         if (approvalStatus === 'approved' && examData && examData.length > 0) {
           console.log("✅ Loading proctors from APPROVED schedule for college:", collegeName);
           
@@ -121,7 +117,6 @@ const SmsSender: React.FC<SmsSenderProps> = ({
               section_name: exam.section_name
             }));
 
-            console.log(`📅 ${proctor.first_name} ${proctor.last_name}: ${scheduleMap[proctor.user_id].length} exam(s) for ${collegeName}`);
           });
 
           setProctorSchedules(scheduleMap);

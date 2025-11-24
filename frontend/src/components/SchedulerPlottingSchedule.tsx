@@ -1245,12 +1245,6 @@ const SchedulerPlottingSchedule: React.FC<SchedulerProps> = ({ user, onScheduleC
       const randomDate = sortedDates[Math.floor(Math.random() * sortedDates.length)];
       courseDateAssignment.set(courseId, randomDate);
     });
-
-    // Evolution
-    console.log("🧬 Starting genetic algorithm...");
-    console.log(`📊 Scheduling ${allSections.length} sections across ${sortedDates.length} dates`);
-    console.log(`⏰ Valid time slots: ${validTimes.length} slots`);
-    console.log(`🏫 Total rooms available: ${roomCapacityMap.size}`);
     
     toast.info("Generating schedule... This may take a moment.", { autoClose: 2000 });
 
@@ -1494,13 +1488,6 @@ const SchedulerPlottingSchedule: React.FC<SchedulerProps> = ({ user, onScheduleC
       alert("No valid schedules to save. Please adjust constraints.");
       return;
     }
-
-    console.log(`💾 Saving ${scheduledExams.length} exam schedules...`);
-    console.log(`📊 Time slot distribution:`, scheduledExams.reduce((acc, exam) => {
-      const time = exam.exam_start_time.slice(11, 16);
-      acc[time] = (acc[time] || 0) + 1;
-      return acc;
-    }, {} as Record<string, number>));
 
     try {
       await api.post('/tbl_examdetails', scheduledExams);
