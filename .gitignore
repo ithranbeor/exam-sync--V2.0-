@@ -36,3 +36,7 @@ db.sqlite3
 # Optional: exclude Django migrations if you prefer
 # **/migrations/*.py
 # **/migrations/*.pyc
+
+# Environment files
+.env
+*.env
