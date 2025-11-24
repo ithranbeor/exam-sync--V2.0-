@@ -42,7 +42,7 @@ from django.conf import settings
 from django.db import transaction
 from django.utils import timezone
 from uuid import uuid4
-import threading
+from threading import Thread
 
 import secrets
 from django.core.cache import cache
@@ -67,18 +67,23 @@ def tbl_available_rooms_list(request):
         return Response(serializer.data)
     
     elif request.method == 'POST':
+        # Log the incoming data for debugging
+        print("📥 Incoming available_rooms POST data:", request.data)
+        
         serializer = TblAvailableRoomsSerializer(data=request.data)
         if serializer.is_valid():
             try:
                 serializer.save()
                 return Response(serializer.data, status=status.HTTP_201_CREATED)
             except Exception as e:
+                print("❌ Error saving available room:", str(e))
                 return Response({
                     'error': str(e),
                     'detail': 'Failed to save available room'
                 }, status=status.HTTP_400_BAD_REQUEST)
         
         # Log validation errors
+        print("❌ Validation errors:", serializer.errors)
         return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
 
 @api_view(['DELETE'])
@@ -181,6 +186,7 @@ def send_schedule_to_dean(request):
     """
     serializer = ScheduleSendSerializer(data=request.data)
     if not serializer.is_valid():
+        print("❌ Validation errors:", serializer.errors)
         return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
 
     user_id = request.data.get("user_id")
@@ -188,13 +194,20 @@ def send_schedule_to_dean(request):
         return Response({"error": "Missing user_id"}, status=status.HTTP_400_BAD_REQUEST)
 
     try:
+        print(f"📥 Received request from user_id: {user_id}")
+        print(f"📋 College: {serializer.validated_data.get('college_name')}")
+
+        # 1️⃣ Find scheduler's college (role_id = 3)
         scheduler_role = TblUserRole.objects.filter(user_id=user_id, role_id=3).first()
         if not scheduler_role:
+            print(f"❌ No scheduler role found for user {user_id}")
             return Response(
                 {"error": "User is not a scheduler or has no college"}, 
                 status=status.HTTP_404_NOT_FOUND
             )
-        
+
+        print(f"✅ Found scheduler role - College ID: {scheduler_role.college_id}")
+
         # 2️⃣ Find dean in the same college (role_id = 1)
         dean_role = TblUserRole.objects.filter(
             college_id=scheduler_role.college_id, 
@@ -202,17 +215,23 @@ def send_schedule_to_dean(request):
         ).first()
         
         if not dean_role:
+            print(f"❌ No dean found for college {scheduler_role.college_id}")
             return Response(
                 {"error": "No dean found for this college"}, 
                 status=status.HTTP_404_NOT_FOUND
             )
 
+        print(f"✅ Found dean role - User ID: {dean_role.user_id}")
+
         dean_user = TblUsers.objects.filter(user_id=dean_role.user_id).first()
         if not dean_user:
+            print(f"❌ Dean user record not found for user_id {dean_role.user_id}")
             return Response(
                 {"error": "Dean user record not found"}, 
                 status=status.HTTP_404_NOT_FOUND
             )
+
+        print(f"✅ Found dean user: {dean_user.first_name} {dean_user.last_name}")
 
         # 3️⃣ Create schedule approval record with scheduler's user_id
         request_id = uuid4()
@@ -228,6 +247,7 @@ def send_schedule_to_dean(request):
             "submitted_by_id": user_id,  # ✅ ADD THIS - Store scheduler's ID
         }
 
+        print(f"📦 Creating schedule approval record...")
         approval = TblScheduleapproval.objects.create(
             request_id=request_id,
             submitted_by_id=user_id,  # ✅ This is the scheduler's user_id
@@ -239,8 +259,14 @@ def send_schedule_to_dean(request):
             submitted_at=timezone.now(),
             created_at=timezone.now(),
         )
+        print(f"✅ Created approval record: {request_id}")
+        print(f"   - Status: {approval.status}")
+        print(f"   - College: {approval.college_name}")
+        print(f"   - Dean ID: {approval.dean_user_id}")
+        print(f"   - Scheduler ID: {approval.submitted_by_id}")  # ✅ Log this
 
         # 4️⃣ Send dean notification
+        print(f"📧 Creating notification for dean user_id: {dean_role.user_id}")
         notification = TblNotification.objects.create(
             user_id=dean_role.user_id,
             sender_id=user_id,  # ✅ This is the scheduler
@@ -253,6 +279,10 @@ def send_schedule_to_dean(request):
             priority=1,
             created_at=timezone.now(),
         )
+        print(f"✅ Created notification: {notification.notification_id}")
+        print(f"   - For user: {notification.user_id}")
+        print(f"   - From user: {notification.sender_id}")
+        print(f"   - Title: {notification.title}")
 
         return Response(
             {
@@ -269,6 +299,7 @@ def send_schedule_to_dean(request):
         )
 
     except Exception as e:
+        print(f"💥 Error sending schedule: {str(e)}")
         import traceback
         traceback.print_exc()
         return Response(
@@ -300,7 +331,9 @@ def tbl_scheduleapproval_list(request):
                 approvals = approvals[:int(limit)]
             except ValueError:
                 pass
-                
+        
+        print(f"🔍 Fetching approvals - status: {status}, college: {college_name}, count: {approvals.count()}")
+        
         serializer = TblScheduleapprovalSerializer(approvals, many=True)
         return Response(serializer.data)
 
@@ -374,6 +407,7 @@ def tbl_examdetails_list(request):
             return Response(serializer.data)
         
         except Exception as e:
+            print(f"❌ Error in tbl_examdetails GET: {str(e)}")
             import traceback
             traceback.print_exc()
             return Response(
@@ -383,18 +417,21 @@ def tbl_examdetails_list(request):
 
     elif request.method == 'POST':
         many = isinstance(request.data, list)
+        print("📦 Incoming exam details data:", request.data)
         serializer = TblExamdetailsSerializer(data=request.data, many=many)
         if serializer.is_valid():
             try:
                 serializer.save()
                 return Response(serializer.data, status=status.HTTP_201_CREATED)
             except Exception as e:
+                print(f"❌ Error saving exam details: {str(e)}")
                 import traceback
                 traceback.print_exc()
                 return Response(
                     {'error': str(e), 'detail': 'Failed to save exam details'},
                     status=status.HTTP_400_BAD_REQUEST
                 )
+        print("❌ Validation errors:", serializer.errors)
         return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
 
 @api_view(['GET', 'PUT', 'DELETE'])
@@ -441,18 +478,23 @@ def tbl_modality_list(request):
             room_type = request.GET.get('room_type')
             user_id = request.GET.get('user_id')  # ✅ ADD THIS
 
+            print(f"📥 Modality GET request - course_id: {course_id}, program_id: {program_id}, user_id: {user_id}")
+
             # ✅ ADD: Filter by user_id
             if user_id:
                 queryset = queryset.filter(user__user_id=user_id)
+                print(f"🔍 Filtering by user_id: {user_id}")
 
             # Handle comma-separated course_ids
             if course_id:
                 course_ids = [cid.strip() for cid in course_id.split(',') if cid.strip()]
+                print(f"🔍 Filtering by course_ids: {course_ids}")
                 queryset = queryset.filter(course_id__in=course_ids)
             
             # Handle comma-separated program_ids
             if program_id:
                 program_ids = [pid.strip() for pid in program_id.split(',') if pid.strip()]
+                print(f"🔍 Filtering by program_ids: {program_ids}")
                 queryset = queryset.filter(program_id__in=program_ids)
             
             if section_name:
@@ -461,11 +503,14 @@ def tbl_modality_list(request):
                 queryset = queryset.filter(modality_type=modality_type)
             if room_type:
                 queryset = queryset.filter(room_type=room_type)
+
+            print(f"✅ Found {queryset.count()} modalities")
             
             serializer = TblModalitySerializer(queryset, many=True)
             return Response(serializer.data)
         
         except Exception as e:
+            print(f"❌ Error in tbl_modality_list: {str(e)}")
             import traceback
             traceback.print_exc()
             return Response(
@@ -474,17 +519,23 @@ def tbl_modality_list(request):
             )
     
     elif request.method == 'POST':
+        # ✅ ADD: Log incoming data
+        print("📥 Incoming modality POST data:", request.data)
+        
         serializer = TblModalitySerializer(data=request.data)
         if serializer.is_valid():
             try:
                 serializer.save()
+                print(f"✅ Modality created: ID {serializer.data.get('modality_id')}")
                 return Response(serializer.data, status=status.HTTP_201_CREATED)
             except Exception as e:
+                print(f"❌ Error saving modality: {str(e)}")
                 return Response({
                     'error': str(e),
                     'detail': 'Failed to save modality'
                 }, status=status.HTTP_400_BAD_REQUEST)
         
+        print(f"❌ Validation errors: {serializer.errors}")
         return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
     
 @api_view(['POST'])
@@ -525,6 +576,7 @@ def tbl_examdetails_batch_delete(request):
             }, status=status.HTTP_400_BAD_REQUEST)
             
     except Exception as e:
+        print(f"❌ Error in batch delete: {str(e)}")
         return Response({
             'error': str(e),
             'detail': 'Failed to delete exam details'
@@ -550,7 +602,9 @@ def tbl_modality_detail(request, pk):
         return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
 
     elif request.method == 'DELETE':
+        print(f"🗑️ Deleting modality {pk}")
         instance.delete()
+        print(f"✅ Modality {pk} deleted successfully")
         return Response(status=status.HTTP_204_NO_CONTENT)
     
 @api_view(['GET', 'POST', 'DELETE'])
@@ -795,19 +849,25 @@ def accounts_list(request):
         serializer = TblUsersSerializer(users, many=True)
         return Response(serializer.data)
 
-    elif request.method == 'POST':        
+    elif request.method == 'POST':
+        # Log incoming data for debugging
+        print("📥 Creating account with data:", request.data)
+        
         serializer = TblUsersSerializer(data=request.data)
         if serializer.is_valid():
             try:
                 # The serializer's create method will handle password hashing
                 user = serializer.save()
+                print(f"✅ Account created: {user.user_id} - {user.first_name} {user.last_name}")
                 return Response(serializer.data, status=status.HTTP_201_CREATED)
             except Exception as e:
+                print(f"❌ Error creating account: {str(e)}")
                 return Response({
                     'error': str(e),
                     'detail': 'Failed to create account'
                 }, status=status.HTTP_400_BAD_REQUEST)
         
+        print(f"❌ Validation errors: {serializer.errors}")
         return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
 
 
@@ -1107,18 +1167,14 @@ def request_password_change(request):
         return Response({'error': 'No account found with this email.'}, status=status.HTTP_404_NOT_FOUND)
 
     try:
-        # Generate token
         token = secrets.token_urlsafe(32)
         uid = str(user.pk)
 
-        # Store in cache
         cache_key = f"password_reset_{uid}"
         cache.set(cache_key, token, timeout=15 * 60)
 
-        # Build reset link
         reset_link = f"{settings.FRONTEND_URL}/reset-password?uid={uid}&token={token}"
 
-        # Email content
         subject = "Password Reset Request"
         message = (
             f"Hi {user.first_name},\n\n"
@@ -1128,187 +1184,110 @@ def request_password_change(request):
             f"Best,\nExamSync Team"
         )
 
-        # ✅ FIX: Send email synchronously with proper error handling
-        try:
-            send_mail(
-                subject=subject,
-                message=message,
-                from_email=settings.DEFAULT_FROM_EMAIL,
-                recipient_list=[email],
-                fail_silently=False,  # Raise exceptions on failure
-            )
-            print(f"✅ Password reset email sent successfully to {email}")
-            
-            return Response({
-                'message': 'Password reset link has been sent to your email!'
-            }, status=status.HTTP_200_OK)
-            
-        except Exception as email_error:
-            print(f"❌ Email sending failed: {str(email_error)}")
-            
-            # Log detailed error for debugging
-            import traceback
-            traceback.print_exc()
-            
-            return Response({
-                'error': 'Failed to send password reset email. Please try again later.',
-                'detail': str(email_error) if settings.DEBUG else None
-            }, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
-
-    except Exception as e:
-        print(f"❌ Error in password reset: {str(e)}")
-        import traceback
-        traceback.print_exc()
-        
-        return Response({
-            'error': 'Failed to process password reset request.',
-            'detail': str(e) if settings.DEBUG else None
-        }, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
-
-def send_emails_bg(emails_data, sender_id):
-    """Background thread for sending emails"""
-    sent_count = 0
-    failed_emails = []
-
-    for email_data in emails_data:
-        proctor_email = email_data.get("email", "").strip()
-        proctor_name = email_data.get("name", "Unknown")
-        subject = email_data.get("subject", "").strip()
-        message = email_data.get("message", "").strip()
-        user_id = email_data.get("user_id")
-
-        # Validate required fields
-        if not proctor_email:
-            failed_emails.append({
-                "name": proctor_name,
-                "email": "N/A",
-                "reason": "Email address missing"
-            })
-            continue
-
-        if not subject or not message:
-            reason = "Subject missing" if not subject else "Message missing"
-            failed_emails.append({
-                "name": proctor_name,
-                "email": proctor_email,
-                "reason": reason
-            })
-            continue
-
-        # Send email
-        try:
-            send_mail(
-                subject=subject,
-                message=message,
-                from_email=settings.DEFAULT_FROM_EMAIL,
-                recipient_list=[proctor_email],
-                fail_silently=False,
-            )
-
-            # Create notification in database
-            if user_id and sender_id:
-                try:
-                    # ✅ Verify user exists before creating notification
-                    from .models import TblUsers
-                    if TblUsers.objects.filter(user_id=user_id).exists():
-                        TblNotification.objects.create(
-                            user_id=user_id,
-                            sender_id=sender_id,
-                            title=subject,
-                            message=message[:500],  # Truncate long messages
-                            type="email",
-                            status="sent",
-                            is_seen=False,
-                            priority=2,
-                            created_at=timezone.now()
-                        )
-                    else:
-                        print(f"⚠️ User {user_id} not found, skipping notification")
-                except Exception as notif_error:
-                    print(f"⚠️ Failed to create notification for {proctor_name}: {notif_error}")
-                    import traceback
-                    traceback.print_exc()
-
-            sent_count += 1
-            print(f"✅ Email sent to {proctor_name} ({proctor_email})")
-
-        except Exception as e:
-            error_msg = str(e)
-            print(f"❌ Failed to send email to {proctor_email}: {error_msg}")
-            failed_emails.append({
-                "name": proctor_name,
-                "email": proctor_email,
-                "reason": error_msg
-            })
-
-    print(f"📊 Background email result: {sent_count}/{len(emails_data)} sent")
-    if failed_emails:
-        print(f"❌ Failed emails: {failed_emails}")
-
-
-@api_view(["POST"])
-@permission_classes([AllowAny])
-def send_proctor_emails(request):
-    """
-    Sends proctor emails asynchronously in a background thread.
-    Returns immediately with status 200.
-    """
-    try:
-        # ✅ DEBUG: Log incoming request
-        print("📧 Received email request")
-        print(f"Request data: {request.data}")
-        
-        emails_data = request.data.get("emails", [])
-        sender_id = request.data.get("sender_id")
-
-        # ✅ DEBUG: Log extracted data
-        print(f"Emails count: {len(emails_data)}")
-        print(f"Sender ID: {sender_id}")
-
-        # Validation
-        if not emails_data:
-            print("❌ No emails_data provided")
-            return Response(
-                {"error": "No emails to send"},
-                status=status.HTTP_400_BAD_REQUEST
-            )
-
-        if not sender_id:
-            print("❌ No sender_id provided")
-            return Response(
-                {"error": "sender_id is required"},
-                status=status.HTTP_400_BAD_REQUEST
-            )
-
-        # ✅ Verify email settings are configured
-        if not settings.EMAIL_HOST_USER or not settings.EMAIL_HOST_PASSWORD:
-            return Response(
-                {"error": "Email configuration missing. Check EMAIL_HOST_USER and EMAIL_HOST_PASSWORD"},
-                status=status.HTTP_500_INTERNAL_SERVER_ERROR
-            )
+        def send_email_async():
+            try:
+                send_mail(subject, message, settings.DEFAULT_FROM_EMAIL, [email])
+                print(f"✅ Password reset email sent to {email}")
+            except Exception as e:
+                print(f"❌ Failed to send email: {str(e)}")
 
         # Start background thread
-        thread = threading.Thread(
-            target=send_emails_bg,
-            args=(emails_data, sender_id),
-            daemon=True  # ✅ Ensures thread closes when main process ends
-        )
-        thread.start()
+        Thread(target=send_email_async).start()
 
+        # ✅ Return immediately without waiting for email
         return Response({
-            "status": "Emails are being processed",
-            "total_count": len(emails_data),
-            "message": f"Processing {len(emails_data)} email(s) in background"
+            'message': 'Password reset link will be sent to your email shortly!'
         }, status=status.HTTP_200_OK)
 
     except Exception as e:
+        print(f"❌ Error in password reset: {str(e)}")
+        return Response({
+            'error': 'Failed to process password reset request.'
+        }, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+
+@api_view(['POST'])
+@permission_classes([AllowAny])
+def send_proctor_emails(request):
+    """
+    Send real Gmail emails to proctors with their personalized schedules
+    """
+    try:
+        emails_data = request.data.get('emails', [])
+        sender_id = request.data.get('sender_id')
+        
+        if not emails_data:
+            return Response(
+                {'error': 'No emails to send'}, 
+                status=status.HTTP_400_BAD_REQUEST
+            )
+        
+        sent_count = 0
+        failed_emails = []
+        
+        for email_data in emails_data:
+            proctor_email = email_data.get('email')
+            proctor_name = email_data.get('name')
+            subject = email_data.get('subject')
+            message = email_data.get('message')
+            
+            if not all([proctor_email, subject, message]):
+                failed_emails.append({
+                    'email': proctor_email,
+                    'reason': 'Missing required fields'
+                })
+                continue
+            
+            try:
+                # Send actual email via Gmail SMTP
+                send_mail(
+                    subject=subject,
+                    message=message,
+                    from_email=settings.DEFAULT_FROM_EMAIL,
+                    recipient_list=[proctor_email],
+                    fail_silently=False,
+                )
+                
+                # Also create in-app notification for record
+                TblNotification.objects.create(
+                    user_id=email_data.get('user_id'),
+                    sender_id=sender_id,
+                    title=subject,
+                    message=message,
+                    type='email',
+                    status='sent',
+                    is_seen=False,
+                    priority=2,
+                    created_at=timezone.now()
+                )
+                
+                sent_count += 1
+                print(f"✅ Email sent to {proctor_name} ({proctor_email})")
+                
+            except Exception as e:
+                print(f"❌ Failed to send email to {proctor_email}: {str(e)}")
+                failed_emails.append({
+                    'email': proctor_email,
+                    'name': proctor_name,
+                    'reason': str(e)
+                })
+        
+        response_data = {
+            'sent_count': sent_count,
+            'total_count': len(emails_data),
+            'success': sent_count > 0
+        }
+        
+        if failed_emails:
+            response_data['failed_emails'] = failed_emails
+        
+        return Response(response_data, status=status.HTTP_200_OK)
+        
+    except Exception as e:
+        print(f"💥 Error in send_proctor_emails: {str(e)}")
         import traceback
         traceback.print_exc()
-        
-        error_detail = str(e) if settings.DEBUG else "Internal server error"
-        
         return Response(
-            {"error": "Failed to process request", "detail": error_detail},
+            {'error': str(e), 'detail': 'Failed to send emails'}, 
             status=status.HTTP_500_INTERNAL_SERVER_ERROR
         )
     
@@ -1364,12 +1343,17 @@ def login_faculty(request):
 
     try:
         user = TblUsers.objects.get(user_id=user_id)
+        print(f"🔍 Attempting login for {user_id}")
+
         # Check account status
+        print(f"User status from DB: {user.status}")
         if user.status and user.status.lower() != 'active':
+            print("❌ Account inactive")
             return Response({'message': 'Account is not active'}, status=status.HTTP_401_UNAUTHORIZED)
 
         # Check password hash
         if not check_password(password, user.password):
+            print("❌ Password mismatch")
             return Response({'message': 'Invalid credentials'}, status=status.HTTP_401_UNAUTHORIZED)
 
         # Token generation
@@ -1378,6 +1362,7 @@ def login_faculty(request):
         # Get roles (case-insensitive)
         user_roles = TblUserRole.objects.filter(user=user, status__iexact='active')
         roles_data = UserRoleSerializer(user_roles, many=True).data
+        print("✅ Roles found:", roles_data)
 
         return Response({
             'token': token,
@@ -1389,9 +1374,11 @@ def login_faculty(request):
         }, status=status.HTTP_200_OK)
 
     except TblUsers.DoesNotExist:
+        print("❌ No such user found")
         return Response({'message': 'Invalid credentials'}, status=status.HTTP_401_UNAUTHORIZED)
 
     except Exception as e:
+        print("💥 Server error:", str(e))
         return
 
 # ============================================================
@@ -1425,6 +1412,7 @@ def confirm_password_change(request):
 
     cache.delete(cache_key)
 
+    print(f"✅ Password successfully changed for user {user.user_id}")
     return Response({"message": "Password changed successfully!"}, status=status.HTTP_200_OK)
 
 # ============================================================
@@ -1498,6 +1486,7 @@ def user_avatar_upload(request, user_id):
         }, status=status.HTTP_200_OK)
         
     except Exception as e:
+        print(f"❌ Error processing avatar: {str(e)}")
         import traceback
         traceback.print_exc()
         return Response({
@@ -1544,15 +1533,20 @@ def create_account_with_password(request):
             last_name = data.get('last_name', '')
             user_id = data.get('user_id', '')
             data['password'] = f"{last_name}@{user_id}"
-                
+        
+        print(f"📥 Creating account for user {data.get('user_id')} with data: {data}")
+        
         serializer = TblUsersSerializer(data=data)
         if serializer.is_valid():
             user = serializer.save()
+            print(f"✅ Account created successfully: {user.user_id}")
             return Response(UserSerializer(user).data, status=status.HTTP_201_CREATED)
         
+        print(f"❌ Serializer validation errors: {serializer.errors}")
         return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
         
     except Exception as e:
+        print(f"❌ Error creating account: {str(e)}")
         import traceback
         traceback.print_exc()
         return Response({
@@ -1661,6 +1655,7 @@ def tbl_examperiod_bulk_update(request):
                 try:
                     college_obj = TblCollege.objects.get(college_name=college_identifier)
                 except TblCollege.DoesNotExist:
+                    print(f"College not found: {college_identifier}")
                     continue
             
             # Check if this college already has an exam period on this date
@@ -1754,6 +1749,7 @@ def tbl_user_role_list(request):
         
 
     elif request.method == 'POST':
+        print(request.data)
         serializer = TblUserRoleSerializer(data=request.data)
         if serializer.is_valid():
             serializer.save()
