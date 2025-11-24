@@ -44,9 +44,9 @@ INSTALLED_APPS = [
 # MIDDLEWARE
 # ──────────────────────────────────────────────
 MIDDLEWARE = [
-    "corsheaders.middleware.CorsMiddleware",
     "django.middleware.security.SecurityMiddleware",
     "whitenoise.middleware.WhiteNoiseMiddleware",
+    "corsheaders.middleware.CorsMiddleware",  # Must be before CommonMiddleware
     "django.contrib.sessions.middleware.SessionMiddleware",
     "django.middleware.common.CommonMiddleware",
     "django.middleware.csrf.CsrfViewMiddleware",
@@ -60,11 +60,9 @@ MIDDLEWARE = [
 # ──────────────────────────────────────────────
 CORS_ALLOWED_ORIGINS = [
     "https://exam-sync-v2-0-lkat.onrender.com",
-    "https://exam-sync-v2-0-mwnp.onrender.com",  
-    "http://localhost:5173",                     
-    "http://127.0.0.1:5173", 
+    "http://localhost:5173",
+    "http://127.0.0.1:5173",
 ]
-
 
 CORS_ALLOW_CREDENTIALS = True
 

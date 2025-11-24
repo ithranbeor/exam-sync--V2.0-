@@ -57,12 +57,17 @@ const EmailSender: React.FC<EmailSenderProps> = ({
       try {
         if (!user?.user_id) return;
 
-        if (approvalStatus === 'approved' && examData.length > 0) {
+        if (approvalStatus === 'approved' && examData && examData.length > 0) {
+          console.log("✅ Loading proctors from APPROVED schedule for college:", collegeName);
+          
+          // 🔒 CRITICAL: Filter exam data by scheduler's college FIRST
           const collegeExamData = examData.filter(
             exam => exam.college_name === collegeName
           );
 
+
           if (collegeExamData.length === 0) {
+            console.warn("⚠️ No exams found for this college in approved schedule");
             toast.warn(`No exams found for ${collegeName} in the approved schedule`);
             setUsers([]);
             return;
@@ -70,7 +75,9 @@ const EmailSender: React.FC<EmailSenderProps> = ({
 
           const proctorIds = Array.from(
             new Set(
-              collegeExamData.map(exam => exam.proctor_id).filter(Boolean)
+              collegeExamData
+                .map(exam => exam.proctor_id)
+                .filter(Boolean)
             )
           ) as number[];
 
@@ -87,6 +94,7 @@ const EmailSender: React.FC<EmailSenderProps> = ({
             proctorIds.includes(u.user_id)
           );
 
+          proctorUsers.map((p: User) => `${p.first_name} ${p.last_name}`);
           setUsers(proctorUsers);
 
           const scheduleMap: Record<number, ProctorSchedule[]> = {};
@@ -105,11 +113,13 @@ const EmailSender: React.FC<EmailSenderProps> = ({
               course_id: exam.course_id,
               section_name: exam.section_name
             }));
+
           });
 
           setProctorSchedules(scheduleMap);
 
         } else {
+          console.log("⚠️ Using fallback: Loading all proctors from college");
           const schedulerRolesResponse = await api.get('/tbl_user_role', {
             params: {
               user_id: user.user_id,
@@ -150,6 +160,7 @@ const EmailSender: React.FC<EmailSenderProps> = ({
           setUsers(proctorUsers || []);
         }
       } catch (err) {
+        console.error("Error loading users:", err);
         toast.error("Failed to load users");
       }
     };
@@ -202,7 +213,13 @@ const EmailSender: React.FC<EmailSenderProps> = ({
     }
 
     emailBody += `Please ensure you arrive at least 15 minutes before the exam starts.\n\n`;
-    emailBody += `${schedulerFullName}\nScheduler, ${collegeName}\n${schedulerEmail}`;
+    emailBody +=
+      `Best regards,\n` +
+      `${(schedulerFullName)}\n` +
+      `Scheduler, ${collegeName}\n` +
+      `${schedulerEmail}`;
+
+    return emailBody;
 
     return emailBody;
   };
@@ -213,10 +230,8 @@ const EmailSender: React.FC<EmailSenderProps> = ({
       return;
     }
 
-    const missingEmails = selectedUsers.filter(u => !u.email_address);
-    if (missingEmails.length > 0) {
-      const names = missingEmails.map(u => `${u.first_name} ${u.last_name}`).join(", ");
-      toast.error(`These proctors don't have email addresses: ${names}`);
+    if (!selectedUsers.every(u => u.email_address)) {
+      toast.error("Some proctors don't have email addresses!");
       return;
     }
 
@@ -228,8 +243,14 @@ const EmailSender: React.FC<EmailSenderProps> = ({
     setLoading(true);
 
     try {
+      // Prepare emails data for real Gmail sending
       const emailsData = selectedUsers.map((proctor) => {
         const personalizedBody = generateProctorEmailBody(proctor);
+
+        console.log(`Preparing email for ${proctor.first_name} ${proctor.last_name}`);
+        console.log(`   Email: ${proctor.email_address}`);
+        console.log(`   Schedules: ${proctorSchedules[proctor.user_id]?.length || 0}`);
+
         return {
           user_id: proctor.user_id,
           email: proctor.email_address,
@@ -239,66 +260,94 @@ const EmailSender: React.FC<EmailSenderProps> = ({
         };
       });
 
-      console.log("📧 Sending emails:", {
-        count: emailsData.length,
-        sender_id: user?.user_id
-      });
-
+      // 📧 Send real Gmail emails via backend
+      console.log(`📬 Sending ${emailsData.length} real Gmail emails...`);
+      
       const response = await api.post('/send-proctor-emails/', {
         emails: emailsData,
         sender_id: user?.user_id
       });
 
-      console.log("✅ Email response:", response.data);
+      const { sent_count, failed_emails } = response.data;
 
-      // ✅ Handle asynchronous response
-      if (response.data.status === "Emails are being processed") {
-        toast.success(
-          `Sending ${response.data.total_count} email(s) in background. You'll be notified when complete.`,
-          { autoClose: 5000 }
-        );
-        
-        // Close modal after short delay
-        setTimeout(onClose, 2000);
-      } else {
-        // Fallback for old response format (if backend changes)
-        const { sent_count, failed_emails, total_count } = response.data;
-
-        if (sent_count > 0) {
-          toast.success(
-            sent_count === total_count
-              ? `Successfully sent ${sent_count} email(s)`
-              : `Sent ${sent_count} of ${total_count} emails`,
-            { autoClose: 5000 }
-          );
-        }
-
-        if (failed_emails && failed_emails.length > 0) {
-          const failureDetails = failed_emails
-            .map((fail: any) => `• ${fail.name}: ${fail.reason}`)
-            .join('\n');
-
-          toast.error(
-            `${failed_emails.length} email(s) failed:\n${failureDetails}`,
-            { autoClose: 8000, style: { whiteSpace: 'pre-line' } }
-          );
-        }
-
-        if (sent_count === total_count) {
-          setTimeout(onClose, 2000);
-        }
+      if (sent_count > 0) {
+        toast.success(`Successfully sent ${sent_count} email(s) to Gmail!`);
+        console.log(`✅ Successfully sent ${sent_count} Gmail emails`);
       }
 
-    } catch (error: any) {
-      console.error("❌ Email send error:", error);
+      if (failed_emails && failed_emails.length > 0) {
+        console.error("❌ Failed emails:", failed_emails);
+        
+        // Show detailed error messages
+        failed_emails.forEach((fail: any) => {
+          console.error(`   - ${fail.name} (${fail.email}): ${fail.reason}`);
+          
+          // Show specific error toast
+          if (fail.reason.includes('authentication')) {
+            toast.error(`Gmail authentication failed. Contact system admin.`, { 
+              autoClose: 5000 
+            });
+          } else if (fail.reason.includes('timeout')) {
+            toast.warn(`Email to ${fail.name} timed out. Server may be busy.`, { 
+              autoClose: 4000 
+            });
+          } else {
+            toast.warn(`Failed to send to ${fail.name}: ${fail.reason}`, { 
+              autoClose: 4000 
+            });
+          }
+        });
+      }
+
+      if (sent_count === emailsData.length) {
+        onClose(); // Only close if all succeeded
+      }
+
+    } catch (err: any) {
+      console.error("❌ Error sending emails:", err);
       
-      // Extract error message
-      const errorMsg = error.response?.data?.error || 
-                      error.response?.data?.detail || 
-                      error.message || 
-                      "Failed to send emails";
+      // Extract detailed error information
+      const status = err?.response?.status;
+      const errorDetail = err?.response?.data?.detail;
+      const errorMessage = err?.response?.data?.error;
+      const smtpConfig = err?.response?.data?.smtp_config;
       
-      toast.error(`Email Error: ${errorMsg}`, { autoClose: 8000 });
+      // Show specific error messages based on status code
+      if (status === 503) {
+        // Service unavailable - SMTP connection failed
+        toast.error(
+          `Email service unavailable: ${errorDetail || 'Cannot connect to Gmail SMTP server'}`,
+          { autoClose: 7000 }
+        );
+        
+        if (smtpConfig) {
+          console.error('SMTP Configuration:', smtpConfig);
+          toast.info(
+            'Contact administrator to check email settings (Gmail app password may have expired)',
+            { autoClose: 7000 }
+          );
+        }
+      } else if (errorMessage?.toLowerCase().includes('authentication')) {
+        toast.error(
+          'Gmail authentication failed. The Gmail app password needs to be regenerated.',
+          { autoClose: 7000 }
+        );
+        console.error('Authentication error - check EMAIL_HOST_PASSWORD in backend');
+      } else if (errorMessage?.toLowerCase().includes('timeout')) {
+        toast.error(
+          'Connection timeout. Email server may be unreachable or slow.',
+          { autoClose: 5000 }
+        );
+      } else {
+        // Generic error
+        toast.error(
+          errorMessage || errorDetail || "Failed to send emails. Please try again.",
+          { autoClose: 5000 }
+        );
+      }
+      
+      // Log full error for debugging
+      console.error('Full error response:', err?.response?.data);
     } finally {
       setLoading(false);
     }
@@ -412,7 +461,7 @@ const EmailSender: React.FC<EmailSenderProps> = ({
             rows={6}
           />
           <div className="char-count">{body.length} characters</div>
-
+          
           {approvalStatus === 'approved' && (
             <p style={{ fontSize: '11px', color: '#666', marginTop: '5px' }}>
               Note: Real Gmail emails will be sent with personalized exam schedules

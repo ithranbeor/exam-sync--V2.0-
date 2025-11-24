@@ -1544,9 +1544,9 @@ const SchedulerView: React.FC<SchedulerViewProps> = ({ user }) => {
       </Modal>
 
       <Modal isOpen={showEmailModal} onClose={() => setShowEmailModal(false)}>
-        <EmailSender 
-          user={user} 
-          onClose={() => setShowEmailModal(false)} 
+        <EmailSender
+          user={user}
+          onClose={() => setShowEmailModal(false)}
           collegeName={collegeName}
           approvalStatus={approvalStatus}
           examData={examData}
