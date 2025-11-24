@@ -272,7 +272,6 @@ const SchedulerView: React.FC<SchedulerViewProps> = ({ user }) => {
           const previousStatus = approvalStatus;
           const newStatus = latestApproval.status as 'pending' | 'approved' | 'rejected';
 
-          // ✅ Show toast notification when status changes
           if (previousStatus && previousStatus !== newStatus) {
             if (newStatus === 'approved') {
               toast.success('Your schedule has been approved by the dean!', {
