@@ -87,6 +87,9 @@ CORS_ALLOW_HEADERS = [
     "x-requested-with",
 ]
 
+CORS_PREFLIGHT_MAX_AGE = 86400
+CORS_EXPOSE_HEADERS = ['Content-Type', 'X-CSRFToken']
+
 CSRF_TRUSTED_ORIGINS = [
     "https://exam-sync-v2-0-lkat.onrender.com",
     "https://exam-sync-v2-0-mwnp.onrender.com",
