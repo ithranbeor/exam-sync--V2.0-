@@ -250,11 +250,19 @@ const SchedulerView: React.FC<SchedulerViewProps> = ({ user }) => {
     fetchData();
     const interval = setInterval(fetchData, 2000);
     return () => clearInterval(interval);
-  }, [user, schedulerCollegeName, collegeDataReady]);
+  }, [user, schedulerCollegeName, collegeDataReady]); 
 
   useEffect(() => {
     const checkApprovalStatus = async () => {
-      if (!user?.user_id || !collegeName || collegeName === "Add schedule first") return;
+      // Don't check if no college name or no exam data
+      if (!user?.user_id || !collegeName || collegeName === "Add schedule first" || examData.length === 0) {
+        // Clear status if no exam data exists
+        if (examData.length === 0 && (approvalStatus !== null || remarks !== null)) {
+          setApprovalStatus(null);
+          setRemarks(null);
+        }
+        return;
+      }
 
       try {
         const response = await api.get('/tbl_scheduleapproval/', {
@@ -302,7 +310,7 @@ const SchedulerView: React.FC<SchedulerViewProps> = ({ user }) => {
     checkApprovalStatus();
     const interval = setInterval(checkApprovalStatus, 5000);
     return () => clearInterval(interval);
-  }, [user, collegeName, approvalStatus]);
+  }, [user, collegeName, approvalStatus, examData.length]);
 
   const handleProctorChange = async (examId: number, proctorId: number) => {
     try {
@@ -507,9 +515,29 @@ const SchedulerView: React.FC<SchedulerViewProps> = ({ user }) => {
         return;
       }
 
+      // Delete the schedules
       const response = await api.post('/tbl_examdetails/batch-delete/', {
         college_name: schedulerCollegeName
       });
+
+      // Delete the approval status for this college
+      try {
+        const approvalResponse = await api.get('/tbl_scheduleapproval/', {
+          params: { college_name: schedulerCollegeName }
+        });
+
+        if (approvalResponse.data && approvalResponse.data.length > 0) {
+          for (const approval of approvalResponse.data) {
+            await api.delete(`/tbl_scheduleapproval/${approval.id}/`);
+          }
+        }
+        
+        // Reset status immediately
+        setApprovalStatus(null);
+        setRemarks(null);
+      } catch (approvalError) {
+        console.error("Error deleting approval status:", approvalError);
+      }
 
       toast.dismiss(loadingToast);
 
@@ -522,6 +550,8 @@ const SchedulerView: React.FC<SchedulerViewProps> = ({ user }) => {
       toast.dismiss(loadingToast);
       toast.error(`Failed to delete schedules: ${error?.response?.data?.error || error?.message || 'Unknown error'}`);
     }
+    setApprovalStatus(null);
+    setRemarks(null);
   };
 
   const getAvailableProctorsForExam = (
