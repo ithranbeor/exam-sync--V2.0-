@@ -7,11 +7,13 @@ body {
 
 .dashboard {
   background-color: #fff;
-  border-radius: 8px;
-  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
-  padding: 20px;
+  border-radius: 12px;
+  box-shadow: 0 12px 30px rgba(0, 0, 0, 0.08);
+  padding: 24px;
   max-width: 1100px;
-  margin: 20px auto;
+  margin: 0 auto;
+  width: 100%;
+  box-sizing: border-box;
 }
 
 .dashboard-header {
@@ -52,27 +54,34 @@ body {
 
 .calendar-weekdays {
   display: grid;
-  grid-template-columns: repeat(7, 1fr);
+  grid-template-columns: repeat(7, minmax(90px, 1fr));
   padding: 1px 0;
   text-align: center;
   font-weight: bold;
   color: #00173D;
+  gap: 8px;
 }
 
 .calendar-grid {
   display: grid;
-  grid-template-columns: repeat(7, 1fr);
-  gap: 2px;
+  grid-template-columns: repeat(7, minmax(90px, 1fr));
+  gap: 8px;
 }
 
 .calendar-cell {
   background-color: #fff;
   border: 1px solid #f1ecec;
-  min-height: 80px;
-  padding: 5px;
+  min-height: 90px;
+  padding: 8px;
   position: relative;
   box-sizing: border-box;
-  border-radius: 10px;
+  border-radius: 12px;
+  transition: transform 0.2s ease, box-shadow 0.2s ease;
+}
+
+.calendar-cell:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 8px 18px rgba(0, 0, 0, 0.08);
 }
 
 .calendar-cell.empty {
@@ -130,7 +139,7 @@ body {
 .filters {
   display: flex;
   flex-wrap: wrap;
-  gap: 10px;
+  gap: 12px;
   margin-bottom: 20px;
 }
 
@@ -142,6 +151,8 @@ body {
   color: #00173D;
   box-shadow: 1px 1px 3px rgba(0,0,0,0.1);
   font-size: 13px;
+  min-width: 160px;
+  padding: 6px 10px;
 }
 
 .event-details {
@@ -274,4 +285,96 @@ body {
   bottom: 4px;
   left: 50%;
   transform: translateX(-50%);
+}
+
+/* ===================== RESPONSIVE BREAKPOINTS ===================== */
+@media (max-width: 1024px) {
+  .dashboard {
+    padding: 20px;
+    margin: 0 16px;
+  }
+
+  .calendar-grid,
+  .calendar-weekdays {
+    grid-template-columns: repeat(7, minmax(70px, 1fr));
+    gap: 6px;
+  }
+
+  .calendar-cell {
+    min-height: 80px;
+    padding: 6px;
+  }
+
+  .filters {
+    gap: 10px;
+  }
+
+  .dropdown {
+    min-width: 140px;
+  }
+}
+
+@media (max-width: 768px) {
+  .dashboard {
+    padding: 18px;
+    margin: 0 12px;
+  }
+
+  .dashboard-header {
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 12px;
+  }
+
+  .calendar-grid,
+  .calendar-weekdays {
+    grid-template-columns: repeat(auto-fit, minmax(120px, 1fr));
+  }
+
+  .calendar-cell {
+    min-height: 100px;
+  }
+
+  .filters {
+    flex-direction: column;
+    align-items: stretch;
+  }
+
+  .dropdown {
+    width: 100%;
+    min-width: unset;
+  }
+
+  .bottom-navigation {
+    justify-content: center;
+  }
+}
+
+@media (max-width: 480px) {
+  .dashboard {
+    padding: 16px;
+    margin: 0 8px 40px;
+  }
+
+  .calendar-grid,
+  .calendar-weekdays {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 4px;
+  }
+
+  .calendar-cell {
+    min-height: 110px;
+  }
+
+  .calendar-weekdays {
+    display: none;
+  }
+
+  .day-number {
+    font-size: 12px;
+  }
+
+  .event-details {
+    font-size: 9px;
+  }
 }
