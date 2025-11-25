@@ -1,5 +1,6 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import '../styles/proctorSetAvailability.css';
+import '../styles/colleges.css';
 import { FaChevronLeft, FaChevronRight, FaEye, FaTrash, FaPenAlt, FaPlus, FaSearch } from 'react-icons/fa';
 import { api } from '../lib/apiClient.ts';
 import { ToastContainer, toast } from 'react-toastify';
@@ -65,6 +66,9 @@ const SchedulerAvailability: React.FC<ProctorSetAvailabilityProps> = ({ user }) 
 
   const [userCache, setUserCache] = useState<Map<number, any>>(new Map());
   const [selectedAvailabilityIds, setSelectedAvailabilityIds] = useState<Set<number>>(new Set());
+  const [canScrollLeft, setCanScrollLeft] = useState(false);
+  const [canScrollRight, setCanScrollRight] = useState(false);
+  const tableContainerRef = useRef<HTMLDivElement>(null);
 
   const MultiValue = (props: any) => {
     if (props.data.value === 'all') return null;
@@ -520,6 +524,51 @@ const SchedulerAvailability: React.FC<ProctorSetAvailabilityProps> = ({ user }) 
 
   const clearSelection = () => setSelectedAvailabilityIds(new Set());
 
+  // Handle scroll position and update button states
+  useEffect(() => {
+    const checkScroll = () => {
+      const container = tableContainerRef.current;
+      if (!container) return;
+
+      const { scrollLeft, scrollWidth, clientWidth } = container;
+      setCanScrollLeft(scrollLeft > 0);
+      setCanScrollRight(scrollLeft < scrollWidth - clientWidth - 1);
+      
+      // Update scroll indicator classes
+      container.classList.toggle('scrollable-left', scrollLeft > 0);
+      container.classList.toggle('scrollable-right', scrollLeft < scrollWidth - clientWidth - 1);
+    };
+
+    const container = tableContainerRef.current;
+    if (container) {
+      checkScroll();
+      container.addEventListener('scroll', checkScroll);
+      window.addEventListener('resize', checkScroll);
+    }
+
+    return () => {
+      if (container) {
+        container.removeEventListener('scroll', checkScroll);
+        window.removeEventListener('resize', checkScroll);
+      }
+    };
+  }, [filteredEntries, loading]);
+
+  const scrollTable = (direction: 'left' | 'right') => {
+    const container = tableContainerRef.current;
+    if (!container) return;
+
+    const scrollAmount = container.clientWidth * 0.8;
+    const scrollTo = direction === 'left' 
+      ? container.scrollLeft - scrollAmount 
+      : container.scrollLeft + scrollAmount;
+    
+    container.scrollTo({
+      left: scrollTo,
+      behavior: 'smooth'
+    });
+  };
+
   return (
     <div className="colleges-container">
       <div className="colleges-header">
@@ -555,7 +604,29 @@ const SchedulerAvailability: React.FC<ProctorSetAvailabilityProps> = ({ user }) 
         </div>
       </div>
 
-      <div className="colleges-table-container">
+      <div className="table-scroll-wrapper">
+        <div className="table-scroll-hint">
+          <FaChevronLeft /> Swipe or use buttons to scroll <FaChevronRight />
+        </div>
+        <button
+          type="button"
+          className="table-scroll-buttons scroll-left"
+          onClick={() => scrollTable('left')}
+          disabled={!canScrollLeft}
+          aria-label="Scroll left"
+        >
+          <FaChevronLeft />
+        </button>
+        <button
+          type="button"
+          className="table-scroll-buttons scroll-right"
+          onClick={() => scrollTable('right')}
+          disabled={!canScrollRight}
+          aria-label="Scroll right"
+        >
+          <FaChevronRight />
+        </button>
+        <div className="colleges-table-container" ref={tableContainerRef}>
           <table className="colleges-table">
             <thead>
               <tr>
@@ -642,6 +713,7 @@ const SchedulerAvailability: React.FC<ProctorSetAvailabilityProps> = ({ user }) 
               )}
             </tbody>
           </table>
+        </div>
       </div>
 
       {showModal && (

@@ -290,7 +290,7 @@
 }
 
 .scheduler-nav-button-right:hover {
-  transform: translateX(50%) scale(1.1);
+  transform: translateX(-50%) scale(1.1);
 }
 
 .scheduler-nav-button-left:active {
@@ -298,7 +298,7 @@
 }
 
 .scheduler-nav-button-right:active {
-  transform: translateX(50%) scale(0.95);
+  transform: translateX(-50%) scale(0.95);
 }
 
 .scheduler-nav-button svg {
@@ -315,12 +315,14 @@
   left: 50%;
   top: 85%;
   transform: translateX(-50%);
+  right: auto;
 }
 
 .scheduler-nav-button-right {
-  right: 50%;
+  left: 50%;
   top: 92%;
-  transform: translateX(50%);
+  transform: translateX(-50%);
+  right: auto;
 }
 
 /* ======================= DESKTOP (min-width: 1025px) ======================= */
@@ -329,12 +331,14 @@
     left: 50%;
     top: 85%;
     transform: translateX(-50%);
+    right: auto;
   }
 
   .scheduler-nav-button-right {
-    right: 50%;
+    left: 50%;
     top: 92%;
-    transform: translateX(50%);
+    transform: translateX(-50%);
+    right: auto;
   }
 
   .scheduler-nav-button {
@@ -363,12 +367,14 @@
     left: 50%;
     top: 85%;
     transform: translateX(-50%);
+    right: auto;
   }
 
   .scheduler-nav-button-right {
-    right: 50%;
+    left: 50%;
     top: 92%;
-    transform: translateX(50%);
+    transform: translateX(-50%);
+    right: auto;
   }
 }
 
@@ -390,12 +396,14 @@
     left: 50%;
     top: 83%;
     transform: translateX(-50%);
+    right: auto;
   }
 
   .scheduler-nav-button-right {
-    right: 50%;
+    left: 50%;
     top: 90%;
-    transform: translateX(50%);
+    transform: translateX(-50%);
+    right: auto;
   }
 }
 
@@ -417,11 +425,13 @@
     left: 50%;
     top: 80%;
     transform: translateX(-50%);
+    right: auto;
   }
 
   .scheduler-nav-button-right {
-    right: 50%;
+    left: 50%;
     top: 88%;
-    transform: translateX(50%);
+    transform: translateX(-50%);
+    right: auto;
   }
 }
