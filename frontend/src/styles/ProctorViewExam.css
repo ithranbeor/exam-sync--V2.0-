@@ -1,9 +1,10 @@
 .exam-viewer {
-  padding: 20px;
+  padding: 24px;
   font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
   background-color: #f9fafc;
   min-height: 100vh;
   box-sizing: border-box;
+  width: 100%;
 }
 
 .top-bar {
@@ -33,15 +34,32 @@
 }
 
 .view-mode-controls button.active-week,
-.view-mode-controls button.active-day {
+.view-mode-controls button.active-day,
+.view-mode-controls button:not(.inactive) {
   background-color: #f7b731;
   color: #fff;
   border-color: #f7b731;
 }
 
+.view-mode-controls button.inactive {
+  background-color: #ffffff;
+  color: #6c757d;
+  border-color: #dee2e6;
+  opacity: 0.7;
+}
+
 .view-mode-controls button:hover {
   background-color: #e0a32c;
   color: white;
+  transform: translateY(-1px);
+  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+}
+
+.view-mode-controls button.inactive:hover {
+  background-color: #f8f9fa;
+  color: #495057;
+  transform: none;
+  box-shadow: none;
 }
 
 .navigation-bar {
@@ -79,6 +97,27 @@
 .grid-container {
   width: 100%;
   overflow-x: auto;
+  -webkit-overflow-scrolling: touch;
+  scrollbar-width: thin;
+  scrollbar-color: #cbd5e0 #f1f3f5;
+}
+
+.grid-container::-webkit-scrollbar {
+  height: 8px;
+}
+
+.grid-container::-webkit-scrollbar-track {
+  background: #f1f3f5;
+  border-radius: 4px;
+}
+
+.grid-container::-webkit-scrollbar-thumb {
+  background: #cbd5e0;
+  border-radius: 4px;
+}
+
+.grid-container::-webkit-scrollbar-thumb:hover {
+  background: #a0aec0;
 }
 
 .grid-header,
@@ -202,4 +241,321 @@
 .custom-select option {
   color: black;
   background-color: white;
+}
+
+/* ======================= RESPONSIVE STYLES ======================= */
+
+/* Desktop (min-width: 1200px) - Enhanced base styles */
+@media (min-width: 1200px) {
+  .exam-viewer {
+    padding: 28px;
+  }
+
+  .grid-container {
+    overflow-x: visible;
+  }
+
+  .cell {
+    padding: 12px;
+    font-size: 0.95em;
+  }
+
+  .view-mode-controls button {
+    padding: 10px 18px;
+    font-size: 1em;
+  }
+}
+
+/* Laptop (992px - 1199px) */
+@media (min-width: 992px) and (max-width: 1199px) {
+  .exam-viewer {
+    padding: 24px;
+  }
+
+  .grid-container {
+    overflow-x: auto;
+    -webkit-overflow-scrolling: touch;
+  }
+
+  .cell {
+    padding: 10px 8px;
+    font-size: 0.9em;
+    min-width: 80px;
+  }
+
+  .time-header,
+  .time-cell {
+    min-width: 90px;
+    font-size: 0.85em;
+  }
+}
+
+/* Tablet (768px - 991px) */
+@media (min-width: 768px) and (max-width: 991px) {
+  .exam-viewer {
+    padding: 20px;
+  }
+
+  .top-bar {
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 12px;
+  }
+
+  .top-bar h2 {
+    font-size: 1.5em;
+  }
+
+  .view-mode-controls {
+    display: flex;
+    gap: 8px;
+    flex-wrap: wrap;
+  }
+
+  .view-mode-controls button {
+    margin-left: 0;
+    padding: 8px 14px;
+    font-size: 0.9em;
+  }
+
+  .grid-container {
+    overflow-x: auto;
+    -webkit-overflow-scrolling: touch;
+    margin: 0 -20px;
+    padding: 0 20px;
+  }
+
+  .cell {
+    padding: 8px 6px;
+    font-size: 0.85em;
+    min-width: 70px;
+  }
+
+  .time-header,
+  .time-cell {
+    min-width: 85px;
+    font-size: 0.8em;
+    padding: 8px 4px;
+  }
+
+  .day-header,
+  .building-header {
+    font-size: 0.8em;
+    padding: 8px 4px;
+  }
+
+  .building-group-header {
+    font-size: 0.9em;
+    padding: 10px;
+  }
+
+  .schedule-cell {
+    font-size: 0.75em !important;
+  }
+}
+
+/* Mobile (max-width: 767px) */
+@media (max-width: 767px) {
+  .exam-viewer {
+    padding: 16px;
+  }
+
+  .top-bar {
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 12px;
+    margin-bottom: 16px;
+  }
+
+  .top-bar h2 {
+    font-size: 1.3em;
+  }
+
+  .navigation-bar {
+    flex-direction: column;
+    gap: 12px;
+    align-items: stretch;
+    padding: 12px;
+  }
+
+  .navigation-bar h3 {
+    font-size: 1.1em;
+  }
+
+  .view-mode-controls {
+    display: flex;
+    gap: 8px;
+    width: 100%;
+  }
+
+  .view-mode-controls button {
+    flex: 1;
+    margin-left: 0;
+    padding: 10px 12px;
+    font-size: 0.9em;
+    min-height: 44px; /* Touch-friendly */
+  }
+
+  .date-nav-controls {
+    display: flex;
+    gap: 8px;
+    width: 100%;
+  }
+
+  .date-nav-controls button {
+    flex: 1;
+    padding: 10px;
+    font-size: 1em;
+    min-height: 44px; /* Touch-friendly */
+  }
+
+  .grid-container {
+    overflow-x: auto;
+    -webkit-overflow-scrolling: touch;
+    margin: 0 -16px;
+    padding: 0 16px;
+    width: calc(100% + 32px);
+  }
+
+  .grid-header,
+  .grid-body {
+    min-width: 600px; /* Ensure minimum width for readability */
+  }
+
+  .cell {
+    padding: 6px 4px;
+    font-size: 0.75em;
+    min-width: 60px;
+    border-width: 0.5px;
+  }
+
+  .time-header,
+  .time-cell {
+    min-width: 75px;
+    font-size: 0.75em;
+    padding: 6px 4px;
+    position: sticky;
+    left: 0;
+    z-index: 10;
+    background-color: #f8f9fa;
+    box-shadow: 2px 0 4px rgba(0, 0, 0, 0.1);
+  }
+
+  .day-header,
+  .building-header {
+    font-size: 0.75em;
+    padding: 8px 4px;
+    min-width: 80px;
+  }
+
+  .building-group-header {
+    font-size: 0.85em;
+    padding: 8px;
+    min-width: 100%;
+  }
+
+  .schedule-cell {
+    font-size: 0.7em !important;
+    padding: 4px 2px !important;
+    min-height: 40px;
+  }
+
+  .schedule-cell div {
+    font-size: 0.65em !important;
+    line-height: 1.1 !important;
+  }
+
+  .current-time-slot {
+    border-width: 2px;
+  }
+
+  .semester-selection-bottom {
+    justify-content: center;
+    margin-top: 16px;
+  }
+
+  .semester-dropdown-bottom {
+    width: 100%;
+    padding: 12px;
+    font-size: 0.9em;
+  }
+}
+
+/* Small Mobile (max-width: 480px) */
+@media (max-width: 480px) {
+  .exam-viewer {
+    padding: 12px;
+  }
+
+  .top-bar h2 {
+    font-size: 1.2em;
+  }
+
+  .view-mode-controls button {
+    padding: 10px 8px;
+    font-size: 0.85em;
+  }
+
+  .date-nav-controls button {
+    padding: 10px 8px;
+    font-size: 0.9em;
+  }
+
+  .grid-container {
+    margin: 0 -12px;
+    padding: 0 12px;
+    width: calc(100% + 24px);
+  }
+
+  .grid-header,
+  .grid-body {
+    min-width: 550px;
+  }
+
+  .cell {
+    padding: 5px 3px;
+    font-size: 0.7em;
+    min-width: 55px;
+  }
+
+  .time-header,
+  .time-cell {
+    min-width: 70px;
+    font-size: 0.7em;
+    padding: 5px 3px;
+  }
+
+  .day-header,
+  .building-header {
+    font-size: 0.7em;
+    padding: 6px 3px;
+    min-width: 75px;
+  }
+
+  .schedule-cell {
+    font-size: 0.65em !important;
+    padding: 3px 2px !important;
+    min-height: 35px;
+  }
+
+  .schedule-cell div {
+    font-size: 0.6em !important;
+  }
+}
+
+/* Landscape Mobile (max-width: 767px and landscape) */
+@media (max-width: 767px) and (orientation: landscape) {
+  .grid-container {
+    max-height: 70vh;
+    overflow-y: auto;
+  }
+
+  .cell {
+    padding: 5px 4px;
+    min-height: 30px;
+  }
+
+  .schedule-cell {
+    min-height: 30px;
+  }
 }
