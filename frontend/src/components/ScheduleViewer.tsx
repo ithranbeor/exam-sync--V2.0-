@@ -978,42 +978,20 @@ const SchedulerView: React.FC<SchedulerViewProps> = ({ user }) => {
       {hasData && page > 0 && (
         <button
           type="button"
-          style={{
-            position: "fixed",
-            left: "45%",
-            top: "90%",
-            transform: "translateY(-50%)",
-            zIndex: 1000,
-            background: "rgba(255,255,255,0.3)",
-            border: "none",
-            borderRadius: "50%",
-            cursor: "pointer",
-            padding: "0.5rem",
-          }}
+          className="scheduler-nav-button scheduler-nav-button-left"
           onClick={() => setPage(page - 1)}
         >
-          <FaChevronLeft style={{ color: "#092C4C", fontSize: "3rem", opacity: 0.7 }} />
+          <FaChevronLeft style={{ fontSize: "3rem" }} />
         </button>
       )}
 
       {hasData && page < totalPages - 1 && (
         <button
           type="button"
-          style={{
-            position: "fixed",
-            right: "40%",
-            top: "90%",
-            transform: "translateY(-50%)",
-            zIndex: 1000,
-            background: "rgba(255,255,255,0.3)",
-            border: "none",
-            borderRadius: "50%",
-            cursor: "pointer",
-            padding: "0.5rem",
-          }}
+          className="scheduler-nav-button scheduler-nav-button-right"
           onClick={() => setPage(page + 1)}
         >
-          <FaChevronRight style={{ color: "#092C4C", fontSize: "3rem", opacity: 0.7 }} />
+          <FaChevronRight style={{ fontSize: "3rem" }} />
         </button>
       )}
 

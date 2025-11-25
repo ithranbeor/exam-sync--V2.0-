@@ -261,3 +261,167 @@
   padding: 8px;
   transition: background 0.2s ease, transform 0.1s ease;
 }
+
+/* Navigation buttons for pagination */
+.scheduler-nav-button {
+  position: fixed;
+  z-index: 1000;
+  background: rgba(255, 255, 255, 0.9);
+  border: 2px solid #092C4C;
+  border-radius: 50%;
+  cursor: pointer;
+  padding: 0.75rem;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+  transition: all 0.3s ease;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 50px;
+  min-height: 50px;
+}
+
+.scheduler-nav-button:hover {
+  background: rgba(9, 44, 76, 0.1);
+  box-shadow: 0 6px 16px rgba(0, 0, 0, 0.2);
+}
+
+.scheduler-nav-button-left:hover {
+  transform: translateX(-50%) scale(1.1);
+}
+
+.scheduler-nav-button-right:hover {
+  transform: translateX(50%) scale(1.1);
+}
+
+.scheduler-nav-button-left:active {
+  transform: translateX(-50%) scale(0.95);
+}
+
+.scheduler-nav-button-right:active {
+  transform: translateX(50%) scale(0.95);
+}
+
+.scheduler-nav-button svg {
+  color: #092C4C;
+  opacity: 0.8;
+  transition: opacity 0.2s ease;
+}
+
+.scheduler-nav-button:hover svg {
+  opacity: 1;
+}
+
+.scheduler-nav-button-left {
+  left: 50%;
+  top: 85%;
+  transform: translateX(-50%);
+}
+
+.scheduler-nav-button-right {
+  right: 50%;
+  top: 92%;
+  transform: translateX(50%);
+}
+
+/* ======================= DESKTOP (min-width: 1025px) ======================= */
+@media (min-width: 1025px) {
+  .scheduler-nav-button-left {
+    left: 50%;
+    top: 85%;
+    transform: translateX(-50%);
+  }
+
+  .scheduler-nav-button-right {
+    right: 50%;
+    top: 92%;
+    transform: translateX(50%);
+  }
+
+  .scheduler-nav-button {
+    min-width: 50px;
+    min-height: 50px;
+  }
+
+  .scheduler-nav-button svg {
+    font-size: 3rem !important;
+  }
+}
+
+/* ======================= TABLET RESPONSIVENESS (769px - 1024px) ======================= */
+@media (min-width: 769px) and (max-width: 1024px) {
+  .scheduler-nav-button {
+    min-width: 55px;
+    min-height: 55px;
+    padding: 0.85rem;
+  }
+
+  .scheduler-nav-button svg {
+    font-size: 2.5rem !important;
+  }
+
+  .scheduler-nav-button-left {
+    left: 50%;
+    top: 85%;
+    transform: translateX(-50%);
+  }
+
+  .scheduler-nav-button-right {
+    right: 50%;
+    top: 92%;
+    transform: translateX(50%);
+  }
+}
+
+/* ======================= SMALL TABLET / LARGE MOBILE (600px - 900px) ======================= */
+@media (min-width: 600px) and (max-width: 900px) {
+  .scheduler-nav-button {
+    min-width: 60px;
+    min-height: 60px;
+    padding: 1rem;
+    background: rgba(255, 255, 255, 0.95);
+    border-width: 3px;
+  }
+
+  .scheduler-nav-button svg {
+    font-size: 2.2rem !important;
+  }
+
+  .scheduler-nav-button-left {
+    left: 50%;
+    top: 83%;
+    transform: translateX(-50%);
+  }
+
+  .scheduler-nav-button-right {
+    right: 50%;
+    top: 90%;
+    transform: translateX(50%);
+  }
+}
+
+/* ======================= MOBILE RESPONSIVENESS (max-width: 599px) ======================= */
+@media (max-width: 599px) {
+  .scheduler-nav-button {
+    min-width: 50px;
+    min-height: 50px;
+    padding: 0.9rem;
+    background: rgba(255, 255, 255, 0.95);
+    border-width: 2px;
+  }
+
+  .scheduler-nav-button svg {
+    font-size: 1.8rem !important;
+  }
+
+  .scheduler-nav-button-left {
+    left: 50%;
+    top: 80%;
+    transform: translateX(-50%);
+  }
+
+  .scheduler-nav-button-right {
+    right: 50%;
+    top: 88%;
+    transform: translateX(50%);
+  }
+}
