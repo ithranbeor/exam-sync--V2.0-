@@ -27,26 +27,50 @@
 
 .mini-nav-controls {
   display: flex;
-  gap: 6px;
+  gap: 10px;
+  padding: 4px 8px;
+  border-radius: 999px;
+  background: rgba(9, 44, 76, 0.05);
+  border: 1px solid rgba(9, 44, 76, 0.08);
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.6);
 }
 
 .mini-nav-btn {
-  background-color: #092C4C;
+  position: relative;
+  background: linear-gradient(135deg, #0c2f55, #174775);
   color: #fff;
-  border: none;
-  width: 28px;
-  height: 28px;
+  border: 1px solid rgba(255, 255, 255, 0.2);
+  width: 34px;
+  height: 34px;
   border-radius: 50%;
   cursor: pointer;
   display: flex;
   align-items: center;
   justify-content: center;
-  transition: background-color 0.2s ease;
+  transition: transform 0.2s ease, box-shadow 0.2s ease, background 0.2s ease;
+  box-shadow: 0 6px 15px rgba(9, 44, 76, 0.25);
 }
 
 .mini-nav-btn:hover {
-  background-color: #F2994A;
-  color: #092C4C;
+  background: linear-gradient(135deg, #f2994a, #f57f17);
+  box-shadow: 0 10px 22px rgba(242, 153, 74, 0.4);
+  transform: translateY(-1px);
+}
+
+.mini-nav-btn:focus-visible {
+  outline: 2px solid #f2994a;
+  outline-offset: 3px;
+}
+
+.mini-nav-btn:active {
+  transform: scale(0.95);
+}
+
+.mini-nav-btn-icon {
+  font-size: 16px;
+  font-weight: 700;
+  line-height: 1;
+  color: inherit;
 }
 
 .mini-calendar-weekdays {

@@ -1,7 +1,6 @@
 import { useState, useEffect } from 'react';
 import '../styles/miniExamCalendar.css';
 import { api } from '../lib/apiClient.ts';
-import { FaChevronLeft, FaChevronRight } from 'react-icons/fa';
 
 type ExamPeriod = {
   examperiod_id: number;
@@ -150,22 +149,22 @@ const MiniExamDateCalendar = ({ }: MiniExamDateCalendarProps) => {
         <h3>
           {monthNames[currentMonthIndex]} {currentYear}
         </h3>
-        <div className="mini-nav-controls">
+        <div className="mini-nav-controls" role="group" aria-label="Change month">
           <button
             type="button"
-            className="mini-nav-btn"
+            className="mini-nav-btn mini-nav-btn-prev"
             onClick={goToPreviousMonth}
             aria-label="Previous month"
           >
-            <FaChevronLeft size={14} />
+            <span className="mini-nav-btn-icon" aria-hidden="true">&lt;</span>
           </button>
           <button
             type="button"
-            className="mini-nav-btn"
+            className="mini-nav-btn mini-nav-btn-next"
             onClick={goToNextMonth}
             aria-label="Next month"
           >
-            <FaChevronRight size={14} />
+            <span className="mini-nav-btn-icon" aria-hidden="true">&gt;</span>
           </button>
         </div>
       </div>
