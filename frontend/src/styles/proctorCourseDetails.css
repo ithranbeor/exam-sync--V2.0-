@@ -1,0 +1,146 @@
+.proctor-course-container {
+  background: white;
+  border-radius: 12px;
+  padding: 20px;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+  height: 100%;
+  display: flex;
+  flex-direction: column;
+  overflow: auto;
+}
+
+.proctor-course-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 16px;
+  padding-bottom: 12px;
+  border-bottom: 2px solid #f0f0f0;
+}
+
+.proctor-course-header h3 {
+  margin: 0;
+  font-size: 1.2rem;
+  color: #092C4C;
+  font-weight: bold;
+}
+
+.filter-buttons {
+  display: flex;
+  gap: 8px;
+}
+
+.filter-btn {
+  background-color: #f0f0f0;
+  color: #092C4C;
+  border: 1px solid #ddd;
+  padding: 6px 12px;
+  border-radius: 20px;
+  font-size: 12px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+
+.filter-btn:hover {
+  background-color: #e0e0e0;
+}
+
+.filter-btn.active {
+  background-color: #F2994A;
+  color: white;
+  border-color: #F2994A;
+}
+
+.loading-message {
+  text-align: center;
+  padding: 20px;
+  color: #999;
+  font-size: 14px;
+}
+
+.empty-message {
+  text-align: center;
+  padding: 30px 20px;
+  color: #666;
+  font-size: 14px;
+}
+
+.courses-list {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  overflow-y: auto;
+  flex: 1;
+}
+
+.course-card {
+  background-color: #f9f9f9;
+  border-left: 4px solid #F2994A;
+  border-radius: 8px;
+  padding: 12px;
+  transition: all 0.2s ease;
+}
+
+.course-card:hover {
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+  background-color: #fff;
+}
+
+.course-card.completed {
+  border-left-color: #4CAF50;
+  opacity: 0.8;
+}
+
+.course-card.upcoming {
+  border-left-color: #FF9800;
+}
+
+.course-card-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 8px;
+}
+
+.course-code {
+  font-weight: bold;
+  color: #092C4C;
+  font-size: 14px;
+}
+
+.status-badge {
+  font-size: 10px;
+  padding: 2px 8px;
+  border-radius: 12px;
+  font-weight: 600;
+}
+
+.status-badge.upcoming-badge {
+  background-color: #FFE0B2;
+  color: #E65100;
+}
+
+.status-badge.completed-badge {
+  background-color: #C8E6C9;
+  color: #2E7D32;
+}
+
+.course-card-info,
+.course-card-exam-details {
+  font-size: 12px;
+  color: #555;
+  margin-bottom: 8px;
+}
+
+.course-card-info p,
+.course-card-exam-details p {
+  margin: 4px 0;
+  line-height: 1.4;
+}
+
+.course-card-info strong,
+.course-card-exam-details strong {
+  color: #092C4C;
+  font-weight: 600;
+}

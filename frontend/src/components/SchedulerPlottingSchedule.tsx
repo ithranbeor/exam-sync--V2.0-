@@ -979,8 +979,6 @@ const SchedulerPlottingSchedule: React.FC<SchedulerProps> = ({ user, onScheduleC
       ...TIME_SLOT_RANGES["6 PM - 9 PM (Evening)"]
     ];
 
-    console.log('✅ Available time slots for scheduling:', allAvailableTimeSlots);
-
     const availabilityMap = new Map<string, Set<number>>();
     allAvailability?.forEach(a => {
       const proctorId = a.user_id;
@@ -1066,25 +1064,22 @@ const SchedulerPlottingSchedule: React.FC<SchedulerProps> = ({ user, onScheduleC
       }
     });
 
-    // ✅ CRITICAL FIX: Evening time slots from TIME_SLOT_RANGES
     const eveningTimeSlots = TIME_SLOT_RANGES["6 PM - 9 PM (Evening)"];
     const morningTimeSlots = TIME_SLOT_RANGES["7 AM - 1 PM (Morning)"];
     const afternoonTimeSlots = TIME_SLOT_RANGES["1 PM - 6 PM (Afternoon)"];
 
-    console.log('🌅 Morning slots:', morningTimeSlots);
-    console.log('🌤️ Afternoon slots:', afternoonTimeSlots);
-    console.log('🌙 Evening slots:', eveningTimeSlots);
+    console.log('Morning slots:', morningTimeSlots);
+    console.log('Afternoon slots:', afternoonTimeSlots);
+    console.log('Evening slots:', eveningTimeSlots);
 
-    // ✅ CRITICAL FIX: Filter valid times to only include slots where exams can END before 21:00
     const isValidTimeSlot = (startTime: string, isNightClass: boolean): boolean => {
-      // Check if this time slot is in our available slots
       if (!allAvailableTimeSlots.includes(startTime)) {
         return false;
       }
 
       const [startHour, startMinute] = startTime.split(":").map(Number);
       const endMinutes = (startHour * 60 + startMinute) + totalDurationMinutes;
-      const maxEndTime = 21 * 60; // ✅ 21:00 (9 PM) is the absolute maximum end time
+      const maxEndTime = 21 * 60;
       
       // Exam must end by 21:00
       if (endMinutes > maxEndTime) {
@@ -1095,15 +1090,10 @@ const SchedulerPlottingSchedule: React.FC<SchedulerProps> = ({ user, onScheduleC
       if (isNightClass) {
         return eveningTimeSlots.includes(startTime);
       }
-      
-      // ✅ FIX: Day classes CAN use ALL slots (morning, afternoon, evening) as long as they end by 9 PM
-      // Remove this line that was blocking day classes from using all valid times:
-      // return !eveningTimeSlots.includes(startTime);
-      
-      return true; // ✅ Allow all valid time slots for day classes
+
+      return true;
     };
 
-    // ✅ CRITICAL: Only use time slots where proctors are available AND exams can finish
     const validTimes = allAvailableTimeSlots.filter(t => isValidTimeSlot(t, false));
     
     console.log(`✅ Valid start times for day classes (${validTimes.length} slots):`, validTimes);

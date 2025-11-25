@@ -254,10 +254,16 @@ const SchedulerView: React.FC<SchedulerViewProps> = ({ user }) => {
 
   useEffect(() => {
     const checkApprovalStatus = async () => {
-      // Don't check if no college name or no exam data
-      if (!user?.user_id || !collegeName || collegeName === "Add schedule first" || examData.length === 0) {
-        // Clear status if no exam data exists
-        if (examData.length === 0 && (approvalStatus !== null || remarks !== null)) {
+      if (!user?.user_id || !collegeName || collegeName === "Add schedule first") {
+        if (approvalStatus !== null || remarks !== null) {
+          setApprovalStatus(null);
+          setRemarks(null);
+        }
+        return;
+      }
+
+      if (examData.length === 0) {
+        if (approvalStatus !== null || remarks !== null) {
           setApprovalStatus(null);
           setRemarks(null);
         }
@@ -521,27 +527,30 @@ const SchedulerView: React.FC<SchedulerViewProps> = ({ user }) => {
       });
 
       // Delete the approval status for this college
+      toast.dismiss(loadingToast);
+
+      // Delete the approval status for this college
       try {
         const approvalResponse = await api.get('/tbl_scheduleapproval/', {
           params: { college_name: schedulerCollegeName }
         });
 
         if (approvalResponse.data && approvalResponse.data.length > 0) {
-          for (const approval of approvalResponse.data) {
-            await api.delete(`/tbl_scheduleapproval/${approval.id}/`);
-          }
+          const deletePromises = approvalResponse.data.map((approval: any) => 
+            api.delete(`/tbl_scheduleapproval/${approval.request_id || approval.id}/`)
+          );
+          await Promise.all(deletePromises);
         }
-        
-        // Reset status immediately
-        setApprovalStatus(null);
-        setRemarks(null);
       } catch (approvalError) {
         console.error("Error deleting approval status:", approvalError);
       }
 
-      toast.dismiss(loadingToast);
+      // Reset local state immediately
+      setApprovalStatus(null);
+      setRemarks(null);
 
-      setExamData(prev => prev.filter(e => e.college_name !== schedulerCollegeName));
+      // Clear exam data completely
+      setExamData([]);
 
       toast.success(`Successfully deleted ${response.data.deleted_count} schedules for ${schedulerCollegeName}!`);
 

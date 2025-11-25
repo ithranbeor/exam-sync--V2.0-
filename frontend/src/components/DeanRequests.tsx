@@ -297,12 +297,12 @@ const DeanRequests: React.FC<SchedulerViewProps> = ({ user }) => {
     
     setProcessingRequest(true);
     try {
+      const schedulerUserId = req.schedule_data?.submitted_by_id || 
+        (await api.get(`/tbl_scheduleapproval/${req.request_id}/`)).data.submitted_by;
+      
       await api.put(`/tbl_scheduleapproval/${req.request_id}/`, { 
         status: 'approved' 
       });
-      
-      const schedulerUserId = req.schedule_data?.submitted_by_id || 
-                            (await api.get(`/tbl_scheduleapproval/${req.request_id}/`)).data.submitted_by;
       
       if (schedulerUserId && user?.user_id) {
         await sendNotificationToScheduler(

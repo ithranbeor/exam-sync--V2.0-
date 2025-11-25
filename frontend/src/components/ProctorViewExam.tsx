@@ -1,31 +1,19 @@
-import _React, { useState, useEffect } from 'react';
+import { useState, useEffect } from 'react';
 import '../styles/ProctorViewExam.css';
+import { api } from '../lib/apiClient.ts';
 
-interface Exam {
-  id: string;
-  courseCode: string;
+interface ProctorSchedule {
+  assignment_id: number;
+  course_id: string;
   section: string;
-  type: string;
-  instructor: string;
+  exam_date: string;
+  exam_start_time: string;
+  exam_end_time: string;
+  room_id: string;
   building: string;
-  date: string;
-  startTime: string;
-  endTime: string;
-  semester: string;
+  instructor: string;
+  status: string;
 }
-
-const MOCK_EXAMS: Exam[] = [];
-
-const buildings = ['9-203', '9-204', '9-205', '9-206', '9-207', '9-208', '9-209'];
-
-const semesters = [
-  '2023-2024 2nd Semester',
-  '2023-2024 1st Semester',
-  '2022-2023 2nd Semester',
-  '2022-2023 1st Semester',
-  '2021-2022 2nd Semester',
-  '2021-2022 1st Semester',
-];
 
 const generateTimeSlots = () => {
   const slots: {
@@ -65,24 +53,62 @@ const generateTimeSlots = () => {
   return slots;
 };
 
+const generateCourseColors = (courses: string[]) => {
+  const colors = [
+    '#79b4f2', '#f27f79', '#79f2b4', '#f2e279', '#b479f2', '#f279d6',
+    '#79d6f2', '#d6f279', '#f29979', '#a3f279', '#f279a3', '#79a3f2',
+    '#f2c879', '#79f2e2', '#f2a879', '#b4f279', '#f27979', '#79f279',
+    '#79f2d6', '#f279f2', '#79f2f2', '#f2b479', '#c879f2', '#79f2a8',
+    '#f2d679', '#a879f2', '#79f2c8', '#f279b4', '#f2f279', '#79b4f2'
+  ];
+
+  const courseColorMap: Record<string, string> = {};
+  courses.forEach((course, idx) => {
+    courseColorMap[course] = colors[idx % colors.length];
+  });
+  return courseColorMap;
+};
+
 const ProctorViewExam = () => {
-  const [viewMode, setViewMode] = useState<'week' | 'day'>('day');
+  const [schedules, setSchedules] = useState<ProctorSchedule[]>([]);
+  const [loading, setLoading] = useState(true);
   const [currentDate, setCurrentDate] = useState(new Date());
-  const [exams, setExams] = useState<Exam[]>([]);
-  const [loadingExams, setLoadingExams] = useState(true);
-  const [selectedSemester, setSelectedSemester] = useState(semesters[0]);
+  const [viewMode, setViewMode] = useState<'week' | 'day'>('day');
+  const [user, setUser] = useState<any>(null);
 
   useEffect(() => {
-    const fetchExams = async () => {
-      setLoadingExams(true);
-      await new Promise((res) => setTimeout(res, 300));
-      const filtered = MOCK_EXAMS.filter((e) => e.semester === selectedSemester);
-      setExams(filtered);
-      setLoadingExams(false);
+    const storedUser =
+      JSON.parse(localStorage.getItem('user') || 'null') ||
+      JSON.parse(sessionStorage.getItem('user') || 'null');
+    setUser(storedUser);
+  }, []);
+
+  useEffect(() => {
+    const fetchSchedules = async () => {
+      if (!user?.user_id) return;
+
+      try {
+        setLoading(true);
+        const { data } = await api.get('/tbl_proctorschedule/', {
+          params: {
+            proctor_id: user.user_id,
+            status: 'approved',
+          },
+        });
+
+        if (data && Array.isArray(data)) {
+          setSchedules(data);
+        }
+      } catch (err) {
+        console.error('Error fetching schedules:', err);
+        setSchedules([]);
+      } finally {
+        setLoading(false);
+      }
     };
 
-    fetchExams();
-  }, [currentDate, selectedSemester]);
+    fetchSchedules();
+  }, [user?.user_id]);
 
   const getStartOfWeek = (date: Date) => {
     const day = date.getDay();
@@ -120,30 +146,45 @@ const ProctorViewExam = () => {
       day: 'numeric',
     });
 
-  const getExamsForCell = (
+  const formatTime12Hour = (timeStr: string) => {
+    const [hours, minutes] = timeStr.slice(11, 16).split(':');
+    const hour = parseInt(hours, 10);
+    const ampm = hour >= 12 ? 'PM' : 'AM';
+    const displayHour = hour % 12 || 12;
+    return `${displayHour}:${minutes} ${ampm}`;
+  };
+
+  const getSchedulesForCell = (
     date: Date,
     room: string | null,
     startHour: number,
     startMin: number,
     endHour: number,
     endMin: number
-  ): Exam[] => {
+  ): ProctorSchedule[] => {
     const cellDateStr = date.toISOString().split('T')[0];
-    return exams.filter((exam) => {
-      const examStart = new Date(`${exam.date}T${exam.startTime}`);
-      const examEnd = new Date(`${exam.date}T${exam.endTime}`);
+    return schedules.filter((schedule) => {
+      const examStart = new Date(`${schedule.exam_date}T${schedule.exam_start_time.slice(11)}`);
+      const examEnd = new Date(`${schedule.exam_date}T${schedule.exam_end_time.slice(11)}`);
       const slotStart = new Date(date);
       const slotEnd = new Date(date);
       slotStart.setHours(startHour, startMin, 0, 0);
       slotEnd.setHours(endHour, endMin, 0, 0);
+
       return (
-        exam.date === cellDateStr &&
-        (!room || exam.building === room) &&
+        schedule.exam_date === cellDateStr &&
+        (!room || schedule.building === room) &&
         examStart < slotEnd &&
         examEnd > slotStart
       );
     });
   };
+
+  const uniqueCourses = Array.from(new Set(schedules.map(s => s.course_id)));
+  const courseColorMap = generateCourseColors(uniqueCourses);
+
+  const buildings = Array.from(new Set(schedules.map(s => s.building))).sort();
+  const timeSlots = generateTimeSlots();
 
   const handlePrev = () => {
     const updated = new Date(currentDate);
@@ -162,7 +203,7 @@ const ProctorViewExam = () => {
     gridTemplateColumns:
       viewMode === 'week'
         ? `100px repeat(7, 1fr)`
-        : `100px repeat(${buildings.length}, 1fr)`,
+        : `100px repeat(${buildings.length || 1}, 1fr)`,
   };
 
   const now = new Date();
@@ -171,24 +212,27 @@ const ProctorViewExam = () => {
     <div className="set-availability-container">
       <div className="availability-sections" style={{ flexDirection: 'column', gap: 25 }}>
         <div className="availability-card" style={{ width: '100%' }}>
-          <div className="form-group" style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' }}>
+          <div
+            className="form-group"
+            style={{
+              flexDirection: 'row',
+              justifyContent: 'space-between',
+              alignItems: 'center',
+            }}
+          >
             <div>
               <label style={{ fontSize: '1.1em' }}>{formatDate(currentDate, true)}</label>
             </div>
-            <div>
-              <select
-                className="custom-select"
-                value={selectedSemester}
-                onChange={(e) => setSelectedSemester(e.target.value)}
-              >
-                {semesters.map((s) => (
-                  <option key={s} value={s}>{s}</option>
-                ))}
-              </select>
-            </div>
           </div>
 
-          <div className="form-group" style={{ flexDirection: 'row', gap: 10, justifyContent: 'space-between' }}>
+          <div
+            className="form-group"
+            style={{
+              flexDirection: 'row',
+              gap: 10,
+              justifyContent: 'space-between',
+            }}
+          >
             <div className="view-mode-controls">
               <button
                 type="button"
@@ -206,52 +250,119 @@ const ProctorViewExam = () => {
               </button>
             </div>
             <div>
-              <button type="button" className="submit-button" onClick={handlePrev}>{'<'}</button>
-              <button type="button" className="submit-button" onClick={handleNext}>{'>'}</button>
+              <button type="button" className="submit-button" onClick={handlePrev}>
+                {'<'}
+              </button>
+              <button type="button" className="submit-button" onClick={handleNext}>
+                {'>'}
+              </button>
             </div>
           </div>
 
-          {loadingExams ? (
-            <p>Loading exams...</p>
+          {loading ? (
+            <p>Loading schedules...</p>
+          ) : schedules.length === 0 ? (
+            <p style={{ textAlign: 'center', color: '#999' }}>
+              No approved proctoring schedules found
+            </p>
           ) : (
             <div className="grid-container">
               <div className="grid-header" style={gridCols}>
                 <div className="cell time-header">Time</div>
                 {viewMode === 'week' ? (
                   (headers as Date[]).map((d, i) => (
-                    <div key={i} className="cell day-header">{formatHeaderDate(d)}</div>
+                    <div key={i} className="cell day-header">
+                      {formatHeaderDate(d)}
+                    </div>
                   ))
                 ) : (
                   <>
-                    <div className="building-group-header" style={{ gridColumn: `span ${buildings.length}` }}>
-                      ICT - BUILDING (BLDG 9)
+                    <div
+                      className="building-group-header"
+                      style={{
+                        gridColumn: `span ${buildings.length || 1}`,
+                      }}
+                    >
+                      Buildings
                     </div>
                     {buildings.map((b, i) => (
-                      <div key={i} className="cell building-header">{b}</div>
+                      <div key={i} className="cell building-header">
+                        {b}
+                      </div>
                     ))}
                   </>
                 )}
               </div>
 
               <div className="grid-body" style={gridCols}>
-                {generateTimeSlots().map((slot, rowIdx) => (
+                {timeSlots.map((slot, rowIdx) => (
                   <div key={rowIdx} className="row">
                     <div className="cell time-cell">{slot.display}</div>
                     {headers.map((header: string | Date, colIdx) => {
-                      const cellDate = viewMode === 'week' ? (header as Date) : currentDate;
-                      const cellRoom = viewMode === 'day' ? (header as string) : null;
+                      const cellDate =
+                        viewMode === 'week' ? (header as Date) : currentDate;
+                      const cellRoom =
+                        viewMode === 'day' ? (header as string) : null;
 
-                      const isCurrent = (
+                      const cellSchedules = getSchedulesForCell(
+                        cellDate,
+                        cellRoom,
+                        slot.startHour,
+                        slot.startMinute,
+                        slot.endHour,
+                        slot.endMinute
+                      );
+
+                      const isCurrent =
                         cellDate.toDateString() === now.toDateString() &&
                         now.getHours() === slot.startHour &&
                         now.getMinutes() >= slot.startMinute &&
-                        now.getMinutes() < slot.endMinute
-                      );
-
-                      const hasExam = getExamsForCell(cellDate, cellRoom, slot.startHour, slot.startMinute, slot.endHour, slot.endMinute).length > 0;
+                        now.getMinutes() < slot.endMinute;
 
                       return (
-                        <div key={colIdx} className={`cell schedule-cell ${hasExam ? 'occupied-cell' : 'empty-cell'} ${isCurrent ? 'current-time-slot' : ''}`} />
+                        <div
+                          key={colIdx}
+                          className={`cell schedule-cell ${
+                            cellSchedules.length > 0
+                              ? 'occupied-cell'
+                              : 'empty-cell'
+                          } ${isCurrent ? 'current-time-slot' : ''}`}
+                          style={{
+                            backgroundColor:
+                              cellSchedules.length > 0
+                                ? courseColorMap[cellSchedules[0].course_id]
+                                : undefined,
+                            position: 'relative',
+                            display: 'flex',
+                            alignItems: 'center',
+                            justifyContent: 'center',
+                            flexDirection: 'column',
+                            padding: '4px',
+                            overflow: 'hidden',
+                          }}
+                        >
+                          {cellSchedules.length > 0 && (
+                            <div
+                              style={{
+                                fontSize: '11px',
+                                fontWeight: 'bold',
+                                color: 'black',
+                                textAlign: 'center',
+                                lineHeight: '1.2',
+                              }}
+                            >
+                              <div>{cellSchedules[0].course_id}</div>
+                              <div style={{ fontSize: '9px' }}>
+                                {cellSchedules[0].room_id}
+                              </div>
+                              <div style={{ fontSize: '9px' }}>
+                                {formatTime12Hour(
+                                  cellSchedules[0].exam_start_time
+                                )}
+                              </div>
+                            </div>
+                          )}
+                        </div>
                       );
                     })}
                   </div>

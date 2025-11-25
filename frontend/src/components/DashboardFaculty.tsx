@@ -22,6 +22,8 @@ import DeanRequests from "./DeanRequests.tsx";
 import RoomManagement from './RoomManagement.tsx';
 import ProctorMonitoring from './ProctorMonitoring.tsx';
 import ProctorAttendance from './ProctorAttendance.tsx';
+import MiniExamDateCalendar from './MiniExamDateCalendar.tsx';
+import ProctorCourseDetails from './ProctorCourseDetails.tsx';
 
 const iconStyle = { className: 'icon', size: 20 };
 
@@ -54,7 +56,6 @@ const roleSidebarMap: Record<string, { key: string, label: string, icon: JSX.Ele
     { key: 'notification', label: 'Notification', icon: <FaBell {...iconStyle} /> },
   ],
   admin: [
-    // Admin has access to ALL features from all roles
     { key: 'exam-Date', label: 'Exam Date', icon: <FaCalendar {...iconStyle} /> },
     { key: 'plot-Schedule', label: 'Plot Schedule', icon: <FaCalendarPlus {...iconStyle} /> },
     { key: 'exam-Schedule', label: 'View Exam Schedule', icon: <FaClipboardList {...iconStyle} /> },
@@ -76,10 +77,8 @@ const DashboardFaculty = () => {
   const [isMobile, setIsMobile] = useState(window.innerWidth <= 1024);
   const navigate = useNavigate();
 
-  /** 🧩 Load user info from API */
   useEffect(() => {
     const loadUser = async () => {
-      // Get user from localStorage or sessionStorage
       const stored =
         JSON.parse(localStorage.getItem('user') || 'null') ||
         JSON.parse(sessionStorage.getItem('user') || 'null');
@@ -87,11 +86,9 @@ const DashboardFaculty = () => {
       if (!stored) return navigate('/');
 
       try {
-        // Fetch full user info from backend
         const res = await api.get(`/users/${stored.user_id}/`);
         const data = res.data;
 
-        // Merge data and create full name & default avatar
         setUser({
           ...data,
           full_name: `${data.first_name} ${data.middle_name ?? ''} ${data.last_name}`.trim(),
@@ -99,7 +96,6 @@ const DashboardFaculty = () => {
         });
       } catch (err) {
         console.error('Error loading user info:', err);
-        // Fallback to stored data if backend fails
         setUser({
           ...stored,
           full_name: `${stored.first_name} ${stored.middle_name ?? ''} ${stored.last_name}`.trim(),
@@ -111,13 +107,11 @@ const DashboardFaculty = () => {
     loadUser();
   }, [navigate]);
 
-  /** 🕒 Real-time clock */
   useEffect(() => {
     const timer = setInterval(() => setCurrentDateTime(new Date()), 1000);
     return () => clearInterval(timer);
   }, []);
 
-  /** 🧩 Fetch user roles */
   useEffect(() => {
     const fetchUserRoles = async () => {
       if (!user?.user_id) return;
@@ -134,28 +128,23 @@ const DashboardFaculty = () => {
     fetchUserRoles();
   }, [user]);
 
-  /** 📱 Handle window resize for responsive behavior */
   useEffect(() => {
     let resizeTimer: NodeJS.Timeout;
     
     const handleResize = () => {
-      // Debounce resize events for better performance
       clearTimeout(resizeTimer);
       resizeTimer = setTimeout(() => {
         const nowMobile = window.innerWidth <= 1024;
         const wasMobile = isMobile;
         
-        // Update mobile state
         setIsMobile(nowMobile);
         
-        // When switching between mobile and desktop: reset sidebar state
         if (wasMobile !== nowMobile) {
           setIsSidebarOpen(false);
         }
-      }, 150); // 150ms debounce
+      }, 150);
     };
 
-    // Initial check
     const initialMobile = window.innerWidth <= 1024;
     setIsMobile(initialMobile);
     
@@ -166,9 +155,6 @@ const DashboardFaculty = () => {
     };
   }, [isMobile]);
 
-
-
-  /** 🧭 Merge sidebar items - Admin gets all features */
   const mergedSidebarItems = Array.from(
     new Map(
       roles
@@ -177,12 +163,10 @@ const DashboardFaculty = () => {
     ).values()
   );
 
-  /** 🍔 Toggle sidebar (for mobile/tablet) */
   const toggleSidebar = () => {
     setIsSidebarOpen(!isSidebarOpen);
   };
 
-  /** 📱 Handle menu item click - close sidebar on mobile/tablet */
   const handleMenuClick = (menuKey: string) => {
     setActiveMenu(menuKey);
     if (isMobile) {
@@ -190,7 +174,6 @@ const DashboardFaculty = () => {
     }
   };
 
-  /** 🖱️ Handle sidebar hover (desktop only) */
   const handleSidebarHover = (isEntering: boolean) => {
     if (!isMobile) {
       setIsSidebarOpen(isEntering);
@@ -216,7 +199,6 @@ const DashboardFaculty = () => {
   return (
     <div className="app-container">
       <div className="main-content-wrapper">
-        {/* Hamburger Menu Button (Mobile/Tablet) */}
         {roles.length > 0 && isMobile && (
           <button
             type="button"
@@ -228,7 +210,6 @@ const DashboardFaculty = () => {
           </button>
         )}
 
-        {/* Sidebar Backdrop (Mobile/Tablet) */}
         {roles.length > 0 && isMobile && (
           <div
             className={`sidebar-backdrop ${isSidebarOpen ? 'active' : ''}`}
@@ -340,8 +321,8 @@ const DashboardFaculty = () => {
               <div className="full-width-section">
                 <h2>Shortcut</h2>
                 <div className="try-things-grid">
-                  <div className="try-thing-card"><ProctorExamDate /></div>
-                  <div className="try-thing-card"><ProctorViewExam /></div>
+                  <div className="try-thing-card"><MiniExamDateCalendar user={user} /></div>
+                  {roles.includes('proctor') && <div className="try-thing-card"><ProctorCourseDetails user={user} /></div>}
                 </div>
               </div>
             </div>

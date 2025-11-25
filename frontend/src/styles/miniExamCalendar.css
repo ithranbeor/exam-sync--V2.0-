@@ -1,0 +1,141 @@
+.mini-exam-calendar {
+  background: white;
+  border-radius: 12px;
+  padding: 15px;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+  height: 100%;
+  display: flex;
+  flex-direction: column;
+  overflow: auto;
+}
+
+.mini-calendar-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 12px;
+  padding-bottom: 10px;
+  border-bottom: 2px solid #f0f0f0;
+}
+
+.mini-calendar-header h3 {
+  margin: 0;
+  font-size: 1.1rem;
+  color: #092C4C;
+  font-weight: bold;
+}
+
+.mini-nav-controls {
+  display: flex;
+  gap: 6px;
+}
+
+.mini-nav-btn {
+  background-color: #092C4C;
+  color: #fff;
+  border: none;
+  width: 28px;
+  height: 28px;
+  border-radius: 50%;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: background-color 0.2s ease;
+}
+
+.mini-nav-btn:hover {
+  background-color: #F2994A;
+  color: #092C4C;
+}
+
+.mini-calendar-weekdays {
+  display: grid;
+  grid-template-columns: repeat(7, 1fr);
+  gap: 2px;
+  margin-bottom: 8px;
+  text-align: center;
+}
+
+.mini-weekday {
+  font-size: 12px;
+  font-weight: bold;
+  color: #092C4C;
+  padding: 4px 0;
+}
+
+.mini-calendar-grid {
+  display: grid;
+  grid-template-columns: repeat(7, 1fr);
+  gap: 2px;
+  flex: 1;
+  margin-bottom: 10px;
+}
+
+.mini-calendar-cell {
+  background-color: #f9f9f9;
+  border: 1px solid #e0e0e0;
+  border-radius: 6px;
+  padding: 4px;
+  min-height: 50px;
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  font-size: 10px;
+}
+
+.mini-calendar-cell.empty {
+  background-color: #f5f5f5;
+  border: none;
+}
+
+.mini-calendar-cell.today {
+  border: 2px solid #F2994A;
+  background-color: rgba(242, 153, 74, 0.05);
+}
+
+.mini-day-number {
+  font-weight: bold;
+  color: #092C4C;
+  margin-bottom: 2px;
+  font-size: 11px;
+}
+
+.mini-event-details {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  width: 100%;
+}
+
+.mini-college-badge {
+  display: block;
+  text-align: center;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.mini-calendar-legend {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  padding-top: 10px;
+  border-top: 1px solid #e0e0e0;
+  justify-content: center;
+}
+
+.mini-legend-item {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  font-size: 9px;
+  color: #333;
+}
+
+.mini-legend-color {
+  width: 8px;
+  height: 8px;
+  border-radius: 2px;
+}

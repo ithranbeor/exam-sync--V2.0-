@@ -244,3 +244,34 @@ body {
   background-color: rgba(239, 68, 68, 0.1);
   border: 2px solid #ef4444;
 }
+.mini-calendar {
+  width: 100%;
+}
+
+.mini-calendar .mini-title {
+  text-align: center;
+  font-size: 16px;
+  margin-bottom: 10px;
+}
+
+.calendar-cell.mini {
+  height: 40px;
+  border-radius: 6px;
+  position: relative;
+}
+
+.calendar-cell.mini.exam-day {
+  background: #ffd9d9;
+  border: 1px solid #ff8b8b;
+}
+
+.calendar-cell .mini-dot {
+  width: 6px;
+  height: 6px;
+  background: #ff4747;
+  border-radius: 50%;
+  position: absolute;
+  bottom: 4px;
+  left: 50%;
+  transform: translateX(-50%);
+}

@@ -184,6 +184,11 @@ const SectionCourses: React.FC = () => {
       return;
     }
 
+    // Prevent double-click submission
+    if (isSubmitting) {
+      return;
+    }
+
     const payload = {
       course_id,
       program_id,
@@ -192,8 +197,26 @@ const SectionCourses: React.FC = () => {
       section_name,
       number_of_students,
       year_level,
-      is_night_class: newSection.is_night_class === "YES" ? "YES" : "",  // Changed from null to ""
+      is_night_class: newSection.is_night_class === "YES" ? "YES" : "",
     };
+
+    // Check for duplicate section course (only when adding new, not editing)
+    if (!editMode) {
+      const duplicate = sectionCourses.find(sc => 
+        sc.course_id === course_id &&
+        sc.program_id === program_id &&
+        sc.section_name === section_name &&
+        sc.term_id === term_id &&
+        sc.user_id === user_id &&
+        sc.number_of_students === number_of_students &&
+        sc.year_level === year_level
+      );
+
+      if (duplicate) {
+        toast.error('This section course already exists!');
+        return;
+      }
+    }
 
     setIsSubmitting(true);
     try {
@@ -206,12 +229,12 @@ const SectionCourses: React.FC = () => {
         if (status === 201) toast.success('Section added');
         else toast.error('Failed to add section');
       }
+      setShowModal(false);
+      fetchAll();
     } catch (_error) {
       toast.error('Request failed.');
     } finally {
-      setShowModal(false);
       setIsSubmitting(false);
-      fetchAll();
     }
   };
 
@@ -357,18 +380,48 @@ const SectionCourses: React.FC = () => {
         }
 
         let added = 0;
+        let duplicates = 0;
         const batchSize = 10;
+
         for (let i = 0; i < validRows.length; i += batchSize) {
           const batch = validRows.slice(i, i + batchSize);
-          const results = await Promise.allSettled(batch.map(payload => api.post('/tbl_sectioncourse/', payload)));
-          added += results.filter(r => r.status === 'fulfilled' && (r.value.status === 200 || r.value.status === 201)).length;
+          
+          // Check each row for duplicates before adding
+          const nonDuplicateBatch = batch.filter(row => {
+            const duplicate = sectionCourses.find(sc => 
+              sc.course_id === row.course_id &&
+              sc.program_id === row.program_id &&
+              sc.section_name === row.section_name &&
+              sc.term_id === row.term_id &&
+              sc.user_id === row.user_id &&
+              sc.number_of_students === row.number_of_students &&
+              sc.year_level === row.year_level
+            );
+            
+            if (duplicate) {
+              duplicates++;
+              return false;
+            }
+            return true;
+          });
+          
+          if (nonDuplicateBatch.length > 0) {
+            const results = await Promise.allSettled(
+              nonDuplicateBatch.map(payload => api.post('/tbl_sectioncourse/', payload))
+            );
+            added += results.filter(r => r.status === 'fulfilled' && (r.value.status === 200 || r.value.status === 201)).length;
+          }
         }
 
-        toast.success(`Import completed: ${added} section(s) added`);
+        if (duplicates > 0) {
+          toast.warning(`${duplicates} duplicate section(s) skipped`);
+        }
+        if (added > 0) {
+          toast.success(`Import completed: ${added} section(s) added`);
+        } else if (duplicates === 0) {
+          toast.info('No sections were imported');
+        }
         fetchAll();
-      } catch (err) {
-        console.error('Import error:', err);
-        toast.error('Error reading or importing file');
       } finally {
         setShowImport(false);
         setIsImporting(false);
@@ -381,7 +434,7 @@ const SectionCourses: React.FC = () => {
   const downloadTemplate = () => {
     const ws = XLSX.utils.aoa_to_sheet([
       ['Course ID','Program ID','Section Name','Number of Students','Year Level','Term Name','Instructor Name','Night Class'],
-      ['IT 112','BSIT','IT 1R1','30','1st Year','1st Semester','Ithran Beor Turno','YES']
+      ['IT 112','BSIT','IT 1R1','30','1st Year','1st Semester','Ithran Beor Turno','YES or Leave it blank']
     ]);
     const wb = XLSX.utils.book_new();
     XLSX.utils.book_append_sheet(wb, ws, 'SectionCourses Template');
@@ -845,6 +898,7 @@ const SectionCourses: React.FC = () => {
                 type="button"
                 onClick={handleSubmit}
                 disabled={isSubmitting}
+                style={isSubmitting ? { opacity: 0.6, cursor: 'not-allowed' } : {}}
               >
                 {isSubmitting ? 'Saving...' : 'Save'}
               </button>
