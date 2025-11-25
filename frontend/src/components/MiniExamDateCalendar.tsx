@@ -36,10 +36,10 @@ const collegeColors: Record<string, string> = {
   'SHS': '#ffaa00',
 };
 
-const MiniExamDateCalendar = ({ user }: MiniExamDateCalendarProps) => {
+const MiniExamDateCalendar = ({ }: MiniExamDateCalendarProps) => {
   const [currentMonth, setCurrentMonth] = useState(new Date());
   const [examPeriods, setExamPeriods] = useState<ExamPeriod[]>([]);
-  const [termMap, setTermMap] = useState<Record<string, string>>({});
+  const [_termMap, setTermMap] = useState<Record<string, string>>({});
 
   const currentYear = currentMonth.getFullYear();
   const currentMonthIndex = currentMonth.getMonth();
