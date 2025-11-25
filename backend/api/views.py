@@ -417,12 +417,43 @@ def tbl_examdetails_list(request):
 
     elif request.method == 'POST':
         many = isinstance(request.data, list)
-        print("📦 Incoming exam details data:", request.data)
+        print("📦 Incoming exam details data:", len(request.data) if many else 1, "records")
+        
+        # ✅ CHECK FOR DUPLICATES BEFORE SAVING
+        if many:
+            modality_ids = [item.get('modality_id') for item in request.data if item.get('modality_id')]
+        else:
+            modality_ids = [request.data.get('modality_id')] if request.data.get('modality_id') else []
+        
+        # Check if any of these modalities already have schedules
+        existing_schedules = TblExamdetails.objects.filter(
+            modality_id__in=modality_ids
+        ).select_related('modality', 'modality__course')
+        
+        if existing_schedules.exists():
+            duplicate_info = []
+            for schedule in existing_schedules:
+                duplicate_info.append({
+                    'modality_id': schedule.modality_id,
+                    'course_id': schedule.course_id,
+                    'section_name': schedule.section_name,
+                    'exam_date': schedule.exam_date,
+                    'exam_start_time': schedule.exam_start_time,
+                })
+            
+            return Response({
+                'error': 'Duplicate schedules detected',
+                'detail': f'{len(duplicate_info)} section(s) already have scheduled exams',
+                'duplicates': duplicate_info
+            }, status=status.HTTP_409_CONFLICT)
+        
+        # Proceed with saving if no duplicates
         serializer = TblExamdetailsSerializer(data=request.data, many=many)
         if serializer.is_valid():
             try:
-                serializer.save()
-                return Response(serializer.data, status=status.HTTP_201_CREATED)
+                with transaction.atomic():
+                    serializer.save()
+                    return Response(serializer.data, status=status.HTTP_201_CREATED)
             except Exception as e:
                 print(f"❌ Error saving exam details: {str(e)}")
                 import traceback
@@ -740,15 +771,76 @@ def tbl_sectioncourse_list(request):
         ).all()
 
         serializer = TblSectioncourseSerializer(qs, many=True)
-        return Response(serializer.data)  # ✅ Simple array, paginate on frontend
+        return Response(serializer.data)
 
     elif request.method == 'POST':
+        # ✅ NEW: Check for duplicates before creating
+        course_id = request.data.get('course_id')
+        program_id = request.data.get('program_id')
+        section_name = request.data.get('section_name')
+        term_id = request.data.get('term_id')
+        user_id = request.data.get('user_id')
+        
+        # Check for exact duplicate (all fields match)
+        existing_exact = TblSectioncourse.objects.filter(
+            course_id=course_id,
+            program_id=program_id,
+            section_name=section_name,
+            term_id=term_id,
+            user_id=user_id,
+            number_of_students=request.data.get('number_of_students'),
+            year_level=request.data.get('year_level'),
+            is_night_class=request.data.get('is_night_class', '')
+        ).first()
+        
+        if existing_exact:
+            return Response({
+                'error': 'Duplicate section course',
+                'detail': 'This exact section course already exists in the database.',
+                'existing': {
+                    'id': existing_exact.id,
+                    'section_name': existing_exact.section_name,
+                    'course_id': existing_exact.course_id,
+                    'program_id': existing_exact.program_id
+                }
+            }, status=status.HTTP_409_CONFLICT)
+        
+        # Check for section name conflict (same course, program, section, term)
+        existing_section = TblSectioncourse.objects.filter(
+            course_id=course_id,
+            program_id=program_id,
+            section_name=section_name,
+            term_id=term_id
+        ).first()
+        
+        if existing_section:
+            instructor_name = f"{existing_section.user.first_name} {existing_section.user.last_name}" if existing_section.user else 'Unknown'
+            return Response({
+                'error': 'Section name conflict',
+                'detail': f'Section "{section_name}" already exists for this course, program, and term.',
+                'existing': {
+                    'id': existing_section.id,
+                    'section_name': existing_section.section_name,
+                    'instructor': instructor_name,
+                    'course_id': existing_section.course_id,
+                    'program_id': existing_section.program_id
+                }
+            }, status=status.HTTP_409_CONFLICT)
+        
+        # Proceed with creation if no duplicates
         serializer = TblSectioncourseSerializer(data=request.data)
         if serializer.is_valid():
-            serializer.save()
-            return Response(serializer.data, status=status.HTTP_201_CREATED)
+            try:
+                serializer.save()
+                return Response(serializer.data, status=status.HTTP_201_CREATED)
+            except Exception as e:
+                return Response({
+                    'error': str(e),
+                    'detail': 'Failed to create section course'
+                }, status=status.HTTP_400_BAD_REQUEST)
         return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
 
+# ✅ ALSO UPDATE: tbl_sectioncourse_detail for PUT/PATCH
 @api_view(['GET', 'PUT', 'DELETE'])
 @permission_classes([AllowAny])
 def tbl_sectioncourse_detail(request, pk):
@@ -762,10 +854,42 @@ def tbl_sectioncourse_detail(request, pk):
         return Response(serializer.data)
 
     elif request.method == 'PUT':
+        # ✅ NEW: Check for conflicts with OTHER sections when updating
+        course_id = request.data.get('course_id', section.course_id)
+        program_id = request.data.get('program_id', section.program_id)
+        section_name = request.data.get('section_name', section.section_name)
+        term_id = request.data.get('term_id', section.term_id)
+        
+        # Check for section name conflict (excluding current section)
+        existing_section = TblSectioncourse.objects.filter(
+            course_id=course_id,
+            program_id=program_id,
+            section_name=section_name,
+            term_id=term_id
+        ).exclude(pk=pk).first()
+        
+        if existing_section:
+            instructor_name = f"{existing_section.user.first_name} {existing_section.user.last_name}" if existing_section.user else 'Unknown'
+            return Response({
+                'error': 'Section name conflict',
+                'detail': f'Another section "{section_name}" already exists for this course, program, and term.',
+                'existing': {
+                    'id': existing_section.id,
+                    'section_name': existing_section.section_name,
+                    'instructor': instructor_name
+                }
+            }, status=status.HTTP_409_CONFLICT)
+        
         serializer = TblSectioncourseSerializer(section, data=request.data)
         if serializer.is_valid():
-            serializer.save()
-            return Response(serializer.data)
+            try:
+                serializer.save()
+                return Response(serializer.data)
+            except Exception as e:
+                return Response({
+                    'error': str(e),
+                    'detail': 'Failed to update section course'
+                }, status=status.HTTP_400_BAD_REQUEST)
         return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
 
     elif request.method == 'DELETE':

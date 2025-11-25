@@ -245,6 +245,7 @@ class TblExamdetails(models.Model):
     class Meta:
         managed = True
         db_table = 'tbl_examdetails'
+        unique_together = (('modality', 'exam_date', 'exam_start_time'),)
         indexes = [
             models.Index(fields=['room']),
             models.Index(fields=['modality']),

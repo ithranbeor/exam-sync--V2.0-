@@ -55,6 +55,9 @@ const SchedulerPlottingSchedule: React.FC<SchedulerProps> = ({ user, onScheduleC
   const [duration, setDuration] = useState({ hours: 1, minutes: 0 });
   const [selectedStartTime, setSelectedStartTime] = useState<string>("");
 
+  const [alreadyScheduledIds, setAlreadyScheduledIds] = useState<Set<number>>(new Set());
+  const [_checkingSchedules, setCheckingSchedules] = useState(false);
+
   const times = [
     "07:00", "07:30", "08:00", "08:30", "09:00", "09:30", "10:00", "10:30", "11:00", "11:30",
     "12:00", "12:30", "13:00", "13:30", "14:00", "14:30", "15:00", "15:30", "16:00", "16:30",
@@ -293,27 +296,39 @@ const SchedulerPlottingSchedule: React.FC<SchedulerProps> = ({ user, onScheduleC
   // COMPUTED DATA
   // ============================================================================
 
-  const checkExistingSchedules = async (modalityIds: number[]): Promise<Set<number>> => {
-    try {
-      const response = await api.get('/tbl_examdetails', {
-        params: {
-          modality_id: modalityIds.join(',')
+  useEffect(() => {
+    const checkExistingSchedules = async () => {
+      if (formData.selectedModalities.length === 0) {
+        setAlreadyScheduledIds(new Set());
+        return;
+      }
+
+      setCheckingSchedules(true);
+      try {
+        const response = await api.get('/tbl_examdetails', {
+          params: {
+            modality_id: formData.selectedModalities.join(',')
+          }
+        });
+
+        const scheduled = new Set<number>(
+          response.data.map((s: any) => Number(s.modality_id))
+        );
+        
+        setAlreadyScheduledIds(scheduled);
+        
+        if (scheduled.size > 0) {
+          console.log(`⚠️ ${scheduled.size} section(s) already scheduled`);
         }
-      });
+      } catch (error) {
+        console.error('Error checking schedules:', error);
+      } finally {
+        setCheckingSchedules(false);
+      }
+    };
 
-      const existingSchedules = response.data;
-      
-      // Filter schedules that match any of the modality IDs
-      const matchingSchedules = existingSchedules.filter((s: any) => 
-        modalityIds.includes(s.modality_id)
-      );
-
-      return new Set(matchingSchedules.map((s: any) => s.modality_id) || []);
-    } catch (error) {
-      console.error("Error checking existing schedules:", error);
-      return new Set();
-    }
-  };
+    checkExistingSchedules();
+  }, [formData.selectedModalities]);
 
   const termNameById = useMemo(() => {
     const map = new Map<number | string, string>();
@@ -1031,17 +1046,6 @@ const SchedulerPlottingSchedule: React.FC<SchedulerProps> = ({ user, onScheduleC
     const collegeObj = collegesCache?.find(c => c.college_id === schedulerCollegeId);
     const collegeNameForCourse = collegeObj?.college_name ?? "Unknown College";
 
-    const existingScheduledIds = await checkExistingSchedules(formData.selectedModalities);
-
-    if (existingScheduledIds.size > 0) {
-      const count = existingScheduledIds.size;
-      toast.error(
-        `${count} section${count > 1 ? 's are' : ' is'} already scheduled. Please deselect them.`,
-        { autoClose: 5000 }
-      );
-      return;
-    }
-
     const allSections: any[] = [];
     const sectionMap = new Map<number, any>();
     formData.selectedModalities.forEach(modalityId => {
@@ -1217,6 +1221,75 @@ const SchedulerPlottingSchedule: React.FC<SchedulerProps> = ({ user, onScheduleC
 
     if (violations.length > 0) {
       alert(`Cannot generate schedule:\n\n${violations.join("\n\n")}`);
+      return;
+    }
+
+    console.log('🔍 Checking for existing schedules...');
+    
+    try {
+      const modalityIds = formData.selectedModalities;
+      const existingSchedulesResponse = await api.get('/tbl_examdetails', {
+        params: {
+          modality_id: modalityIds.join(',')
+        }
+      });
+      
+      const existingSchedules = existingSchedulesResponse.data || [];
+      
+      if (existingSchedules.length > 0) {
+        // Group by modality to show which ones are already scheduled
+        const scheduledModalities = new Map<number, any>();
+        existingSchedules.forEach((schedule: any) => {
+          if (!scheduledModalities.has(schedule.modality_id)) {
+            scheduledModalities.set(schedule.modality_id, []);
+          }
+          scheduledModalities.get(schedule.modality_id)!.push(schedule);
+        });
+        
+        // Build detailed error message
+        const duplicateDetails: string[] = [];
+        scheduledModalities.forEach((schedules, modalityId) => {
+          const modality = modalities.find(m => m.modality_id === modalityId);
+          if (modality) {
+            const schedule = schedules[0]; // Get first schedule for details
+            duplicateDetails.push(
+              `• ${modality.course_id} - ${modality.section_name}\n` +
+              `  Already scheduled on: ${new Date(schedule.exam_date).toLocaleDateString('en-US', { 
+                year: 'numeric', 
+                month: 'long', 
+                day: 'numeric' 
+              })}\n` +
+              `  Time: ${new Date(schedule.exam_start_time).toLocaleTimeString('en-US', { 
+                hour: '2-digit', 
+                minute: '2-digit' 
+              })} - ${new Date(schedule.exam_end_time).toLocaleTimeString('en-US', { 
+                hour: '2-digit', 
+                minute: '2-digit' 
+              })}\n` +
+              `  Room: ${schedule.room?.room_name || 'N/A'}\n` +
+              `  Exam Period: ${schedule.exam_period || 'N/A'}`
+            );
+          }
+        });
+        
+        const errorMessage = 
+          `❌ Cannot generate schedule - ${scheduledModalities.size} section(s) already have scheduled exams:\n\n` +
+          duplicateDetails.slice(0, 5).join('\n\n') +
+          (duplicateDetails.length > 5 ? `\n\n... and ${duplicateDetails.length - 5} more` : '') +
+          `\n\n📋 Options:\n` +
+          `1. Deselect these sections from your modality selection\n` +
+          `2. Delete the existing schedules first if you want to reschedule\n` +
+          `3. Use the "Edit Schedule" feature to modify existing schedules`;
+        
+        alert(errorMessage);
+        return; // Exit the function
+      }
+      
+      console.log('✅ No existing schedules found - safe to proceed');
+      
+    } catch (error) {
+      console.error('Error checking for existing schedules:', error);
+      toast.error('Failed to check for existing schedules');
       return;
     }
 
@@ -1767,7 +1840,19 @@ const SchedulerPlottingSchedule: React.FC<SchedulerProps> = ({ user, onScheduleC
         </div>
 
         <div className="preview-column">
-          <h3 className="preview-header">Selected Modality Preview ({formData.selectedModalities.length})</h3>
+          <h3 className="preview-header">
+            Selected Modality Preview ({formData.selectedModalities.length})
+            {alreadyScheduledIds.size > 0 && (
+              <span style={{ 
+                color: '#f59e0b', 
+                fontSize: '14px', 
+                marginLeft: '10px',
+                fontWeight: 'normal' 
+              }}>
+                ⚠️ {alreadyScheduledIds.size} already scheduled
+              </span>
+            )}
+          </h3>
           <input
             type="text"
             placeholder="Search within selected modalities"
@@ -1781,16 +1866,50 @@ const SchedulerPlottingSchedule: React.FC<SchedulerProps> = ({ user, onScheduleC
                 .map(modalityId => {
                   const modality = filteredModalitiesBySelection.find(m => m.modality_id === modalityId);
                   const course = filteredCoursesByPrograms.find(c => c.course_id === modality?.course_id);
+                  const isScheduled = alreadyScheduledIds.has(modalityId);
                   const searchString = [course?.course_id, modality?.section_name, modality?.modality_type].join(' ').toLowerCase();
-                  return { modality, course, searchString, modalityId };
+                  return { modality, course, searchString, modalityId, isScheduled };
                 })
                 .filter(item => !modalityPreviewSearchTerm || item.searchString.includes(modalityPreviewSearchTerm.toLowerCase()))
-                .map(({ modality, course, modalityId }) => (
-                  <div key={modalityId} className="modality-item">
+                .map(({ modality, course, modalityId, isScheduled }) => (
+                  <div 
+                    key={modalityId} 
+                    className="modality-item"
+                    style={{
+                      backgroundColor: isScheduled ? '#fef3c7' : 'transparent',
+                      border: isScheduled ? '2px solid #f59e0b' : '1px solid #e5e7eb',
+                      position: 'relative'
+                    }}
+                  >
+                    {isScheduled && (
+                      <div style={{
+                        position: 'absolute',
+                        top: '8px',
+                        right: '8px',
+                        background: '#f59e0b',
+                        color: 'white',
+                        padding: '4px 8px',
+                        borderRadius: '4px',
+                        fontSize: '12px',
+                        fontWeight: 'bold'
+                      }}>
+                        ⚠️ ALREADY SCHEDULED
+                      </div>
+                    )}
                     <p className="modality-detail">Course: {course ? course.course_id : 'N/A'}</p>
                     <p className="modality-detail">Section: {modality?.section_name ?? 'N/A'}</p>
                     <p className="modality-detail">Modality Type: {modality?.modality_type ?? 'N/A'}</p>
                     <p className="modality-detail">Remarks: {modality?.modality_remarks ?? 'N/A'}</p>
+                    {isScheduled && (
+                      <p style={{ 
+                        color: '#f59e0b', 
+                        fontSize: '13px', 
+                        marginTop: '8px',
+                        fontWeight: '500' 
+                      }}>
+                        ⚠️ This section already has an exam schedule
+                      </p>
+                    )}
                     <hr className="modality-divider" />
                   </div>
                 ))}
@@ -1801,16 +1920,65 @@ const SchedulerPlottingSchedule: React.FC<SchedulerProps> = ({ user, onScheduleC
         </div>
       </div>
 
+      {alreadyScheduledIds.size > 0 && (
+        <button
+          onClick={() => {
+            setFormData(prev => ({
+              ...prev,
+              selectedModalities: prev.selectedModalities.filter(
+                id => !alreadyScheduledIds.has(id)
+              )
+            }));
+            toast.success(`Removed ${alreadyScheduledIds.size} already scheduled section(s)`);
+          }}
+          style={{
+            marginLeft: '10px',
+            padding: '6px 12px',
+            background: '#f59e0b',
+            color: 'white',
+            border: 'none',
+            borderRadius: '4px',
+            cursor: 'pointer',
+            fontSize: '13px',
+            fontWeight: '500'
+          }}
+        >
+          Remove Already Scheduled ({alreadyScheduledIds.size})
+        </button>
+      )}
+
       <div className="save-button-wrapper">
         <button
           type="button"
           onClick={handleSaveClick}
           className="btn-save"
-          disabled={loading}
-          style={{ display: "flex", alignItems: "center", justifyContent: "center", gap: "8px", fontSize: "20px", width: "45px" }}
+          disabled={loading || alreadyScheduledIds.size > 0}
+          style={{ 
+            display: "flex", 
+            alignItems: "center", 
+            justifyContent: "center", 
+            gap: "8px", 
+            fontSize: "20px", 
+            width: "45px",
+            opacity: alreadyScheduledIds.size > 0 ? 0.5 : 1,
+            cursor: alreadyScheduledIds.size > 0 ? 'not-allowed' : 'pointer'
+          }}
+          title={alreadyScheduledIds.size > 0 
+            ? 'Cannot generate - some sections are already scheduled' 
+            : 'Generate schedule'}
         >
           {loading ? <FaSpinner className="spin" /> : <FaPlay />}
         </button>
+        {alreadyScheduledIds.size > 0 && (
+          <p style={{ 
+            color: '#f59e0b', 
+            fontSize: '14px', 
+            marginTop: '8px',
+            textAlign: 'center' 
+          }}>
+            Remove already scheduled sections to proceed
+          </p>
+        )}
       </div>
       <ToastContainer position="top-center" autoClose={3000} />
     </div>

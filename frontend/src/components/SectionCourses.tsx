@@ -200,20 +200,57 @@ const SectionCourses: React.FC = () => {
       is_night_class: newSection.is_night_class === "YES" ? "YES" : "",
     };
 
-    // Check for duplicate section course (only when adding new, not editing)
+    // ✅ IMPROVED: Better duplicate checking
     if (!editMode) {
-      const duplicate = sectionCourses.find(sc => 
+      // Check for exact duplicate (all fields match)
+      const exactDuplicate = sectionCourses.find(sc => 
         sc.course_id === course_id &&
         sc.program_id === program_id &&
         sc.section_name === section_name &&
         sc.term_id === term_id &&
         sc.user_id === user_id &&
         sc.number_of_students === number_of_students &&
-        sc.year_level === year_level
+        sc.year_level === year_level &&
+        (sc.is_night_class === "YES" ? "YES" : "") === (newSection.is_night_class === "YES" ? "YES" : "")
       );
 
-      if (duplicate) {
-        toast.error('This section course already exists!');
+      if (exactDuplicate) {
+        toast.error('❌ This exact section course already exists!');
+        return;
+      }
+
+      // ✅ NEW: Check for section name conflict (same course, program, section name, term)
+      const sectionConflict = sectionCourses.find(sc => 
+        sc.course_id === course_id &&
+        sc.program_id === program_id &&
+        sc.section_name === section_name &&
+        sc.term_id === term_id
+      );
+
+      if (sectionConflict) {
+        const conflictDetails = 
+          `Section "${section_name}" already exists for:\n` +
+          `Course: ${course_id}\n` +
+          `Program: ${program_id}\n` +
+          `Term: ${terms.find(t => t.term_id === term_id)?.term_name || 'N/A'}\n` +
+          `Instructor: ${sectionConflict.user?.full_name || 'N/A'}\n\n` +
+          `Please use a different section name or edit the existing section.`;
+        
+        toast.error(conflictDetails, { autoClose: 7000 });
+        return;
+      }
+    } else {
+      // ✅ EDIT MODE: Check for conflicts with OTHER records (exclude current)
+      const conflict = sectionCourses.find(sc => 
+        sc.id !== newSection.id && // Exclude current record
+        sc.course_id === course_id &&
+        sc.program_id === program_id &&
+        sc.section_name === section_name &&
+        sc.term_id === term_id
+      );
+
+      if (conflict) {
+        toast.error('❌ A section with this name already exists for this course, program, and term!');
         return;
       }
     }
@@ -222,17 +259,25 @@ const SectionCourses: React.FC = () => {
     try {
       if (editMode) {
         const { status } = await api.put(`/tbl_sectioncourse/${newSection.id}/`, payload);
-        if (status === 200) toast.success('Section updated');
-        else toast.error('Failed to update section');
+        if (status === 200) {
+          toast.success('✅ Section updated successfully');
+        } else {
+          toast.error('❌ Failed to update section');
+        }
       } else {
         const { status } = await api.post(`/tbl_sectioncourse/`, payload);
-        if (status === 201) toast.success('Section added');
-        else toast.error('Failed to add section');
+        if (status === 201) {
+          toast.success('✅ Section added successfully');
+        } else {
+          toast.error('❌ Failed to add section');
+        }
       }
       setShowModal(false);
       fetchAll();
-    } catch (_error) {
-      toast.error('Request failed.');
+    } catch (error: any) {
+      console.error('Submit error:', error);
+      const errorMsg = error.response?.data?.error || error.message || 'Request failed';
+      toast.error(`❌ Error: ${errorMsg}`);
     } finally {
       setIsSubmitting(false);
     }
@@ -253,6 +298,10 @@ const SectionCourses: React.FC = () => {
 
         const validRows: SectionCourse[] = [];
         const errors: string[] = [];
+        const warnings: string[] = [];
+        
+        // ✅ NEW: Track what we're about to import to detect duplicates within the import file itself
+        const importMap = new Map<string, number>();
         
         for (let idx = 0; idx < rows.length; idx++) {
           const row = rows[idx];
@@ -272,7 +321,7 @@ const SectionCourses: React.FC = () => {
             errors.push(`Row ${rowNum}: Missing Section Name`);
             continue;
           }
-          if (!number_of_students) {
+          if (!number_of_students || isNaN(number_of_students)) {
             errors.push(`Row ${rowNum}: Missing or invalid Number of Students`);
             continue;
           }
@@ -316,11 +365,7 @@ const SectionCourses: React.FC = () => {
 
           // Handle instructor names (can be empty, single, or multiple comma-separated)
           if (!instructor_names_raw) {
-            // No instructor specified - create section without instructor
-            validRows.push({
-              course_id, program_id, section_name, number_of_students, year_level,
-              term_id: term.term_id, user_id: undefined, is_night_class
-            } as SectionCourse);
+            errors.push(`Row ${rowNum}: Instructor Name is required`);
             continue;
           }
 
@@ -330,11 +375,7 @@ const SectionCourses: React.FC = () => {
           const instructorNames = instructor_names_raw.split(',').map(name => name.trim()).filter(name => name);
           
           if (instructorNames.length === 0) {
-            // Empty after trimming - create section without instructor
-            validRows.push({
-              course_id, program_id, section_name, number_of_students, year_level,
-              term_id: term.term_id, user_id: undefined, is_night_class
-            } as SectionCourse);
+            errors.push(`Row ${rowNum}: Instructor Name is required`);
             continue;
           }
 
@@ -354,74 +395,125 @@ const SectionCourses: React.FC = () => {
               continue;
             }
 
+            // ✅ NEW: Create unique key for duplicate detection
+            const uniqueKey = `${course_id}|${program_id}|${section_name}|${term.term_id}|${user.user_id}`;
+            
+            // ✅ Check for duplicates in existing data
+            const existingDuplicate = sectionCourses.find(sc => 
+              sc.course_id === course_id &&
+              sc.program_id === program_id &&
+              sc.section_name === section_name &&
+              sc.term_id === term.term_id &&
+              sc.user_id === user.user_id
+            );
+
+            if (existingDuplicate) {
+              warnings.push(`Row ${rowNum}: Section "${section_name}" already exists in database - skipping`);
+              continue;
+            }
+
+            // ✅ Check for duplicates within the import file itself
+            if (importMap.has(uniqueKey)) {
+              const firstRow = importMap.get(uniqueKey);
+              warnings.push(`Row ${rowNum}: Duplicate of row ${firstRow} - skipping`);
+              continue;
+            }
+
+            // ✅ Check for section name conflicts (same section name for same course/program/term but different instructor)
+            const existingSection = sectionCourses.find(sc =>
+              sc.course_id === course_id &&
+              sc.program_id === program_id &&
+              sc.section_name === section_name &&
+              sc.term_id === term.term_id
+            );
+
+            if (existingSection) {
+              warnings.push(`Row ${rowNum}: Section "${section_name}" already exists with instructor "${existingSection.user?.full_name}" - skipping`);
+              continue;
+            }
+
             foundAtLeastOne = true;
+            importMap.set(uniqueKey, rowNum);
+            
             validRows.push({
-              course_id, program_id, section_name, number_of_students, year_level,
-              term_id: term.term_id, user_id: user.user_id, is_night_class
+              course_id, 
+              program_id, 
+              section_name, 
+              number_of_students, 
+              year_level,
+              term_id: term.term_id, 
+              user_id: user.user_id, 
+              is_night_class
             } as SectionCourse);
           }
 
           if (!foundAtLeastOne && instructorNames.length > 0) {
-            errors.push(`Row ${rowNum}: None of the specified instructors were found for course "${course_id}"`);
+            errors.push(`Row ${rowNum}: None of the specified instructors were found or all entries were duplicates`);
           }
         }
 
-        // Show errors if any
+        // Show errors and warnings
         if (errors.length > 0) {
           console.error('Import errors:', errors);
-          toast.error(`${errors.length} issue(s) found. Check console for details.`);
+          toast.error(`❌ ${errors.length} error(s) found. Check console for details.`, { autoClose: 5000 });
+        }
+
+        if (warnings.length > 0) {
+          console.warn('Import warnings:', warnings);
+          toast.warning(`⚠️ ${warnings.length} duplicate(s) skipped. Check console for details.`, { autoClose: 5000 });
         }
 
         if (validRows.length === 0) {
-          toast.warning('No valid rows to import');
+          if (errors.length === 0 && warnings.length > 0) {
+            toast.info('ℹ️ All rows were duplicates - nothing to import');
+          } else {
+            toast.warning('⚠️ No valid rows to import');
+          }
           setShowImport(false);
           setIsImporting(false);
           return;
         }
 
+        // ✅ Import valid rows in batches
         let added = 0;
-        let duplicates = 0;
+        let failed = 0;
         const batchSize = 10;
 
         for (let i = 0; i < validRows.length; i += batchSize) {
           const batch = validRows.slice(i, i + batchSize);
           
-          // Check each row for duplicates before adding
-          const nonDuplicateBatch = batch.filter(row => {
-            const duplicate = sectionCourses.find(sc => 
-              sc.course_id === row.course_id &&
-              sc.program_id === row.program_id &&
-              sc.section_name === row.section_name &&
-              sc.term_id === row.term_id &&
-              sc.user_id === row.user_id &&
-              sc.number_of_students === row.number_of_students &&
-              sc.year_level === row.year_level
-            );
-            
-            if (duplicate) {
-              duplicates++;
-              return false;
-            }
-            return true;
-          });
+          const results = await Promise.allSettled(
+            batch.map(payload => api.post('/tbl_sectioncourse/', payload))
+          );
           
-          if (nonDuplicateBatch.length > 0) {
-            const results = await Promise.allSettled(
-              nonDuplicateBatch.map(payload => api.post('/tbl_sectioncourse/', payload))
-            );
-            added += results.filter(r => r.status === 'fulfilled' && (r.value.status === 200 || r.value.status === 201)).length;
-          }
+          results.forEach((result, index) => {
+            if (result.status === 'fulfilled' && (result.value.status === 200 || result.value.status === 201)) {
+              added++;
+            } else {
+              failed++;
+              if (result.status === 'rejected') {
+                console.error(`Failed to import row:`, batch[index], result.reason);
+              }
+            }
+          });
         }
 
-        if (duplicates > 0) {
-          toast.warning(`${duplicates} duplicate section(s) skipped`);
-        }
+        // Show final summary
+        const messages = [];
+        if (added > 0) messages.push(`✅ ${added} section(s) added`);
+        if (failed > 0) messages.push(`❌ ${failed} failed`);
+        if (warnings.length > 0) messages.push(`⚠️ ${warnings.length} skipped`);
+
         if (added > 0) {
-          toast.success(`Import completed: ${added} section(s) added`);
-        } else if (duplicates === 0) {
-          toast.info('No sections were imported');
+          toast.success(`Import completed: ${messages.join(', ')}`, { autoClose: 5000 });
+        } else if (failed > 0 || warnings.length > 0) {
+          toast.info(`Import completed: ${messages.join(', ')}`, { autoClose: 5000 });
         }
+
         fetchAll();
+      } catch (error) {
+        console.error('Import error:', error);
+        toast.error('❌ Import failed. Check console for details.');
       } finally {
         setShowImport(false);
         setIsImporting(false);
