@@ -34,12 +34,16 @@
   background-color: #f0f0f0;
   color: #092C4C;
   border: 1px solid #ddd;
-  padding: 6px 12px;
-  border-radius: 20px;
+  padding: 6px 14px;
+  border-radius: 999px;
   font-size: 12px;
   font-weight: 600;
   cursor: pointer;
   transition: all 0.2s ease;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  line-height: 1;
 }
 
 .filter-btn:hover {
