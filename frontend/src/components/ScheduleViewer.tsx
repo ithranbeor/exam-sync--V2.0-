@@ -1118,173 +1118,175 @@ const SchedulerView: React.FC<SchedulerViewProps> = ({ user }) => {
                       <div style={{ fontSize: '20px', color: '#333', marginTop: '-10px', fontFamily: 'serif' }}>{examPeriodName}</div>
                     </div>
                     <hr />
-                    <table className="exam-table">
-                      <thead>
-                        <tr>
-                          <th colSpan={pageRooms.length + 1}>{date && new Date(date).toLocaleDateString("en-US", { year: "numeric", month: "long", day: "numeric" })}</th>
-                        </tr>
-                        <tr>
-                          <th></th>
-                          {(() => {
-                            const buildingGroups: Record<string, string[]> = {};
-                            pageRooms.forEach((room) => {
-                              const building = filteredExamData.find(e => e.room_id === (room ?? ""))?.building_name || "Unknown Building";
-                              if (!buildingGroups[building]) buildingGroups[building] = [];
-                              buildingGroups[building].push(String(room));
-                            });
+                    <div className="table-wrapper">
+                      <table className="exam-table">
+                        <thead>
+                          <tr>
+                            <th colSpan={pageRooms.length + 1}>{date && new Date(date).toLocaleDateString("en-US", { year: "numeric", month: "long", day: "numeric" })}</th>
+                          </tr>
+                          <tr>
+                            <th></th>
+                            {(() => {
+                              const buildingGroups: Record<string, string[]> = {};
+                              pageRooms.forEach((room) => {
+                                const building = filteredExamData.find(e => e.room_id === (room ?? ""))?.building_name || "Unknown Building";
+                                if (!buildingGroups[building]) buildingGroups[building] = [];
+                                buildingGroups[building].push(String(room));
+                              });
 
-                            return Object.entries(buildingGroups).map(([building, rooms]) => (
-                              <th key={building} colSpan={rooms.length}>{building}</th>
-                            ));
-                          })()}
-                        </tr>
-                        <tr>
-                          <th>Time</th>
-                          {(() => {
-                            const buildingGroups: Record<string, string[]> = {};
-                            pageRooms.forEach((room) => {
-                              const building = dateExams.find(e => e.room_id === (room ?? ""))?.building_name || "Unknown Building";
-                              if (!buildingGroups[building]) buildingGroups[building] = [];
-                              buildingGroups[building].push(String(room));
-                            });
+                              return Object.entries(buildingGroups).map(([building, rooms]) => (
+                                <th key={building} colSpan={rooms.length}>{building}</th>
+                              ));
+                            })()}
+                          </tr>
+                          <tr>
+                            <th>Time</th>
+                            {(() => {
+                              const buildingGroups: Record<string, string[]> = {};
+                              pageRooms.forEach((room) => {
+                                const building = dateExams.find(e => e.room_id === (room ?? ""))?.building_name || "Unknown Building";
+                                if (!buildingGroups[building]) buildingGroups[building] = [];
+                                buildingGroups[building].push(String(room));
+                              });
 
-                            return Object.values(buildingGroups)
-                              .flat()
-                              .map((room, idx) => <th key={idx}>{room}</th>);
-                          })()}
-                        </tr>
-                      </thead>
-                      <tbody>
-                        {timeSlots.map((slot, rowIndex) => (
-                          <tr key={slot.start24}>
-                            <td>{slot.label}</td>
-                            {pageRooms.map((room) => {
-                              const key = `${date}-${room}-${rowIndex}`;
-                              if (occupiedCells[key]) return null;
+                              return Object.values(buildingGroups)
+                                .flat()
+                                .map((room, idx) => <th key={idx}>{room}</th>);
+                            })()}
+                          </tr>
+                        </thead>
+                        <tbody>
+                          {timeSlots.map((slot, rowIndex) => (
+                            <tr key={slot.start24}>
+                              <td>{slot.label}</td>
+                              {pageRooms.map((room) => {
+                                const key = `${date}-${room}-${rowIndex}`;
+                                if (occupiedCells[key]) return null;
 
-                              const examsInRoom = groupedData[`${date}-${room}`] || [];
+                                const examsInRoom = groupedData[`${date}-${room}`] || [];
 
-                              const exam = examsInRoom.find((e) => {
-                                if (!e.exam_start_time || !e.exam_end_time) {
-                                  console.warn('⚠️ Missing time data:', e.examdetails_id);
-                                  return false;
-                                }
+                                const exam = examsInRoom.find((e) => {
+                                  if (!e.exam_start_time || !e.exam_end_time) {
+                                    console.warn('⚠️ Missing time data:', e.examdetails_id);
+                                    return false;
+                                  }
 
-                                // ✅ FIX: Extract time directly from ISO string (HH:MM format)
-                                const examStartTimeStr = e.exam_start_time.slice(11, 16);
-                                const examEndTimeStr = e.exam_end_time.slice(11, 16);
+                                  // ✅ FIX: Extract time directly from ISO string (HH:MM format)
+                                  const examStartTimeStr = e.exam_start_time.slice(11, 16);
+                                  const examEndTimeStr = e.exam_end_time.slice(11, 16);
+
+                                  const [examStartHour, examStartMin] = examStartTimeStr.split(':').map(Number);
+                                  const [examEndHour, examEndMin] = examEndTimeStr.split(':').map(Number);
+
+                                  const examStart = examStartHour * 60 + examStartMin;
+                                  const examEnd = examEndHour * 60 + examEndMin;
+
+                                  const slotStart = Number(slot.start24.split(":")[0]) * 60 + Number(slot.start24.split(":")[1]);
+                                  const slotEnd = Number(slot.end24.split(":")[0]) * 60 + Number(slot.end24.split(":")[1]);
+
+                                  const matches = (examStart < slotEnd) && (examEnd > slotStart);
+
+                                  return matches;
+                                });
+
+                                if (!exam) return <td key={room}></td>;
+
+                                // ✅ FIX: Extract time directly from ISO string
+                                const examStartTimeStr = exam.exam_start_time!.slice(11, 16);
+                                const examEndTimeStr = exam.exam_end_time!.slice(11, 16);
 
                                 const [examStartHour, examStartMin] = examStartTimeStr.split(':').map(Number);
                                 const [examEndHour, examEndMin] = examEndTimeStr.split(':').map(Number);
 
-                                const examStart = examStartHour * 60 + examStartMin;
-                                const examEnd = examEndHour * 60 + examEndMin;
+                                const startMinutes = examStartHour * 60 + examStartMin;
+                                const endMinutes = examEndHour * 60 + examEndMin;
 
-                                const slotStart = Number(slot.start24.split(":")[0]) * 60 + Number(slot.start24.split(":")[1]);
-                                const slotEnd = Number(slot.end24.split(":")[0]) * 60 + Number(slot.end24.split(":")[1]);
+                                const startSlotIndex = timeSlots.findIndex(slot => {
+                                  const slotStart = Number(slot.start24.split(":")[0]) * 60 + Number(slot.start24.split(":")[1]);
+                                  const slotEnd = Number(slot.end24.split(":")[0]) * 60 + Number(slot.end24.split(":")[1]);
+                                  return startMinutes >= slotStart && startMinutes < slotEnd;
+                                });
 
-                                const matches = (examStart < slotEnd) && (examEnd > slotStart);
+                                const rowSpan = Math.ceil((endMinutes - startMinutes) / 30);
 
-                                return matches;
-                              });
-
-                              if (!exam) return <td key={room}></td>;
-
-                              // ✅ FIX: Extract time directly from ISO string
-                              const examStartTimeStr = exam.exam_start_time!.slice(11, 16);
-                              const examEndTimeStr = exam.exam_end_time!.slice(11, 16);
-
-                              const [examStartHour, examStartMin] = examStartTimeStr.split(':').map(Number);
-                              const [examEndHour, examEndMin] = examEndTimeStr.split(':').map(Number);
-
-                              const startMinutes = examStartHour * 60 + examStartMin;
-                              const endMinutes = examEndHour * 60 + examEndMin;
-
-                              const startSlotIndex = timeSlots.findIndex(slot => {
-                                const slotStart = Number(slot.start24.split(":")[0]) * 60 + Number(slot.start24.split(":")[1]);
-                                const slotEnd = Number(slot.end24.split(":")[0]) * 60 + Number(slot.end24.split(":")[1]);
-                                return startMinutes >= slotStart && startMinutes < slotEnd;
-                              });
-
-                              const rowSpan = Math.ceil((endMinutes - startMinutes) / 30);
-
-                              for (let i = 0; i < rowSpan; i++) {
-                                if (startSlotIndex + i < timeSlots.length) {
-                                  occupiedCells[`${date}-${room}-${startSlotIndex + i}`] = true;
+                                for (let i = 0; i < rowSpan; i++) {
+                                  if (startSlotIndex + i < timeSlots.length) {
+                                    occupiedCells[`${date}-${room}-${startSlotIndex + i}`] = true;
+                                  }
                                 }
-                              }
 
-                              return (
-                                <td key={room} rowSpan={rowSpan}>
-                                  <div
-                                    onClick={() => handleScheduleClick(exam)}
-                                    style={{
-                                      backgroundColor: courseColorMap[exam.course_id || ""] || "#ccc",
-                                      color: "black",
-                                      padding: 4,
-                                      borderRadius: 4,
-                                      fontSize: 12,
-                                      cursor: swapMode ? "pointer" : "default",
-                                      outline: selectedSwap?.examdetails_id === exam.examdetails_id
-                                        ? "10px solid blue"
-                                        : searchTerm && (
+                                return (
+                                  <td key={room} rowSpan={rowSpan}>
+                                    <div
+                                      onClick={() => handleScheduleClick(exam)}
+                                      style={{
+                                        backgroundColor: courseColorMap[exam.course_id || ""] || "#ccc",
+                                        color: "black",
+                                        padding: 4,
+                                        borderRadius: 4,
+                                        fontSize: 12,
+                                        cursor: swapMode ? "pointer" : "default",
+                                        outline: selectedSwap?.examdetails_id === exam.examdetails_id
+                                          ? "10px solid blue"
+                                          : searchTerm && (
+                                            exam.course_id?.toLowerCase().includes(searchTerm.toLowerCase()) ||
+                                            exam.section_name?.toLowerCase().includes(searchTerm.toLowerCase()) ||
+                                            exam.room_id?.toLowerCase().includes(searchTerm.toLowerCase()) ||
+                                            getUserName(exam.instructor_id).toLowerCase().includes(searchTerm.toLowerCase()) ||
+                                            getUserName(exam.proctor_id).toLowerCase().includes(searchTerm.toLowerCase())
+                                          )
+                                            ? "3px solid yellow"
+                                            : "none",
+                                        boxShadow: searchTerm && (
                                           exam.course_id?.toLowerCase().includes(searchTerm.toLowerCase()) ||
                                           exam.section_name?.toLowerCase().includes(searchTerm.toLowerCase()) ||
                                           exam.room_id?.toLowerCase().includes(searchTerm.toLowerCase()) ||
                                           getUserName(exam.instructor_id).toLowerCase().includes(searchTerm.toLowerCase()) ||
                                           getUserName(exam.proctor_id).toLowerCase().includes(searchTerm.toLowerCase())
-                                        )
-                                          ? "3px solid yellow"
-                                          : "none",
-                                      boxShadow: searchTerm && (
-                                        exam.course_id?.toLowerCase().includes(searchTerm.toLowerCase()) ||
-                                        exam.section_name?.toLowerCase().includes(searchTerm.toLowerCase()) ||
-                                        exam.room_id?.toLowerCase().includes(searchTerm.toLowerCase()) ||
-                                        getUserName(exam.instructor_id).toLowerCase().includes(searchTerm.toLowerCase()) ||
-                                        getUserName(exam.proctor_id).toLowerCase().includes(searchTerm.toLowerCase())
-                                      ) ? "0 0 15px 3px rgba(255, 255, 0, 0.8)" : "none"
-                                    }}
-                                  >
-                                    <p>{exam.course_id}</p>
-                                    <p>{exam.section_name}</p>
-                                    <p>Instructor: {getUserName(exam.instructor_id)}</p>
-                                    <p>
-                                      Proctor:
-                                      {activeProctorEdit === exam.examdetails_id || activeProctorEdit === -1 ? (
-                                        <Select
-                                          value={
-                                            exam.proctor_id
-                                              ? {
-                                                value: exam.proctor_id,
-                                                label: getUserName(exam.proctor_id)
-                                              }
-                                              : null
-                                          }
-                                          onChange={(selectedOption) => {
-                                            if (selectedOption) {
-                                              handleProctorChange(exam.examdetails_id!, selectedOption.value);
+                                        ) ? "0 0 15px 3px rgba(255, 255, 0, 0.8)" : "none"
+                                      }}
+                                    >
+                                      <p>{exam.course_id}</p>
+                                      <p>{exam.section_name}</p>
+                                      <p>Instructor: {getUserName(exam.instructor_id)}</p>
+                                      <p>
+                                        Proctor:
+                                        {activeProctorEdit === exam.examdetails_id || activeProctorEdit === -1 ? (
+                                          <Select
+                                            value={
+                                              exam.proctor_id
+                                                ? {
+                                                  value: exam.proctor_id,
+                                                  label: getUserName(exam.proctor_id)
+                                                }
+                                                : null
                                             }
-                                          }}
-                                          options={getAvailableProctorsForExam(exam, examData, allCollegeUsers, users)}
-                                          placeholder="--Select Proctor--"
-                                          isSearchable
-                                          styles={{ menu: (provided) => ({ ...provided, zIndex: 9999 }) }}
-                                        />
-                                      ) : (
-                                        <span style={{ marginLeft: '5px' }}>
-                                          {exam.proctor_id ? getUserName(exam.proctor_id) : "Not Assigned"}
-                                        </span>
-                                      )}
-                                    </p>
-                                    <p>{formatTo12Hour(examStartTimeStr)} - {formatTo12Hour(examEndTimeStr)}</p>
-                                  </div>
-                                </td>
-                              );
-                            })}
-                          </tr>
-                        ))}
-                      </tbody>
-                    </table>
+                                            onChange={(selectedOption) => {
+                                              if (selectedOption) {
+                                                handleProctorChange(exam.examdetails_id!, selectedOption.value);
+                                              }
+                                            }}
+                                            options={getAvailableProctorsForExam(exam, examData, allCollegeUsers, users)}
+                                            placeholder="--Select Proctor--"
+                                            isSearchable
+                                            styles={{ menu: (provided) => ({ ...provided, zIndex: 9999 }) }}
+                                          />
+                                        ) : (
+                                          <span style={{ marginLeft: '5px' }}>
+                                            {exam.proctor_id ? getUserName(exam.proctor_id) : "Not Assigned"}
+                                          </span>
+                                        )}
+                                      </p>
+                                      <p>{formatTo12Hour(examStartTimeStr)} - {formatTo12Hour(examEndTimeStr)}</p>
+                                    </div>
+                                  </td>
+                                );
+                              })}
+                            </tr>
+                          ))}
+                        </tbody>
+                      </table>
+                    </div>
                   </div>
                 </div>
               );
@@ -1358,173 +1360,175 @@ const SchedulerView: React.FC<SchedulerViewProps> = ({ user }) => {
                       <div style={{ fontSize: '20px', color: '#333', marginTop: '-10px', fontFamily: 'serif' }}>{examPeriodName}</div>
                     </div>
                     <hr />
-                    <table className="exam-table">
-                      <thead>
-                        <tr>
-                          <th colSpan={pageRooms.length + 1}>{date && new Date(date).toLocaleDateString("en-US", { year: "numeric", month: "long", day: "numeric" })}</th>
-                        </tr>
-                        <tr>
-                          <th></th>
-                          {(() => {
-                            const buildingGroups: Record<string, string[]> = {};
-                            pageRooms.forEach((room) => {
-                              const building = filteredExamData.find(e => e.room_id === (room ?? ""))?.building_name || "Unknown Building";
-                              if (!buildingGroups[building]) buildingGroups[building] = [];
-                              buildingGroups[building].push(String(room));
-                            });
+                    <div className="table-wrapper">
+                      <table className="exam-table">
+                        <thead>
+                          <tr>
+                            <th colSpan={pageRooms.length + 1}>{date && new Date(date).toLocaleDateString("en-US", { year: "numeric", month: "long", day: "numeric" })}</th>
+                          </tr>
+                          <tr>
+                            <th></th>
+                            {(() => {
+                              const buildingGroups: Record<string, string[]> = {};
+                              pageRooms.forEach((room) => {
+                                const building = filteredExamData.find(e => e.room_id === (room ?? ""))?.building_name || "Unknown Building";
+                                if (!buildingGroups[building]) buildingGroups[building] = [];
+                                buildingGroups[building].push(String(room));
+                              });
 
-                            return Object.entries(buildingGroups).map(([building, rooms]) => (
-                              <th key={building} colSpan={rooms.length}>{building}</th>
-                            ));
-                          })()}
-                        </tr>
-                        <tr>
-                          <th>Time</th>
-                          {(() => {
-                            const buildingGroups: Record<string, string[]> = {};
-                            pageRooms.forEach((room) => {
-                              const building = dateExams.find(e => e.room_id === (room ?? ""))?.building_name || "Unknown Building";
-                              if (!buildingGroups[building]) buildingGroups[building] = [];
-                              buildingGroups[building].push(String(room));
-                            });
+                              return Object.entries(buildingGroups).map(([building, rooms]) => (
+                                <th key={building} colSpan={rooms.length}>{building}</th>
+                              ));
+                            })()}
+                          </tr>
+                          <tr>
+                            <th>Time</th>
+                            {(() => {
+                              const buildingGroups: Record<string, string[]> = {};
+                              pageRooms.forEach((room) => {
+                                const building = dateExams.find(e => e.room_id === (room ?? ""))?.building_name || "Unknown Building";
+                                if (!buildingGroups[building]) buildingGroups[building] = [];
+                                buildingGroups[building].push(String(room));
+                              });
 
-                            return Object.values(buildingGroups)
-                              .flat()
-                              .map((room, idx) => <th key={idx}>{room}</th>);
-                          })()}
-                        </tr>
-                      </thead>
-                      <tbody>
-                        {timeSlots.map((slot, rowIndex) => (
-                          <tr key={slot.start24}>
-                            <td>{slot.label}</td>
-                            {pageRooms.map((room) => {
-                              const key = `${date}-${room}-${rowIndex}`;
-                              if (occupiedCells[key]) return null;
+                              return Object.values(buildingGroups)
+                                .flat()
+                                .map((room, idx) => <th key={idx}>{room}</th>);
+                            })()}
+                          </tr>
+                        </thead>
+                        <tbody>
+                          {timeSlots.map((slot, rowIndex) => (
+                            <tr key={slot.start24}>
+                              <td>{slot.label}</td>
+                              {pageRooms.map((room) => {
+                                const key = `${date}-${room}-${rowIndex}`;
+                                if (occupiedCells[key]) return null;
 
-                              const examsInRoom = groupedData[`${date}-${room}`] || [];
+                                const examsInRoom = groupedData[`${date}-${room}`] || [];
 
-                              const exam = examsInRoom.find((e) => {
-                                if (!e.exam_start_time || !e.exam_end_time) {
-                                  console.warn('⚠️ Missing time data:', e.examdetails_id);
-                                  return false;
-                                }
+                                const exam = examsInRoom.find((e) => {
+                                  if (!e.exam_start_time || !e.exam_end_time) {
+                                    console.warn('⚠️ Missing time data:', e.examdetails_id);
+                                    return false;
+                                  }
 
-                                // ✅ FIX: Extract time directly from ISO string (HH:MM format)
-                                const examStartTimeStr = e.exam_start_time.slice(11, 16);
-                                const examEndTimeStr = e.exam_end_time.slice(11, 16);
+                                  // ✅ FIX: Extract time directly from ISO string (HH:MM format)
+                                  const examStartTimeStr = e.exam_start_time.slice(11, 16);
+                                  const examEndTimeStr = e.exam_end_time.slice(11, 16);
+
+                                  const [examStartHour, examStartMin] = examStartTimeStr.split(':').map(Number);
+                                  const [examEndHour, examEndMin] = examEndTimeStr.split(':').map(Number);
+
+                                  const examStart = examStartHour * 60 + examStartMin;
+                                  const examEnd = examEndHour * 60 + examEndMin;
+
+                                  const slotStart = Number(slot.start24.split(":")[0]) * 60 + Number(slot.start24.split(":")[1]);
+                                  const slotEnd = Number(slot.end24.split(":")[0]) * 60 + Number(slot.end24.split(":")[1]);
+
+                                  const matches = (examStart < slotEnd) && (examEnd > slotStart);
+
+                                  return matches;
+                                });
+
+                                if (!exam) return <td key={room}></td>;
+
+                                // ✅ FIX: Extract time directly from ISO string
+                                const examStartTimeStr = exam.exam_start_time!.slice(11, 16);
+                                const examEndTimeStr = exam.exam_end_time!.slice(11, 16);
 
                                 const [examStartHour, examStartMin] = examStartTimeStr.split(':').map(Number);
                                 const [examEndHour, examEndMin] = examEndTimeStr.split(':').map(Number);
 
-                                const examStart = examStartHour * 60 + examStartMin;
-                                const examEnd = examEndHour * 60 + examEndMin;
+                                const startMinutes = examStartHour * 60 + examStartMin;
+                                const endMinutes = examEndHour * 60 + examEndMin;
 
-                                const slotStart = Number(slot.start24.split(":")[0]) * 60 + Number(slot.start24.split(":")[1]);
-                                const slotEnd = Number(slot.end24.split(":")[0]) * 60 + Number(slot.end24.split(":")[1]);
+                                const startSlotIndex = timeSlots.findIndex(slot => {
+                                  const slotStart = Number(slot.start24.split(":")[0]) * 60 + Number(slot.start24.split(":")[1]);
+                                  const slotEnd = Number(slot.end24.split(":")[0]) * 60 + Number(slot.end24.split(":")[1]);
+                                  return startMinutes >= slotStart && startMinutes < slotEnd;
+                                });
 
-                                const matches = (examStart < slotEnd) && (examEnd > slotStart);
+                                const rowSpan = Math.ceil((endMinutes - startMinutes) / 30);
 
-                                return matches;
-                              });
-
-                              if (!exam) return <td key={room}></td>;
-
-                              // ✅ FIX: Extract time directly from ISO string
-                              const examStartTimeStr = exam.exam_start_time!.slice(11, 16);
-                              const examEndTimeStr = exam.exam_end_time!.slice(11, 16);
-
-                              const [examStartHour, examStartMin] = examStartTimeStr.split(':').map(Number);
-                              const [examEndHour, examEndMin] = examEndTimeStr.split(':').map(Number);
-
-                              const startMinutes = examStartHour * 60 + examStartMin;
-                              const endMinutes = examEndHour * 60 + examEndMin;
-
-                              const startSlotIndex = timeSlots.findIndex(slot => {
-                                const slotStart = Number(slot.start24.split(":")[0]) * 60 + Number(slot.start24.split(":")[1]);
-                                const slotEnd = Number(slot.end24.split(":")[0]) * 60 + Number(slot.end24.split(":")[1]);
-                                return startMinutes >= slotStart && startMinutes < slotEnd;
-                              });
-
-                              const rowSpan = Math.ceil((endMinutes - startMinutes) / 30);
-
-                              for (let i = 0; i < rowSpan; i++) {
-                                if (startSlotIndex + i < timeSlots.length) {
-                                  occupiedCells[`${date}-${room}-${startSlotIndex + i}`] = true;
+                                for (let i = 0; i < rowSpan; i++) {
+                                  if (startSlotIndex + i < timeSlots.length) {
+                                    occupiedCells[`${date}-${room}-${startSlotIndex + i}`] = true;
+                                  }
                                 }
-                              }
 
-                              return (
-                                <td key={room} rowSpan={rowSpan}>
-                                  <div
-                                    onClick={() => handleScheduleClick(exam)}
-                                    style={{
-                                      backgroundColor: courseColorMap[exam.course_id || ""] || "#ccc",
-                                      color: "black",
-                                      padding: 4,
-                                      borderRadius: 4,
-                                      fontSize: 12,
-                                      cursor: swapMode ? "pointer" : "default",
-                                      outline: selectedSwap?.examdetails_id === exam.examdetails_id
-                                        ? "10px solid blue"
-                                        : searchTerm && (
+                                return (
+                                  <td key={room} rowSpan={rowSpan}>
+                                    <div
+                                      onClick={() => handleScheduleClick(exam)}
+                                      style={{
+                                        backgroundColor: courseColorMap[exam.course_id || ""] || "#ccc",
+                                        color: "black",
+                                        padding: 4,
+                                        borderRadius: 4,
+                                        fontSize: 12,
+                                        cursor: swapMode ? "pointer" : "default",
+                                        outline: selectedSwap?.examdetails_id === exam.examdetails_id
+                                          ? "10px solid blue"
+                                          : searchTerm && (
+                                            exam.course_id?.toLowerCase().includes(searchTerm.toLowerCase()) ||
+                                            exam.section_name?.toLowerCase().includes(searchTerm.toLowerCase()) ||
+                                            exam.room_id?.toLowerCase().includes(searchTerm.toLowerCase()) ||
+                                            getUserName(exam.instructor_id).toLowerCase().includes(searchTerm.toLowerCase()) ||
+                                            getUserName(exam.proctor_id).toLowerCase().includes(searchTerm.toLowerCase())
+                                          )
+                                            ? "3px solid yellow"
+                                            : "none",
+                                        boxShadow: searchTerm && (
                                           exam.course_id?.toLowerCase().includes(searchTerm.toLowerCase()) ||
                                           exam.section_name?.toLowerCase().includes(searchTerm.toLowerCase()) ||
                                           exam.room_id?.toLowerCase().includes(searchTerm.toLowerCase()) ||
                                           getUserName(exam.instructor_id).toLowerCase().includes(searchTerm.toLowerCase()) ||
                                           getUserName(exam.proctor_id).toLowerCase().includes(searchTerm.toLowerCase())
-                                        )
-                                          ? "3px solid yellow"
-                                          : "none",
-                                      boxShadow: searchTerm && (
-                                        exam.course_id?.toLowerCase().includes(searchTerm.toLowerCase()) ||
-                                        exam.section_name?.toLowerCase().includes(searchTerm.toLowerCase()) ||
-                                        exam.room_id?.toLowerCase().includes(searchTerm.toLowerCase()) ||
-                                        getUserName(exam.instructor_id).toLowerCase().includes(searchTerm.toLowerCase()) ||
-                                        getUserName(exam.proctor_id).toLowerCase().includes(searchTerm.toLowerCase())
-                                      ) ? "0 0 15px 3px rgba(255, 255, 0, 0.8)" : "none"
-                                    }}
-                                  >
-                                    <p>{exam.course_id}</p>
-                                    <p>{exam.section_name}</p>
-                                    <p>Instructor: {getUserName(exam.instructor_id)}</p>
-                                    <p>
-                                      Proctor:
-                                      {activeProctorEdit === exam.examdetails_id || activeProctorEdit === -1 ? (
-                                        <Select
-                                          value={
-                                            exam.proctor_id
-                                              ? {
-                                                value: exam.proctor_id,
-                                                label: getUserName(exam.proctor_id)
-                                              }
-                                              : null
-                                          }
-                                          onChange={(selectedOption) => {
-                                            if (selectedOption) {
-                                              handleProctorChange(exam.examdetails_id!, selectedOption.value);
+                                        ) ? "0 0 15px 3px rgba(255, 255, 0, 0.8)" : "none"
+                                      }}
+                                    >
+                                      <p>{exam.course_id}</p>
+                                      <p>{exam.section_name}</p>
+                                      <p>Instructor: {getUserName(exam.instructor_id)}</p>
+                                      <p>
+                                        Proctor:
+                                        {activeProctorEdit === exam.examdetails_id || activeProctorEdit === -1 ? (
+                                          <Select
+                                            value={
+                                              exam.proctor_id
+                                                ? {
+                                                  value: exam.proctor_id,
+                                                  label: getUserName(exam.proctor_id)
+                                                }
+                                                : null
                                             }
-                                          }}
-                                          options={getAvailableProctorsForExam(exam, examData, allCollegeUsers, users)}
-                                          placeholder="--Select Proctor--"
-                                          isSearchable
-                                          styles={{ menu: (provided) => ({ ...provided, zIndex: 9999 }) }}
-                                        />
-                                      ) : (
-                                        <span style={{ marginLeft: '5px' }}>
-                                          {exam.proctor_id ? getUserName(exam.proctor_id) : "Not Assigned"}
-                                        </span>
-                                      )}
-                                    </p>
-                                    <p>{formatTo12Hour(examStartTimeStr)} - {formatTo12Hour(examEndTimeStr)}</p>
-                                  </div>
-                                </td>
-                              );
-                            })}
-                          </tr>
-                        ))}
-                      </tbody>
-                    </table>
+                                            onChange={(selectedOption) => {
+                                              if (selectedOption) {
+                                                handleProctorChange(exam.examdetails_id!, selectedOption.value);
+                                              }
+                                            }}
+                                            options={getAvailableProctorsForExam(exam, examData, allCollegeUsers, users)}
+                                            placeholder="--Select Proctor--"
+                                            isSearchable
+                                            styles={{ menu: (provided) => ({ ...provided, zIndex: 9999 }) }}
+                                          />
+                                        ) : (
+                                          <span style={{ marginLeft: '5px' }}>
+                                            {exam.proctor_id ? getUserName(exam.proctor_id) : "Not Assigned"}
+                                          </span>
+                                        )}
+                                      </p>
+                                      <p>{formatTo12Hour(examStartTimeStr)} - {formatTo12Hour(examEndTimeStr)}</p>
+                                    </div>
+                                  </td>
+                                );
+                              })}
+                            </tr>
+                          ))}
+                        </tbody>
+                      </table>
+                    </div>
                   </div>
                 </div>
               );
