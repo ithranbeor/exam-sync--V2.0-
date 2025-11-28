@@ -565,34 +565,6 @@ def tbl_examdetails_list(request):
         print("❌ Validation errors:", serializer.errors)
         return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
 
-@api_view(['POST'])
-@permission_classes([AllowAny])
-def check_existing_schedules(request):
-    """
-    Check which modalities already have schedules (accepts large lists via POST body)
-    """
-    modality_ids = request.data.get('modality_ids', [])
-    
-    if not modality_ids:
-        return Response([], status=status.HTTP_200_OK)
-    
-    try:
-        # Query existing schedules for these modalities
-        existing_schedules = TblExamdetails.objects.filter(
-            modality_id__in=modality_ids
-        ).values_list('modality_id', flat=True).distinct()
-        
-        return Response(list(existing_schedules), status=status.HTTP_200_OK)
-        
-    except Exception as e:
-        print(f"❌ Error checking schedules: {str(e)}")
-        import traceback
-        traceback.print_exc()
-        return Response(
-            {'error': str(e)}, 
-            status=status.HTTP_500_INTERNAL_SERVER_ERROR
-        )
-    
 @api_view(['GET', 'PUT', 'DELETE'])
 @permission_classes([AllowAny])
 def tbl_examdetails_detail(request, pk):
@@ -615,7 +587,45 @@ def tbl_examdetails_detail(request, pk):
     elif request.method == 'DELETE':
         instance.delete()
         return Response(status=status.HTTP_204_NO_CONTENT)
-    
+
+@api_view(['POST'])
+@permission_classes([AllowAny])
+def check_scheduled_modalities(request):
+    """
+    Check which modalities are already scheduled.
+    Accepts POST body: { "modality_ids": [1, 2, 3, ...] }
+    Returns: { "scheduled_ids": [1, 3, ...] }
+    """
+    try:
+        modality_ids = request.data.get('modality_ids', [])
+        
+        if not modality_ids:
+            return Response({'scheduled_ids': []}, status=status.HTTP_200_OK)
+        
+        # Batch query to check which modalities are already scheduled
+        existing_schedules = TblExamdetails.objects.filter(
+            modality_id__in=modality_ids
+        ).values_list('modality_id', flat=True).distinct()
+        
+        scheduled_ids = list(existing_schedules)
+        
+        print(f"✅ Checked {len(modality_ids)} modalities - {len(scheduled_ids)} already scheduled")
+        
+        return Response({
+            'scheduled_ids': scheduled_ids,
+            'total_checked': len(modality_ids),
+            'already_scheduled_count': len(scheduled_ids)
+        }, status=status.HTTP_200_OK)
+        
+    except Exception as e:
+        print(f"❌ Error in check_scheduled_modalities: {str(e)}")
+        import traceback
+        traceback.print_exc()
+        return Response({
+            'error': str(e),
+            'detail': 'Failed to check scheduled modalities'
+        }, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+        
 @api_view(['GET', 'POST'])
 @permission_classes([AllowAny])
 def tbl_modality_list(request):
