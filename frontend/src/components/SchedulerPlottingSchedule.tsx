@@ -529,7 +529,6 @@ const SchedulerPlottingSchedule: React.FC<SchedulerProps> = ({ user, onScheduleC
         
         // Check if we can fit all sections with room sharing
         let canFitAllSections = true;
-        const tempRoomUsage = new Map<string, number>();
 
         for (const section of sections) {
           const suitableRooms = sectionRoomsMap.get(section.modality_id) || [];
