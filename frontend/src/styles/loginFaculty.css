@@ -266,7 +266,7 @@ body {
   height: 50px !important;
   border-radius: 50px !important;
   background-color: rgba(253, 216, 53, 0.85) !important; /* Yellow color with transparency */
-  color: #0d1b3f !important; /* Dark blue text for contrast */
+  color: white !important; /* White text color */
   border: none !important;
   padding: 0 !important; /* Override global button padding */
   cursor: pointer !important;
@@ -429,7 +429,7 @@ body {
     font-size: 14px !important;
     border-radius: 45px !important;
     background-color: #fdd835 !important; /* Yellow color */
-    color: #0d1b3f !important; /* Dark blue text for contrast */
+    color: white !important; /* White text color */
   }
 
   .admin-toggle-button {
@@ -496,7 +496,7 @@ body {
     font-size: 15px !important;
     border-radius: 50px !important;
     background-color: #fdd835 !important; /* Yellow color */
-    color: #0d1b3f !important; /* Dark blue text for contrast */
+    color: white !important; /* White text color */
   }
 }
 
@@ -569,7 +569,7 @@ body {
     border-radius: 55px !important;
     margin-top: 15px !important;
     background-color: #fdd835 !important; /* Yellow color */
-    color: #0d1b3f !important; /* Dark blue text for contrast */
+    color: white !important; /* White text color */
     border: none !important;
     display: flex !important;
     align-items: center !important;
