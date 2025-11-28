@@ -43,11 +43,11 @@ body {
 .availability-card {
   background-color: #ffffff;
   border: 1px solid #ced4da;
-  border-radius: 50px;
-  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.08);
-  padding: 30px;
-  width: 1000px;
-  max-width: 95%;
+  border-radius: 18px;
+  box-shadow: 0 12px 28px rgba(0, 0, 0, 0.09);
+  padding: 32px;
+  width: 100%;
+  max-width: 1000px;
   box-sizing: border-box;
   display: flex;
   flex-direction: column;
@@ -573,12 +573,62 @@ button.open-modal-btn:hover {
 }
 
 /* ============================================
-   TABLET STYLES (768px - 1024px)
+   DESKTOP STYLES (min-width: 1200px)
    ============================================ */
 
-@media screen and (max-width: 1024px) {
+@media screen and (min-width: 1200px) {
+  .availability-card {
+    padding: 36px;
+    max-width: 1100px;
+  }
+
+  .availability-grid {
+    gap: 24px;
+  }
+
+  .room-grid {
+    grid-template-columns: repeat(auto-fill, minmax(120px, 1fr));
+    gap: 14px;
+  }
+
+  .modal-contents-modality {
+    max-width: 800px;
+    padding: 2.5rem;
+  }
+}
+
+/* ============================================
+   LAPTOP STYLES (992px - 1199px)
+   ============================================ */
+
+@media screen and (min-width: 992px) and (max-width: 1199px) {
+  .availability-card {
+    padding: 28px;
+    max-width: 100%;
+  }
+
+  .availability-grid {
+    gap: 20px;
+  }
+
+  .room-grid {
+    grid-template-columns: repeat(auto-fill, minmax(110px, 1fr));
+    gap: 12px;
+  }
+
+  .modal-contents-modality {
+    max-width: 85%;
+    padding: 2rem;
+  }
+}
+
+/* ============================================
+   TABLET STYLES (768px - 991px)
+   ============================================ */
+
+@media screen and (min-width: 768px) and (max-width: 991px) {
   .bayanihan-container {
-    padding: 25px 18px;
+    padding: 20px;
   }
 
   .bayanihan-header-title {
@@ -586,20 +636,42 @@ button.open-modal-btn:hover {
   }
 
   .bayanihan-card {
-    padding: 25px;
+    padding: 24px;
   }
 
   .availability-card {
-    padding: 25px;
-    border-radius: 30px;
+    padding: 24px;
+    border-radius: 16px;
+    width: 100%;
+    max-width: 100%;
+  }
+
+  .card-header-set {
+    font-size: 1.15em;
+    padding: 8px 16px;
   }
 
   .bayanihan-form {
-    gap: 18px 25px;
+    gap: 18px 24px;
+  }
+
+  .availability-grid {
+    grid-template-columns: 1fr;
+    gap: 18px;
+  }
+
+  .form-group.full-width {
+    grid-column: span 1;
+  }
+
+  .submit-button {
+    grid-column: span 1;
+    width: 100%;
+    max-width: 300px;
   }
 
   .modal-contents-modality {
-    padding: 1.5rem;
+    padding: 1.75rem;
     max-width: 90%;
   }
 
@@ -608,16 +680,25 @@ button.open-modal-btn:hover {
     gap: 10px;
   }
 
-  .availability-grid {
-    gap: 15px;
+  .room-box {
+    padding: 12px 10px;
+    min-height: 75px;
   }
 }
 
 /* ============================================
-   MOBILE STYLES (< 768px)
+   MOBILE STYLES (max-width: 767px)
    ============================================ */
 
-@media screen and (max-width: 768px) {
+@media screen and (max-width: 767px) {
+  .set-availability-container {
+    padding: 16px;
+  }
+
+  .availability-sections {
+    gap: 20px;
+  }
+
   .bayanihan-container {
     padding: 15px 12px;
   }
@@ -634,16 +715,17 @@ button.open-modal-btn:hover {
   }
 
   .availability-card {
-    padding: 20px 15px;
-    border-radius: 20px;
+    padding: 20px 16px;
+    border-radius: 16px;
     width: 100%;
     max-width: 100%;
   }
 
   .card-header-set {
     font-size: 1.1em;
-    padding: 8px 12px;
+    padding: 8px 14px;
     margin-bottom: 15px;
+    border-radius: 12px;
   }
 
   .subtitle {
@@ -653,7 +735,7 @@ button.open-modal-btn:hover {
 
   .bayanihan-form {
     grid-template-columns: 1fr;
-    gap: 15px;
+    gap: 16px;
   }
 
   .form-group.full-width {
@@ -666,23 +748,24 @@ button.open-modal-btn:hover {
     padding: 14px 0;
     font-size: 1em;
     min-height: 48px;
+    border-radius: 12px;
   }
 
   .custom-select,
   .form-group textarea {
     padding: 12px;
     font-size: 16px; /* Prevents zoom on iOS */
-    border-radius: 6px;
+    border-radius: 8px;
   }
 
   .form-group label {
     font-size: 0.9em;
-    margin-bottom: 6px;
+    margin-bottom: 8px;
   }
 
   .availability-grid {
     grid-template-columns: 1fr;
-    gap: 15px;
+    gap: 16px;
   }
 
   .full-width {
@@ -695,8 +778,15 @@ button.open-modal-btn:hover {
   }
 
   .dropdown-item {
-    padding: 10px 12px;
+    padding: 12px;
     font-size: 0.9em;
+    min-height: 48px;
+  }
+
+  .open-modal-btn {
+    width: 100%;
+    padding: 12px;
+    font-size: 1em;
     min-height: 48px;
   }
 
@@ -704,31 +794,32 @@ button.open-modal-btn:hover {
     flex-direction: column;
     align-items: stretch;
     font-size: 0.95rem;
-    padding: 10px;
+    padding: 12px;
+    gap: 10px;
   }
 
   .building-header button {
     width: 100%;
-    padding: 8px 12px;
+    padding: 10px 12px;
     font-size: 0.9rem;
-    min-height: 40px;
+    min-height: 44px;
   }
 
   .room-grid {
     grid-template-columns: repeat(auto-fill, minmax(90px, 1fr));
     gap: 10px;
-    margin-top: 10px;
+    margin-top: 12px;
   }
 
   .room-box {
     padding: 12px 8px;
     font-size: 0.85rem;
-    min-height: 70px;
+    min-height: 75px;
   }
 
   .room-label {
     font-size: 0.8rem;
-    margin-bottom: 4px;
+    margin-bottom: 6px;
   }
 
   .view-occupancy {
@@ -740,13 +831,13 @@ button.open-modal-btn:hover {
   }
 
   .modal-overlay {
-    padding: 10px;
+    padding: 12px;
     align-items: flex-start;
     padding-top: 20px;
   }
 
   .modal-contents-modality {
-    padding: 1.5rem 1rem;
+    padding: 1.5rem 1.25rem;
     border-radius: 12px;
     max-width: 100%;
     width: 100%;
@@ -755,19 +846,20 @@ button.open-modal-btn:hover {
 
   .modal-contents-modality h3 {
     font-size: 1.2rem;
-    margin-bottom: 15px;
+    margin-bottom: 16px;
   }
 
   .occupancy-timeslots {
     max-height: 300px;
-    padding: 6px;
+    padding: 8px;
   }
 
   .timeslot-entry {
-    padding: 8px 10px;
+    padding: 10px 12px;
     font-size: 0.85rem;
     flex-direction: column;
     align-items: flex-start;
+    gap: 6px;
   }
 
   .timeslot-status {
@@ -781,7 +873,7 @@ button.open-modal-btn:hover {
   .modal-actions {
     flex-direction: column;
     gap: 10px;
-    margin-top: 15px;
+    margin-top: 16px;
   }
 
   .modal-actions button,
@@ -805,14 +897,30 @@ button.open-modal-btn:hover {
   .no-rooms {
     font-size: 13px;
     margin-top: 15px;
+    padding: 12px;
+  }
+
+  .delete-button {
+    width: 100%;
+    padding: 12px;
+    font-size: 1em;
+    min-height: 48px;
   }
 }
 
 /* ============================================
-   SMALL MOBILE STYLES (< 480px)
+   SMALL MOBILE STYLES (max-width: 480px)
    ============================================ */
 
 @media screen and (max-width: 480px) {
+  .set-availability-container {
+    padding: 12px;
+  }
+
+  .availability-sections {
+    gap: 16px;
+  }
+
   .bayanihan-container {
     padding: 12px 10px;
   }
@@ -823,61 +931,151 @@ button.open-modal-btn:hover {
   }
 
   .bayanihan-card {
-    padding: 15px 12px;
+    padding: 16px 12px;
   }
 
   .availability-card {
-    padding: 15px 12px;
-    border-radius: 15px;
+    padding: 16px 12px;
+    border-radius: 14px;
   }
 
   .card-header-set {
     font-size: 1em;
-    padding: 6px 10px;
+    padding: 8px 12px;
+    border-radius: 10px;
+  }
+
+  .subtitle {
+    font-size: 0.85em;
+    margin-bottom: 16px;
   }
 
   .bayanihan-form {
-    gap: 12px;
+    gap: 14px;
+  }
+
+  .availability-grid {
+    gap: 14px;
   }
 
   .custom-select,
   .form-group textarea {
-    padding: 10px;
+    padding: 10px 12px;
     font-size: 16px;
+    border-radius: 6px;
+  }
+
+  .form-group label {
+    font-size: 0.85em;
+    margin-bottom: 6px;
+  }
+
+  .submit-button {
+    padding: 12px 0;
+    font-size: 0.95em;
+    border-radius: 10px;
+  }
+
+  .open-modal-btn {
+    padding: 10px;
+    font-size: 0.95em;
   }
 
   .room-grid {
-    grid-template-columns: repeat(auto-fill, minmax(80px, 1fr));
+    grid-template-columns: repeat(auto-fill, minmax(85px, 1fr));
     gap: 8px;
+    margin-top: 10px;
   }
 
   .room-box {
     padding: 10px 6px;
     font-size: 0.8rem;
-    min-height: 65px;
+    min-height: 70px;
+    border-radius: 10px;
   }
 
   .room-label {
     font-size: 0.75rem;
+    margin-bottom: 4px;
   }
 
   .view-occupancy {
     font-size: 0.65rem;
     padding: 4px 8px;
     min-height: 28px;
+    border-radius: 4px;
+  }
+
+  .modal-overlay {
+    padding: 10px;
   }
 
   .modal-contents-modality {
-    padding: 1rem;
+    padding: 1.25rem 1rem;
+    border-radius: 10px;
   }
 
   .modal-contents-modality h3 {
     font-size: 1.1rem;
+    margin-bottom: 12px;
   }
 
   .building-header {
     font-size: 0.9rem;
-    padding: 8px;
+    padding: 10px;
+    border-radius: 8px;
+  }
+
+  .building-header button {
+    padding: 8px 10px;
+    font-size: 0.85rem;
+    min-height: 40px;
+  }
+
+  .occupancy-timeslots {
+    max-height: 250px;
+    padding: 6px;
+  }
+
+  .timeslot-entry {
+    padding: 8px 10px;
+    font-size: 0.8rem;
+  }
+
+  .timeslot-status {
+    font-size: 0.7rem;
+  }
+
+  .timeslot-time {
+    font-size: 0.75rem;
+  }
+
+  .modal-actions {
+    gap: 8px;
+    margin-top: 12px;
+  }
+
+  .modal-actions button,
+  .close-modal {
+    padding: 10px;
+    font-size: 15px;
+    min-height: 44px;
+  }
+
+  .selected-rooms {
+    gap: 6px;
+    margin-top: 10px;
+  }
+
+  .room-card {
+    padding: 3px 6px;
+    font-size: 0.8rem;
+  }
+
+  .delete-button {
+    padding: 10px;
+    font-size: 0.95em;
+    min-height: 44px;
   }
 }
 
@@ -885,17 +1083,49 @@ button.open-modal-btn:hover {
    LANDSCAPE MOBILE ORIENTATION
    ============================================ */
 
-@media screen and (max-width: 768px) and (orientation: landscape) {
+@media screen and (max-width: 767px) and (orientation: landscape) {
+  .set-availability-container {
+    padding: 12px;
+  }
+
   .bayanihan-container {
     padding: 15px;
   }
 
+  .availability-card {
+    padding: 18px 16px;
+  }
+
+  .availability-grid {
+    grid-template-columns: repeat(2, 1fr);
+    gap: 14px;
+  }
+
+  .form-group.full-width {
+    grid-column: span 2;
+  }
+
+  .submit-button {
+    grid-column: span 2;
+    max-width: 250px;
+  }
+
   .modal-contents-modality {
     max-height: 90vh;
+    padding: 1.5rem;
   }
 
   .occupancy-timeslots {
     max-height: 350px;
+  }
+
+  .room-grid {
+    grid-template-columns: repeat(auto-fill, minmax(100px, 1fr));
+    gap: 10px;
+  }
+
+  .room-box {
+    min-height: 70px;
   }
 }
 

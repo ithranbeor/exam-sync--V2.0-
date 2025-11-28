@@ -153,21 +153,213 @@
     box-shadow: none;
 }
 
-/* Small responsive behavior */
-@media (max-width: 900px) {
-    .main-content-layout {
-        flex-direction: column; /* Stack columns vertically on smaller screens */
-        gap: 20px;
+/* ======================= TABLET RESPONSIVENESS (769px - 1024px) ======================= */
+@media (min-width: 769px) and (max-width: 1024px) {
+    .scheduler-container {
+        max-width: 95%;
+        padding: 18px;
+        margin: 16px auto;
     }
-    
+
+    .scheduler-header {
+        font-size: 22px;
+        margin-bottom: 18px;
+    }
+
+    .main-content-layout {
+        gap: 24px;
+    }
+
     .form-column {
-        max-width: 100%; /* Full width for the form */
+        max-width: 100%;
     }
 
     .preview-column {
-        width: 100%; /* Full width for the preview */
-        position: static; /* Remove sticky behavior when stacked */
+        width: 280px;
+        padding: 14px;
+    }
+
+    .field {
+        margin-bottom: 14px;
+    }
+
+    .label {
+        font-size: 12px;
+    }
+
+    .input, .select, .textarea {
+        padding: 9px 11px;
+        font-size: 13px;
+    }
+
+    .btn-save {
+        padding: 11px 13px;
+        font-size: 14px;
+    }
+}
+
+/* ======================= SMALL TABLET / LARGE MOBILE (600px - 768px) ======================= */
+@media (min-width: 600px) and (max-width: 768px) {
+    .scheduler-container {
+        max-width: 98%;
+        padding: 16px;
+        margin: 12px auto;
+    }
+
+    .scheduler-header {
+        font-size: 20px;
+        margin-bottom: 16px;
+    }
+
+    .main-content-layout {
+        flex-direction: column;
+        gap: 18px;
+    }
+
+    .form-column {
+        max-width: 100%;
+    }
+
+    .preview-column {
+        width: 100%;
+        position: static;
         min-height: auto;
+        padding: 12px;
+    }
+
+    .preview-header {
+        font-size: 15px;
+    }
+
+    .modality-list {
+        max-height: 350px;
+    }
+
+    .field {
+        margin-bottom: 14px;
+    }
+
+    .label {
+        font-size: 12px;
+    }
+
+    .input, .select, .textarea {
+        padding: 9px 11px;
+        font-size: 13px;
+    }
+
+    .btn-save {
+        padding: 11px 13px;
+        font-size: 14px;
+    }
+}
+
+/* ======================= MOBILE RESPONSIVENESS (max-width: 599px) ======================= */
+@media (max-width: 599px) {
+    .scheduler-container {
+        max-width: 100%;
+        padding: 12px;
+        margin: 8px auto;
+        border-radius: 8px;
+    }
+
+    .scheduler-header {
+        font-size: 18px;
+        margin-bottom: 14px;
+        text-align: center;
+    }
+
+    .main-content-layout {
+        flex-direction: column;
+        gap: 16px;
+    }
+
+    .form-column {
+        max-width: 100%;
+    }
+
+    .preview-column {
+        width: 100%;
+        position: static;
+        min-height: auto;
+        padding: 12px;
+        border-radius: 6px;
+    }
+
+    .preview-header {
+        font-size: 14px;
+        margin-bottom: 12px;
+    }
+
+    .modality-list {
+        max-height: 300px;
+        gap: 8px;
+    }
+
+    .modality-item {
+        padding: 6px 0;
+    }
+
+    .modality-detail {
+        font-size: 12px;
+        margin: 3px 0;
+    }
+
+    .preview-search-input {
+        font-size: 13px;
+        padding: 8px 10px;
+    }
+
+    .field {
+        margin-bottom: 12px;
+    }
+
+    .label {
+        font-size: 11px;
+        margin-bottom: 5px;
+    }
+
+    .input, .select, .textarea {
+        padding: 8px 10px;
+        font-size: 13px;
+        border-radius: 6px;
+    }
+
+    .btn-save {
+        padding: 10px 12px;
+        font-size: 14px;
+        border-radius: 30px;
+    }
+
+    .save-button-wrapper {
+        margin-top: 16px;
+    }
+
+    /* React Select responsive adjustments */
+    .select__control {
+        min-height: 38px !important;
+    }
+
+    .select__value-container {
+        padding: 4px 8px !important;
+    }
+
+    .select__input {
+        font-size: 13px !important;
+    }
+
+    .select__menu {
+        font-size: 13px !important;
+    }
+
+    /* Duration and time selectors */
+    .field > div[style*="display: flex"] {
+        flex-direction: column;
+        gap: 8px;
+    }
+
+    .field > div[style*="display: flex"] > * {
+        width: 100% !important;
     }
 }
 .spin {

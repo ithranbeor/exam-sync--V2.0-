@@ -583,3 +583,51 @@
     min-height: 30px;
   }
 }
+
+/* Navigation buttons (submit-button) responsive styles */
+.submit-button {
+  background-color: #f7b731;
+  color: #fff;
+  border: none;
+  padding: 8px 16px;
+  border-radius: 6px;
+  font-size: 1.1em;
+  font-weight: bold;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  min-width: 44px;
+  min-height: 44px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.submit-button:hover {
+  background-color: #e0a32c;
+  transform: translateY(-1px);
+  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+}
+
+.submit-button:active {
+  transform: translateY(0);
+}
+
+/* ======================= TABLET / 900px RESPONSIVENESS ======================= */
+@media (min-width: 600px) and (max-width: 1024px) {
+  .submit-button {
+    min-width: 50px;
+    min-height: 50px;
+    padding: 10px 18px;
+    font-size: 1.2em;
+  }
+}
+
+/* ======================= MOBILE RESPONSIVENESS ======================= */
+@media (max-width: 599px) {
+  .submit-button {
+    min-width: 48px;
+    min-height: 48px;
+    padding: 10px 14px;
+    font-size: 1.1em;
+  }
+}

@@ -17,8 +17,44 @@
   margin-bottom: 30px;
 }
 
+/* Table wrapper for horizontal scrolling on mobile */
+.table-wrapper {
+  width: 100%;
+  overflow-x: auto;
+  overflow-y: visible;
+  -webkit-overflow-scrolling: touch; /* Smooth scrolling on iOS */
+  scroll-behavior: smooth;
+  position: relative;
+}
+
+/* Hide scrollbar but keep functionality */
+.table-wrapper::-webkit-scrollbar {
+  height: 8px;
+}
+
+.table-wrapper::-webkit-scrollbar-track {
+  background: rgba(0, 0, 0, 0.05);
+  border-radius: 4px;
+}
+
+.table-wrapper::-webkit-scrollbar-thumb {
+  background: rgba(9, 44, 76, 0.3);
+  border-radius: 4px;
+}
+
+.table-wrapper::-webkit-scrollbar-thumb:hover {
+  background: rgba(9, 44, 76, 0.5);
+}
+
+/* Firefox scrollbar */
+.table-wrapper {
+  scrollbar-width: thin;
+  scrollbar-color: rgba(9, 44, 76, 0.3) rgba(0, 0, 0, 0.05);
+}
+
 .exam-table {
   width: 100%;
+  min-width: 600px; /* Minimum width to ensure table doesn't get too compressed */
   border-collapse: collapse;
   border-top-right-radius: 50px;
   border-top-left-radius: 50px;
@@ -260,4 +296,302 @@
   font-size: 22px;
   padding: 8px;
   transition: background 0.2s ease, transform 0.1s ease;
+}
+
+/* Navigation buttons for pagination */
+.scheduler-nav-button {
+  position: fixed;
+  z-index: 1000;
+  background: rgba(255, 255, 255, 0.9);
+  border: 2px solid #092C4C;
+  border-radius: 50%;
+  cursor: pointer;
+  padding: 0.75rem;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+  transition: all 0.3s ease;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 50px;
+  min-height: 50px;
+}
+
+.scheduler-nav-button:hover {
+  background: rgba(9, 44, 76, 0.1);
+  box-shadow: 0 6px 16px rgba(0, 0, 0, 0.2);
+}
+
+.scheduler-nav-button-left:hover {
+  transform: translateX(-50%) scale(1.1);
+}
+
+.scheduler-nav-button-right:hover {
+  transform: translateX(-50%) scale(1.1);
+}
+
+.scheduler-nav-button-left:active {
+  transform: translateX(-50%) scale(0.95);
+}
+
+.scheduler-nav-button-right:active {
+  transform: translateX(-50%) scale(0.95);
+}
+
+.scheduler-nav-button svg {
+  color: #092C4C;
+  opacity: 0.8;
+  transition: opacity 0.2s ease;
+}
+
+.scheduler-nav-button:hover svg {
+  opacity: 1;
+}
+
+.scheduler-nav-button-left {
+  left: 50%;
+  top: 85%;
+  transform: translateX(-50%);
+  right: auto;
+}
+
+.scheduler-nav-button-right {
+  left: 50%;
+  top: 92%;
+  transform: translateX(-50%);
+  right: auto;
+}
+
+/* ======================= DESKTOP (min-width: 1025px) ======================= */
+@media (min-width: 1025px) {
+  .scheduler-nav-button-left {
+    left: 50%;
+    top: 85%;
+    transform: translateX(-50%);
+    right: auto;
+  }
+
+  .scheduler-nav-button-right {
+    left: 50%;
+    top: 92%;
+    transform: translateX(-50%);
+    right: auto;
+  }
+
+  .scheduler-nav-button {
+    min-width: 50px;
+    min-height: 50px;
+  }
+
+  .scheduler-nav-button svg {
+    font-size: 3rem !important;
+  }
+}
+
+/* ======================= TABLET RESPONSIVENESS (769px - 1024px) ======================= */
+@media (min-width: 769px) and (max-width: 1024px) {
+  .scheduler-nav-button {
+    min-width: 55px;
+    min-height: 55px;
+    padding: 0.85rem;
+  }
+
+  .scheduler-nav-button svg {
+    font-size: 2.5rem !important;
+  }
+
+  .scheduler-nav-button-left {
+    left: 50%;
+    top: 85%;
+    transform: translateX(-50%);
+    right: auto;
+  }
+
+  .scheduler-nav-button-right {
+    left: 50%;
+    top: 92%;
+    transform: translateX(-50%);
+    right: auto;
+  }
+}
+
+/* ======================= SMALL TABLET / LARGE MOBILE (600px - 900px) ======================= */
+@media (min-width: 600px) and (max-width: 900px) {
+  .scheduler-nav-button {
+    min-width: 60px;
+    min-height: 60px;
+    padding: 1rem;
+    background: rgba(255, 255, 255, 0.95);
+    border-width: 3px;
+  }
+
+  .scheduler-nav-button svg {
+    font-size: 2.2rem !important;
+  }
+
+  .scheduler-nav-button-left {
+    left: 50%;
+    top: 83%;
+    transform: translateX(-50%);
+    right: auto;
+  }
+
+  .scheduler-nav-button-right {
+    left: 50%;
+    top: 90%;
+    transform: translateX(-50%);
+    right: auto;
+  }
+}
+
+/* ======================= MOBILE RESPONSIVENESS (max-width: 599px) ======================= */
+@media (max-width: 599px) {
+  .scheduler-view-container {
+    padding: 12px;
+  }
+
+  .header {
+    margin-bottom: 15px;
+  }
+
+  .header img {
+    width: 120px !important;
+    height: 96px !important;
+    margin-bottom: 3px !important;
+  }
+
+  .header > div {
+    font-size: 14px !important;
+    margin-bottom: -8px !important;
+  }
+
+  .header > div:first-of-type {
+    font-size: 18px !important;
+  }
+
+  .header > div:nth-of-type(2) {
+    font-size: 10px !important;
+  }
+
+  .header > div:nth-of-type(3) {
+    font-size: 18px !important;
+  }
+
+  .header > div:nth-of-type(4) {
+    font-size: 14px !important;
+  }
+
+  .header > div:nth-of-type(5) {
+    font-size: 14px !important;
+  }
+
+  .table-wrapper {
+    margin: 0 -12px;
+    padding: 0 12px;
+  }
+
+  .exam-table {
+    min-width: 800px;
+    font-size: 11px;
+  }
+
+  .exam-table thead tr:first-child th {
+    font-size: 12px;
+    padding: 6px 4px;
+  }
+
+  .exam-table thead tr:nth-child(2) th {
+    font-size: 11px;
+    padding: 5px 3px;
+  }
+
+  .exam-table thead tr:nth-child(3) th {
+    font-size: 10px;
+    padding: 4px 2px;
+  }
+
+  .exam-table th,
+  .exam-table td {
+    padding: 3px;
+    font-size: 10px;
+  }
+
+  .exam-table td > div {
+    padding: 3px !important;
+    font-size: 9px !important;
+  }
+
+  .exam-table td > div > p {
+    margin: 2px 0;
+    font-size: 9px;
+  }
+
+  .scheduler-view-card {
+    padding: 12px;
+    border-radius: 12px;
+    transform: scale(0.95) !important;
+  }
+
+  .scheduler-top-card {
+    flex-wrap: wrap;
+    gap: 0.5rem;
+    padding: 0.4rem 0.8rem;
+    left: 50%;
+    top: 10px;
+    max-width: 95%;
+  }
+
+  .scheduler-icon {
+    font-size: 18px;
+    padding: 6px;
+    margin: 0 3px;
+  }
+
+  .scheduler-icon svg {
+    font-size: 18px !important;
+  }
+
+  .scheduler-nav-button {
+    min-width: 45px;
+    min-height: 45px;
+    padding: 0.8rem;
+    background: rgba(255, 255, 255, 0.95);
+    border-width: 2px;
+  }
+
+  .scheduler-nav-button svg {
+    font-size: 1.6rem !important;
+  }
+
+  .scheduler-nav-button-left {
+    left: 50%;
+    top: 80%;
+    transform: translateX(-50%);
+    right: auto;
+  }
+
+  .scheduler-nav-button-right {
+    left: 50%;
+    top: 88%;
+    transform: translateX(-50%);
+    right: auto;
+  }
+
+  .tooltip-text {
+    font-size: 9px;
+    padding: 2px 5px;
+  }
+
+  .envelope-dropdown {
+    min-width: 120px;
+    padding: 6px 0;
+  }
+
+  .dropdown-item {
+    padding: 8px 12px;
+    font-size: 12px;
+  }
+
+  .dropdown-item svg {
+    font-size: 14px;
+  }
 }
