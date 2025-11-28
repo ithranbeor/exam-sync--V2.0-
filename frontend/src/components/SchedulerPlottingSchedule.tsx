@@ -321,14 +321,13 @@ const SchedulerPlottingSchedule: React.FC<SchedulerProps> = ({ user, onScheduleC
 
       setCheckingSchedules(true);
       try {
-        const response = await api.get('/tbl_examdetails', {
-          params: {
-            modality_id: formData.selectedModalities.join(',')
-          }
+        // ✅ Use POST to send large array in body instead of URL
+        const response = await api.post('/check-existing-schedules/', {
+          modality_ids: formData.selectedModalities
         });
 
         const scheduled = new Set<number>(
-          response.data.map((s: any) => Number(s.modality_id))
+          response.data.map((id: number) => Number(id))
         );
         
         setAlreadyScheduledIds(scheduled);

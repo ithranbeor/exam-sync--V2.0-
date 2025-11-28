@@ -565,6 +565,34 @@ def tbl_examdetails_list(request):
         print("❌ Validation errors:", serializer.errors)
         return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
 
+@api_view(['POST'])
+@permission_classes([AllowAny])
+def check_existing_schedules(request):
+    """
+    Check which modalities already have schedules (accepts large lists via POST body)
+    """
+    modality_ids = request.data.get('modality_ids', [])
+    
+    if not modality_ids:
+        return Response([], status=status.HTTP_200_OK)
+    
+    try:
+        # Query existing schedules for these modalities
+        existing_schedules = TblExamdetails.objects.filter(
+            modality_id__in=modality_ids
+        ).values_list('modality_id', flat=True).distinct()
+        
+        return Response(list(existing_schedules), status=status.HTTP_200_OK)
+        
+    except Exception as e:
+        print(f"❌ Error checking schedules: {str(e)}")
+        import traceback
+        traceback.print_exc()
+        return Response(
+            {'error': str(e)}, 
+            status=status.HTTP_500_INTERNAL_SERVER_ERROR
+        )
+    
 @api_view(['GET', 'PUT', 'DELETE'])
 @permission_classes([AllowAny])
 def tbl_examdetails_detail(request, pk):
