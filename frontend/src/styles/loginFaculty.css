@@ -265,8 +265,8 @@ body {
   width: 100% !important;
   height: 50px !important;
   border-radius: 50px !important;
-  background-color: #4caf50 !important; /* Green color */
-  color: white !important;
+  background-color: rgba(253, 216, 53, 0.85) !important; /* Yellow color with transparency */
+  color: #0d1b3f !important; /* Dark blue text for contrast */
   border: none !important;
   padding: 0 !important; /* Override global button padding */
   cursor: pointer !important;
@@ -284,7 +284,8 @@ body {
 }
 
 .submit-button:hover:not(:disabled) {
-  background-color: #45a049; /* Darker green on hover */
+  background-color: #4caf50 !important; /* Green on hover */
+  color: white !important; /* White text on green for better contrast */
   box-shadow: 0 6px 16px rgba(0, 0, 0, 0.4);
   transform: translateY(-2px);
 }
@@ -295,7 +296,7 @@ body {
 }
 
 .submit-button:disabled {
-  background-color: rgba(76, 175, 80, 0.5);
+  background-color: rgba(253, 216, 53, 0.5); /* Semi-transparent yellow for disabled */
   cursor: not-allowed;
   opacity: 0.7;
 }
@@ -427,8 +428,8 @@ body {
     height: 45px !important;
     font-size: 14px !important;
     border-radius: 45px !important;
-    background-color: #4caf50 !important;
-    color: white !important;
+    background-color: #fdd835 !important; /* Yellow color */
+    color: #0d1b3f !important; /* Dark blue text for contrast */
   }
 
   .admin-toggle-button {
@@ -494,8 +495,8 @@ body {
     height: 50px !important;
     font-size: 15px !important;
     border-radius: 50px !important;
-    background-color: #4caf50 !important;
-    color: white !important;
+    background-color: #fdd835 !important; /* Yellow color */
+    color: #0d1b3f !important; /* Dark blue text for contrast */
   }
 }
 
@@ -567,8 +568,8 @@ body {
     font-weight: 600 !important;
     border-radius: 55px !important;
     margin-top: 15px !important;
-    background-color: #4caf50 !important; /* Green color */
-    color: white !important;
+    background-color: #fdd835 !important; /* Yellow color */
+    color: #0d1b3f !important; /* Dark blue text for contrast */
     border: none !important;
     display: flex !important;
     align-items: center !important;
@@ -577,7 +578,8 @@ body {
   }
 
   .submit-button:hover:not(:disabled) {
-    background-color: #45a049 !important;
+    background-color: #4caf50 !important; /* Green on hover */
+    color: white !important; /* White text on green for better contrast */
     box-shadow: 0 6px 16px rgba(0, 0, 0, 0.4) !important;
     transform: translateY(-2px) !important;
   }
@@ -588,7 +590,7 @@ body {
   }
 
   .submit-button:disabled {
-    background-color: rgba(76, 175, 80, 0.5) !important;
+    background-color: rgba(253, 216, 53, 0.5) !important;
     opacity: 0.7 !important;
   }
 
