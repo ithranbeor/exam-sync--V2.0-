@@ -292,11 +292,16 @@ body {
   margin-top: auto;
   padding-bottom: 20px;
   width: 100%;
+  max-width: 350px;
+  padding-left: 20px;
+  padding-right: 20px;
+  box-sizing: border-box;
   display: flex;
   justify-content: center;
 }
 
 .admin-login-btn {
+  width: 100%;
   background: rgba(255, 255, 255, 0.15);
   border: 1px solid rgba(255, 255, 255, 0.3);
   color: var(--color-white);
@@ -305,6 +310,7 @@ body {
   font-size: 13px;
   cursor: pointer;
   transition: all 0.3s ease;
+  box-sizing: border-box;
 }
 
 .admin-login-btn:hover {
@@ -361,6 +367,10 @@ body {
   .error-text {
     font-size: 12px;
   }
+
+  .admin-login-link {
+    max-width: 100%;
+  }
 }
 
 /* === TABLET RESPONSIVENESS === */
@@ -398,6 +408,10 @@ body {
   .login-button {
     padding: 12px 15px;
     font-size: 15px;
+  }
+
+  .admin-login-link {
+    max-width: 380px;
   }
 }
 
@@ -462,5 +476,9 @@ body {
 
   .remember-me-container {
     font-size: 14px;
+  }
+
+  .admin-login-link {
+    max-width: 400px;
   }
 }
