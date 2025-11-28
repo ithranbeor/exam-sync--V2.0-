@@ -996,44 +996,46 @@ export const UserManagement: React.FC<UserManagementProps> = ({}) => {
       </div>
 
       <div className="colleges-actions">
-        <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-          <button
-            type="button"
-            className="action-button add-new"
-            onClick={() => {
-              setIsEditMode(false);
-              setShowAccountModal(true);
-              setNewAccount({
-                user_id: 0,
-                first_name: '',
-                last_name: '',
-                middle_name: '',
-                email_address: '',
-                contact_number: '',
-                status: 'Active',
-                created_at: new Date().toISOString(),
-              });
-              setNewAccountRoles([{
-                role_id: 0,
-                college_id: null,
-                department_id: null,
-                date_start: null,
-                date_ended: null
-              }]);
-            }}
-          >
-            <FaPlus/>
-          </button>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 8, width: '100%' }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+            <button
+              type="button"
+              className="action-button add-new"
+              onClick={() => {
+                setIsEditMode(false);
+                setShowAccountModal(true);
+                setNewAccount({
+                  user_id: 0,
+                  first_name: '',
+                  last_name: '',
+                  middle_name: '',
+                  email_address: '',
+                  contact_number: '',
+                  status: 'Active',
+                  created_at: new Date().toISOString(),
+                });
+                setNewAccountRoles([{
+                  role_id: 0,
+                  college_id: null,
+                  department_id: null,
+                  date_start: null,
+                  date_ended: null
+                }]);
+              }}
+            >
+              <FaPlus/>
+            </button>
 
-          <button
-            type="button"
-            className="action-button import"
-            onClick={() => setShowImportAccountsModal(true)}
-          >
-            <FaFileImport/>
-          </button>
+            <button
+              type="button"
+              className="action-button import"
+              onClick={() => setShowImportAccountsModal(true)}
+            >
+              <FaFileImport/>
+            </button>
+          </div>
 
-          <div className="input-group" style={{ marginBottom: 0 }}>
+          <div className="input-group" style={{ marginBottom: 0, marginLeft: '16px' }}>
             <select
               value={selectedCollege}
               onChange={(e) => setSelectedCollege(e.target.value)}
@@ -1054,18 +1056,18 @@ export const UserManagement: React.FC<UserManagementProps> = ({}) => {
               ))}
             </select>
           </div>
-        </div>
 
-        <div style={{ marginLeft: 'auto', display: 'flex', alignItems: 'center', gap: 8 }}>
-          <button
-            type="button"
-            className="action-button delete"
-            onClick={handleBulkDeleteSelected}
-            disabled={isBulkDeletingAccounts || selectedAccountIds.size === 0}
-            title={selectedAccountIds.size > 0 ? `Delete ${selectedAccountIds.size} selected` : 'Delete selected'}
-          >
-            <FaTrash/>
-          </button>
+          <div style={{ marginLeft: 'auto', display: 'flex', alignItems: 'center', gap: 8 }}>
+            <button
+              type="button"
+              className="action-button delete"
+              onClick={handleBulkDeleteSelected}
+              disabled={isBulkDeletingAccounts || selectedAccountIds.size === 0}
+              title={selectedAccountIds.size > 0 ? `Delete ${selectedAccountIds.size} selected` : 'Delete selected'}
+            >
+              <FaTrash/>
+            </button>
+          </div>
         </div>
       </div>
 
