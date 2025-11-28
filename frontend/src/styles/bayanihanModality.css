@@ -118,21 +118,18 @@ textarea {
 }
 
 .submit-button {
-  grid-column: span 2;
-  background-color: #ffb800;
+  display: flex;
+  background-color: #179b0e;
   color: white;
-  padding: 12px 0;
-  border: none;
+  padding: 10px;
   border-radius: 50px;
-  font-size: 1.05em;
+  font-size: 16px;
   font-weight: bold;
   cursor: pointer;
-  width: 100px;
+  width: 50px;
   justify-self: center;
   box-shadow: 0 4px 10px rgba(255, 184, 0, 0.25);
   transition: background-color 0.2s ease, transform 0.1s ease;
-  touch-action: manipulation;
-  min-height: 44px;
 }
 
 .submit-button:hover {

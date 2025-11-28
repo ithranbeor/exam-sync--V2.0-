@@ -377,6 +377,7 @@ def tbl_scheduleapproval_detail(request, pk):
 def tbl_examdetails_list(request):
     if request.method == 'GET':
         try:
+            # Start with a more efficient base query
             queryset = TblExamdetails.objects.select_related(
                 'room',
                 'room__building',
@@ -385,14 +386,14 @@ def tbl_examdetails_list(request):
                 'modality__user',
                 'proctor',
                 'examperiod'
-            ).all()
+            )
 
-            # ✅ ADD: Filter by college_name
             college_name = request.GET.get('college_name')
             room_id = request.GET.get('room_id')
             exam_date = request.GET.get('exam_date')
             modality_id = request.GET.get('modality_id')
 
+            # ✅ Apply filters before .all() for better performance
             if college_name:
                 queryset = queryset.filter(college_name=college_name)
             if room_id:
@@ -401,7 +402,18 @@ def tbl_examdetails_list(request):
                 queryset = queryset.filter(exam_date=exam_date)
             if modality_id:
                 modality_ids = [mid.strip() for mid in modality_id.split(',') if mid.strip()]
-                queryset = queryset.filter(modality_id__in=modality_ids)
+                # ✅ Use .only() for duplicate checks to speed up query
+                queryset = queryset.filter(modality_id__in=modality_ids).only(
+                    'examdetails_id', 'modality_id', 'exam_date', 
+                    'exam_start_time', 'exam_end_time', 'course_id', 
+                    'section_name', 'room_id'
+                )
+            else:
+                # Only fetch all data if no specific filters
+                queryset = queryset.all()
+
+            # ✅ Order by for consistent results
+            queryset = queryset.order_by('room_id', 'exam_date', 'exam_start_time')
 
             serializer = TblExamdetailsSerializer(queryset, many=True)
             return Response(serializer.data)
@@ -419,13 +431,99 @@ def tbl_examdetails_list(request):
         many = isinstance(request.data, list)
         print("📦 Incoming exam details data:", len(request.data) if many else 1, "records")
         
-        # ✅ CHECK FOR DUPLICATES BEFORE SAVING
+        # ✅ NEW: Enhanced capacity validation for multi-section room sharing
+        if many:
+            # Group schedules by room, date, and time to check capacity
+            room_time_usage = {}
+            
+            for item in request.data:
+                room_id = item.get('room_id')
+                exam_date = item.get('exam_date')
+                exam_start_time = item.get('exam_start_time')
+                exam_end_time = item.get('exam_end_time')
+                modality_id = item.get('modality_id')
+                
+                if not all([room_id, exam_date, exam_start_time, exam_end_time]):
+                    continue
+                
+                # Get room capacity
+                try:
+                    room = TblRooms.objects.get(room_id=room_id)
+                    room_capacity = room.room_capacity
+                except TblRooms.DoesNotExist:
+                    return Response({
+                        'error': f'Room {room_id} not found'
+                    }, status=status.HTTP_400_BAD_REQUEST)
+                
+                # Get modality student count
+                try:
+                    modality = TblModality.objects.get(modality_id=modality_id)
+                    section = TblSectioncourse.objects.get(
+                        course_id=modality.course_id,
+                        program_id=modality.program_id,
+                        section_name=modality.section_name
+                    )
+                    needed_capacity = section.number_of_students
+                except (TblModality.DoesNotExist, TblSectioncourse.DoesNotExist):
+                    needed_capacity = 0
+                
+                # Create unique key for room+date+time
+                time_key = f"{room_id}|{exam_date}|{exam_start_time}|{exam_end_time}"
+                
+                if time_key not in room_time_usage:
+                    # Check existing schedules in DB for this room/time
+                    existing_schedules = TblExamdetails.objects.filter(
+                        room_id=room_id,
+                        exam_date=exam_date,
+                        exam_start_time__lt=exam_end_time,
+                        exam_end_time__gt=exam_start_time
+                    )
+                    
+                    existing_occupancy = 0
+                    for schedule in existing_schedules:
+                        try:
+                            existing_modality = schedule.modality
+                            existing_section = TblSectioncourse.objects.get(
+                                course_id=existing_modality.course_id,
+                                program_id=existing_modality.program_id,
+                                section_name=existing_modality.section_name
+                            )
+                            existing_occupancy += existing_section.number_of_students
+                        except:
+                            pass
+                    
+                    room_time_usage[time_key] = {
+                        'capacity': room_capacity,
+                        'current_occupancy': existing_occupancy,
+                        'pending_students': 0
+                    }
+                
+                # Add this section's students to pending count
+                room_time_usage[time_key]['pending_students'] += needed_capacity
+                
+                # Check if total would exceed capacity
+                total_students = (
+                    room_time_usage[time_key]['current_occupancy'] + 
+                    room_time_usage[time_key]['pending_students']
+                )
+                
+                if total_students > room_time_usage[time_key]['capacity']:
+                    return Response({
+                        'error': 'Room capacity exceeded',
+                        'detail': f'Room {room_id} (capacity: {room_capacity}) cannot accommodate {total_students} students',
+                        'room_id': room_id,
+                        'capacity': room_capacity,
+                        'current_occupancy': room_time_usage[time_key]['current_occupancy'],
+                        'pending_students': room_time_usage[time_key]['pending_students'],
+                        'total_needed': total_students
+                    }, status=status.HTTP_409_CONFLICT)
+        
+        # ✅ Check for duplicate schedules (existing validation)
         if many:
             modality_ids = [item.get('modality_id') for item in request.data if item.get('modality_id')]
         else:
             modality_ids = [request.data.get('modality_id')] if request.data.get('modality_id') else []
         
-        # Check if any of these modalities already have schedules
         existing_schedules = TblExamdetails.objects.filter(
             modality_id__in=modality_ids
         ).select_related('modality', 'modality__course')
@@ -447,12 +545,13 @@ def tbl_examdetails_list(request):
                 'duplicates': duplicate_info
             }, status=status.HTTP_409_CONFLICT)
         
-        # Proceed with saving if no duplicates
+        # Proceed with saving if all validations pass
         serializer = TblExamdetailsSerializer(data=request.data, many=many)
         if serializer.is_valid():
             try:
                 with transaction.atomic():
                     serializer.save()
+                    print(f"✅ Successfully saved {len(request.data) if many else 1} exam schedule(s)")
                     return Response(serializer.data, status=status.HTTP_201_CREATED)
             except Exception as e:
                 print(f"❌ Error saving exam details: {str(e)}")
@@ -462,6 +561,7 @@ def tbl_examdetails_list(request):
                     {'error': str(e), 'detail': 'Failed to save exam details'},
                     status=status.HTTP_400_BAD_REQUEST
                 )
+        
         print("❌ Validation errors:", serializer.errors)
         return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
 
@@ -491,6 +591,26 @@ def tbl_examdetails_detail(request, pk):
 @api_view(['GET', 'POST'])
 @permission_classes([AllowAny])
 def tbl_modality_list(request):
+    if 'possible_rooms' in request.data and 'section_name' in request.data:
+        section = TblSectioncourse.objects.filter(
+            course_id=request.data.get('course_id'),
+            program_id=request.data.get('program_id'),
+            section_name=request.data.get('section_name')
+        ).first()
+        
+        if section:
+            total_capacity = 0
+            for room_id in request.data['possible_rooms']:
+                room = TblRooms.objects.filter(room_id=room_id).first()
+                if room:
+                    total_capacity += room.room_capacity
+            
+            if total_capacity < section.number_of_students:
+                return Response({
+                    'error': 'Insufficient room capacity',
+                    'detail': f'Total capacity ({total_capacity}) < Students ({section.number_of_students})'
+                }, status=status.HTTP_400_BAD_REQUEST)
+            
     if request.method == 'GET':
         try:
             queryset = TblModality.objects.select_related(

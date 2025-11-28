@@ -253,6 +253,7 @@ class TblExamdetails(models.Model):
             models.Index(fields=['examperiod']),
             models.Index(fields=['exam_date']),
             models.Index(fields=['course_id']),
+            models.Index(fields=['college_name']),
         ]
 
 
@@ -260,8 +261,8 @@ class TblExamperiod(models.Model):
     examperiod_id = models.AutoField(primary_key=True)
     start_date = models.DateTimeField()
     end_date = models.DateTimeField()
-    academic_year = models.TextField()  # This field type is a guess.
-    exam_category = models.TextField()  # This field type is a guess.
+    academic_year = models.TextField()
+    exam_category = models.TextField()
     term = models.ForeignKey('TblTerm', models.DO_NOTHING)
     department = models.ForeignKey(TblDepartment, models.DO_NOTHING, blank=True, null=True)
     college = models.ForeignKey(TblCollege, models.DO_NOTHING, blank=True, null=True)

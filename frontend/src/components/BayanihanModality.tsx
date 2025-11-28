@@ -4,7 +4,7 @@ import '../styles/bayanihanModality.css';
 import { ToastContainer, toast } from 'react-toastify';
 import 'react-toastify/dist/ReactToastify.css';
 import Select, { components } from 'react-select';
-import { FaTrash  } from "react-icons/fa";
+import { FaTrash, FaCheck } from "react-icons/fa";
 
 interface UserProps {
   user: {
@@ -37,8 +37,8 @@ const BayanihanModality: React.FC<UserProps> = ({ user }) => {
 
   const [programOptions, setProgramOptions] = useState<{ program_id: string; program_name: string }[]>([]);
   const [courseOptions, setCourseOptions] = useState<{ course_id: string; course_name: string }[]>([]);
-  const [sectionOptions, setSectionOptions] = useState<{ course_id: string; program_id: string; section_name: string }[]>([]);
-  const [roomOptions, setRoomOptions] = useState<{ room_id: string; room_name: string; room_type: string; building_id?: string }[]>([]);
+  const [sectionOptions, setSectionOptions] = useState<{ course_id: string; program_id: string; section_name: string; number_of_students: number }[]>([]);
+  const [roomOptions, setRoomOptions] = useState<{ room_id: string; room_name: string; room_type: string; room_capacity: number; building_id?: string }[]>([]);
   const [availableRoomIds, setAvailableRoomIds] = useState<string[]>([]);
   const [_sectionDropdownOpen, _setSectionDropdownOpen] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
@@ -74,12 +74,10 @@ const BayanihanModality: React.FC<UserProps> = ({ user }) => {
     }
   }, [user]);
 
-  // Add this useEffect to load user's modalities on component mount
   useEffect(() => {
     fetchUserModalities();
   }, [fetchUserModalities]);
 
-  // Add delete handlers
   const handleDeleteSelected = async () => {
     if (selectedForDelete.length === 0) {
       toast.warn('Please select modalities to delete');
@@ -99,7 +97,6 @@ const BayanihanModality: React.FC<UserProps> = ({ user }) => {
       setSelectedForDelete([]);
       setShowDeleteConfirm(false);
       
-      // Refresh the list
       await fetchUserModalities();
     } catch (error) {
       console.error('Error deleting modalities:', error);
@@ -158,7 +155,6 @@ const BayanihanModality: React.FC<UserProps> = ({ user }) => {
     }
   };
 
-  // Room status with occupied times
   const [roomStatus, setRoomStatus] = useState<{
     [key: string]: { occupiedTimes: { start: string; end: string }[] }
   }>({});
@@ -175,9 +171,8 @@ const BayanihanModality: React.FC<UserProps> = ({ user }) => {
     </components.Option>
   );
 
-  /** FETCH ROOM STATUS BASED ON EXAMDETAILS (lazy loaded when viewing occupancy) */
   const fetchRoomOccupancy = useCallback(async (roomId: string) => {
-    if (roomStatus[roomId]) return; // Already loaded
+    if (roomStatus[roomId]) return;
 
     try {
       const { data: exams } = await api.get('/tbl_examdetails', {
@@ -198,7 +193,6 @@ const BayanihanModality: React.FC<UserProps> = ({ user }) => {
     }
   }, [roomStatus]);
 
-  // Memoize filtered courses based on program
   const filteredCourseOptions = useMemo(() => {
     if (!form.program) return [];
     return courseOptions.filter(c => 
@@ -206,16 +200,44 @@ const BayanihanModality: React.FC<UserProps> = ({ user }) => {
     );
   }, [courseOptions, sectionOptions, form.program]);
 
-  // Memoize filtered sections based on course
   const filteredSectionOptions = useMemo(() => {
     if (!form.course) return [];
     return sectionOptions
       .filter(s => s.course_id === form.course)
-      .map(s => ({ value: s.section_name, label: s.section_name }));
+      .map(s => ({ 
+        value: s.section_name, 
+        label: `${s.section_name} (${s.number_of_students} students)`,
+        studentCount: s.number_of_students
+      }));
   }, [sectionOptions, form.course]);
 
-  /** FETCH PROGRAMS, COURSES, SECTIONS, ROOMS, BUILDINGS, AND AVAILABLE ROOMS */
-  /** FETCH PROGRAMS, COURSES, SECTIONS, ROOMS, BUILDINGS, AND AVAILABLE ROOMS */
+  // ✅ NEW: Calculate total students and required room capacity
+  const selectedSectionsInfo = useMemo(() => {
+    const sections = sectionOptions.filter(s => 
+      form.sections.includes(s.section_name) && s.course_id === form.course
+    );
+    
+    const totalStudents = sections.reduce((sum, s) => sum + s.number_of_students, 0);
+    const sectionCount = sections.length;
+    
+    return { totalStudents, sectionCount, sections };
+  }, [form.sections, form.course, sectionOptions]);
+
+  // ✅ NEW: Calculate how many rooms are needed based on capacity
+  const calculateRoomsNeeded = useCallback((selectedRooms: string[]) => {
+    const { totalStudents } = selectedSectionsInfo;
+    
+    const totalCapacity = selectedRooms.reduce((sum, roomId) => {
+      const room = roomOptions.find(r => r.room_id === roomId);
+      return sum + (room?.room_capacity || 0);
+    }, 0);
+    
+    const canAccommodate = totalCapacity >= totalStudents;
+    const remainingCapacity = totalCapacity - totalStudents;
+    
+    return { canAccommodate, remainingCapacity, totalCapacity };
+  }, [selectedSectionsInfo, roomOptions]);
+
   useEffect(() => {
     const fetchData = async () => {
       if (!user?.user_id) return;
@@ -223,7 +245,6 @@ const BayanihanModality: React.FC<UserProps> = ({ user }) => {
       setLoadingRooms(true);
 
       try {
-        // PARALLEL API CALLS - Fetch everything at once
         const [
           { data: roles },
           { data: allPrograms },
@@ -245,27 +266,24 @@ const BayanihanModality: React.FC<UserProps> = ({ user }) => {
           return;
         }
 
-        // Check if user is admin (role 2 or role_id 2)
         const isAdmin = roles.some((r: any) => r.role === 2 || r.role_id === 2);
 
         if (isAdmin) {
-          // ADMIN: Show all programs, courses, sections, and ALL rooms (not filtered by scheduler)
           setProgramOptions(allPrograms);
           setCourseOptions(allCourses);
 
           const allSections = sectionCourses.map((sc: any) => ({
             course_id: sc.course_id || sc.course?.course_id,
             program_id: sc.program_id || sc.program?.program_id,
-            section_name: sc.section_name
+            section_name: sc.section_name,
+            number_of_students: sc.number_of_students || 0
           }));
           setSectionOptions(allSections);
 
-          // Fetch ALL rooms for admin (not filtered by available_rooms)
           const { data: allRooms } = await api.get('/tbl_rooms');
           setRoomOptions(allRooms);
           setAvailableRoomIds(allRooms.map((r: any) => r.room_id));
 
-          // Set buildings
           setBuildingOptions(
             buildings?.map((b: any) => ({ 
               id: b.building_id, 
@@ -273,12 +291,11 @@ const BayanihanModality: React.FC<UserProps> = ({ user }) => {
             })) ?? []
           );
 
-          console.log('Admin access: All rooms available (not filtered by scheduler)');
+          console.log('Admin access: All rooms available');
           setLoadingRooms(false);
           return;
         }
 
-        // Get leader roles (Bayanihan Leader = role 4)
         const leaderRoles = roles.filter((r: any) => 
           r.role === 4 || r.role_id === 4
         );
@@ -299,7 +316,6 @@ const BayanihanModality: React.FC<UserProps> = ({ user }) => {
           return;
         }
 
-        // Get colleges from departments
         const departments = allDepartments.filter((d: any) =>
           leaderDepartmentIds.includes(d.department_id)
         );
@@ -314,108 +330,72 @@ const BayanihanModality: React.FC<UserProps> = ({ user }) => {
           return;
         }
 
-        // FIX: Extract college IDs properly (they might be objects)
         const collegeIdStrings = collegeIds
           .map((c: any) => String(c.college_id || c))
           .filter(Boolean);
 
-        // FIX: Get department names to match against program.department field
         const deptNames = departments.map((d: any) => d.department_name).filter(Boolean);
 
-        console.log('=== BAYANIHAN LEADER DEBUG ===');
-        console.log('Leader Department IDs:', leaderDepartmentIds);
-        console.log('Department Names:', deptNames);
-        console.log('College IDs (objects):', collegeIds);
-        console.log('College ID Strings:', collegeIdStrings);
-
-        // Filter programs by matching department name OR college ID
         const programs = allPrograms.filter((p: any) => {
           const progDeptName = String(p.department || p.department_name || '');
           const progDeptId = String(p.department_id || '');
           const progCollege = String(p.college_id || p.college || '');
 
-          // Match by department ID or name
           const deptMatch = 
             leaderDepartmentIds.includes(progDeptId) ||
             deptNames.some((name: string) => progDeptName.includes(name));
           
-          // Match by college ID
           const collegeMatch = collegeIdStrings.includes(progCollege);
 
           return deptMatch || collegeMatch;
         });
 
-        console.log('Total Programs:', allPrograms.length);
-        console.log('Filtered Programs:', programs.length);
-        console.log('Sample Program:', allPrograms[0]);
-        console.log('==============================');
-
         setProgramOptions(programs);
 
-        // Fetch user courses - this still needs to be separate
         const { data: userCourses } = await api.get('/tbl_course_users/', {
           params: { user_id: user.user_id, is_bayanihan_leader: true }
         });
 
         const courseIds = userCourses?.map((c: any) => c.course_id) ?? [];
 
-        // Filter courses
         const coursesWithNames = allCourses.filter((c: any) => 
           courseIds.includes(c.course_id)
         );
         setCourseOptions(coursesWithNames);
 
-        // Filter sections
         const filteredSections = sectionCourses
           ?.filter((sc: any) => courseIds.includes(sc.course_id || sc.course?.course_id))
           .map((sc: any) => ({
             course_id: sc.course_id || sc.course?.course_id,
             program_id: sc.program_id || sc.program?.program_id,
-            section_name: sc.section_name
+            section_name: sc.section_name,
+            number_of_students: sc.number_of_students || 0
           })) ?? [];
         setSectionOptions(filteredSections);
 
-        // BAYANIHAN LEADER: Fetch available rooms for their college(s)
-        console.log('Fetching available rooms for colleges:', collegeIdStrings);
-        
-        // Fetch available rooms for each college using the string IDs
         const availableRoomsPromises = collegeIdStrings.map((collegeId: string) => 
           api.get('/tbl_available_rooms/', { params: { college_id: collegeId } })
         );
         
         const availableRoomsResponses = await Promise.all(availableRoomsPromises);
-        
-        // Combine all available rooms from all colleges
         const allAvailableRooms = availableRoomsResponses.flatMap(response => response.data);
         
-        console.log('Available rooms data:', allAvailableRooms);
-        
-        // Extract room IDs - handle both nested room object and direct room_id
         const availableIds = allAvailableRooms
-          .map((ar: any) => {
-            // Try to get room_id from nested room object first, then from direct room_id property
-            return ar.room?.room_id || ar.room_id || ar.room;
-          })
-          .filter((id: string) => id); // Filter out undefined/null values
-        
-        console.log('Extracted room IDs:', availableIds);
+          .map((ar: any) => ar.room?.room_id || ar.room_id || ar.room)
+          .filter((id: string) => id);
         
         setAvailableRoomIds(availableIds.map(String));
 
-        // Fetch all rooms and filter by available IDs
         if (availableIds.length > 0) {
           const { data: allRooms } = await api.get('/tbl_rooms');
           const filteredRooms = allRooms.filter((r: any) => 
             availableIds.includes(r.room_id)
           );
           setRoomOptions(filteredRooms);
-          console.log('Filtered rooms for Bayanihan Leader:', filteredRooms);
         } else {
           setRoomOptions([]);
-          console.log('No available rooms found for Bayanihan Leader');
         }
 
-        // Set buildings
         setBuildingOptions(
           buildings?.map((b: any) => ({ 
             id: b.building_id, 
@@ -423,7 +403,6 @@ const BayanihanModality: React.FC<UserProps> = ({ user }) => {
           })) ?? []
         );
 
-        console.log('Bayanihan Leader - Available Room IDs (set by scheduler):', availableIds);
       } catch (error: any) {
         console.error('Unexpected error fetching data:', error);
         toast.error('An unexpected error occurred while loading data');
@@ -435,7 +414,6 @@ const BayanihanModality: React.FC<UserProps> = ({ user }) => {
     fetchData();
   }, [user]);
 
-  /** AUTO-SELECT ROOM TYPE BASED ON MODALITY */
   useEffect(() => {
     const requiredRoomType = modalityRoomTypeMap[form.modality];
     if (!requiredRoomType) return;
@@ -448,7 +426,6 @@ const BayanihanModality: React.FC<UserProps> = ({ user }) => {
     setForm(prev => ({ ...prev, roomType: requiredRoomType }));
   }, [form.modality]);
 
-  /** HANDLE FORM CHANGE */
   const handleChange = (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement | HTMLTextAreaElement>) => {
     const { name, value } = e.target;
     if (name === 'program') {
@@ -458,7 +435,6 @@ const BayanihanModality: React.FC<UserProps> = ({ user }) => {
     }
   };
 
-  /** HANDLE FORM SUBMIT */
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (isSubmitting) return;
@@ -469,8 +445,10 @@ const BayanihanModality: React.FC<UserProps> = ({ user }) => {
       return;
     }
 
-    if (form.sections.length !== form.rooms.length) {
-      toast.error(`Number of sections must be equal to the number of rooms! (${form.sections.length} of ${form.rooms.length} selected)`);
+    const { canAccommodate } = calculateRoomsNeeded(form.rooms);
+    
+    if (!canAccommodate) {
+      toast.error('Selected rooms do not have enough capacity for all students!');
       return;
     }
 
@@ -485,7 +463,6 @@ const BayanihanModality: React.FC<UserProps> = ({ user }) => {
       }
 
       try {
-        // Check for existing record
         const { data: existing } = await api.get('/tbl_modality/', {
           params: {
             course_id: section.course_id,
@@ -500,7 +477,6 @@ const BayanihanModality: React.FC<UserProps> = ({ user }) => {
           return { status: 'skipped', section: sectionName };
         }
 
-        // Insert new record
         await api.post('/tbl_modality/', {
           modality_type: form.modality,
           room_type: form.roomType,
@@ -542,7 +518,6 @@ const BayanihanModality: React.FC<UserProps> = ({ user }) => {
 
     setIsSubmitting(false);
 
-    // Reset form after submit
     setForm({
       modality: '',
       rooms: [],
@@ -554,7 +529,6 @@ const BayanihanModality: React.FC<UserProps> = ({ user }) => {
     });
   };
 
-  /** GET ROOM TIMESLOTS WITH 30-MINUTE VACANT INTERVALS */
   const getRoomTimeslots = useCallback((roomId: string) => {
     const dayStart = new Date();
     dayStart.setHours(7, 30, 0, 0);
@@ -599,7 +573,6 @@ const BayanihanModality: React.FC<UserProps> = ({ user }) => {
     return timeslots;
   }, [roomStatus]);
 
-  /** RENDER TIMESLOT LIST */
   const RoomTimeslots: React.FC<{ roomId: string }> = ({ roomId }) => {
     useEffect(() => {
       fetchRoomOccupancy(roomId);
@@ -631,10 +604,8 @@ const BayanihanModality: React.FC<UserProps> = ({ user }) => {
     );
   };
 
-  // Filter rooms to only show available ones
   const filteredRoomOptions = roomOptions;
 
-  // Memoized sorted and filtered rooms for modal
   const filteredAndSortedRooms = useMemo(() => {
     return filteredRoomOptions
       .filter(r => !selectedBuilding || r.building_id === selectedBuilding)
@@ -673,7 +644,7 @@ const BayanihanModality: React.FC<UserProps> = ({ user }) => {
               marginBottom: '20px',
               color: '#856404'
             }}>
-              ⚠️ No rooms are currently available for selection. Please contact the administrator to set up available rooms in the Room Management page.
+              ⚠️ No rooms are currently available for selection. Please contact the administrator.
             </div>
           ) : null}
 
@@ -698,32 +669,6 @@ const BayanihanModality: React.FC<UserProps> = ({ user }) => {
                 />
               </div>
 
-              {/* BUILDING-ROOM */}
-              <div className="form-group">
-                <label>Building-Room</label>
-                <button
-                  type="button"
-                  className="open-modal-btn"
-                  disabled={!form.roomType || form.roomType === "No Room" || availableRoomIds.length === 0 || loadingRooms}
-                  onClick={() => setShowRoomModal(true)}
-                >
-                  {loadingRooms ? 'Loading...' : 'Select Room'}
-                </button>
-
-                {form.rooms.length > 0 && (
-                  <div className="selected-rooms">
-                    {form.rooms.map((roomId) => {
-                      const r = roomOptions.find(r => r.room_id === roomId);
-                      return (
-                        <div key={roomId} className="room-card">
-                          {r?.room_id}
-                        </div>
-                      );
-                    })}
-                  </div>
-                )}
-              </div>
-
               {/* ROOM TYPE */}
               <div className="form-group">
                 <label>Room Type</label>
@@ -743,7 +688,7 @@ const BayanihanModality: React.FC<UserProps> = ({ user }) => {
                 <Select
                   options={programOptions.map(p => ({ value: p.program_id, label: `${p.program_id} - ${p.program_name}` }))}
                   value={programOptions.filter(p => p.program_id === form.program).map(p => ({ value: p.program_id, label: `${p.program_id} - ${p.program_name}` }))}
-                  onChange={selected => setForm(prev => ({ ...prev, program: selected?.value || '', course: '', sections: [] }))}
+                  onChange={selected => setForm(prev => ({ ...prev, program: selected?.value || '', course: '', sections: [], rooms: [] }))}
                   placeholder="Select program..."
                   isClearable
                 />
@@ -762,7 +707,7 @@ const BayanihanModality: React.FC<UserProps> = ({ user }) => {
                     value: form.course, 
                     label: `${filteredCourseOptions.find(c => c.course_id === form.course)?.course_id} (${filteredCourseOptions.find(c => c.course_id === form.course)?.course_name})` 
                   } : null}
-                  onChange={selected => setForm(prev => ({ ...prev, course: selected?.value || '', sections: [] }))}
+                  onChange={selected => setForm(prev => ({ ...prev, course: selected?.value || '', sections: [], rooms: [] }))}
                   placeholder="Select course..."
                   isClearable
                 />
@@ -773,57 +718,107 @@ const BayanihanModality: React.FC<UserProps> = ({ user }) => {
                 <label>Sections</label>
 
                 {form.course ? (
-                  <Select
-                    isMulti
-                    closeMenuOnSelect={false}
-                    hideSelectedOptions={false}
-                    components={{ Option: CheckboxOption }}
-                    options={[
-                      { value: 'select_all', label: 'Select All Sections' },
-                      ...filteredSectionOptions
-                    ]}
-                    value={form.sections.map(sec => ({ value: sec, label: sec }))}
-                    onChange={(selected) => {
-                      if (!selected) {
-                        setForm(prev => ({ ...prev, sections: [] }));
-                        return;
-                      }
-
-                      const allSections = filteredSectionOptions.map(s => s.value);
-                      const isSelectAll = selected.some(s => s.value === 'select_all');
-
-                      if (isSelectAll) {
-                        if (form.rooms.length === 0) {
-                          toast.warn('Please select rooms first before using "Select All".');
+                  <>
+                    <Select
+                      isMulti
+                      closeMenuOnSelect={false}
+                      hideSelectedOptions={false}
+                      components={{ Option: CheckboxOption }}
+                      options={[
+                        { value: 'select_all', label: 'Select All Sections' },
+                        ...filteredSectionOptions
+                      ]}
+                      value={form.sections.map(sec => {
+                        const opt = filteredSectionOptions.find(s => s.value === sec);
+                        return { value: sec, label: opt?.label || sec };
+                      })}
+                      onChange={(selected) => {
+                        if (!selected) {
+                          setForm(prev => ({ ...prev, sections: [] }));
                           return;
                         }
 
-                        const limitedSections = allSections.slice(0, form.rooms.length);
-                        setForm(prev => ({ ...prev, sections: limitedSections }));
-                        toast.info(`Only ${form.rooms.length} section(s) selected.`);
-                        return;
-                      }
+                        const allSections = filteredSectionOptions.map(s => s.value);
+                        const isSelectAll = selected.some(s => s.value === 'select_all');
 
-                      const selectedValues = selected.map(s => s.value);
-                      if (selectedValues.length > form.rooms.length) {
-                        toast.error(`You can only select ${form.rooms.length} section(s) because ${form.rooms.length} room(s) are selected.`);
-                        return;
-                      }
+                        if (isSelectAll) {
+                          setForm(prev => ({ ...prev, sections: allSections }));
+                          return;
+                        }
 
-                      setForm(prev => ({ ...prev, sections: selectedValues }));
-                    }}
-                    placeholder="Select sections..."
-                  />
+                        const selectedValues = selected.map(s => s.value);
+                        setForm(prev => ({ ...prev, sections: selectedValues }));
+                      }}
+                      placeholder="Select sections..."
+                    />
+                    
+                    {/* ✅ NEW: Show total students info */}
+                    {form.sections.length > 0 && (
+                      <div style={{ 
+                        marginTop: '8px', 
+                        padding: '8px', 
+                        backgroundColor: '#eff0c1ff', 
+                        borderRadius: '4px',
+                        fontSize: '14px',
+                        color: '#021e41ff'
+                      }}>
+                        <strong>Selected: {selectedSectionsInfo.sectionCount} sections</strong><br/>
+                        <strong>Total Students: {selectedSectionsInfo.totalStudents}</strong>
+                      </div>
+                    )}
+                  </>
                 ) : (
                   <p style={{ color: "#888" }}>Select a course first</p>
                 )}
-
-                {form.rooms.length > 0 && (
-                  <small style={{ marginTop: "4px", display: "block", color: form.sections.length !== form.rooms.length ? "red" : "#666" }}>
-                    ⚠️ Number of sections must be equal to the number of rooms! {form.sections.length} of {form.rooms.length} section(s) selected.
-                  </small>
-                )}
               </div>
+
+              {/* ✅ MOVED: Building-Room selection AFTER sections */}
+              {form.sections.length > 0 && (
+                <div className="form-group full-width">
+                  <label>Building-Room</label>
+                  <button
+                    type="button"
+                    className="open-modal-btn"
+                    disabled={!form.roomType || form.roomType === "No Room" || availableRoomIds.length === 0 || loadingRooms}
+                    onClick={() => setShowRoomModal(true)}
+                  >
+                    {loadingRooms ? 'Loading...' : 'Select Rooms'}
+                  </button>
+
+                  {form.rooms.length > 0 && (
+                    <div className="selected-rooms">
+                      {form.rooms.map((roomId) => {
+                        const r = roomOptions.find(r => r.room_id === roomId);
+                        return (
+                          <div key={roomId} className="room-card">
+                            {r?.room_id} (Capacity: {r?.room_capacity})
+                          </div>
+                        );
+                      })}
+                    </div>
+                  )}
+
+                  {/* ✅ NEW: Show capacity validation */}
+                  {form.rooms.length > 0 && (
+                    <div style={{ 
+                      marginTop: '8px', 
+                      padding: '8px', 
+                      backgroundColor: calculateRoomsNeeded(form.rooms).canAccommodate ? '#d4edda' : '#f8d7da',
+                      border: `1px solid ${calculateRoomsNeeded(form.rooms).canAccommodate ? '#28a745' : '#dc3545'}`,
+                      borderRadius: '4px',
+                      fontSize: '14px'
+                    }}>
+                      <strong>Total Room Capacity: {calculateRoomsNeeded(form.rooms).totalCapacity}</strong><br/>
+                      <strong>Students to Accommodate: {selectedSectionsInfo.totalStudents}</strong><br/>
+                      {calculateRoomsNeeded(form.rooms).canAccommodate ? (
+                        <span style={{ color: '#28a745' }}>✅ Sufficient capacity ({calculateRoomsNeeded(form.rooms).remainingCapacity} extra seats)</span>
+                      ) : (
+                        <span style={{ color: '#dc3545' }}>❌ Insufficient capacity (need {Math.abs(calculateRoomsNeeded(form.rooms).remainingCapacity)} more seats)</span>
+                      )}
+                    </div>
+                  )}
+                </div>
+              )}
 
               {/* REMARKS */}
               <div className="form-group">
@@ -838,9 +833,8 @@ const BayanihanModality: React.FC<UserProps> = ({ user }) => {
 
             </div>
 
-            <button type="submit" disabled={isSubmitting}>Submit</button>
+            <button className="submit-button" type="submit" disabled={isSubmitting}><FaCheck/></button>
 
-            {/* Add this after the submit button or create a new section */}
             <div style={{ marginTop: '20px', textAlign: 'center' }}>
               <button
                 type="button"
@@ -871,7 +865,17 @@ const BayanihanModality: React.FC<UserProps> = ({ user }) => {
       {showRoomModal && (
         <div className="modal-overlay">
           <div className="modal-contents-modality">
-            <h3>Select Room</h3>
+            <h3>Select Rooms (Capacity-Based)</h3>
+            
+            <div style={{ 
+              marginBottom: '15px', 
+              padding: '10px', 
+              backgroundColor: '#e3f2fd',
+              borderRadius: '4px',
+              color: '#0d47a1'
+            }}>
+              <strong>Need to accommodate: {selectedSectionsInfo.totalStudents} students</strong>
+            </div>
 
             <Select
               options={buildingOptions.map(b => ({
@@ -884,7 +888,7 @@ const BayanihanModality: React.FC<UserProps> = ({ user }) => {
                   : null
               }
               onChange={(selected) => setSelectedBuilding(selected?.value || null)}
-              placeholder="-- Select Building --"
+              placeholder="-- Filter by Building --"
               isClearable
             />
 
@@ -909,6 +913,8 @@ const BayanihanModality: React.FC<UserProps> = ({ user }) => {
                   >
                     <div className="room-label">
                       {r.room_id} <small>({r.room_type})</small>
+                      <br/>
+                      <strong>Capacity: {r.room_capacity}</strong>
                     </div>
 
                     {!isDisabled && (
@@ -961,6 +967,7 @@ const BayanihanModality: React.FC<UserProps> = ({ user }) => {
       )}
 
       <ToastContainer position="top-right" autoClose={2000} />
+      
       {/* DELETE MODALITIES MODAL */}
       {showDeleteConfirm && (
         <div className="modal-overlay">
@@ -973,7 +980,6 @@ const BayanihanModality: React.FC<UserProps> = ({ user }) => {
                   You haven't created any modalities yet.
                 </div>
                 
-                {/* ✅ ADD: Close button for empty state */}
                 <div style={{ 
                   marginTop: '1rem', 
                   display: 'flex', 
@@ -1013,8 +1019,6 @@ const BayanihanModality: React.FC<UserProps> = ({ user }) => {
                     {selectedForDelete.length} selected
                   </span>
                 </div>
-
-                {/* ✅ REMOVED: Duplicate cancel button that was here */}
 
                 <div style={{ 
                   maxHeight: '400px', 
