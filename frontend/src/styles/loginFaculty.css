@@ -61,17 +61,24 @@ body {
   flex-direction: column;
   align-items: center;
   z-index: 1;
+  max-width: 100%;
+  box-sizing: border-box;
 }
 
 .e-graphic-logo {
   display: flex;
   flex-direction: column;
   align-items: center;
+  width: 100%;
+  max-width: 100%;
 }
 
 .examsync-logo {
   width: 400px; /* Even larger logo for desktop */
   height: 400px;
+  max-width: 100%;
+  max-height: 35vh; /* Prevent logo from taking too much vertical space */
+  object-fit: contain;
   filter: drop-shadow(0 0 5px rgba(245, 238, 238, 0.5));
   position: relative;
 }
@@ -81,6 +88,7 @@ body {
   font-weight: 500;
   color: var(--color-bright-yellow);
   margin-top: 5px;
+  text-align: center;
 }
 
 /* Login Form Card (Center) */
@@ -98,14 +106,18 @@ body {
   align-items: center;
   border-radius: 10px;
   z-index: 10;
+  box-sizing: border-box;
+  min-height: fit-content;
 }
 
 .login-form-card h2 {
   font-size: 24px;
-  margin-bottom: 20px;
+  margin: 0 0 20px 0;
   font-weight: 400;
   color: var(--color-white);
   text-align: center;
+  flex-shrink: 0;
+  line-height: 1.2;
 }
 
 /* Input Fields (Styled to look like the image's inputs) */
@@ -334,14 +346,20 @@ body {
   .examsync-logo {
     width: 150px;
     height: 150px;
+    max-height: 25vh; /* Smaller max height on mobile */
   }
 
   .logo-text {
     font-size: 12px;
   }
 
+  .logo-section {
+    top: 2%;
+    max-width: 90%;
+  }
+
   .login-form-card {
-    top: 50%;
+    top: 55%;
     transform: translate(-50%, -50%);
     width: 95%;
     max-width: 280px;
@@ -421,10 +439,15 @@ body {
   .examsync-logo {
     width: 280px;
     height: 280px;
+    max-height: 30vh; /* Prevent overlap on tablet */
+  }
+
+  .logo-section {
+    top: 4%;
   }
 
   .login-form-card {
-    top: 65%;
+    top: 68%;
     transform: translate(-50%, -50%);
     width: 90%;
     max-width: 380px;
@@ -464,6 +487,12 @@ body {
   .examsync-logo {
     width: 280px;
     height: 280px;
+    max-height: 32vh; /* Prevent overlap on desktop */
+  }
+
+  .logo-section {
+    top: 5%;
+    max-width: 95%;
   }
 
   .logo-text {
@@ -472,7 +501,7 @@ body {
   }
 
   .login-form-card {
-    top: 70%;
+    top: 72%;
     transform: translate(-50%, -50%);
     width: 90%;
     max-width: 400px;

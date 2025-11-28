@@ -1,4 +1,4 @@
-/* Color Variables based on the image's gradient and elements */
+/* Color Variables */
 :root {
   --color-dark-blue: #0d1b3f;
   --color-vibrant-blue: #1c4b8b;
@@ -10,399 +10,352 @@
 
 body {
   margin: 0;
-  font-family: sans-serif; /* Use a common font */
+  font-family: sans-serif;
 }
 
-.login-container {
+/* Main Container - Use Flexbox */
+.main-container {
   display: flex;
   flex-direction: column;
-  align-items: center;
-  justify-content: center;
+  width: 100%;
   height: 100vh;
-  width: 100vw;
   position: relative;
   overflow: hidden;
   color: var(--color-white);
 }
 
-/* Background Gradient (Mimicking the image) */
-.background-gradient {
-  position: absolute;
-  top: 0;
-  left: 0;
-  width: 100%;
-  height: 100%;
+.left-panel {
+  display: none;
+}
+
+.right-panel {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: flex-start;
+  padding-top: 20px;
+  overflow-y: auto;
   background: linear-gradient(
     135deg,
     var(--color-vibrant-blue) 0%,
     var(--color-dark-blue) 40%,
     var(--color-bright-yellow) 100%
   );
-  z-index: 0;
 }
 
-/* Greeting Text Position (Top-left) */
-.greeting-text {
-  position: absolute;
-  top: 30px;
-  left: 30px;
-  font-size: 24px;
-  font-weight: 500;
-  z-index: 10;
-}
-
-/* Logo Section (Top) */
-.logo-section {
-  position: absolute;
-  top: 3%;
-  left: 50%;
-  transform: translateX(-50%);
+/* Header Section - Contains Logo */
+.header-section {
   display: flex;
   flex-direction: column;
   align-items: center;
-  z-index: 1;
+  width: 100%;
+  padding: 0 20px;
+  margin-bottom: 30px;
+  flex-shrink: 0;
+  min-height: 0;
 }
 
-.e-graphic-logo {
-  display: flex;
-  flex-direction: column;
-  align-items: center;
+.greeting {
+  text-align: center;
+  margin-bottom: 15px;
 }
 
-.examsync-logo {
-  width: 400px; /* Even larger logo for desktop */
-  height: 400px;
-  filter: drop-shadow(0 0 5px rgba(245, 238, 238, 0.5));
-  position: relative;
-}
-
-.logo-text {
+.greeting p {
+  margin: 5px 0;
   font-size: 16px;
   font-weight: 500;
-  color: var(--color-bright-yellow);
-  margin-top: 5px;
 }
 
-/* Login Form Card (Center) */
-.login-form-card {
-  position: absolute;
-  top: 65%;
-  left: 50%;
-  transform: translate(-50%, -50%);
-  width: 90%;
-  max-width: 350px;
-  padding: 40px 30px 60px;
-  background: rgba(255, 255, 255, 0); /* Invisible background */
+.greeting .good-morning {
+  font-size: 14px;
+  opacity: 0.9;
+}
+
+/* Logo */
+.logo {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 100%;
+  flex-shrink: 0;
+}
+
+.logo img {
+  width: 200px;
+  height: auto;
+  max-width: 100%;
+  object-fit: contain;
+  filter: drop-shadow(0 0 5px rgba(245, 238, 238, 0.5));
+}
+
+/* Login Section - Contains Form */
+.login-section {
   display: flex;
   flex-direction: column;
   align-items: center;
-  border-radius: 10px;
-  z-index: 10;
+  width: 100%;
+  padding: 0 20px;
+  margin-bottom: 20px;
+  flex-shrink: 0;
+  min-height: 0;
 }
 
-.login-form-card h2 {
+.login-section h2 {
   font-size: 24px;
-  margin-bottom: 20px;
+  margin: 0 0 30px;
   font-weight: 400;
   color: var(--color-white);
   text-align: center;
+  white-space: nowrap;
+  flex-shrink: 0;
 }
 
-/* Input Fields (Styled to look like the image's inputs) */
-.input-field {
-  position: relative;
-  width: 100%;
-  margin-bottom: 25px;
-}
-
-.input-field input {
-  width: 100%;
-  padding: 15px 15px;
-  background: rgba(250, 250, 250, 0.2); /* Semi-transparent background */
-  border: none;
-  border-radius: 10px;
-  color: var(--color-white);
-  font-size: 16px;
-  outline: none;
-  box-sizing: border-box;
-  transition: all 0.3s ease;
-  height: 40px;
-}
-
-.input-field input::placeholder {
-  color: rgba(255, 255, 255, 0.7);
-}
-
-.input-field label {
-  position: absolute;
-  top: 10px;
-  left: 15px;
-  color: rgba(255, 255, 255, 0.7);
-  font-size: 16px;
-  pointer-events: none;
-  transition: all 0.3s ease;
-  transform-origin: left top;
-}
-
-.input-field input:focus,
-.input-field input:not(:placeholder-shown) {
-  background: rgba(255, 255, 255, 0.1);
-}
-
-.input-field input:focus ~ label,
-.input-field input:not(:placeholder-shown) ~ label {
-  transform: translateY(-25px) scale(0.7);
+.faculty-text {
   color: var(--color-soft-yellow);
+  font-weight: 600;
 }
 
-/* Password Field Specifics */
-.password-field input {
-  padding-right: 50px; /* Space for the eye icon */
+/* Form */
+.login-form {
+  display: flex;
+  flex-direction: column;
+  width: 100%;
+  max-width: 350px;
+  padding: 0;
+}
+
+/* Input Group */
+.input-group {
+  display: flex;
+  flex-direction: column;
+  margin-bottom: 20px;
+  width: 100%;
+}
+
+.input-group label {
+  font-size: 14px;
+  color: rgba(255, 255, 255, 0.8);
+  margin-bottom: 5px;
+  font-weight: 500;
+}
+
+.login-input {
+  padding: 12px 15px;
+  background: rgba(250, 250, 250, 0.15);
+  border: 1px solid rgba(255, 255, 255, 0.2);
+  border-radius: 8px;
+  color: var(--color-white);
+  font-size: 14px;
+  outline: none;
+  transition: all 0.3s ease;
+  box-sizing: border-box;
+}
+
+.login-input::placeholder {
+  color: rgba(255, 255, 255, 0.5);
+}
+
+.login-input:focus {
+  background: rgba(250, 250, 250, 0.25);
+  border-color: rgba(255, 255, 255, 0.4);
+  box-shadow: 0 0 10px rgba(248, 192, 0, 0.2);
+}
+
+/* Password Group */
+.password-group {
+  position: relative;
+}
+
+.password-wrapper {
+  position: relative;
+  display: flex;
+  align-items: center;
+  width: 100%;
+}
+
+.password-wrapper .login-input {
+  padding-right: 45px;
+  width: 100%;
 }
 
 .toggle-password {
   position: absolute;
-  top: 50%;
-  right: 15px;
-  transform: translateY(-50%);
+  right: 12px;
   cursor: pointer;
-  color: rgba(255, 255, 255, 0.7);
-  z-index: 1;
+  color: rgba(255, 255, 255, 0.6);
+  font-size: 16px;
+  transition: color 0.3s ease;
 }
 
-.form-actions {
-    width: 100%;
-    display: flex;
-    justify-content: space-between;
-    align-items: center;
-    margin-bottom: 20px;
+.toggle-password:hover {
+  color: rgba(255, 255, 255, 0.9);
 }
 
-/* Modern Remember Me Checkbox */
-.modern-checkbox-container {
-  display: block;
-  position: relative;
-  padding-left: 25px;
-  margin-right: 15px;
-  cursor: pointer;
-  font-size: 14px;
+/* Error */
+.form-error-row {
+  height: 24px;
+  margin-bottom: 10px;
+  display: flex;
+  align-items: center;
+}
+
+.error-text {
+  color: var(--color-error);
+  font-size: 13px;
+  font-weight: 500;
+}
+
+.error-text.hidden {
+  visibility: hidden;
+}
+
+/* Remember Me */
+.remember-me-container {
+  display: flex;
+  align-items: center;
+  margin-bottom: 20px;
+  font-size: 13px;
   color: rgba(255, 255, 255, 0.8);
-  -webkit-user-select: none;
-  -moz-user-select: none;
-  -ms-user-select: none;
-  user-select: none;
 }
 
-.modern-checkbox-container input {
-  position: absolute;
-  opacity: 0;
-  cursor: pointer;
-  height: 0;
-  width: 0;
-}
-
-.checkmark {
-  position: absolute;
-  top: 0;
-  left: 0;
-  height: 18px;
+.remember-me-container input {
+  appearance: none;
   width: 18px;
-  background-color: rgba(255, 255, 255, 0.3);
+  height: 18px;
+  border: 1px solid rgba(255, 255, 255, 0.4);
   border-radius: 4px;
+  cursor: pointer;
+  margin-right: 8px;
+  background: rgba(250, 250, 250, 0.1);
+  transition: all 0.3s ease;
 }
 
-.modern-checkbox-container:hover input ~ .checkmark {
-  background-color: rgba(255, 255, 255, 0.5);
+.remember-me-container input:checked {
+  background: var(--color-soft-yellow);
+  border-color: var(--color-soft-yellow);
 }
 
-.modern-checkbox-container input:checked ~ .checkmark {
-  background-color: var(--color-soft-yellow);
-}
-
-.checkmark:after {
-  content: "";
-  position: absolute;
-  display: none;
-}
-
-.modern-checkbox-container input:checked ~ .checkmark:after {
-  display: block;
-}
-
-.modern-checkbox-container .checkmark:after {
-  left: 6px;
-  top: 3px;
-  width: 3px;
-  height: 8px;
-  border: solid white;
-  border-width: 0 2px 2px 0;
-  -webkit-transform: rotate(45deg);
-  -ms-transform: rotate(45deg);
-  transform: rotate(45deg);
-}
-
-/* Login Submit Button (Full width like input fields) */
-.submit-button {
+/* Login Button */
+.login-button {
   width: 100%;
-  height: 50px;
-  border-radius: 10px;
+  padding: 12px 15px;
   background-color: var(--color-soft-yellow);
   color: var(--color-dark-blue);
   border: none;
-  cursor: pointer;
-  display: flex;
-  align-items: center;
-  justify-content: center;
+  border-radius: 8px;
   font-size: 16px;
   font-weight: 600;
-  transition: background-color 0.3s ease, transform 0.1s ease;
-  box-shadow: 0 4px 10px rgba(0, 0, 0, 0.3);
-  position: relative;
-  margin-top: 10px;
-}
-
-.submit-button:hover {
-  background-color: var(--color-bright-yellow);
-  transform: translateY(-2px);
-  box-shadow: 0 6px 15px rgba(0, 0, 0, 0.4);
-}
-
-.submit-button:active {
-  transform: scale(0.95);
-}
-
-.submit-button:disabled {
-  background-color: rgba(248, 192, 0, 0.5);
-  cursor: not-allowed;
-}
-
-/* Error Text */
-.error-text {
-  color: var(--color-error);
-  font-size: 14px;
-  margin-top: 5px;
-  text-align: left;
-  flex-grow: 1;
-}
-
-/* Admin/Settings Toggle Button (Bottom-right) */
-.admin-toggle-button {
-  position: absolute;
-  bottom: 20px;
-  right: 20px;
-  width: 50px;
-  height: 50px;
-  border-radius: 50%;
-  background-color: rgba(255, 255, 255, 0.15); /* Slightly visible */
-  color: var(--color-white);
+  cursor: pointer;
+  transition: all 0.3s ease;
   display: flex;
   align-items: center;
   justify-content: center;
-  cursor: pointer;
-  transition: background-color 0.3s ease;
-  z-index: 10;
+  gap: 8px;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.2);
 }
 
-.admin-toggle-button:hover {
-  background-color: rgba(255, 255, 255, 0.3);
+.login-button:hover:not(:disabled) {
+  background-color: var(--color-bright-yellow);
+  transform: translateY(-2px);
+  box-shadow: 0 6px 16px rgba(0, 0, 0, 0.3);
 }
 
-/* Loading Spinner */
+.login-button:active:not(:disabled) {
+  transform: translateY(0);
+}
+
+.login-button:disabled {
+  background-color: rgba(248, 192, 0, 0.5);
+  cursor: not-allowed;
+  opacity: 0.7;
+}
+
+/* Spinner */
 @keyframes spin {
   0% { transform: rotate(0deg); }
   100% { transform: rotate(360deg); }
 }
 
 .spinner {
-  border: 4px solid rgba(0, 0, 0, 0.1);
-  border-top: 4px solid var(--color-dark-blue);
+  display: inline-block;
+  width: 16px;
+  height: 16px;
+  border: 2px solid rgba(13, 27, 63, 0.2);
+  border-top: 2px solid var(--color-dark-blue);
   border-radius: 50%;
-  width: 20px;
-  height: 20px;
   animation: spin 1s linear infinite;
 }
 
-/* === MOBILE RESPONSIVENESS (Small phones) === */
+/* Admin Link */
+.admin-login-link {
+  margin-top: auto;
+  padding-bottom: 20px;
+  width: 100%;
+  display: flex;
+  justify-content: center;
+}
+
+.admin-login-btn {
+  background: rgba(255, 255, 255, 0.15);
+  border: 1px solid rgba(255, 255, 255, 0.3);
+  color: var(--color-white);
+  padding: 10px 20px;
+  border-radius: 8px;
+  font-size: 13px;
+  cursor: pointer;
+  transition: all 0.3s ease;
+}
+
+.admin-login-btn:hover {
+  background: rgba(255, 255, 255, 0.25);
+  border-color: rgba(255, 255, 255, 0.5);
+}
+
+/* === MOBILE RESPONSIVENESS === */
 @media (max-width: 480px) {
-  .greeting-text {
-    font-size: 18px;
-    top: 20px;
-    left: 20px;
+  .right-panel {
+    padding-top: 15px;
   }
 
-  .logo-section {
-    top: 5%;
-  }
-
-  .examsync-logo {
-    width: 150px;
-    height: 150px;
-  }
-
-  .logo-text {
-    font-size: 12px;
-  }
-
-  .login-form-card {
-    top: 50%;
-    transform: translate(-50%, -50%);
-    width: 95%;
-    max-width: 280px;
-    padding: 30px 20px 50px;
-  }
-
-  .login-form-card h2 {
-    font-size: 18px;
-    margin-bottom: 15px;
-  }
-
-  .input-field {
+  .header-section {
     margin-bottom: 20px;
   }
 
-  .input-field input {
+  .greeting p {
     font-size: 14px;
-    padding: 12px 12px;
-    height: 36px;
   }
 
-  .input-field label {
-    font-size: 14px;
-    top: 8px;
-    left: 12px;
+  .logo img {
+    width: 120px;
   }
 
-  .input-field input:focus ~ label,
-  .input-field input:not(:placeholder-shown) ~ label {
-    transform: translateY(-22px) scale(0.65);
+  .login-section h2 {
+    font-size: 18px;
+    margin: 0 0 20px;
+    white-space: normal;
   }
 
-  .form-actions {
+  .login-form {
+    max-width: 100%;
+  }
+
+  .input-group {
     margin-bottom: 15px;
   }
 
-  .modern-checkbox-container {
-    font-size: 12px;
-    padding-left: 20px;
+  .login-input {
+    font-size: 13px;
+    padding: 10px 12px;
   }
 
-  .checkmark {
-    height: 16px;
-    width: 16px;
-  }
-
-  .submit-button {
-    width: 100%;
-    height: 45px;
+  .login-button {
+    padding: 10px 15px;
     font-size: 14px;
-    font-weight: 600;
   }
 
-  .admin-toggle-button {
-    width: 45px;
-    height: 45px;
-    bottom: 15px;
-    right: 15px;
+  .remember-me-container {
+    font-size: 12px;
   }
 
   .error-text {
@@ -410,124 +363,104 @@ body {
   }
 }
 
-/* === TABLET RESPONSIVENESS (768px and up) === */
+/* === TABLET RESPONSIVENESS === */
 @media (min-width: 481px) and (max-width: 1024px) {
-  .greeting-text {
+  .right-panel {
+    padding-top: 25px;
+  }
+
+  .header-section {
+    margin-bottom: 35px;
+  }
+
+  .logo img {
+    width: 160px;
+  }
+
+  .login-section h2 {
     font-size: 22px;
-    top: 25px;
-    left: 25px;
+    margin: 0 0 25px;
   }
 
-  .logo-section {
-    top: 8%;
-  }
-
-  .examsync-logo {
-    width: 280px;
-    height: 280px;
-  }
-
-  .login-form-card {
-    top: 65%;
-    transform: translate(-50%, -50%);
-    width: 90%;
+  .login-form {
     max-width: 380px;
-    padding: 40px 30px 60px;
   }
 
-  .login-form-card h2 {
-    font-size: 22px;
+  .input-group {
     margin-bottom: 18px;
   }
 
-  .input-field input {
+  .login-input {
     font-size: 15px;
-    padding: 13px 13px;
+    padding: 12px 15px;
   }
 
-  .submit-button {
-    width: 100%;
-    height: 50px;
-    font-size: 16px;
-    font-weight: 600;
+  .login-button {
+    padding: 12px 15px;
+    font-size: 15px;
   }
 }
 
-/* === DESKTOP RESPONSIVENESS (1025px and up) === */
+/* === DESKTOP RESPONSIVENESS === */
 @media (min-width: 1025px) {
-  .greeting-text {
+  .main-container {
+    flex-direction: row;
+  }
+
+  .left-panel {
+    display: flex;
+    flex: 1;
+    background: linear-gradient(
+      135deg,
+      var(--color-vibrant-blue) 0%,
+      var(--color-dark-blue) 40%,
+      var(--color-bright-yellow) 100%
+    );
+  }
+
+  .right-panel {
+    flex: 1;
+    padding-top: 40px;
+    background: linear-gradient(
+      135deg,
+      var(--color-vibrant-blue) 0%,
+      var(--color-dark-blue) 40%,
+      var(--color-bright-yellow) 100%
+    );
+  }
+
+  .header-section {
+    margin-bottom: 50px;
+  }
+
+  .logo img {
+    width: 220px;
+  }
+
+  .login-section h2 {
     font-size: 26px;
-    top: 35px;
-    left: 35px;
+    margin: 0 0 35px;
   }
 
-  .logo-section {
-    top: 5%;
-    margin-bottom: 20px;
-    z-index: 1;
-  }
-
-  .examsync-logo {
-    width: 280px;
-    height: 280px;
-  }
-
-  .logo-text {
-    font-size: 20px;
-    margin-top: 10px;
-  }
-
-  .login-form-card {
-    top: 70%;
-    transform: translate(-50%, -50%);
-    width: 90%;
+  .login-form {
     max-width: 400px;
-    padding: 45px 35px 70px;
-    z-index: 15;
   }
 
-  .login-form-card h2 {
-    font-size: 26px;
+  .input-group {
     margin-bottom: 22px;
   }
 
-  .input-field {
-    margin-bottom: 28px;
-  }
-
-  .input-field input {
-    font-size: 16px;
-    padding: 15px 15px;
-    height: 42px;
-  }
-
-  .form-actions {
-    margin-bottom: 22px;
-  }
-
-  .modern-checkbox-container {
+  .login-input {
     font-size: 15px;
+    padding: 13px 15px;
   }
 
-  .submit-button {
-    width: 100%;
-    height: 50px;
+  .login-button {
+    padding: 13px 20px;
     font-size: 16px;
-    font-weight: 600;
   }
 
-  .submit-button:hover {
-    background-color: var(--color-bright-yellow);
-    transform: translateY(-2px);
-    box-shadow: 0 6px 15px rgba(0, 0, 0, 0.4);
-  }
-
-  .admin-toggle-button {
-    width: 55px;
-    height: 55px;
-  }
-
-  .error-text {
-    font-size: 15px;
+  .remember-me-container {
+    font-size: 14px;
   }
 }
