@@ -322,12 +322,12 @@ const SchedulerPlottingSchedule: React.FC<SchedulerProps> = ({ user, onScheduleC
       setCheckingSchedules(true);
       try {
         // ✅ FIX: Use POST instead of GET to avoid URL length limits
-        const response = await api.post('/tbl_examdetails/check_scheduled/', {
+        const response = await api.post('/check-existing-schedules/', {
           modality_ids: formData.selectedModalities
         });
 
         const scheduled = new Set<number>(
-          response.data.scheduled_ids || []
+          response.data.scheduled_ids.map((id: any) => Number(id))
         );
         
         setAlreadyScheduledIds(scheduled);
@@ -337,7 +337,7 @@ const SchedulerPlottingSchedule: React.FC<SchedulerProps> = ({ user, onScheduleC
         }
       } catch (error) {
         console.error('Error checking schedules:', error);
-        // Don't block the user if check fails
+        // ✅ Don't block UI on error - just clear the set
         setAlreadyScheduledIds(new Set());
       } finally {
         setCheckingSchedules(false);

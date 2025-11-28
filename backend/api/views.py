@@ -590,41 +590,42 @@ def tbl_examdetails_detail(request, pk):
 
 @api_view(['POST'])
 @permission_classes([AllowAny])
-def check_scheduled_modalities(request):
+def check_existing_schedules(request):
     """
-    Check which modalities are already scheduled.
-    Accepts POST body: { "modality_ids": [1, 2, 3, ...] }
-    Returns: { "scheduled_ids": [1, 3, ...] }
+    Check if modalities already have schedules (POST to handle large lists)
+    Expects: { "modality_ids": [1, 2, 3, ...] }
+    Returns: { "scheduled_ids": [1, 3], "count": 2 }
     """
     try:
         modality_ids = request.data.get('modality_ids', [])
         
         if not modality_ids:
-            return Response({'scheduled_ids': []}, status=status.HTTP_200_OK)
+            return Response({'scheduled_ids': [], 'count': 0}, status=status.HTTP_200_OK)
         
-        # Batch query to check which modalities are already scheduled
-        existing_schedules = TblExamdetails.objects.filter(
-            modality_id__in=modality_ids
-        ).values_list('modality_id', flat=True).distinct()
+        # Query in batches to avoid memory issues
+        BATCH_SIZE = 100
+        scheduled_ids = set()
         
-        scheduled_ids = list(existing_schedules)
-        
-        print(f"✅ Checked {len(modality_ids)} modalities - {len(scheduled_ids)} already scheduled")
+        for i in range(0, len(modality_ids), BATCH_SIZE):
+            batch = modality_ids[i:i + BATCH_SIZE]
+            existing = TblExamdetails.objects.filter(
+                modality_id__in=batch
+            ).values_list('modality_id', flat=True)
+            scheduled_ids.update(existing)
         
         return Response({
-            'scheduled_ids': scheduled_ids,
-            'total_checked': len(modality_ids),
-            'already_scheduled_count': len(scheduled_ids)
+            'scheduled_ids': list(scheduled_ids),
+            'count': len(scheduled_ids)
         }, status=status.HTTP_200_OK)
         
     except Exception as e:
-        print(f"❌ Error in check_scheduled_modalities: {str(e)}")
+        print(f"❌ Error checking schedules: {str(e)}")
         import traceback
         traceback.print_exc()
-        return Response({
-            'error': str(e),
-            'detail': 'Failed to check scheduled modalities'
-        }, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+        return Response(
+            {'error': str(e), 'detail': 'Failed to check existing schedules'},
+            status=status.HTTP_500_INTERNAL_SERVER_ERROR
+        )
         
 @api_view(['GET', 'POST'])
 @permission_classes([AllowAny])
