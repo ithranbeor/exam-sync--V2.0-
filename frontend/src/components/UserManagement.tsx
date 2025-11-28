@@ -1045,7 +1045,9 @@ export const UserManagement: React.FC<UserManagementProps> = ({}) => {
                 padding: '8px 15px',
                 fontSize: '0.9rem',
                 borderRadius: '50px',
-                border: '1px solid #ccc'
+                border: '1px solid #ccc',
+                width: '400px',
+                maxWidth: '400px'
               }}
             >
               <option value="">All Colleges</option>
