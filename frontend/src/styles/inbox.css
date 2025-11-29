@@ -1159,3 +1159,194 @@
   font-size: 0.85rem;
 }
 
+/* ============================================
+   RESPONSIVE STYLES - CONSISTENT PATTERNS
+   ============================================ */
+
+/* Tablet (768px - 1024px) */
+@media screen and (max-width: 1024px) {
+  .inbox-container {
+    padding: 15px;
+  }
+
+  .inbox-modal-pane {
+    width: 90%;
+    max-width: 550px;
+    padding: 20px;
+  }
+
+  .modal-pane {
+    width: 90%;
+    max-width: 550px;
+  }
+
+  .compose-modal-pane,
+  .my-compose-modal-pane {
+    max-width: 550px;
+    height: 85%;
+  }
+}
+
+/* Mobile (< 768px) */
+@media screen and (max-width: 768px) {
+  .inbox-container {
+    padding: 12px;
+    min-height: calc(100vh - 50px);
+  }
+
+  .inbox-banner {
+    flex-direction: column;
+    align-items: stretch;
+    gap: 10px;
+    padding: 12px;
+    font-size: 14px;
+  }
+
+  .inbox-actions {
+    justify-content: flex-start;
+    flex-wrap: wrap;
+    gap: 10px;
+  }
+
+  .inbox-card {
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 10px;
+    padding: 12px;
+  }
+
+  .inbox-center {
+    margin-left: 0;
+    width: 100%;
+  }
+
+  .inbox-layout {
+    flex-direction: column;
+    gap: 15px;
+  }
+
+  .inbox-sidebar {
+    width: 100%;
+    padding: 15px;
+  }
+
+  .inbox-modal-overlay,
+  .modal-overlay,
+  .compose-modal-overlay,
+  .my-compose-modal-overlay {
+    padding: 10px;
+    align-items: flex-start;
+    padding-top: 20px;
+  }
+
+  .inbox-modal-pane,
+  .modal-pane {
+    width: 100%;
+    max-width: 100%;
+    padding: 20px 16px;
+    margin: 0;
+    max-height: 95vh;
+  }
+
+  .deanreq-modal-pane {
+    width: 100%;
+    max-width: 100%;
+    padding: 20px 16px;
+  }
+
+  .compose-modal-pane,
+  .my-compose-modal-pane {
+    width: 100%;
+    max-width: 100%;
+    height: 95vh;
+    border-radius: 12px 12px 0 0;
+  }
+
+  .compose-modal-input,
+  .inbox-compose-form input,
+  .inbox-compose-form textarea,
+  .compose-form input,
+  .compose-form textarea {
+    font-size: 16px; /* Prevents zoom on iOS */
+    padding: 12px;
+  }
+
+  .inbox-compose-btn,
+  .inbox-delete-btn,
+  .inbox-modal-button,
+  .deanreq-btn,
+  .deanreq-btn1 {
+    min-height: 44px;
+    padding: 12px 16px;
+    font-size: 16px;
+    touch-action: manipulation;
+  }
+
+  .inbox-modal-actions,
+  .deanreq-actions {
+    flex-direction: column-reverse;
+    gap: 10px;
+    margin-top: 15px;
+  }
+
+  .inbox-modal-actions button,
+  .deanreq-actions button {
+    width: 100%;
+  }
+
+  .chat-message {
+    max-width: 90%;
+    font-size: 14px;
+    padding: 12px;
+  }
+
+  .subject-title {
+    font-size: 18px;
+  }
+
+  .modal-header,
+  .compose-modal-header,
+  .my-compose-modal-header {
+    padding: 12px;
+    font-size: 16px;
+  }
+}
+
+/* Small Mobile (< 480px) */
+@media screen and (max-width: 480px) {
+  .inbox-container {
+    padding: 10px;
+  }
+
+  .inbox-banner {
+    font-size: 13px;
+    padding: 10px;
+  }
+
+  .inbox-card {
+    padding: 10px;
+  }
+
+  .inbox-modal-pane,
+  .modal-pane,
+  .deanreq-modal-pane {
+    padding: 16px 12px;
+  }
+
+  .compose-modal-pane,
+  .my-compose-modal-pane {
+    height: 100vh;
+    border-radius: 0;
+  }
+
+  .subject-title {
+    font-size: 16px;
+  }
+
+  .chat-message {
+    max-width: 95%;
+    font-size: 13px;
+    padding: 10px;
+  }
+}
+

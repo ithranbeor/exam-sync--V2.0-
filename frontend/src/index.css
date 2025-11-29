@@ -1,4 +1,7 @@
-
+/* Global Responsive Base Styles */
+* {
+  box-sizing: border-box;
+}
 
 :root {
   font-family: system-ui, Avenir, Helvetica, Arial, sans-serif;
@@ -30,6 +33,8 @@ body {
   place-items: center;
   min-width: 320px;
   min-height: 100vh;
+  overflow-x: hidden;
+  width: 100%;
 }
 
 h1 {
@@ -47,6 +52,7 @@ button {
   background-color: #1a1a1a;
   cursor: pointer;
   transition: border-color 0.25s;
+  touch-action: manipulation;
 }
 button:hover {
   border-color: #646cff;
@@ -54,6 +60,19 @@ button:hover {
 button:focus,
 button:focus-visible {
   outline: 4px auto -webkit-focus-ring-color;
+}
+
+/* Responsive Typography */
+@media (max-width: 768px) {
+  h1 {
+    font-size: 2em;
+  }
+}
+
+@media (max-width: 480px) {
+  h1 {
+    font-size: 1.5em;
+  }
 }
 
 @media (prefers-color-scheme: light) {

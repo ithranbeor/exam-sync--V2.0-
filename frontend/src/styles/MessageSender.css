@@ -143,3 +143,77 @@ textarea {
   background: #9acfa2;
   cursor: not-allowed;
 }
+
+/* ============================================
+   RESPONSIVE STYLES - CONSISTENT PATTERNS
+   ============================================ */
+
+/* Tablet (768px - 1024px) */
+@media screen and (max-width: 1024px) {
+  .message-sender-container {
+    width: 90%;
+    max-width: 550px;
+    padding: 18px;
+  }
+}
+
+/* Mobile (< 768px) */
+@media screen and (max-width: 768px) {
+  .message-sender-container {
+    width: 100%;
+    max-width: 100%;
+    padding: 20px 16px;
+    margin: 10px;
+    max-height: 95vh;
+    border-radius: 12px;
+  }
+
+  .message-sender-header h3 {
+    font-size: 18px;
+  }
+
+  .user-selection-section {
+    padding: 12px;
+  }
+
+  .user-list {
+    max-height: 150px;
+  }
+
+  .subject-input,
+  textarea {
+    font-size: 16px; /* Prevents zoom on iOS */
+    padding: 12px;
+  }
+
+  .message-sender-footer {
+    flex-direction: column-reverse;
+    gap: 10px;
+    margin-top: 15px;
+  }
+
+  .btn-cancel,
+  .btn-send {
+    width: 100%;
+    min-height: 44px;
+    padding: 12px 16px;
+    font-size: 16px;
+    touch-action: manipulation;
+  }
+}
+
+/* Small Mobile (< 480px) */
+@media screen and (max-width: 480px) {
+  .message-sender-container {
+    padding: 16px 12px;
+    margin: 5px;
+  }
+
+  .message-sender-header h3 {
+    font-size: 16px;
+  }
+
+  .user-list {
+    max-height: 120px;
+  }
+}

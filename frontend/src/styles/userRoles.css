@@ -246,10 +246,195 @@ p {
   background: white;
   padding: 20px;
   width: 25%;
+  max-width: 500px;
+  min-width: 300px;
   border-radius: 8px;
   box-shadow: 0 5px 15px rgba(0,0,0,0.3);
   display: flex;
   flex-direction: column;
   gap: 12px;
   color: #092c4c;
+}
+
+.modal {
+  background: white;
+  padding: 20px;
+  border-radius: 8px;
+  box-shadow: 0 5px 15px rgba(0,0,0,0.3);
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  color: #092c4c;
+  max-width: 500px;
+  width: 90%;
+}
+
+.userroles-table-container {
+  overflow-x: auto;
+  -webkit-overflow-scrolling: touch;
+  scroll-behavior: smooth;
+  position: relative;
+}
+
+.userroles-table {
+  min-width: 600px;
+}
+
+/* ============================================
+   RESPONSIVE STYLES
+   ============================================ */
+
+/* Tablet (768px - 1024px) */
+@media screen and (max-width: 1024px) {
+  .userroles-container {
+    padding: 15px;
+  }
+
+  .userroles-title {
+    font-size: 20px;
+  }
+
+  .userroles-table th,
+  .userroles-table td {
+    padding: 10px 12px;
+    font-size: 14px;
+  }
+
+  .modal-contents,
+  .modal {
+    width: 70%;
+    max-width: 450px;
+  }
+}
+
+/* Mobile (< 768px) */
+@media screen and (max-width: 768px) {
+  .userroles-container {
+    padding: 12px;
+    min-height: calc(100vh - 50px);
+  }
+
+  .userroles-header {
+    flex-direction: column;
+    align-items: stretch;
+    margin-bottom: 15px;
+    gap: 12px;
+  }
+
+  .userroles-title {
+    font-size: 18px;
+    text-align: center;
+  }
+
+  .userroles-table-container {
+    border-radius: 6px;
+    box-shadow: 0 1px 4px rgba(0, 0, 0, 0.1);
+  }
+
+  .userroles-table {
+    min-width: 500px;
+    font-size: 14px;
+  }
+
+  .userroles-table th {
+    padding: 10px 8px;
+    font-size: 12px;
+  }
+
+  .userroles-table td {
+    padding: 10px 8px;
+    font-size: 13px;
+  }
+
+  .modal-overlay {
+    padding: 10px;
+    align-items: flex-start;
+    padding-top: 20px;
+  }
+
+  .modal-contents,
+  .modal {
+    width: 100%;
+    max-width: 100%;
+    padding: 20px 16px;
+    margin: 0;
+  }
+
+  .modal h3 {
+    font-size: 18px;
+    margin-bottom: 15px;
+  }
+
+  .input-group input,
+  .input-group select {
+    width: 100%;
+    padding: 12px;
+    font-size: 16px; /* Prevents zoom on iOS */
+    border-radius: 6px;
+  }
+
+  .input-group {
+    margin-bottom: 18px;
+  }
+
+  .input-group label {
+    font-size: 14px;
+    margin-bottom: 8px;
+  }
+
+  .modal-actions {
+    flex-direction: column-reverse;
+    gap: 10px;
+    margin-top: 10px;
+  }
+
+  .modal-actions button {
+    width: 100%;
+    padding: 12px 16px;
+    font-size: 16px;
+    min-height: 48px;
+  }
+
+  .calendar-icon {
+    left: 10px;
+  }
+
+  .date-input-wrapper input[type="date"] {
+    padding-left: 35px;
+  }
+}
+
+/* Small Mobile (< 480px) */
+@media screen and (max-width: 480px) {
+  .userroles-container {
+    padding: 10px;
+  }
+
+  .userroles-title {
+    font-size: 16px;
+  }
+
+  .userroles-table {
+    min-width: 450px;
+    font-size: 13px;
+  }
+
+  .userroles-table th {
+    padding: 8px 6px;
+    font-size: 11px;
+  }
+
+  .userroles-table td {
+    padding: 8px 6px;
+    font-size: 12px;
+  }
+
+  .modal-contents,
+  .modal {
+    padding: 16px 12px;
+  }
+
+  .modal h3 {
+    font-size: 16px;
+  }
 }

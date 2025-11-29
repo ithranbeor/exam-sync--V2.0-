@@ -702,6 +702,407 @@ input {
   background-color: #0d034f;
 }
 
+/* ============================================
+   TABLE SCROLLING WRAPPER
+   ============================================ */
+
+.table-scroll-wrapper {
+  position: relative;
+  margin-bottom: 20px;
+}
+
+.table-scroll-hint {
+  display: none;
+  text-align: center;
+  padding: 8px;
+  font-size: 12px;
+  color: #666;
+  background: #f8f8f8;
+  border-radius: 4px;
+  margin-bottom: 8px;
+}
+
+.table-scroll-hint svg {
+  margin: 0 4px;
+  vertical-align: middle;
+}
+
+.table-scroll-buttons {
+  display: none;
+  position: absolute;
+  top: 50%;
+  transform: translateY(-50%);
+  z-index: 10;
+  background: rgba(255, 255, 255, 0.95);
+  border: 2px solid #ffb800;
+  border-radius: 50%;
+  width: 44px;
+  height: 44px;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.15);
+  transition: all 0.3s ease;
+  touch-action: manipulation;
+}
+
+.table-scroll-buttons:hover {
+  background: #ffb800;
+  color: white;
+  transform: translateY(-50%) scale(1.1);
+}
+
+.table-scroll-buttons:active {
+  transform: translateY(-50%) scale(0.95);
+}
+
+.table-scroll-buttons.scroll-left {
+  left: 10px;
+}
+
+.table-scroll-buttons.scroll-right {
+  right: 10px;
+}
+
+.table-scroll-buttons:disabled {
+  opacity: 0.3;
+  cursor: not-allowed;
+  pointer-events: none;
+}
+
+.table-scroll-buttons svg {
+  font-size: 18px;
+  color: #ffb800;
+  transition: color 0.3s ease;
+}
+
+.table-scroll-buttons:hover svg {
+  color: white;
+}
+
+.table-scroll-buttons:disabled svg {
+  color: #999;
+}
+
+/* Ensure accounts table container has proper scrolling */
+.accounts-table-container {
+  overflow-x: auto;
+  -webkit-overflow-scrolling: touch;
+  scroll-behavior: smooth;
+  position: relative;
+}
+
+/* Scroll indicator shadows */
+.accounts-table-container::before,
+.accounts-table-container::after {
+  content: '';
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  width: 30px;
+  pointer-events: none;
+  z-index: 1;
+  opacity: 0;
+  transition: opacity 0.3s ease;
+}
+
+.accounts-table-container::before {
+  left: 0;
+  background: linear-gradient(to right, rgba(255, 255, 255, 0.95), transparent);
+}
+
+.accounts-table-container::after {
+  right: 0;
+  background: linear-gradient(to left, rgba(255, 255, 255, 0.95), transparent);
+}
+
+.accounts-table-container.scrollable-left::before {
+  opacity: 1;
+}
+
+.accounts-table-container.scrollable-right::after {
+  opacity: 1;
+}
+
+/* Ensure accounts table has minimum width for scrolling */
+.accounts-table {
+  min-width: 800px;
+}
+
+/* ============================================
+   RESPONSIVE STYLES
+   ============================================ */
+
+/* Tablet (768px - 1024px) */
+@media screen and (max-width: 1024px) {
+  .accounts-container {
+    padding: 15px;
+  }
+
+  .accounts-title {
+    font-size: 20px;
+  }
+
+  .search-bar {
+    min-width: 200px;
+  }
+
+  .search-bar input {
+    width: 200px;
+  }
+
+  .accounts-table th,
+  .accounts-table td {
+    padding: 10px 12px;
+    font-size: 14px;
+  }
+
+  .modal {
+    max-width: 380px;
+    padding: 20px;
+  }
+
+  .user-details-modal.fixed-modal {
+    width: 95%;
+    padding: 20px;
+  }
+}
+
+/* Mobile (< 768px) */
+@media screen and (max-width: 768px) {
+  .accounts-container {
+    padding: 12px;
+    min-height: calc(100vh - 50px);
+  }
+
+  .accounts-header {
+    flex-direction: column;
+    align-items: stretch;
+    margin-bottom: 15px;
+    gap: 12px;
+  }
+
+  .accounts-title {
+    font-size: 18px;
+    text-align: center;
+  }
+
+  .search-bar {
+    width: 100%;
+    min-width: 100%;
+    border-radius: 8px;
+  }
+
+  .search-bar input {
+    width: 100%;
+    flex: 1;
+    padding: 12px 15px;
+    font-size: 16px; /* Prevents zoom on iOS */
+  }
+
+  .search-bar .search-button {
+    padding: 12px 15px;
+    font-size: 18px;
+  }
+
+  .accounts-actions {
+    margin-bottom: 15px;
+    flex-wrap: wrap;
+    gap: 8px;
+  }
+
+  .accounts-actions .action-button {
+    width: 44px;
+    height: 44px;
+    font-size: 18px;
+  }
+
+  /* Show scroll buttons on mobile */
+  .table-scroll-wrapper {
+    position: relative;
+  }
+
+  .table-scroll-buttons {
+    display: flex;
+  }
+
+  .table-scroll-hint {
+    display: block;
+  }
+
+  .accounts-table-container {
+    border-radius: 6px;
+    box-shadow: 0 1px 4px rgba(0, 0, 0, 0.1);
+  }
+
+  .accounts-table {
+    min-width: 700px;
+    font-size: 14px;
+  }
+
+  .accounts-table th {
+    padding: 10px 8px;
+    font-size: 12px;
+  }
+
+  .accounts-table td {
+    padding: 10px 8px;
+    font-size: 13px;
+  }
+
+  .icon-button {
+    min-width: 36px;
+    min-height: 36px;
+    font-size: 18px;
+    padding: 6px;
+  }
+
+  .accounts-table th input[type="checkbox"],
+  .accounts-table td.action-buttons input[type="checkbox"] {
+    width: 20px;
+    height: 20px;
+  }
+
+  .action-buttons {
+    gap: 8px;
+    flex-wrap: wrap;
+  }
+
+  .modal-overlay {
+    padding: 10px;
+    align-items: flex-start;
+    padding-top: 20px;
+  }
+
+  .modal {
+    max-width: 100%;
+    width: 100%;
+    padding: 20px 16px;
+    border-radius: 12px;
+    margin: 0;
+  }
+
+  .modal h4 {
+    font-size: 18px;
+    margin-bottom: 15px;
+  }
+
+  .modal input,
+  .modal textarea,
+  .modal select {
+    width: 100%;
+    padding: 12px;
+    font-size: 16px; /* Prevents zoom on iOS */
+    border-radius: 6px;
+  }
+
+  .input-group {
+    margin-bottom: 18px;
+  }
+
+  .input-group label {
+    font-size: 14px;
+    margin-bottom: 8px;
+  }
+
+  .modal-actions,
+  .modal-buttons {
+    flex-direction: column-reverse;
+    gap: 10px;
+    margin-top: 10px;
+  }
+
+  .modal-actions button,
+  .modal-button {
+    width: 100%;
+    padding: 12px 16px;
+    font-size: 16px;
+    min-height: 48px;
+  }
+
+  .user-details-modal.fixed-modal {
+    width: 100%;
+    max-width: 100%;
+    padding: 15px;
+    margin: 10px;
+  }
+
+  .account-summary-card.horizontal-layout {
+    flex-direction: column;
+    gap: 15px;
+    padding: 15px;
+  }
+
+  .account-actions {
+    justify-content: flex-start;
+    flex-wrap: wrap;
+  }
+
+  .accounts-table.user-roles-table {
+    min-width: 600px;
+    font-size: 12px;
+  }
+
+  .accounts-table.user-roles-table th,
+  .accounts-table.user-roles-table td {
+    padding: 8px 6px;
+    font-size: 11px;
+  }
+}
+
+/* Small Mobile (< 480px) - iPhone 14 size */
+@media screen and (max-width: 480px) {
+  .accounts-container {
+    padding: 10px;
+  }
+
+  .accounts-title {
+    font-size: 16px;
+  }
+
+  .accounts-table {
+    min-width: 650px;
+    font-size: 13px;
+  }
+
+  .accounts-table th {
+    padding: 8px 6px;
+    font-size: 11px;
+  }
+
+  .accounts-table td {
+    padding: 8px 6px;
+    font-size: 12px;
+  }
+
+  .accounts-actions .action-button {
+    width: 40px;
+    height: 40px;
+    font-size: 16px;
+  }
+
+  .modal {
+    padding: 16px 12px;
+  }
+
+  .modal h4 {
+    font-size: 16px;
+  }
+
+  .user-details-modal.fixed-modal {
+    padding: 12px;
+    margin: 5px;
+  }
+
+  .account-summary-card.horizontal-layout {
+    padding: 12px;
+  }
+
+  .accounts-table.user-roles-table {
+    min-width: 550px;
+  }
+}
+
 /* Responsive for smaller screens */
 @media (max-width: 1400px) {
   .user-details-modal.fixed-modal {
@@ -715,6 +1116,7 @@ input {
     justify-content: flex-start;
   }
 }
+
 @keyframes spin {
   0% { transform: rotate(0deg); }
   100% { transform: rotate(360deg); }

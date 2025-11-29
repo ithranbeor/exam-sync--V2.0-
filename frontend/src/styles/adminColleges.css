@@ -172,25 +172,139 @@
   background-color: #e3a00c;
 }
 
-/* Responsive adjustments for the table */
-@media (max-width: 768px) {
+/* ============================================
+   TABLE SCROLLING
+   ============================================ */
+
+.colleges-table-container {
+  overflow-x: auto;
+  -webkit-overflow-scrolling: touch;
+  scroll-behavior: smooth;
+  position: relative;
+}
+
+.colleges-table {
+  min-width: 600px;
+}
+
+/* ============================================
+   RESPONSIVE STYLES
+   ============================================ */
+
+/* Tablet (768px - 1024px) */
+@media screen and (max-width: 1024px) {
+  .admin-colleges-container {
+    padding: 15px;
+  }
+
+  .admin-header h2 {
+    font-size: 1.5rem;
+  }
+
+  .colleges-table th,
+  .colleges-table td {
+    padding: 10px 12px;
+    font-size: 14px;
+  }
+}
+
+/* Mobile (< 768px) */
+@media screen and (max-width: 768px) {
+  .admin-colleges-container {
+    padding: 12px;
+    min-height: calc(100vh - 50px);
+  }
+
   .admin-header {
     flex-direction: column;
-    align-items: flex-start;
+    align-items: stretch;
+    margin-bottom: 15px;
+    gap: 12px;
   }
+
+  .admin-header h2 {
+    font-size: 1.3rem;
+    text-align: center;
+  }
+
   .search-bar {
     width: 100%;
-    margin-top: 15px;
+    margin-top: 0;
   }
+
+  .action-buttons {
+    flex-direction: row;
+    flex-wrap: wrap;
+    width: 100%;
+    gap: 10px;
+  }
+
+  .add-new-button,
+  .import-button {
+    flex: 1;
+    min-width: 120px;
+  }
+
+  .colleges-table-container {
+    padding: 10px;
+    border-radius: 6px;
+    box-shadow: 0 1px 4px rgba(0, 0, 0, 0.1);
+  }
+
+  .colleges-table {
+    min-width: 500px;
+    font-size: 14px;
+  }
+
+  .colleges-table th {
+    padding: 10px 8px;
+    font-size: 12px;
+  }
+
+  .colleges-table td {
+    padding: 10px 8px;
+    font-size: 13px;
+  }
+
+  .icon-button {
+    min-width: 36px;
+    min-height: 36px;
+    font-size: 18px;
+    padding: 6px;
+  }
+}
+
+/* Small Mobile (< 480px) */
+@media screen and (max-width: 480px) {
+  .admin-colleges-container {
+    padding: 10px;
+  }
+
+  .admin-header h2 {
+    font-size: 1.2rem;
+  }
+
   .action-buttons {
     flex-direction: column;
-    width: 100%;
   }
+
   .add-new-button,
   .import-button {
     width: 100%;
   }
-  .colleges-table-container {
-    padding: 10px;
+
+  .colleges-table {
+    min-width: 450px;
+    font-size: 13px;
+  }
+
+  .colleges-table th {
+    padding: 8px 6px;
+    font-size: 11px;
+  }
+
+  .colleges-table td {
+    padding: 8px 6px;
+    font-size: 12px;
   }
 }

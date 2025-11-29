@@ -151,8 +151,12 @@
   font-weight: bold;
 }
 
-/* Responsive design */
-@media (max-width: 1200px) {
+/* ============================================
+   RESPONSIVE STYLES - CONSISTENT PATTERNS
+   ============================================ */
+
+/* Tablet (768px - 1024px) */
+@media screen and (max-width: 1024px) {
   .dean-schedule-viewer {
     padding: 15px;
   }
@@ -163,6 +167,109 @@
 
   .dean-schedule-college {
     font-size: 18px;
+  }
+
+  .dean-exam-table {
+    font-size: 13px;
+  }
+
+  .dean-schedule-cell {
+    padding: 6px;
+  }
+}
+
+/* Mobile (< 768px) */
+@media screen and (max-width: 768px) {
+  .dean-schedule-viewer {
+    padding: 12px;
+    min-height: calc(100vh - 50px);
+  }
+
+  .dean-schedule-title {
+    font-size: 18px;
+    text-align: center;
+    margin-bottom: 12px;
+  }
+
+  .dean-schedule-college {
+    font-size: 16px;
+    text-align: center;
+    margin-bottom: 12px;
+  }
+
+  .dean-schedule-table-container {
+    overflow-x: auto;
+    -webkit-overflow-scrolling: touch;
+    scroll-behavior: smooth;
+    position: relative;
+  }
+
+  .dean-exam-table {
+    min-width: 600px;
+    font-size: 12px;
+  }
+
+  .dean-exam-table th,
+  .dean-exam-table td {
+    padding: 8px 6px;
+    font-size: 11px;
+  }
+
+  .dean-schedule-cell {
+    padding: 5px;
+    font-size: 10px;
+  }
+
+  .dean-schedule-cell p {
+    font-size: 10px;
+  }
+
+  .dean-schedule-cell strong {
+    font-size: 11px;
+  }
+
+  .dean-schedule-pagination {
+    flex-wrap: wrap;
+    gap: 8px;
+    padding: 10px;
+  }
+
+  .dean-schedule-pagination button {
+    min-height: 40px;
+    min-width: 40px;
+    font-size: 14px;
+    touch-action: manipulation;
+  }
+}
+
+/* Small Mobile (< 480px) */
+@media screen and (max-width: 480px) {
+  .dean-schedule-viewer {
+    padding: 10px;
+  }
+
+  .dean-schedule-title {
+    font-size: 16px;
+  }
+
+  .dean-schedule-college {
+    font-size: 14px;
+  }
+
+  .dean-exam-table {
+    min-width: 550px;
+    font-size: 11px;
+  }
+
+  .dean-exam-table th,
+  .dean-exam-table td {
+    padding: 6px 4px;
+    font-size: 10px;
+  }
+
+  .dean-schedule-cell {
+    padding: 4px;
+    font-size: 9px;
   }
 }
 
