@@ -28,7 +28,9 @@ const ProctorMonitoring: React.FC<UserProps> = ({ }) => {
       proctor_name: "Mr. Cruz",
       instructor_name: "Ms. Dela Peña",
       department: "Information Technology",
-      college: "CITC"
+      college: "CITC",
+      status: "confirmed", // 'confirmed', 'late', 'absent', 'substitute'
+      code_entry_time: "2024-01-15T08:05:23" // When proctor entered the code
     },
     {
       id: 2,
@@ -43,7 +45,9 @@ const ProctorMonitoring: React.FC<UserProps> = ({ }) => {
       proctor_name: "Dr. Santos",
       instructor_name: "Prof. Garcia",
       department: "Computer Science",
-      college: "CITC"
+      college: "CITC",
+      status: "late",
+      code_entry_time: "2024-01-15T10:15:42" // Entered late
     },
     {
       id: 3,
@@ -58,7 +62,9 @@ const ProctorMonitoring: React.FC<UserProps> = ({ }) => {
       proctor_name: "Ms. Reyes",
       instructor_name: "Dr. Martinez",
       department: "Information Technology",
-      college: "CITC"
+      college: "CITC",
+      status: "substitute",
+      code_entry_time: "2024-01-16T00:58:15" // Substitute entered code
     },
     {
       id: 4,
@@ -73,7 +79,9 @@ const ProctorMonitoring: React.FC<UserProps> = ({ }) => {
       proctor_name: "Mr. Torres",
       instructor_name: "Ms. Fernandez",
       department: "Computer Science",
-      college: "CITC"
+      college: "CITC",
+      status: "absent",
+      code_entry_time: null // No code entered - absent
     }
   ];
 
@@ -82,67 +90,111 @@ const ProctorMonitoring: React.FC<UserProps> = ({ }) => {
       <div className="proctor-monitoring-header">
         <div className="proctor-monitoring-header-left">
           <p className="proctor-monitoring-label">
-            EXAM SCHEDULE IS APPROVE WOULD YOU LIKE TO CREATE EXAM CODES?
+            EXAM SCHEDULE HAS BEEN APPROVED. CLICK TO GENERATE EXAM CODES
           </p>
         </div>
         <button className="proctor-monitoring-create-button">
-          CREATE BUTTON
+          CLICK TO GENERATE EXAM CODES
         </button>
       </div>
       
-      {/* Canvas Area - Similar to Plot Schedule UI */}
-      <div className="proctor-monitoring-canvas">
-        <div className="proctor-monitoring-schedules-grid">
-          {approvedSchedules.map((schedule) => (
-            <div key={schedule.id} className="proctor-monitoring-schedule-card">
-              <div className="proctor-monitoring-schedule-header">
-                <h3 className="proctor-monitoring-schedule-subject">
-                  {schedule.course_id} - {schedule.subject}
-                </h3>
-                <span className="proctor-monitoring-schedule-code">{schedule.course_id}</span>
-              </div>
-              
-              <div className="proctor-monitoring-schedule-details">
-                <div className="proctor-monitoring-detail-row">
-                  <span className="proctor-monitoring-detail-label">Section:</span>
-                  <span className="proctor-monitoring-detail-value">{schedule.section_name}</span>
-                </div>
-                <div className="proctor-monitoring-detail-row">
-                  <span className="proctor-monitoring-detail-label">Date:</span>
-                  <span className="proctor-monitoring-detail-value">{schedule.exam_date}</span>
-                </div>
-                <div className="proctor-monitoring-detail-row">
-                  <span className="proctor-monitoring-detail-label">Time:</span>
-                  <span className="proctor-monitoring-detail-value">{schedule.exam_start_time} - {schedule.exam_end_time}</span>
-                </div>
-                <div className="proctor-monitoring-detail-row">
-                  <span className="proctor-monitoring-detail-label">Building:</span>
-                  <span className="proctor-monitoring-detail-value">{schedule.building_name}</span>
-                </div>
-                <div className="proctor-monitoring-detail-row">
-                  <span className="proctor-monitoring-detail-label">Room:</span>
-                  <span className="proctor-monitoring-detail-value">{schedule.room_id}</span>
-                </div>
-                <div className="proctor-monitoring-detail-row">
-                  <span className="proctor-monitoring-detail-label">Proctor:</span>
-                  <span className="proctor-monitoring-detail-value">{schedule.proctor_name}</span>
-                </div>
-                <div className="proctor-monitoring-detail-row">
-                  <span className="proctor-monitoring-detail-label">Instructor:</span>
-                  <span className="proctor-monitoring-detail-value">{schedule.instructor_name}</span>
-                </div>
-              </div>
+      {/* Table Area */}
+      <div className="proctor-monitoring-table-container">
+        <table className="proctor-monitoring-table">
+          <thead>
+            <tr>
+              <th>#</th>
+              <th>Course Code</th>
+              <th>Subject</th>
+              <th>Section</th>
+              <th>Date</th>
+              <th>Time</th>
+              <th>Building</th>
+              <th>Room</th>
+              <th>Proctor</th>
+              <th>Instructor</th>
+              <th>Exam Code (OTP)</th>
+              <th>Time In</th>
+              <th>Status of Proctorship</th>
+            </tr>
+          </thead>
+          <tbody>
+            {approvedSchedules.length > 0 ? (
+              approvedSchedules.map((schedule, index) => {
+                // Determine status based on schedule data (can be updated to use actual status from backend)
+                const status = schedule.status || 'pending'; // 'confirmed', 'late', 'absent', 'substitute'
+                
+                const getStatusDisplay = (status: string) => {
+                  switch(status.toLowerCase()) {
+                    case 'confirmed':
+                    case 'confirm':
+                      return { text: 'Confirmed', className: 'status-confirmed' };
+                    case 'late':
+                    case 'absent':
+                      return { text: status === 'late' ? 'Late' : 'Absent', className: 'status-late-absent' };
+                    case 'substitute':
+                    case 'sub':
+                      return { text: 'Substitute', className: 'status-substitute' };
+                    default:
+                      return { text: 'Pending', className: 'status-pending' };
+                  }
+                };
 
-              {/* OTP Field - Blank for now */}
-              <div className="proctor-monitoring-otp-section">
-                <label className="proctor-monitoring-otp-label">Exam Code (OTP):</label>
-                <div className="proctor-monitoring-otp-field">
-                  {/* OTP will be generated here */}
-                </div>
-              </div>
-            </div>
-          ))}
-        </div>
+                const statusDisplay = getStatusDisplay(status);
+
+                // Format time entry
+                const formatTimeIn = (timeString: string | null | undefined) => {
+                  if (!timeString) return '-';
+                  try {
+                    const date = new Date(timeString);
+                    // Format as HH:MM (hours and minutes only)
+                    const hours = date.getHours().toString().padStart(2, '0');
+                    const minutes = date.getMinutes().toString().padStart(2, '0');
+                    return `${hours}:${minutes}`;
+                  } catch (e) {
+                    return '-';
+                  }
+                };
+
+                const codeEntryTime = schedule.code_entry_time || (schedule as any).proctor_timein;
+
+                return (
+                  <tr key={schedule.id}>
+                    <td>{index + 1}</td>
+                    <td>{schedule.course_id}</td>
+                    <td>{schedule.subject}</td>
+                    <td>{schedule.section_name}</td>
+                    <td>{schedule.exam_date}</td>
+                    <td>{schedule.exam_start_time} - {schedule.exam_end_time}</td>
+                    <td>{schedule.building_name}</td>
+                    <td>{schedule.room_id}</td>
+                    <td>{schedule.proctor_name}</td>
+                    <td>{schedule.instructor_name}</td>
+                    <td>
+                      <div className="proctor-monitoring-otp-field">
+                        {/* OTP will be generated here */}
+                      </div>
+                    </td>
+                    <td className="proctor-monitoring-time-in">
+                      {formatTimeIn(codeEntryTime)}
+                    </td>
+                    <td>
+                      <span className={`status-badge ${statusDisplay.className}`}>
+                        {statusDisplay.text}
+                      </span>
+                    </td>
+                  </tr>
+                );
+              })
+            ) : (
+              <tr>
+                <td colSpan={13} className="no-data-message">
+                  No approved schedules found
+                </td>
+              </tr>
+            )}
+          </tbody>
+        </table>
       </div>
     </div>
   );

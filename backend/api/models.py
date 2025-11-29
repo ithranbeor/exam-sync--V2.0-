@@ -232,6 +232,12 @@ class TblExamdetails(models.Model):
     exam_end_time = models.DateTimeField(blank=True, null=True)
     proctor_timein = models.DateTimeField(blank=True, null=True)
     proctor_timeout = models.DateTimeField(blank=True, null=True)
+    proctor_status = models.CharField(max_length=20, blank=True, null=True, choices=[
+        ('confirmed', 'Confirmed'),
+        ('late', 'Late'),
+        ('absent', 'Absent'),
+        ('substitute', 'Substitute'),
+    ], default=None, help_text="Proctor attendance status: confirmed, late, absent, or substitute")
     section_name = models.CharField(blank=True, null=True)
     academic_year = models.TextField(blank=True, null=True)
     semester = models.TextField(blank=True, null=True)
