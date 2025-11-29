@@ -56,6 +56,7 @@ const SmsSender: React.FC<SmsSenderProps> = ({
       try {
         if (!user?.user_id) return;
 
+        // ✅ Only load proctors if schedule is approved
         if (approvalStatus === 'approved' && examData && examData.length > 0) {
           console.log("✅ Loading proctors from APPROVED schedule for college:", collegeName);
           
@@ -116,51 +117,15 @@ const SmsSender: React.FC<SmsSenderProps> = ({
               course_id: exam.course_id,
               section_name: exam.section_name
             }));
-
           });
 
           setProctorSchedules(scheduleMap);
 
         } else {
-          console.log("⚠️ Using fallback: Loading all proctors from college");
-          const schedulerRolesResponse = await api.get('/tbl_user_role', {
-            params: {
-              user_id: user.user_id,
-              role_id: 3
-            }
-          });
-
-          const schedulerRoles = schedulerRolesResponse.data;
-          if (!schedulerRoles || schedulerRoles.length === 0) {
-            toast.error("No scheduler role found");
-            return;
-          }
-
-          const schedulerColleges = schedulerRoles.map((r: any) => r.college_id).filter(Boolean);
-
-          const proctorRolesResponse = await api.get('/tbl_user_role', {
-            params: {
-              role_id: 5
-            }
-          });
-
-          const proctorRoles = proctorRolesResponse.data;
-          const proctorIds = proctorRoles
-            .filter((r: any) => schedulerColleges.includes(r.college_id))
-            .map((r: any) => r.user_id);
-
-          if (proctorIds.length === 0) {
-            setUsers([]);
-            toast.warn("No proctors found under your college");
-            return;
-          }
-
-          const usersResponse = await api.get('/users/');
-          const proctorUsers = usersResponse.data.filter((u: User) => 
-            proctorIds.includes(u.user_id)
-          );
-
-          setUsers(proctorUsers || []);
+          // ❌ Don't load proctors if schedule is not approved
+          console.log("⚠️ Schedule not approved - SMS sending disabled");
+          toast.info("SMS can only be sent after the schedule is approved");
+          setUsers([]);
         }
       } catch (err) {
         console.error("Error loading users:", err);
@@ -226,6 +191,12 @@ const SmsSender: React.FC<SmsSenderProps> = ({
   };
 
   const handleSendSms = async () => {
+    // ✅ Check if approved
+    if (approvalStatus !== 'approved') {
+      toast.error("SMS can only be sent after the schedule is approved!");
+      return;
+    }
+
     if (selectedUsers.length === 0) {
       toast.warn("Please select at least one user");
       return;
@@ -241,7 +212,7 @@ const SmsSender: React.FC<SmsSenderProps> = ({
     setLoading(true);
 
     try {
-      // Prepare SMS data for real ITExmo sending
+      // Prepare SMS data for Twilio sending
       const smsData = selectedUsers.map((proctor) => {
         const personalizedMessage = generateProctorSmsBody(proctor);
 
@@ -258,8 +229,8 @@ const SmsSender: React.FC<SmsSenderProps> = ({
         };
       });
 
-      // 📱 Send real SMS via ITExmo API through backend
-      console.log(`📬 Sending ${smsData.length} real SMS messages...`);
+      // 📱 Send real SMS via Twilio API through backend
+      console.log(`📬 Sending ${smsData.length} real SMS messages via Twilio...`);
       
       const response = await api.post('/send-proctor-sms/', {
         sms_list: smsData,
@@ -269,7 +240,7 @@ const SmsSender: React.FC<SmsSenderProps> = ({
       const { sent_count, failed_sms } = response.data;
 
       if (sent_count > 0) {
-        toast.success(`Successfully sent ${sent_count} SMS message(s)!`);
+        toast.success(`Successfully sent ${sent_count} SMS message(s) via Twilio!`);
         console.log(`✅ Successfully sent ${sent_count} SMS messages`);
       }
 
@@ -287,7 +258,30 @@ const SmsSender: React.FC<SmsSenderProps> = ({
 
     } catch (err: any) {
       console.error("Error sending SMS:", err);
-      toast.error(err?.response?.data?.error || "Failed to send SMS messages");
+      
+      // ✅ Enhanced error handling for Twilio
+      const status = err?.response?.status;
+      const errorDetail = err?.response?.data?.detail;
+      const errorMessage = err?.response?.data?.error;
+      
+      if (status === 503) {
+        toast.error(
+          `SMS service unavailable: ${errorDetail || 'Twilio not configured'}`,
+          { autoClose: 7000 }
+        );
+      } else if (errorMessage?.toLowerCase().includes('insufficient')) {
+        toast.error(
+          'Insufficient Twilio account balance. Please top up your account.',
+          { autoClose: 7000 }
+        );
+      } else if (errorMessage?.toLowerCase().includes('unverified')) {
+        toast.error(
+          'Some phone numbers are not verified in your Twilio account.',
+          { autoClose: 7000 }
+        );
+      } else {
+        toast.error(errorMessage || errorDetail || "Failed to send SMS messages");
+      }
     } finally {
       setLoading(false);
     }
@@ -310,12 +304,16 @@ const SmsSender: React.FC<SmsSenderProps> = ({
       <div className="message-sender-header">
         <h3>
           {approvalStatus === 'approved' 
-            ? `Send Approved Schedule via SMS` 
+            ? `Send Approved Schedule via SMS (Twilio)` 
             : `Send SMS to Proctors`}
         </h3>
-        {approvalStatus === 'approved' && (
+        {approvalStatus === 'approved' ? (
           <p style={{ fontSize: '12px', color: '#666', marginTop: '5px' }}>
-            Schedule approved - SMS will be sent to proctors with their exam schedules.
+            ✅ Schedule approved - SMS will be sent to proctors via Twilio with their exam schedules.
+          </p>
+        ) : (
+          <p style={{ fontSize: '12px', color: '#f44336', marginTop: '5px' }}>
+            ⚠️ SMS can only be sent after the schedule is approved by the dean.
           </p>
         )}
       </div>
@@ -331,6 +329,7 @@ const SmsSender: React.FC<SmsSenderProps> = ({
             isMulti
             closeMenuOnSelect={false}
             hideSelectedOptions={false}
+            isDisabled={approvalStatus !== 'approved'} // ✅ Disable if not approved
             onChange={(selectedOptions: any) => {
               if (!selectedOptions) {
                 setSelectedUsers([]);
@@ -382,10 +381,11 @@ const SmsSender: React.FC<SmsSenderProps> = ({
           <textarea
             value={message}
             onChange={e => setMessage(e.target.value)}
+            disabled={approvalStatus !== 'approved'} // ✅ Disable if not approved
             placeholder={
               approvalStatus === 'approved'
                 ? "Add any additional instructions or notes..."
-                : "Enter your SMS message here..."
+                : "SMS can only be sent after schedule approval..."
             }
             rows={6}
             maxLength={320}
@@ -394,7 +394,7 @@ const SmsSender: React.FC<SmsSenderProps> = ({
           
           {approvalStatus === 'approved' && (
             <p style={{ fontSize: '11px', color: '#666', marginTop: '5px' }}>
-              Note: Real SMS will be sent via ITExmo with personalized exam schedules
+              📱 Real SMS will be sent via Twilio with personalized exam schedules
             </p>
           )}
         </div>
@@ -408,11 +408,13 @@ const SmsSender: React.FC<SmsSenderProps> = ({
           type="button"
           onClick={handleSendSms}
           className="btn-send"
-          disabled={loading || selectedUsers.length === 0}
+          disabled={loading || selectedUsers.length === 0 || approvalStatus !== 'approved'} // ✅ Disable if not approved
         >
           {loading 
-            ? "Sending SMS..." 
-            : `Send SMS to ${selectedUsers.length} proctor(s)`
+            ? "Sending SMS via Twilio..." 
+            : approvalStatus === 'approved'
+            ? `Send SMS to ${selectedUsers.length} proctor(s)`
+            : "Schedule Must Be Approved First"
           }
         </button>
       </div>
