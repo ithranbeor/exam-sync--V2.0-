@@ -169,8 +169,7 @@ const DashboardAdmin: React.FC = () => {
       case 'dashboard':
       default:
         return (
-          <div className="dashboard-grid">
-            {activeMenu === 'dashboard' && (
+          activeMenu === 'dashboard' && (
             <div className="dashboard-grid">
               <div className="card welcome-card">
                 <h3>Welcome, <span className="robert-name">{user.first_name}!</span></h3>
@@ -198,8 +197,7 @@ const DashboardAdmin: React.FC = () => {
                 </div>
               </div>
             </div>
-          )}
-          </div>
+          )
         );
     }
   };

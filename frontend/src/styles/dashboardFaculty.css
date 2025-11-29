@@ -764,7 +764,7 @@ button.view-button {
     font-size: 1.3rem;
   }
 
-  /* FIXED: Tables stack vertically on mobile */
+  /* FIXED: Tables stack vertically on mobile and avoid cut‑off content */
   .try-things-grid {
     grid-template-columns: 1fr;
     height: auto;
@@ -774,6 +774,119 @@ button.view-button {
   .try-thing-card {
     padding: 12px;
     height: auto;
+  }
+
+  /* Make large tables inside shortcut cards scrollable instead of shrinking */
+  .try-thing-card table {
+    width: 100%;
+    border-collapse: collapse;
+    font-size: 13px;
+    color: black !important;
+  }
+
+  .try-thing-card table thead {
+    display: none;
+  }
+
+  .try-thing-card table tbody tr {
+    display: block;
+    margin-bottom: 12px;
+    border: 1px solid #ddd;
+    border-radius: 6px;
+    overflow: hidden;
+    box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+    background: white;
+  }
+
+  .try-thing-card table td {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 8px 12px;
+    border-bottom: 1px solid #eee;
+    min-height: 35px;
+    color: black !important;
+  }
+
+  .try-thing-card table th {
+    color: black !important;
+    background-color: #f5f5f5;
+  }
+
+  .try-thing-card table tbody tr td span,
+  .try-thing-card table tbody tr td div {
+    color: black !important;
+  }
+
+  .try-thing-card {
+    color: black !important;
+  }
+
+  .try-thing-card .action-buttons {
+    display: flex;
+    gap: 6px;
+    justify-content: flex-start;
+  }
+
+  .try-thing-card .icon-button {
+    font-size: 16px;
+    padding: 4px;
+  }
+
+  /* Responsive styles for ALL tables in main content (for admin components like UserManagement, Colleges, etc.) */
+  /* Tables inside .try-thing-card have their own card-style layout, so we exclude those */
+  .main-content table {
+    width: 100%;
+    border-collapse: collapse;
+    font-size: 12px;
+    color: black !important;
+    display: block;
+    overflow-x: auto;
+    -webkit-overflow-scrolling: touch;
+    max-width: 100%;
+  }
+
+  /* Override for try-thing-card tables to use card layout instead */
+  .try-thing-card table {
+    display: table; /* Reset to table display for card layout */
+  }
+
+  /* Ensure table containers don't overflow */
+  .main-content > * {
+    overflow-x: auto;
+    max-width: 100%;
+    box-sizing: border-box;
+  }
+
+  /* Make table cells have minimum width to prevent squishing */
+  .main-content table th,
+  .main-content table td {
+    white-space: nowrap;
+    min-width: 80px;
+    padding: 8px 6px;
+    font-size: 12px;
+  }
+
+  /* Override for try-thing-card table cells */
+  .try-thing-card table th,
+  .try-thing-card table td {
+    display: flex; /* Card layout for try-thing-card tables */
+    white-space: normal;
+  }
+
+  /* For tables with action buttons - allow wrapping on mobile */
+  .main-content table .action-buttons {
+    display: flex;
+    gap: 6px;
+    justify-content: flex-start;
+    flex-wrap: wrap;
+    white-space: normal;
+  }
+
+  .main-content table .icon-button {
+    font-size: 14px;
+    padding: 4px 6px;
+    min-width: auto;
   }
 
   .card {
@@ -797,6 +910,43 @@ button.view-button {
   .icon {
     width: 18px;
     height: 18px;
+  }
+}
+
+/* ======================= SMALL PHONE FIXES (max-width: 480px) ======================= */
+@media (max-width: 480px) {
+  .content-header h1 {
+    font-size: 1.2rem;
+  }
+
+  .welcome-card h3 {
+    font-size: 1.1rem;
+  }
+
+  .welcome-card p {
+    font-size: 0.95rem;
+  }
+
+  .time-display {
+    font-size: 1.8rem;
+  }
+
+  .faculty-info-card h4 {
+    font-size: 0.95rem;
+  }
+
+  .faculty-info-card p {
+    font-size: 0.8rem;
+  }
+
+  /* Prevent horizontal scrolling issues on very narrow devices */
+  body {
+    overflow-x: hidden;
+  }
+
+  .main-content {
+    padding-left: 12px;
+    padding-right: 12px;
   }
 }
 
@@ -912,6 +1062,56 @@ button.view-button {
   .try-thing-card .icon-button {
     font-size: 16px;
     padding: 4px;
+  }
+
+  /* Responsive styles for ALL tables in main content (for admin components) */
+  .main-content table {
+    width: 100%;
+    border-collapse: collapse;
+    font-size: 12px;
+    color: black !important;
+    display: block;
+    overflow-x: auto;
+    -webkit-overflow-scrolling: touch;
+    max-width: 100%;
+  }
+
+  .try-thing-card table {
+    display: table;
+  }
+
+  .main-content > * {
+    overflow-x: auto;
+    max-width: 100%;
+    box-sizing: border-box;
+  }
+
+  .main-content table th,
+  .main-content table td {
+    white-space: nowrap;
+    min-width: 80px;
+    padding: 8px 6px;
+    font-size: 12px;
+  }
+
+  .try-thing-card table th,
+  .try-thing-card table td {
+    display: flex;
+    white-space: normal;
+  }
+
+  .main-content table .action-buttons {
+    display: flex;
+    gap: 6px;
+    justify-content: flex-start;
+    flex-wrap: wrap;
+    white-space: normal;
+  }
+
+  .main-content table .icon-button {
+    font-size: 14px;
+    padding: 4px 6px;
+    min-width: auto;
   }
 
   .content-header h1 {
@@ -1061,6 +1261,56 @@ button.view-button {
 
   .try-thing-card {
     height: auto;
+  }
+
+  /* Responsive styles for ALL tables in main content (for admin components) */
+  .main-content table {
+    width: 100%;
+    border-collapse: collapse;
+    font-size: 12px;
+    color: black !important;
+    display: block;
+    overflow-x: auto;
+    -webkit-overflow-scrolling: touch;
+    max-width: 100%;
+  }
+
+  .try-thing-card table {
+    display: table;
+  }
+
+  .main-content > * {
+    overflow-x: auto;
+    max-width: 100%;
+    box-sizing: border-box;
+  }
+
+  .main-content table th,
+  .main-content table td {
+    white-space: nowrap;
+    min-width: 80px;
+    padding: 8px 6px;
+    font-size: 12px;
+  }
+
+  .try-thing-card table th,
+  .try-thing-card table td {
+    display: flex;
+    white-space: normal;
+  }
+
+  .main-content table .action-buttons {
+    display: flex;
+    gap: 6px;
+    justify-content: flex-start;
+    flex-wrap: wrap;
+    white-space: normal;
+  }
+
+  .main-content table .icon-button {
+    font-size: 14px;
+    padding: 4px 6px;
+    min-width: auto;
   }
 
   .card {
