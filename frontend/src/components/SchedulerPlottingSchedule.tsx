@@ -53,7 +53,7 @@ const SchedulerPlottingSchedule: React.FC<SchedulerProps> = ({ user, onScheduleC
   const [departments, setDepartments] = useState<any[]>([]);
   const [modalityPreviewSearchTerm, setModalityPreviewSearchTerm] = useState('');
   const [loading, setLoading] = useState(false);
-  const [schedulerCollegeName, setSchedulerCollegeName] = useState<string>("");
+  const [_schedulerCollegeName, setSchedulerCollegeName] = useState<string>("");
 
   const [roomsCache, setRoomsCache] = useState<any[]>([]);
   const [buildingsCache, setBuildingsCache] = useState<any[]>([]);
@@ -1180,8 +1180,6 @@ const SchedulerPlottingSchedule: React.FC<SchedulerProps> = ({ user, onScheduleC
     });
 
     const eveningTimeSlots = TIME_SLOT_RANGES["6 PM - 9 PM (Evening)"];
-    const morningTimeSlots = TIME_SLOT_RANGES["7 AM - 1 PM (Morning)"];
-    const afternoonTimeSlots = TIME_SLOT_RANGES["1 PM - 6 PM (Afternoon)"];
 
     const isValidTimeSlot = (startTime: string, isNightClass: boolean): boolean => {
       if (!allAvailableTimeSlots.includes(startTime)) {

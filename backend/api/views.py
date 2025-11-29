@@ -393,7 +393,7 @@ def tbl_examdetails_list(request):
             exam_date = request.GET.get('exam_date')
             modality_id = request.GET.get('modality_id')
 
-            # ✅ Apply filters before .all() for better performance
+            # ✅ FIXED: Apply all filters, then get results
             if college_name:
                 queryset = queryset.filter(college_name=college_name)
             if room_id:
@@ -401,20 +401,15 @@ def tbl_examdetails_list(request):
             if exam_date:
                 queryset = queryset.filter(exam_date=exam_date)
             if modality_id:
-                # ✅ FIX: Handle single modality_id (not comma-separated for GET)
+                # Handle single modality_id (not comma-separated for GET)
                 try:
                     modality_id_int = int(modality_id)
-                    queryset = queryset.filter(modality_id=modality_id_int).only(
-                        'examdetails_id', 'modality_id', 'exam_date', 
-                        'exam_start_time', 'exam_end_time', 'course_id', 
-                        'section_name', 'room_id'
-                    )
+                    queryset = queryset.filter(modality_id=modality_id_int)
                 except ValueError:
                     # If not a valid integer, return empty
-                    queryset = queryset.none()
-            else:
-                queryset = queryset.all()
-
+                    return Response([], status=status.HTTP_200_OK)
+            
+            # ✅ FIXED: Order and serialize the filtered queryset
             queryset = queryset.order_by('room_id', 'exam_date', 'exam_start_time')
             serializer = TblExamdetailsSerializer(queryset, many=True)
             return Response(serializer.data)
