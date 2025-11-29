@@ -16,50 +16,152 @@
   margin-bottom: 20px;
 }
 
+.proctor-attendance-section {
+  margin-bottom: 30px;
+}
+
+.proctor-attendance-instruction {
+  margin-bottom: 20px;
+  padding: 12px 16px;
+  background-color: #e3f2fd;
+  border-left: 4px solid #2196f3;
+  border-radius: 4px;
+}
+
+.proctor-attendance-instruction-text {
+  margin: 0;
+  font-size: 14px;
+  color: #1976d2;
+  font-weight: 500;
+}
+
+.proctor-attendance-section-title {
+  font-size: 18px;
+  color: #333;
+  margin: 0 0 15px 0;
+  font-weight: 600;
+  padding-bottom: 8px;
+  border-bottom: 2px solid #333d52;
+}
+
 .proctor-attendance-title {
   font-size: 24px;
   color: #333;
   margin: 0;
 }
 
-.proctor-attendance-table-container {
+/* Canvas Area - Similar to Proctor Monitoring */
+.proctor-attendance-canvas {
   background-color: #fff;
   border-radius: 8px;
-  overflow: hidden;
+  padding: 15px;
   box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+  min-height: 200px;
 }
 
-.proctor-attendance-table {
-  width: 100%;
-  border-collapse: collapse;
-  color: #333;
+.proctor-attendance-schedules-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
+  gap: 12px;
 }
 
-.proctor-attendance-table th,
-.proctor-attendance-table td {
-  padding: 12px 15px;
-  text-align: left;
-  border-bottom: 1px solid #eee;
+.proctor-attendance-schedule-card {
+  background-color: #f9f9f9;
+  border: 1px solid #e0e0e0;
+  border-radius: 6px;
+  padding: 12px;
+  box-shadow: 0 2px 6px rgba(0, 0, 0, 0.08);
+  transition: box-shadow 0.3s ease, transform 0.2s ease;
 }
 
-.proctor-attendance-table thead {
-  background-color: #333d52;
-  color: white;
+.proctor-attendance-schedule-card:hover {
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.12);
+  transform: translateY(-2px);
 }
 
-.proctor-attendance-table th {
-  background-color: #333d52;
-  color: white;
+.proctor-attendance-schedule-card-clickable {
+  cursor: pointer;
+  position: relative;
+  border: 2px solid #e0e0e0;
+  transition: all 0.3s ease;
+}
+
+.proctor-attendance-schedule-card-clickable:hover {
+  border-color: #FAB417;
+  box-shadow: 0 4px 12px rgba(250, 180, 23, 0.3);
+  transform: translateY(-3px);
+}
+
+.proctor-attendance-schedule-card-clickable:active {
+  transform: translateY(-1px);
+}
+
+.proctor-attendance-click-hint {
+  margin-top: 8px;
+  padding-top: 8px;
+  border-top: 1px dashed #ccc;
+  text-align: center;
+  font-size: 10px;
+  color: #FAB417;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+}
+
+.proctor-attendance-schedule-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 8px;
+  padding-bottom: 6px;
+  border-bottom: 1.5px solid #333d52;
+}
+
+.proctor-attendance-schedule-subject {
+  font-size: 13px;
   font-weight: bold;
-  border-bottom: 2px solid #092C4C;
+  color: #333;
+  margin: 0;
+  flex: 1;
+  line-height: 1.3;
 }
 
-.proctor-attendance-table tbody tr:nth-child(even) {
-  background-color: #f8f8f8;
+.proctor-attendance-schedule-code {
+  background-color: #333d52;
+  color: white;
+  padding: 4px 8px;
+  border-radius: 4px;
+  font-size: 10px;
+  font-weight: bold;
+  margin-left: 8px;
+  white-space: nowrap;
 }
 
-.proctor-attendance-table tbody tr:hover {
-  background-color: #f0f0f0;
+.proctor-attendance-schedule-details {
+  margin-bottom: 10px;
+}
+
+.proctor-attendance-detail-row {
+  display: flex;
+  justify-content: space-between;
+  padding: 3px 0;
+  border-bottom: 1px solid #f0f0f0;
+}
+
+.proctor-attendance-detail-row:last-child {
+  border-bottom: none;
+}
+
+.proctor-attendance-detail-label {
+  font-weight: 600;
+  color: #555;
+  font-size: 11px;
+}
+
+.proctor-attendance-detail-value {
+  color: #333;
+  font-size: 11px;
+  text-align: right;
 }
 
 .no-data-message {
@@ -67,6 +169,232 @@
   padding: 40px 20px;
   color: #666;
   font-style: italic;
+  grid-column: 1 / -1;
+}
+
+.status-badge {
+  padding: 4px 10px;
+  border-radius: 12px;
+  font-size: 11px;
+  font-weight: 600;
+  text-transform: capitalize;
+  display: inline-block;
+}
+
+.status-assigned {
+  background-color: #e3f2fd;
+  color: #1976d2;
+}
+
+.status-available {
+  background-color: #f1f8e9;
+  color: #558b2f;
+}
+
+.status-pending {
+  background-color: #fff3e0;
+  color: #f57c00;
+}
+
+/* Modal Styles */
+.proctor-attendance-modal-overlay {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background-color: rgba(0, 0, 0, 0.5);
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  z-index: 1000;
+  padding: 20px;
+}
+
+.proctor-attendance-modal {
+  background-color: #fff;
+  border-radius: 8px;
+  width: 100%;
+  max-width: 600px;
+  max-height: 90vh;
+  overflow-y: auto;
+  box-shadow: 0 10px 40px rgba(0, 0, 0, 0.2);
+  display: flex;
+  flex-direction: column;
+}
+
+.proctor-attendance-modal-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 20px;
+  border-bottom: 2px solid #f0f0f0;
+}
+
+.proctor-attendance-modal-title {
+  margin: 0;
+  font-size: 20px;
+  color: #333;
+  font-weight: 600;
+}
+
+.proctor-attendance-modal-close {
+  background: none;
+  border: none;
+  font-size: 28px;
+  color: #999;
+  cursor: pointer;
+  padding: 0;
+  width: 30px;
+  height: 30px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 4px;
+  transition: all 0.2s ease;
+}
+
+.proctor-attendance-modal-close:hover {
+  background-color: #f0f0f0;
+  color: #333;
+}
+
+.proctor-attendance-modal-content {
+  padding: 20px;
+  flex: 1;
+}
+
+.proctor-attendance-modal-exam-details {
+  margin-bottom: 25px;
+}
+
+.proctor-attendance-modal-exam-details h4 {
+  margin: 0 0 15px 0;
+  font-size: 16px;
+  color: #333;
+  font-weight: 600;
+}
+
+.proctor-attendance-modal-details-grid {
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
+  gap: 12px;
+  background-color: #f9f9f9;
+  padding: 15px;
+  border-radius: 6px;
+}
+
+.proctor-attendance-modal-detail-item {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.modal-detail-label {
+  font-size: 11px;
+  color: #666;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+}
+
+.modal-detail-value {
+  font-size: 13px;
+  color: #333;
+  font-weight: 500;
+}
+
+.proctor-attendance-modal-form {
+  display: flex;
+  flex-direction: column;
+  gap: 20px;
+}
+
+.proctor-attendance-modal-input-group {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.proctor-attendance-modal-label {
+  font-size: 13px;
+  color: #333;
+  font-weight: 600;
+}
+
+.proctor-attendance-modal-input {
+  padding: 10px 12px;
+  border: 2px solid #e0e0e0;
+  border-radius: 6px;
+  font-size: 14px;
+  font-family: 'Courier New', monospace;
+  letter-spacing: 2px;
+  transition: border-color 0.3s ease;
+}
+
+.proctor-attendance-modal-input:focus {
+  outline: none;
+  border-color: #FAB417;
+}
+
+.proctor-attendance-modal-textarea {
+  padding: 10px 12px;
+  border: 2px solid #e0e0e0;
+  border-radius: 6px;
+  font-size: 13px;
+  font-family: Arial, sans-serif;
+  resize: vertical;
+  transition: border-color 0.3s ease;
+}
+
+.proctor-attendance-modal-textarea:focus {
+  outline: none;
+  border-color: #FAB417;
+}
+
+.proctor-attendance-modal-footer {
+  display: flex;
+  justify-content: flex-end;
+  gap: 12px;
+  padding: 20px;
+  border-top: 2px solid #f0f0f0;
+}
+
+.proctor-attendance-modal-cancel,
+.proctor-attendance-modal-submit {
+  padding: 10px 20px;
+  border: none;
+  border-radius: 6px;
+  font-size: 14px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.3s ease;
+}
+
+.proctor-attendance-modal-cancel {
+  background-color: #f5f5f5;
+  color: #666;
+}
+
+.proctor-attendance-modal-cancel:hover {
+  background-color: #e0e0e0;
+}
+
+.proctor-attendance-modal-submit {
+  background-color: #FAB417;
+  color: white;
+}
+
+.proctor-attendance-modal-submit:hover:not(:disabled) {
+  background-color: #e6a700;
+  transform: translateY(-1px);
+  box-shadow: 0 4px 8px rgba(250, 180, 23, 0.3);
+}
+
+.proctor-attendance-modal-submit:disabled {
+  background-color: #ccc;
+  cursor: not-allowed;
+  opacity: 0.6;
 }
 
 /* ============================================
