@@ -401,20 +401,28 @@ def tbl_examdetails_list(request):
             if exam_date:
                 queryset = queryset.filter(exam_date=exam_date)
             if modality_id:
-                modality_ids = [mid.strip() for mid in modality_id.split(',') if mid.strip()]
-                # ✅ Use .only() for duplicate checks to speed up query
-                queryset = queryset.filter(modality_id__in=modality_ids).only(
-                    'examdetails_id', 'modality_id', 'exam_date', 
-                    'exam_start_time', 'exam_end_time', 'course_id', 
-                    'section_name', 'room_id'
-                )
+                # ✅ FIX: Convert strings to integers
+                try:
+                    modality_ids = [int(mid.strip()) for mid in modality_id.split(',') if mid.strip().isdigit()]
+                    if modality_ids:  # Only filter if we have valid IDs
+                        queryset = queryset.filter(modality_id__in=modality_ids).only(
+                            'examdetails_id', 'modality_id', 'exam_date', 
+                            'exam_start_time', 'exam_end_time', 'course_id', 
+                            'section_name', 'room_id'
+                        )
+                    else:
+                        # If no valid IDs, return empty queryset
+                        queryset = queryset.none()
+                except (ValueError, TypeError) as e:
+                    print(f"❌ Error parsing modality_ids: {str(e)}")
+                    return Response(
+                        {'error': 'Invalid modality_id format', 'detail': str(e)},
+                        status=status.HTTP_400_BAD_REQUEST
+                    )
             else:
-                # Only fetch all data if no specific filters
                 queryset = queryset.all()
 
-            # ✅ Order by for consistent results
             queryset = queryset.order_by('room_id', 'exam_date', 'exam_start_time')
-
             serializer = TblExamdetailsSerializer(queryset, many=True)
             return Response(serializer.data)
         
@@ -431,11 +439,10 @@ def tbl_examdetails_list(request):
         many = isinstance(request.data, list)
         print("📦 Incoming exam details data:", len(request.data) if many else 1, "records")
         
-        # ✅ NEW: Enhanced capacity validation for multi-section room sharing
+        # ✅ FIXED: Build occupancy map from the CURRENT batch ONLY
+        room_time_usage = {}
+        
         if many:
-            # Group schedules by room, date, and time to check capacity
-            room_time_usage = {}
-            
             for item in request.data:
                 room_id = item.get('room_id')
                 exam_date = item.get('exam_date')
@@ -470,53 +477,31 @@ def tbl_examdetails_list(request):
                 # Create unique key for room+date+time
                 time_key = f"{room_id}|{exam_date}|{exam_start_time}|{exam_end_time}"
                 
+                # ✅ FIXED: Initialize with 0, not with existing DB schedules
                 if time_key not in room_time_usage:
-                    # Check existing schedules in DB for this room/time
-                    existing_schedules = TblExamdetails.objects.filter(
-                        room_id=room_id,
-                        exam_date=exam_date,
-                        exam_start_time__lt=exam_end_time,
-                        exam_end_time__gt=exam_start_time
-                    )
-                    
-                    existing_occupancy = 0
-                    for schedule in existing_schedules:
-                        try:
-                            existing_modality = schedule.modality
-                            existing_section = TblSectioncourse.objects.get(
-                                course_id=existing_modality.course_id,
-                                program_id=existing_modality.program_id,
-                                section_name=existing_modality.section_name
-                            )
-                            existing_occupancy += existing_section.number_of_students
-                        except:
-                            pass
-                    
                     room_time_usage[time_key] = {
                         'capacity': room_capacity,
-                        'current_occupancy': existing_occupancy,
-                        'pending_students': 0
+                        'batch_occupancy': 0,  # Only count items in THIS batch
+                        'room_id': room_id,
+                        'date': exam_date
                     }
                 
-                # Add this section's students to pending count
-                room_time_usage[time_key]['pending_students'] += needed_capacity
-                
-                # Check if total would exceed capacity
-                total_students = (
-                    room_time_usage[time_key]['current_occupancy'] + 
-                    room_time_usage[time_key]['pending_students']
-                )
+                # Check if total would exceed capacity (using only batch occupancy)
+                total_students = room_time_usage[time_key]['batch_occupancy'] + needed_capacity
                 
                 if total_students > room_time_usage[time_key]['capacity']:
                     return Response({
-                        'error': 'Room capacity exceeded',
-                        'detail': f'Room {room_id} (capacity: {room_capacity}) cannot accommodate {total_students} students',
+                        'error': 'Room capacity exceeded in batch',
+                        'detail': f'Room {room_id} (capacity: {room_capacity}) cannot accommodate {total_students} students at {exam_start_time}',
                         'room_id': room_id,
                         'capacity': room_capacity,
-                        'current_occupancy': room_time_usage[time_key]['current_occupancy'],
-                        'pending_students': room_time_usage[time_key]['pending_students'],
+                        'batch_occupancy': room_time_usage[time_key]['batch_occupancy'],
+                        'needed': needed_capacity,
                         'total_needed': total_students
                     }, status=status.HTTP_409_CONFLICT)
+                
+                # Add to batch occupancy
+                room_time_usage[time_key]['batch_occupancy'] += needed_capacity
         
         # ✅ Check for duplicate schedules (existing validation)
         if many:

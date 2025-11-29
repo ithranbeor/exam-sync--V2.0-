@@ -313,39 +313,37 @@ const SchedulerPlottingSchedule: React.FC<SchedulerProps> = ({ user, onScheduleC
   // ============================================================================
 
   useEffect(() => {
-    const checkExistingSchedules = async () => {
-      if (formData.selectedModalities.length === 0) {
-        setAlreadyScheduledIds(new Set());
-        return;
+  const checkExistingSchedules = async () => {
+    if (formData.selectedModalities.length === 0) {
+      setAlreadyScheduledIds(new Set());
+      return;
+    }
+
+    setCheckingSchedules(true);
+    try {
+      // ✅ USE POST endpoint instead of GET with query params
+      const response = await api.post('/check_existing_schedules/', {
+        modality_ids: formData.selectedModalities
+      });
+
+      const scheduled = new Set<number>(response.data.scheduled_ids || []);
+      
+      setAlreadyScheduledIds(scheduled);
+      
+      if (scheduled.size > 0) {
+        console.log(`⚠️ ${scheduled.size} section(s) already scheduled`);
       }
+    } catch (error) {
+      console.error('Error checking schedules:', error);
+      // Don't show error to user, just log it
+      setAlreadyScheduledIds(new Set());
+    } finally {
+      setCheckingSchedules(false);
+    }
+  };
 
-      setCheckingSchedules(true);
-      try {
-        // ✅ FIX: Use POST instead of GET to avoid URL length limits
-        const response = await api.post('/check-existing-schedules/', {
-          modality_ids: formData.selectedModalities
-        });
-
-        const scheduled = new Set<number>(
-          response.data.scheduled_ids.map((id: any) => Number(id))
-        );
-        
-        setAlreadyScheduledIds(scheduled);
-        
-        if (scheduled.size > 0) {
-          console.log(`⚠️ ${scheduled.size} section(s) already scheduled`);
-        }
-      } catch (error) {
-        console.error('Error checking schedules:', error);
-        // ✅ Don't block UI on error - just clear the set
-        setAlreadyScheduledIds(new Set());
-      } finally {
-        setCheckingSchedules(false);
-      }
-    };
-
-    checkExistingSchedules();
-  }, [formData.selectedModalities]);
+  checkExistingSchedules();
+}, [formData.selectedModalities]);
 
   const termNameById = useMemo(() => {
     const map = new Map<number | string, string>();
