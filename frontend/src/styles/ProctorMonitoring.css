@@ -11,9 +11,46 @@
 
 .proctor-monitoring-header {
   display: flex;
-  justify-content: flex-start;
+  justify-content: space-between;
   align-items: center;
   margin-bottom: 20px;
+  gap: 20px;
+}
+
+.proctor-monitoring-header-left {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  flex: 1;
+}
+
+.proctor-monitoring-label {
+  font-size: 14px;
+  color: #666;
+  margin: 0;
+  font-weight: 500;
+}
+
+.proctor-monitoring-create-button {
+  padding: 10px 20px;
+  background-color: #FAB417;
+  color: white;
+  border: none;
+  border-radius: 5px;
+  font-size: 14px;
+  font-weight: bold;
+  cursor: pointer;
+  transition: background-color 0.3s ease, transform 0.1s ease;
+  white-space: nowrap;
+  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+}
+
+.proctor-monitoring-create-button:hover {
+  background-color: #e6a700;
+}
+
+.proctor-monitoring-create-button:active {
+  transform: translateY(1px);
 }
 
 .proctor-monitoring-title {
@@ -22,51 +59,119 @@
   margin: 0;
 }
 
-.proctor-monitoring-table-container {
+/* Canvas Area - Similar to Plot Schedule UI */
+.proctor-monitoring-canvas {
   background-color: #fff;
-  border-radius: 8px;
-  overflow: hidden;
+  border-radius: 10px;
+  padding: 30px;
   box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+  min-height: 600px;
+  margin-top: 20px;
 }
 
-.proctor-monitoring-table {
-  width: 100%;
-  border-collapse: collapse;
-  color: #333;
+.proctor-monitoring-schedules-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(400px, 1fr));
+  gap: 25px;
 }
 
-.proctor-monitoring-table th,
-.proctor-monitoring-table td {
-  padding: 12px 15px;
-  text-align: left;
-  border-bottom: 1px solid #eee;
+.proctor-monitoring-schedule-card {
+  background-color: #f9f9f9;
+  border: 1px solid #e0e0e0;
+  border-radius: 8px;
+  padding: 20px;
+  box-shadow: 0 2px 6px rgba(0, 0, 0, 0.08);
+  transition: box-shadow 0.3s ease, transform 0.2s ease;
 }
 
-.proctor-monitoring-table thead {
-  background-color: #333d52;
-  color: white;
+.proctor-monitoring-schedule-card:hover {
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.12);
+  transform: translateY(-2px);
 }
 
-.proctor-monitoring-table th {
-  background-color: #333d52;
-  color: white;
+.proctor-monitoring-schedule-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 15px;
+  padding-bottom: 12px;
+  border-bottom: 2px solid #333d52;
+}
+
+.proctor-monitoring-schedule-subject {
+  font-size: 18px;
   font-weight: bold;
-  border-bottom: 2px solid #092C4C;
+  color: #333;
+  margin: 0;
+  flex: 1;
 }
 
-.proctor-monitoring-table tbody tr:nth-child(even) {
-  background-color: #f8f8f8;
+.proctor-monitoring-schedule-code {
+  background-color: #333d52;
+  color: white;
+  padding: 6px 12px;
+  border-radius: 5px;
+  font-size: 14px;
+  font-weight: bold;
+  margin-left: 10px;
 }
 
-.proctor-monitoring-table tbody tr:hover {
-  background-color: #f0f0f0;
+.proctor-monitoring-schedule-details {
+  margin-bottom: 20px;
 }
 
-.no-data-message {
-  text-align: center;
-  padding: 40px 20px;
-  color: #666;
-  font-style: italic;
+.proctor-monitoring-detail-row {
+  display: flex;
+  justify-content: space-between;
+  padding: 8px 0;
+  border-bottom: 1px solid #f0f0f0;
+}
+
+.proctor-monitoring-detail-row:last-child {
+  border-bottom: none;
+}
+
+.proctor-monitoring-detail-label {
+  font-weight: 600;
+  color: #555;
+  font-size: 14px;
+}
+
+.proctor-monitoring-detail-value {
+  color: #333;
+  font-size: 14px;
+  text-align: right;
+}
+
+/* OTP Section */
+.proctor-monitoring-otp-section {
+  margin-top: 20px;
+  padding-top: 15px;
+  border-top: 2px dashed #ccc;
+}
+
+.proctor-monitoring-otp-label {
+  display: block;
+  font-weight: 600;
+  color: #333;
+  margin-bottom: 10px;
+  font-size: 14px;
+}
+
+.proctor-monitoring-otp-field {
+  background-color: #fff;
+  border: 2px solid #ddd;
+  border-radius: 5px;
+  padding: 15px;
+  min-height: 50px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: #999;
+  font-size: 16px;
+  font-weight: 500;
+  font-family: 'Courier New', monospace;
+  letter-spacing: 2px;
 }
 
 /* ============================================
@@ -120,29 +225,40 @@
     gap: 12px;
   }
 
-  .proctor-monitoring-title {
-    font-size: 18px;
-    text-align: center;
+  .proctor-monitoring-header-left {
+    width: 100%;
   }
 
-  .proctor-monitoring-table-container {
-    border-radius: 6px;
-    box-shadow: 0 1px 4px rgba(0, 0, 0, 0.1);
+  .proctor-monitoring-create-button {
+    width: 100%;
+    padding: 12px 20px;
   }
 
-  .proctor-monitoring-table {
-    min-width: 500px;
-    font-size: 14px;
+  .proctor-monitoring-canvas {
+    padding: 15px;
+    min-height: 400px;
   }
 
-  .proctor-monitoring-table th {
-    padding: 10px 8px;
-    font-size: 12px;
+  .proctor-monitoring-schedules-grid {
+    grid-template-columns: 1fr;
+    gap: 15px;
   }
 
-  .proctor-monitoring-table td {
-    padding: 10px 8px;
-    font-size: 13px;
+  .proctor-monitoring-schedule-card {
+    padding: 15px;
+  }
+
+  .proctor-monitoring-schedule-subject {
+    font-size: 16px;
+  }
+
+  .proctor-monitoring-detail-row {
+    flex-direction: column;
+    gap: 4px;
+  }
+
+  .proctor-monitoring-detail-value {
+    text-align: left;
   }
 }
 
@@ -152,23 +268,31 @@
     padding: 10px;
   }
 
-  .proctor-monitoring-title {
-    font-size: 16px;
+  .proctor-monitoring-canvas {
+    padding: 12px;
   }
 
-  .proctor-monitoring-table {
-    min-width: 450px;
-    font-size: 13px;
+  .proctor-monitoring-schedule-card {
+    padding: 12px;
   }
 
-  .proctor-monitoring-table th {
-    padding: 8px 6px;
-    font-size: 11px;
+  .proctor-monitoring-schedule-subject {
+    font-size: 14px;
   }
 
-  .proctor-monitoring-table td {
-    padding: 8px 6px;
+  .proctor-monitoring-schedule-code {
     font-size: 12px;
+    padding: 4px 8px;
+  }
+
+  .proctor-monitoring-detail-label,
+  .proctor-monitoring-detail-value {
+    font-size: 12px;
+  }
+
+  .proctor-monitoring-otp-field {
+    padding: 12px;
+    font-size: 14px;
   }
 }
 
