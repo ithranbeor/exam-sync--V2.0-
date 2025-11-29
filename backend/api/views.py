@@ -377,7 +377,6 @@ def tbl_scheduleapproval_detail(request, pk):
 def tbl_examdetails_list(request):
     if request.method == 'GET':
         try:
-            # Start with a more efficient base query
             queryset = TblExamdetails.objects.select_related(
                 'room',
                 'room__building',
@@ -386,14 +385,14 @@ def tbl_examdetails_list(request):
                 'modality__user',
                 'proctor',
                 'examperiod'
-            )
+            ).all()
 
+            # ✅ ADD: Filter by college_name
             college_name = request.GET.get('college_name')
             room_id = request.GET.get('room_id')
             exam_date = request.GET.get('exam_date')
             modality_id = request.GET.get('modality_id')
 
-            # ✅ FIXED: Apply all filters, then get results
             if college_name:
                 queryset = queryset.filter(college_name=college_name)
             if room_id:
@@ -401,16 +400,9 @@ def tbl_examdetails_list(request):
             if exam_date:
                 queryset = queryset.filter(exam_date=exam_date)
             if modality_id:
-                # Handle single modality_id (not comma-separated for GET)
-                try:
-                    modality_id_int = int(modality_id)
-                    queryset = queryset.filter(modality_id=modality_id_int)
-                except ValueError:
-                    # If not a valid integer, return empty
-                    return Response([], status=status.HTTP_200_OK)
-            
-            # ✅ FIXED: Order and serialize the filtered queryset
-            queryset = queryset.order_by('room_id', 'exam_date', 'exam_start_time')
+                modality_ids = [mid.strip() for mid in modality_id.split(',') if mid.strip()]
+                queryset = queryset.filter(modality_id__in=modality_ids)
+
             serializer = TblExamdetailsSerializer(queryset, many=True)
             return Response(serializer.data)
         
@@ -427,76 +419,13 @@ def tbl_examdetails_list(request):
         many = isinstance(request.data, list)
         print("📦 Incoming exam details data:", len(request.data) if many else 1, "records")
         
-        # ✅ FIXED: Build occupancy map from the CURRENT batch ONLY
-        room_time_usage = {}
-        
-        if many:
-            for item in request.data:
-                room_id = item.get('room_id')
-                exam_date = item.get('exam_date')
-                exam_start_time = item.get('exam_start_time')
-                exam_end_time = item.get('exam_end_time')
-                modality_id = item.get('modality_id')
-                
-                if not all([room_id, exam_date, exam_start_time, exam_end_time]):
-                    continue
-                
-                # Get room capacity
-                try:
-                    room = TblRooms.objects.get(room_id=room_id)
-                    room_capacity = room.room_capacity
-                except TblRooms.DoesNotExist:
-                    return Response({
-                        'error': f'Room {room_id} not found'
-                    }, status=status.HTTP_400_BAD_REQUEST)
-                
-                # Get modality student count
-                try:
-                    modality = TblModality.objects.get(modality_id=modality_id)
-                    section = TblSectioncourse.objects.get(
-                        course_id=modality.course_id,
-                        program_id=modality.program_id,
-                        section_name=modality.section_name
-                    )
-                    needed_capacity = section.number_of_students
-                except (TblModality.DoesNotExist, TblSectioncourse.DoesNotExist):
-                    needed_capacity = 0
-                
-                # Create unique key for room+date+time
-                time_key = f"{room_id}|{exam_date}|{exam_start_time}|{exam_end_time}"
-                
-                # ✅ FIXED: Initialize with 0, not with existing DB schedules
-                if time_key not in room_time_usage:
-                    room_time_usage[time_key] = {
-                        'capacity': room_capacity,
-                        'batch_occupancy': 0,  # Only count items in THIS batch
-                        'room_id': room_id,
-                        'date': exam_date
-                    }
-                
-                # Check if total would exceed capacity (using only batch occupancy)
-                total_students = room_time_usage[time_key]['batch_occupancy'] + needed_capacity
-                
-                if total_students > room_time_usage[time_key]['capacity']:
-                    return Response({
-                        'error': 'Room capacity exceeded in batch',
-                        'detail': f'Room {room_id} (capacity: {room_capacity}) cannot accommodate {total_students} students at {exam_start_time}',
-                        'room_id': room_id,
-                        'capacity': room_capacity,
-                        'batch_occupancy': room_time_usage[time_key]['batch_occupancy'],
-                        'needed': needed_capacity,
-                        'total_needed': total_students
-                    }, status=status.HTTP_409_CONFLICT)
-                
-                # Add to batch occupancy
-                room_time_usage[time_key]['batch_occupancy'] += needed_capacity
-        
-        # ✅ Check for duplicate schedules (existing validation)
+        # ✅ CHECK FOR DUPLICATES BEFORE SAVING
         if many:
             modality_ids = [item.get('modality_id') for item in request.data if item.get('modality_id')]
         else:
             modality_ids = [request.data.get('modality_id')] if request.data.get('modality_id') else []
         
+        # Check if any of these modalities already have schedules
         existing_schedules = TblExamdetails.objects.filter(
             modality_id__in=modality_ids
         ).select_related('modality', 'modality__course')
@@ -518,13 +447,12 @@ def tbl_examdetails_list(request):
                 'duplicates': duplicate_info
             }, status=status.HTTP_409_CONFLICT)
         
-        # Proceed with saving if all validations pass
+        # Proceed with saving if no duplicates
         serializer = TblExamdetailsSerializer(data=request.data, many=many)
         if serializer.is_valid():
             try:
                 with transaction.atomic():
                     serializer.save()
-                    print(f"✅ Successfully saved {len(request.data) if many else 1} exam schedule(s)")
                     return Response(serializer.data, status=status.HTTP_201_CREATED)
             except Exception as e:
                 print(f"❌ Error saving exam details: {str(e)}")
@@ -534,54 +462,8 @@ def tbl_examdetails_list(request):
                     {'error': str(e), 'detail': 'Failed to save exam details'},
                     status=status.HTTP_400_BAD_REQUEST
                 )
-        
         print("❌ Validation errors:", serializer.errors)
         return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
-
-
-# ============================================================================
-# ADD THIS NEW ENDPOINT to urls.py:
-# path('api/check-existing-schedules/', views.check_existing_schedules, name='check_existing_schedules'),
-# ============================================================================
-
-@api_view(['POST'])
-@permission_classes([AllowAny])
-def check_existing_schedules(request):
-    """
-    Check if modalities already have schedules (POST to handle large lists)
-    Expects: { "modality_ids": [1, 2, 3, ...] }
-    Returns: { "scheduled_ids": [1, 3], "count": 2 }
-    """
-    try:
-        modality_ids = request.data.get('modality_ids', [])
-        
-        if not modality_ids:
-            return Response({'scheduled_ids': [], 'count': 0}, status=status.HTTP_200_OK)
-        
-        # Query in batches to avoid memory issues
-        BATCH_SIZE = 100
-        scheduled_ids = set()
-        
-        for i in range(0, len(modality_ids), BATCH_SIZE):
-            batch = modality_ids[i:i + BATCH_SIZE]
-            existing = TblExamdetails.objects.filter(
-                modality_id__in=batch
-            ).values_list('modality_id', flat=True)
-            scheduled_ids.update(existing)
-        
-        return Response({
-            'scheduled_ids': list(scheduled_ids),
-            'count': len(scheduled_ids)
-        }, status=status.HTTP_200_OK)
-        
-    except Exception as e:
-        print(f"❌ Error checking schedules: {str(e)}")
-        import traceback
-        traceback.print_exc()
-        return Response(
-            {'error': str(e), 'detail': 'Failed to check existing schedules'},
-            status=status.HTTP_500_INTERNAL_SERVER_ERROR
-        )
 
 @api_view(['GET', 'PUT', 'DELETE'])
 @permission_classes([AllowAny])
@@ -605,7 +487,7 @@ def tbl_examdetails_detail(request, pk):
     elif request.method == 'DELETE':
         instance.delete()
         return Response(status=status.HTTP_204_NO_CONTENT)
-        
+    
 @api_view(['GET', 'POST'])
 @permission_classes([AllowAny])
 def tbl_modality_list(request):
