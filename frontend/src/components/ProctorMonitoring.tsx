@@ -12,33 +12,68 @@ interface UserProps {
 
 const ProctorMonitoring: React.FC<UserProps> = ({ }) => {
   // user will be used for future functionality
-  // Mock data structure - will be replaced with actual API data later
-  const mockSchedules = [
+  // Mock data - Approved Exam Schedules (Static UI for demonstration)
+  // This will be replaced with actual API data from approved schedules
+  const approvedSchedules = [
     {
       id: 1,
-      subject: "IT114 - Computer Programming",
-      course_code: "IT114",
-      time_slot: "8:00 AM - 9:30 AM",
-      proctor: "Mr. Cruz",
-      instructor: "Ms. Dela Peña",
-      building: "Building 09",
-      room: "306",
+      course_id: "IT114",
+      subject: "Computer Programming",
+      section_name: "BSIT-3A",
+      exam_date: "2024-01-15",
+      exam_start_time: "08:00",
+      exam_end_time: "09:30",
+      building_name: "Building 09",
+      room_id: "306",
+      proctor_name: "Mr. Cruz",
+      instructor_name: "Ms. Dela Peña",
       department: "Information Technology",
-      college: "CITC",
-      exam_date: "2024-01-15"
+      college: "CITC"
     },
     {
       id: 2,
-      subject: "CS101 - Introduction to Computer Science",
-      course_code: "CS101",
-      time_slot: "10:00 AM - 11:30 AM",
-      proctor: "Dr. Santos",
-      instructor: "Prof. Garcia",
-      building: "Building 09",
-      room: "205",
+      course_id: "CS101",
+      subject: "Introduction to Computer Science",
+      section_name: "BSCS-1B",
+      exam_date: "2024-01-15",
+      exam_start_time: "10:00",
+      exam_end_time: "11:30",
+      building_name: "Building 09",
+      room_id: "205",
+      proctor_name: "Dr. Santos",
+      instructor_name: "Prof. Garcia",
       department: "Computer Science",
-      college: "CITC",
-      exam_date: "2024-01-15"
+      college: "CITC"
+    },
+    {
+      id: 3,
+      course_id: "IT201",
+      subject: "Data Structures",
+      section_name: "BSIT-2C",
+      exam_date: "2024-01-16",
+      exam_start_time: "01:00",
+      exam_end_time: "02:30",
+      building_name: "Building 10",
+      room_id: "401",
+      proctor_name: "Ms. Reyes",
+      instructor_name: "Dr. Martinez",
+      department: "Information Technology",
+      college: "CITC"
+    },
+    {
+      id: 4,
+      course_id: "CS202",
+      subject: "Database Systems",
+      section_name: "BSCS-2A",
+      exam_date: "2024-01-16",
+      exam_start_time: "03:00",
+      exam_end_time: "04:30",
+      building_name: "Building 10",
+      room_id: "402",
+      proctor_name: "Mr. Torres",
+      instructor_name: "Ms. Fernandez",
+      department: "Computer Science",
+      college: "CITC"
     }
   ];
 
@@ -58,45 +93,43 @@ const ProctorMonitoring: React.FC<UserProps> = ({ }) => {
       {/* Canvas Area - Similar to Plot Schedule UI */}
       <div className="proctor-monitoring-canvas">
         <div className="proctor-monitoring-schedules-grid">
-          {mockSchedules.map((schedule) => (
+          {approvedSchedules.map((schedule) => (
             <div key={schedule.id} className="proctor-monitoring-schedule-card">
               <div className="proctor-monitoring-schedule-header">
-                <h3 className="proctor-monitoring-schedule-subject">{schedule.subject}</h3>
-                <span className="proctor-monitoring-schedule-code">{schedule.course_code}</span>
+                <h3 className="proctor-monitoring-schedule-subject">
+                  {schedule.course_id} - {schedule.subject}
+                </h3>
+                <span className="proctor-monitoring-schedule-code">{schedule.course_id}</span>
               </div>
               
               <div className="proctor-monitoring-schedule-details">
                 <div className="proctor-monitoring-detail-row">
-                  <span className="proctor-monitoring-detail-label">Time Slot:</span>
-                  <span className="proctor-monitoring-detail-value">{schedule.time_slot}</span>
+                  <span className="proctor-monitoring-detail-label">Section:</span>
+                  <span className="proctor-monitoring-detail-value">{schedule.section_name}</span>
                 </div>
                 <div className="proctor-monitoring-detail-row">
                   <span className="proctor-monitoring-detail-label">Date:</span>
                   <span className="proctor-monitoring-detail-value">{schedule.exam_date}</span>
                 </div>
                 <div className="proctor-monitoring-detail-row">
+                  <span className="proctor-monitoring-detail-label">Time:</span>
+                  <span className="proctor-monitoring-detail-value">{schedule.exam_start_time} - {schedule.exam_end_time}</span>
+                </div>
+                <div className="proctor-monitoring-detail-row">
                   <span className="proctor-monitoring-detail-label">Building:</span>
-                  <span className="proctor-monitoring-detail-value">{schedule.building}</span>
+                  <span className="proctor-monitoring-detail-value">{schedule.building_name}</span>
                 </div>
                 <div className="proctor-monitoring-detail-row">
                   <span className="proctor-monitoring-detail-label">Room:</span>
-                  <span className="proctor-monitoring-detail-value">{schedule.room}</span>
+                  <span className="proctor-monitoring-detail-value">{schedule.room_id}</span>
                 </div>
                 <div className="proctor-monitoring-detail-row">
                   <span className="proctor-monitoring-detail-label">Proctor:</span>
-                  <span className="proctor-monitoring-detail-value">{schedule.proctor}</span>
+                  <span className="proctor-monitoring-detail-value">{schedule.proctor_name}</span>
                 </div>
                 <div className="proctor-monitoring-detail-row">
                   <span className="proctor-monitoring-detail-label">Instructor:</span>
-                  <span className="proctor-monitoring-detail-value">{schedule.instructor}</span>
-                </div>
-                <div className="proctor-monitoring-detail-row">
-                  <span className="proctor-monitoring-detail-label">Department:</span>
-                  <span className="proctor-monitoring-detail-value">{schedule.department}</span>
-                </div>
-                <div className="proctor-monitoring-detail-row">
-                  <span className="proctor-monitoring-detail-label">College:</span>
-                  <span className="proctor-monitoring-detail-value">{schedule.college}</span>
+                  <span className="proctor-monitoring-detail-value">{schedule.instructor_name}</span>
                 </div>
               </div>
 
