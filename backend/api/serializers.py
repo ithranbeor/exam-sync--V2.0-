@@ -2,7 +2,7 @@
 
 from rest_framework import serializers
 from django.utils import timezone
-from .models import TblScheduleapproval, TblAvailableRooms, TblNotification, TblUsers, TblRoles, TblExamdetails, TblAvailability, TblModality, TblSectioncourse, TblBuildings, TblUserRoleHistory, TblRooms, TblUserRole, TblCourseUsers, TblCourse, TblProgram, TblExamperiod, TblUserRole, TblTerm, TblCollege, TblDepartment
+from .models import TblScheduleapproval, TblAvailableRooms, TblNotification, TblUsers, TblRoles, TblExamdetails, TblAvailability, TblModality, TblSectioncourse, TblBuildings, TblUserRoleHistory, TblRooms, TblUserRole, TblCourseUsers, TblCourse, TblProgram, TblExamperiod, TblUserRole, TblTerm, TblCollege, TblDepartment, TblExamOTP, TblProctorAttendance
 from django.contrib.auth.hashers import make_password
 
 class CourseSerializer(serializers.Serializer):
@@ -876,3 +876,249 @@ class TblAvailableRoomsSerializer(serializers.ModelSerializer):
             room_id=room_id,
             college_id=college_id,
         )
+
+
+class TblExamOTPSerializer(serializers.ModelSerializer):
+    """Serializer for Exam OTP codes"""
+    exam_schedule_id = serializers.IntegerField(source='exam_schedule.examdetails_id', read_only=True)
+    assigned_proctor_id = serializers.IntegerField(source='assigned_proctor.user_id', read_only=True, allow_null=True)
+    assigned_proctor_name = serializers.SerializerMethodField()
+    course_id = serializers.CharField(source='exam_schedule.course_id', read_only=True)
+    building_name = serializers.CharField(source='exam_schedule.building_name', read_only=True)
+    room_id = serializers.CharField(source='exam_schedule.room.room_id', read_only=True)
+
+    class Meta:
+        model = TblExamOTP
+        fields = [
+            'otp_id',
+            'exam_schedule',
+            'exam_schedule_id',
+            'otp_code',
+            'assigned_proctor',
+            'assigned_proctor_id',
+            'assigned_proctor_name',
+            'course_id',
+            'building_name',
+            'room_id',
+            'exam_start_time',
+            'exam_end_time',
+            'is_active',
+            'is_used',
+            'used_at',
+            'used_by',
+            'created_at',
+            'expires_at',
+        ]
+        read_only_fields = ['otp_id', 'otp_code', 'created_at', 'is_used', 'used_at', 'used_by']
+
+    def get_assigned_proctor_name(self, obj):
+        if obj.assigned_proctor:
+            return f"{obj.assigned_proctor.first_name} {obj.assigned_proctor.last_name}"
+        return None
+
+
+class TblProctorAttendanceSerializer(serializers.ModelSerializer):
+    """Serializer for Proctor Attendance records"""
+    exam_schedule_id = serializers.IntegerField(source='exam_schedule.examdetails_id', read_only=True)
+    proctor_id = serializers.IntegerField(source='proctor.user_id', read_only=True)
+    proctor_name = serializers.SerializerMethodField()
+    proctor_email = serializers.CharField(source='proctor.email_address', read_only=True)
+    course_id = serializers.CharField(source='exam_schedule.course_id', read_only=True)
+    subject = serializers.SerializerMethodField()
+    section_name = serializers.CharField(source='exam_schedule.section_name', read_only=True)
+    exam_date = serializers.CharField(source='exam_schedule.exam_date', read_only=True)
+    exam_start_time = serializers.DateTimeField(source='exam_schedule.exam_start_time', read_only=True)
+    exam_end_time = serializers.DateTimeField(source='exam_schedule.exam_end_time', read_only=True)
+    building_name = serializers.CharField(source='exam_schedule.building_name', read_only=True)
+    room_id = serializers.CharField(source='exam_schedule.room.room_id', read_only=True)
+    otp_code = serializers.CharField(source='otp_used.otp_code', read_only=True, allow_null=True)
+
+    class Meta:
+        model = TblProctorAttendance
+        fields = [
+            'attendance_id',
+            'exam_schedule',
+            'exam_schedule_id',
+            'proctor',
+            'proctor_id',
+            'proctor_name',
+            'proctor_email',
+            'course_id',
+            'subject',
+            'section_name',
+            'exam_date',
+            'exam_start_time',
+            'exam_end_time',
+            'building_name',
+            'room_id',
+            'otp_used',
+            'otp_code',
+            'role',
+            'remarks',
+            'time_in',
+            'time_out',
+            'is_locked',
+            'created_at',
+        ]
+        read_only_fields = ['attendance_id', 'time_in', 'created_at', 'is_locked']
+
+    def get_proctor_name(self, obj):
+        return f"{obj.proctor.first_name} {obj.proctor.last_name}"
+
+    def get_subject(self, obj):
+        # Try to get subject from course or modality
+        if obj.exam_schedule and obj.exam_schedule.modality:
+            if obj.exam_schedule.modality.course:
+                return obj.exam_schedule.modality.course.course_name
+        return None
+
+
+class ProctorAssignedExamSerializer(serializers.Serializer):
+    """Serializer for proctor's assigned exams list"""
+    id = serializers.IntegerField(source='examdetails_id')
+    course_id = serializers.CharField()
+    subject = serializers.SerializerMethodField()
+    section_name = serializers.CharField()
+    exam_date = serializers.CharField()
+    exam_start_time = serializers.SerializerMethodField()
+    exam_end_time = serializers.SerializerMethodField()
+    building_name = serializers.CharField()
+    room_id = serializers.SerializerMethodField()
+    instructor_name = serializers.SerializerMethodField()
+    assigned_proctor = serializers.SerializerMethodField()
+    status = serializers.SerializerMethodField()
+    otp_code = serializers.SerializerMethodField()
+
+    def get_subject(self, obj):
+        if obj.modality and obj.modality.course:
+            return obj.modality.course.course_name
+        return None
+
+    def get_exam_start_time(self, obj):
+        if obj.exam_start_time:
+            return obj.exam_start_time.strftime('%H:%M')
+        return None
+
+    def get_exam_end_time(self, obj):
+        if obj.exam_end_time:
+            return obj.exam_end_time.strftime('%H:%M')
+        return None
+
+    def get_room_id(self, obj):
+        if obj.room:
+            return obj.room.room_id
+        return None
+
+    def get_instructor_name(self, obj):
+        if obj.instructor_id:
+            try:
+                instructor = TblUsers.objects.get(user_id=obj.instructor_id)
+                return f"{instructor.first_name} {instructor.last_name}"
+            except TblUsers.DoesNotExist:
+                return None
+        return None
+
+    def get_assigned_proctor(self, obj):
+        if obj.proctor:
+            return f"{obj.proctor.first_name} {obj.proctor.last_name}"
+        return None
+
+    def get_status(self, obj):
+        return obj.proctor_status or 'pending'
+
+    def get_otp_code(self, obj):
+        # Get active OTP for this exam schedule
+        otp = TblExamOTP.objects.filter(
+            exam_schedule=obj,
+            is_active=True
+        ).first()
+        return otp.otp_code if otp else None
+
+
+class ProctorMonitoringSerializer(serializers.Serializer):
+    """Serializer for proctor monitoring dashboard"""
+    id = serializers.IntegerField(source='examdetails_id')
+    course_id = serializers.CharField()
+    subject = serializers.SerializerMethodField()
+    section_name = serializers.CharField()
+    exam_date = serializers.CharField()
+    exam_start_time = serializers.SerializerMethodField()
+    exam_end_time = serializers.SerializerMethodField()
+    building_name = serializers.CharField()
+    room_id = serializers.SerializerMethodField()
+    proctor_name = serializers.SerializerMethodField()
+    instructor_name = serializers.SerializerMethodField()
+    department = serializers.SerializerMethodField()
+    college = serializers.CharField(source='college_name')
+    status = serializers.SerializerMethodField()
+    code_entry_time = serializers.SerializerMethodField()
+    otp_code = serializers.SerializerMethodField()
+
+    def get_subject(self, obj):
+        if obj.modality and obj.modality.course:
+            return obj.modality.course.course_name
+        return None
+
+    def get_exam_start_time(self, obj):
+        if obj.exam_start_time:
+            return obj.exam_start_time.strftime('%H:%M')
+        return None
+
+    def get_exam_end_time(self, obj):
+        if obj.exam_end_time:
+            return obj.exam_end_time.strftime('%H:%M')
+        return None
+
+    def get_room_id(self, obj):
+        if obj.room:
+            return obj.room.room_id
+        return None
+
+    def get_proctor_name(self, obj):
+        if obj.proctor:
+            return f"{obj.proctor.first_name} {obj.proctor.last_name}"
+        return None
+
+    def get_instructor_name(self, obj):
+        if obj.instructor_id:
+            try:
+                instructor = TblUsers.objects.get(user_id=obj.instructor_id)
+                return f"{instructor.first_name} {instructor.last_name}"
+            except TblUsers.DoesNotExist:
+                return None
+        return None
+
+    def get_department(self, obj):
+        if obj.modality and obj.modality.course:
+            # Try to get department from program
+            try:
+                from .models import TblSectioncourse
+                section = TblSectioncourse.objects.filter(
+                    course=obj.modality.course,
+                    section_name=obj.section_name
+                ).first()
+                if section and section.program and section.program.department:
+                    return section.program.department.department_name
+            except:
+                pass
+        return None
+
+    def get_status(self, obj):
+        return obj.proctor_status or 'pending'
+
+    def get_code_entry_time(self, obj):
+        # Get attendance record time_in
+        attendance = TblProctorAttendance.objects.filter(
+            exam_schedule=obj
+        ).order_by('-time_in').first()
+        if attendance:
+            return attendance.time_in
+        return obj.proctor_timein
+
+    def get_otp_code(self, obj):
+        # Get active OTP for this exam schedule
+        otp = TblExamOTP.objects.filter(
+            exam_schedule=obj,
+            is_active=True
+        ).first()
+        return otp.otp_code if otp else None

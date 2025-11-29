@@ -8,7 +8,7 @@ from rest_framework.authtoken.models import Token
 from rest_framework import status
 from django.views.decorators.cache import cache_page
 from django.db.models import Q
-from .models import TblUsers, TblScheduleapproval, TblAvailableRooms, TblNotification, TblUserRole, TblExamdetails, TblModality, TblAvailability, TblCourseUsers, TblSectioncourse, TblUserRoleHistory, TblRoles, TblBuildings, TblRooms, TblCourse, TblExamperiod, TblProgram, TblTerm, TblCollege, TblDepartment
+from .models import TblUsers, TblScheduleapproval, TblAvailableRooms, TblNotification, TblUserRole, TblExamdetails, TblModality, TblAvailability, TblCourseUsers, TblSectioncourse, TblUserRoleHistory, TblRoles, TblBuildings, TblRooms, TblCourse, TblExamperiod, TblProgram, TblTerm, TblCollege, TblDepartment, TblExamOTP, TblProctorAttendance
 from .serializers import (
     UserSerializer,
     UserRoleSerializer,
@@ -33,7 +33,11 @@ from .serializers import (
     ScheduleSendSerializer,
     TblNotificationSerializer,
     EmailNotificationSerializer,
-    TblAvailableRoomsSerializer
+    TblAvailableRoomsSerializer,
+    TblExamOTPSerializer,
+    TblProctorAttendanceSerializer,
+    ProctorAssignedExamSerializer,
+    ProctorMonitoringSerializer
 )
 from django.core.mail import send_mail
 from django.contrib.auth.hashers import make_password, check_password
@@ -362,9 +366,16 @@ def tbl_scheduleapproval_detail(request, pk):
         return Response(serializer.data)
 
     elif request.method == 'PUT':
+        old_status = approval.status
         serializer = TblScheduleapprovalSerializer(approval, data=request.data, partial=True)
         if serializer.is_valid():
             serializer.save()
+            new_status = approval.status
+            
+            # Generate OTP when schedule is approved
+            if old_status != 'approved' and new_status == 'approved':
+                generate_otp_for_approved_schedule(approval)
+            
             return Response(serializer.data)
         return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
 
@@ -2108,3 +2119,541 @@ def get_user(request, user_id):
         return Response(serializer.data)
     except TblUsers.DoesNotExist:
         return Response({"error": "User not found"}, status=404)
+
+
+# ==================== PROCTOR MONITORING SYSTEM ====================
+
+def generate_otp_code(building_name, room_id, course_id):
+    """
+    Generate OTP code in format: [Building][Room]-[CourseCode]-[RandomCode]
+    Example: 09306-IT114-X5P9K
+    """
+    # Extract building number (e.g., "Building 09" -> "09")
+    building_num = ''.join(filter(str.isdigit, building_name)) or '00'
+    
+    # Extract room number (e.g., "306" from room_id)
+    room_num = ''.join(filter(str.isdigit, room_id)) or '000'
+    
+    # Generate random code (5 alphanumeric characters)
+    random_code = secrets.token_hex(3).upper()[:5]  # 5 chars, uppercase
+    
+    # Format: BuildingRoom-CourseCode-RandomCode
+    otp_code = f"{building_num}{room_num}-{course_id}-{random_code}"
+    return otp_code
+
+
+def generate_otp_for_approved_schedule(approval):
+    """
+    Generate OTP codes for all exam schedules in an approved schedule request.
+    Called when dean approves a schedule.
+    """
+    try:
+        schedule_data = approval.schedule_data
+        if not schedule_data or 'schedules' not in schedule_data:
+            print(f"⚠️ No schedule data found for approval {approval.request_id}")
+            return
+        
+        schedules = schedule_data['schedules']
+        print(f"📝 Generating OTPs for {len(schedules)} schedules...")
+        
+        for schedule_item in schedules:
+            # Find the corresponding TblExamdetails record
+            # Match by course_id, exam_date, exam_start_time, room_id
+            exam_details = TblExamdetails.objects.filter(
+                course_id=schedule_item.get('course_id'),
+                exam_date=schedule_item.get('exam_date'),
+                building_name=schedule_item.get('building_name'),
+            ).first()
+            
+            if not exam_details:
+                print(f"⚠️ Exam details not found for course {schedule_item.get('course_id')}")
+                continue
+            
+            # Check if OTP already exists
+            existing_otp = TblExamOTP.objects.filter(
+                exam_schedule=exam_details,
+                is_active=True
+            ).first()
+            
+            if existing_otp:
+                print(f"✅ OTP already exists for exam {exam_details.examdetails_id}: {existing_otp.otp_code}")
+                continue
+            
+            # Generate OTP code
+            building_name = exam_details.building_name or schedule_item.get('building_name', 'Building 00')
+            room_id = exam_details.room.room_id if exam_details.room else schedule_item.get('room_id', '000')
+            course_id = exam_details.course_id
+            
+            otp_code = generate_otp_code(building_name, room_id, course_id)
+            
+            # Ensure uniqueness
+            while TblExamOTP.objects.filter(otp_code=otp_code).exists():
+                otp_code = generate_otp_code(building_name, room_id, course_id)
+            
+            # Create OTP record
+            otp = TblExamOTP.objects.create(
+                exam_schedule=exam_details,
+                otp_code=otp_code,
+                assigned_proctor=exam_details.proctor,
+                exam_start_time=exam_details.exam_start_time or timezone.now(),
+                exam_end_time=exam_details.exam_end_time or timezone.now(),
+                is_active=True,
+                expires_at=exam_details.exam_end_time if exam_details.exam_end_time else None
+            )
+            
+            print(f"✅ Generated OTP: {otp_code} for exam {exam_details.examdetails_id}")
+        
+        print(f"✅ Completed OTP generation for approval {approval.request_id}")
+        
+    except Exception as e:
+        print(f"❌ Error generating OTP: {str(e)}")
+        import traceback
+        traceback.print_exc()
+
+
+@api_view(['POST'])
+@permission_classes([AllowAny])
+def generate_exam_otps(request):
+    """
+    Manually generate OTP codes for approved exam schedules.
+    POST /api/generate-exam-otps/
+    Body: { "schedule_ids": [1, 2, 3] } or { "approval_id": "uuid" }
+    """
+    try:
+        schedule_ids = request.data.get('schedule_ids', [])
+        approval_id = request.data.get('approval_id')
+        
+        if approval_id:
+            # Generate OTPs for all schedules in an approval
+            try:
+                approval = TblScheduleapproval.objects.get(request_id=approval_id)
+                if approval.status == 'approved':
+                    generate_otp_for_approved_schedule(approval)
+                    return Response({
+                        'message': 'OTP codes generated successfully',
+                        'approval_id': str(approval_id)
+                    }, status=status.HTTP_200_OK)
+                else:
+                    return Response({
+                        'error': 'Schedule must be approved before generating OTP codes'
+                    }, status=status.HTTP_400_BAD_REQUEST)
+            except TblScheduleapproval.DoesNotExist:
+                return Response({'error': 'Approval not found'}, status=status.HTTP_404_NOT_FOUND)
+        
+        elif schedule_ids:
+            # Generate OTPs for specific exam schedules
+            generated = []
+            for schedule_id in schedule_ids:
+                try:
+                    exam_details = TblExamdetails.objects.get(examdetails_id=schedule_id)
+                    
+                    # Check if OTP already exists
+                    existing_otp = TblExamOTP.objects.filter(
+                        exam_schedule=exam_details,
+                        is_active=True
+                    ).first()
+                    
+                    if existing_otp:
+                        generated.append({
+                            'schedule_id': schedule_id,
+                            'otp_code': existing_otp.otp_code,
+                            'status': 'already_exists'
+                        })
+                        continue
+                    
+                    # Generate OTP
+                    building_name = exam_details.building_name or 'Building 00'
+                    room_id = exam_details.room.room_id if exam_details.room else '000'
+                    course_id = exam_details.course_id
+                    
+                    otp_code = generate_otp_code(building_name, room_id, course_id)
+                    
+                    # Ensure uniqueness
+                    while TblExamOTP.objects.filter(otp_code=otp_code).exists():
+                        otp_code = generate_otp_code(building_name, room_id, course_id)
+                    
+                    otp = TblExamOTP.objects.create(
+                        exam_schedule=exam_details,
+                        otp_code=otp_code,
+                        assigned_proctor=exam_details.proctor,
+                        exam_start_time=exam_details.exam_start_time or timezone.now(),
+                        exam_end_time=exam_details.exam_end_time or timezone.now(),
+                        is_active=True,
+                        expires_at=exam_details.exam_end_time if exam_details.exam_end_time else None
+                    )
+                    
+                    generated.append({
+                        'schedule_id': schedule_id,
+                        'otp_code': otp_code,
+                        'status': 'created'
+                    })
+                    
+                except TblExamdetails.DoesNotExist:
+                    generated.append({
+                        'schedule_id': schedule_id,
+                        'status': 'not_found'
+                    })
+            
+            return Response({
+                'message': 'OTP generation completed',
+                'results': generated
+            }, status=status.HTTP_200_OK)
+        
+        else:
+            return Response({
+                'error': 'Either schedule_ids or approval_id must be provided'
+            }, status=status.HTTP_400_BAD_REQUEST)
+            
+    except Exception as e:
+        return Response({
+            'error': str(e)
+        }, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+
+
+@api_view(['POST'])
+@permission_classes([AllowAny])
+def verify_otp(request):
+    """
+    Verify OTP code entered by proctor.
+    POST /api/verify-otp/
+    Body: { "otp_code": "09306-IT114-X5P9K", "user_id": 123 }
+    """
+    try:
+        otp_code = request.data.get('otp_code', '').strip()
+        user_id = request.data.get('user_id')
+        
+        if not otp_code:
+            return Response({
+                'error': 'OTP code is required'
+            }, status=status.HTTP_400_BAD_REQUEST)
+        
+        if not user_id:
+            return Response({
+                'error': 'User ID is required'
+            }, status=status.HTTP_400_BAD_REQUEST)
+        
+        # Find OTP
+        try:
+            otp = TblExamOTP.objects.get(otp_code=otp_code, is_active=True)
+        except TblExamOTP.DoesNotExist:
+            return Response({
+                'valid': False,
+                'error': 'Invalid or expired exam code'
+            }, status=status.HTTP_404_NOT_FOUND)
+        
+        # Check if OTP is expired
+        if otp.expires_at and timezone.now() > otp.expires_at:
+            return Response({
+                'valid': False,
+                'error': 'Exam code has expired'
+            }, status=status.HTTP_400_BAD_REQUEST)
+        
+        # Check if already used
+        if otp.is_used:
+            return Response({
+                'valid': False,
+                'error': 'This exam code has already been used'
+            }, status=status.HTTP_400_BAD_REQUEST)
+        
+        # Get exam schedule details
+        exam_schedule = otp.exam_schedule
+        
+        # Check if current time is within exam slot (optional - can be lenient)
+        current_time = timezone.now()
+        is_within_time = True
+        if exam_schedule.exam_start_time and exam_schedule.exam_end_time:
+            # Allow 30 minutes before and after exam time
+            start_window = exam_schedule.exam_start_time - timezone.timedelta(minutes=30)
+            end_window = exam_schedule.exam_end_time + timezone.timedelta(minutes=30)
+            is_within_time = start_window <= current_time <= end_window
+        
+        # Check if user is the assigned proctor
+        is_assigned_proctor = (otp.assigned_proctor and 
+                              otp.assigned_proctor.user_id == user_id)
+        
+        # Determine verification result
+        if is_assigned_proctor and is_within_time:
+            verification_status = 'valid-assigned'
+            message = 'Valid code. You are assigned to this exam.'
+        elif is_within_time:
+            verification_status = 'valid-not-assigned'
+            message = 'Valid code, but you are not assigned. Act as a substitute?'
+        else:
+            verification_status = 'valid-not-assigned'
+            message = 'Valid code, but exam time window has passed. Act as a substitute?'
+        
+        # Return exam details for confirmation
+        return Response({
+            'valid': True,
+            'verification_status': verification_status,
+            'message': message,
+            'exam_schedule_id': exam_schedule.examdetails_id,
+            'course_id': exam_schedule.course_id,
+            'section_name': exam_schedule.section_name,
+            'exam_date': exam_schedule.exam_date,
+            'exam_start_time': exam_schedule.exam_start_time,
+            'exam_end_time': exam_schedule.exam_end_time,
+            'building_name': exam_schedule.building_name,
+            'room_id': exam_schedule.room.room_id if exam_schedule.room else None,
+            'assigned_proctor_id': otp.assigned_proctor.user_id if otp.assigned_proctor else None,
+            'assigned_proctor_name': f"{otp.assigned_proctor.first_name} {otp.assigned_proctor.last_name}" if otp.assigned_proctor else None,
+            'is_within_time': is_within_time,
+            'is_assigned_proctor': is_assigned_proctor
+        }, status=status.HTTP_200_OK)
+        
+    except Exception as e:
+        return Response({
+            'error': str(e)
+        }, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+
+
+@api_view(['POST'])
+@permission_classes([AllowAny])
+def submit_proctor_attendance(request):
+    """
+    Submit proctor attendance after OTP verification.
+    POST /api/submit-proctor-attendance/
+    Body: {
+        "otp_code": "09306-IT114-X5P9K",
+        "user_id": 123,
+        "remarks": "Optional remarks",
+        "role": "assigned" or "sub"
+    }
+    """
+    try:
+        otp_code = request.data.get('otp_code', '').strip()
+        user_id = request.data.get('user_id')
+        remarks = request.data.get('remarks', '').strip()
+        role = request.data.get('role', 'assigned')  # 'assigned' or 'sub'
+        
+        if not otp_code or not user_id:
+            return Response({
+                'error': 'OTP code and user ID are required'
+            }, status=status.HTTP_400_BAD_REQUEST)
+        
+        # Find OTP
+        try:
+            otp = TblExamOTP.objects.get(otp_code=otp_code, is_active=True)
+        except TblExamOTP.DoesNotExist:
+            return Response({
+                'error': 'Invalid exam code'
+            }, status=status.HTTP_404_NOT_FOUND)
+        
+        # Check if already used
+        if otp.is_used:
+            # Check if attendance already exists
+            existing_attendance = TblProctorAttendance.objects.filter(
+                exam_schedule=otp.exam_schedule,
+                proctor_id=user_id
+            ).first()
+            
+            if existing_attendance:
+                return Response({
+                    'error': 'Attendance already recorded for this exam',
+                    'attendance_id': existing_attendance.attendance_id
+                }, status=status.HTTP_400_BAD_REQUEST)
+        
+        # Get user and exam schedule
+        try:
+            user = TblUsers.objects.get(user_id=user_id)
+        except TblUsers.DoesNotExist:
+            return Response({
+                'error': 'User not found'
+            }, status=status.HTTP_404_NOT_FOUND)
+        
+        exam_schedule = otp.exam_schedule
+        
+        # Check if exam has ended (lock attendance)
+        if exam_schedule.exam_end_time and timezone.now() > exam_schedule.exam_end_time:
+            return Response({
+                'error': 'Attendance is closed. Exam has ended.'
+            }, status=status.HTTP_400_BAD_REQUEST)
+        
+        # Validate remarks for substitute
+        if role == 'sub' and not remarks:
+            return Response({
+                'error': 'Remarks are required for substitute proctors'
+            }, status=status.HTTP_400_BAD_REQUEST)
+        
+        # Check if attendance already exists
+        existing_attendance = TblProctorAttendance.objects.filter(
+            exam_schedule=exam_schedule,
+            proctor=user
+        ).first()
+        
+        if existing_attendance:
+            return Response({
+                'error': 'Attendance already recorded',
+                'attendance_id': existing_attendance.attendance_id
+            }, status=status.HTTP_400_BAD_REQUEST)
+        
+        # Create attendance record
+        attendance = TblProctorAttendance.objects.create(
+            exam_schedule=exam_schedule,
+            proctor=user,
+            otp_used=otp,
+            role=role,
+            remarks=remarks if role == 'sub' else None,
+            is_locked=False
+        )
+        
+        # Mark OTP as used
+        otp.is_used = True
+        otp.used_at = timezone.now()
+        otp.used_by = user
+        otp.save()
+        
+        # Update exam details
+        exam_schedule.proctor_timein = attendance.time_in
+        exam_schedule.proctor_status = 'confirmed' if role == 'assigned' else 'substitute'
+        if role == 'sub':
+            exam_schedule.proctor_status = 'substitute'
+        exam_schedule.save()
+        
+        serializer = TblProctorAttendanceSerializer(attendance)
+        
+        return Response({
+            'message': 'Attendance recorded successfully',
+            'attendance': serializer.data
+        }, status=status.HTTP_201_CREATED)
+        
+    except Exception as e:
+        return Response({
+            'error': str(e)
+        }, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+
+
+@api_view(['GET'])
+@permission_classes([AllowAny])
+def proctor_assigned_exams(request, user_id):
+    """
+    Get all exams assigned to a proctor.
+    GET /api/proctor-assigned-exams/<user_id>/
+    """
+    try:
+        # Get all exam schedules where this user is assigned as proctor
+        exams = TblExamdetails.objects.filter(
+            proctor_id=user_id
+        ).select_related(
+            'room',
+            'room__building',
+            'modality',
+            'modality__course',
+            'proctor'
+        ).order_by('exam_date', 'exam_start_time')
+        
+        # Filter by status if provided
+        status_filter = request.GET.get('status')
+        if status_filter:
+            exams = exams.filter(proctor_status=status_filter)
+        
+        # Filter by date range if provided
+        date_from = request.GET.get('date_from')
+        date_to = request.GET.get('date_to')
+        if date_from:
+            exams = exams.filter(exam_date__gte=date_from)
+        if date_to:
+            exams = exams.filter(exam_date__lte=date_to)
+        
+        serializer = ProctorAssignedExamSerializer(exams, many=True)
+        return Response(serializer.data, status=status.HTTP_200_OK)
+        
+    except Exception as e:
+        return Response({
+            'error': str(e)
+        }, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+
+
+@api_view(['GET'])
+@permission_classes([AllowAny])
+def proctor_monitoring_dashboard(request):
+    """
+    Get monitoring dashboard data for approved exam schedules.
+    GET /api/proctor-monitoring/?college_name=CITC&status=approved
+    """
+    try:
+        # Get all exam details
+        exams = TblExamdetails.objects.select_related(
+            'room',
+            'room__building',
+            'modality',
+            'modality__course',
+            'proctor'
+        ).prefetch_related('attendance_records', 'otp_codes')
+        
+        # Filter by college
+        college_name = request.GET.get('college_name')
+        if college_name:
+            exams = exams.filter(college_name=college_name)
+        
+        # Filter by date
+        exam_date = request.GET.get('exam_date')
+        if exam_date:
+            exams = exams.filter(exam_date=exam_date)
+        
+        # Filter by date range
+        date_from = request.GET.get('date_from')
+        date_to = request.GET.get('date_to')
+        if date_from:
+            exams = exams.filter(exam_date__gte=date_from)
+        if date_to:
+            exams = exams.filter(exam_date__lte=date_to)
+        
+        # Only show exams that have been approved (have OTP codes)
+        # This assumes OTP is only generated for approved schedules
+        exams = exams.filter(otp_codes__is_active=True).distinct()
+        
+        # Order by date and time
+        exams = exams.order_by('exam_date', 'exam_start_time')
+        
+        serializer = ProctorMonitoringSerializer(exams, many=True)
+        return Response(serializer.data, status=status.HTTP_200_OK)
+        
+    except Exception as e:
+        return Response({
+            'error': str(e)
+        }, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+
+
+@api_view(['GET'])
+@permission_classes([AllowAny])
+def all_exams_for_substitution(request):
+    """
+    Get all exams available for substitution.
+    GET /api/all-exams-for-substitution/?date=2024-01-15
+    """
+    try:
+        # Get all exam schedules with assigned proctors
+        exams = TblExamdetails.objects.filter(
+            proctor__isnull=False
+        ).select_related(
+            'room',
+            'room__building',
+            'modality',
+            'modality__course',
+            'proctor'
+        )
+        
+        # Filter by date if provided
+        exam_date = request.GET.get('date')
+        if exam_date:
+            exams = exams.filter(exam_date=exam_date)
+        
+        # Filter by date range
+        date_from = request.GET.get('date_from')
+        date_to = request.GET.get('date_to')
+        if date_from:
+            exams = exams.filter(exam_date__gte=date_from)
+        if date_to:
+            exams = exams.filter(exam_date__lte=date_to)
+        
+        # Order by date and time
+        exams = exams.order_by('exam_date', 'exam_start_time')
+        
+        serializer = ProctorAssignedExamSerializer(exams, many=True)
+        return Response(serializer.data, status=status.HTTP_200_OK)
+        
+    except Exception as e:
+        return Response({
+            'error': str(e)
+        }, status=status.HTTP_500_INTERNAL_SERVER_ERROR)

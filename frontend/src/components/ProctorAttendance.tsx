@@ -1,4 +1,7 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
+import { toast, ToastContainer } from 'react-toastify';
+import 'react-toastify/dist/ReactToastify.css';
+import api from '../lib/apiClient';
 import '../styles/ProctorAttendance.css';
 
 interface UserProps {
@@ -25,101 +28,82 @@ interface ExamDetails {
   status?: string;
 }
 
-const ProctorAttendance: React.FC<UserProps> = ({ }) => {
+const ProctorAttendance: React.FC<UserProps> = ({ user }) => {
   const [selectedExam, setSelectedExam] = useState<ExamDetails | null>(null);
   const [showModal, setShowModal] = useState(false);
   const [isSubstitutionMode, setIsSubstitutionMode] = useState(false);
   const [otpCode, setOtpCode] = useState('');
   const [remarks, setRemarks] = useState('');
   const [otpValidationStatus, setOtpValidationStatus] = useState<'idle' | 'valid-assigned' | 'valid-not-assigned' | 'invalid'>('idle');
-  // user will be used for future functionality
-  // Mock data - Proctor's assigned exams (sorted by schedule)
-  const proctorAssignedExams = [
-    {
-      id: 1,
-      course_id: "IT114",
-      subject: "Computer Programming",
-      section_name: "BSIT-3A",
-      exam_date: "2024-01-15",
-      exam_start_time: "08:00",
-      exam_end_time: "09:30",
-      building_name: "Building 09",
-      room_id: "306",
-      instructor_name: "Ms. Dela Peña"
-    },
-    {
-      id: 2,
-      course_id: "IT201",
-      subject: "Data Structures",
-      section_name: "BSIT-2C",
-      exam_date: "2024-01-16",
-      exam_start_time: "01:00",
-      exam_end_time: "02:30",
-      building_name: "Building 10",
-      room_id: "401",
-      instructor_name: "Dr. Martinez"
-    }
-  ];
+  const [proctorAssignedExams, setProctorAssignedExams] = useState<ExamDetails[]>([]);
+  const [allExams, setAllExams] = useState<ExamDetails[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [verifyingOtp, setVerifyingOtp] = useState(false);
+  const [submittingAttendance, setSubmittingAttendance] = useState(false);
+  const [verificationData, setVerificationData] = useState<any>(null);
 
-  // Mock data - All exams (for substitution purposes)
-  const allExams = [
-    {
-      id: 1,
-      course_id: "IT114",
-      subject: "Computer Programming",
-      section_name: "BSIT-3A",
-      exam_date: "2024-01-15",
-      exam_start_time: "08:00",
-      exam_end_time: "09:30",
-      building_name: "Building 09",
-      room_id: "306",
-      assigned_proctor: "Mr. Cruz",
-      instructor_name: "Ms. Dela Peña",
-      status: "assigned"
-    },
-    {
-      id: 2,
-      course_id: "CS101",
-      subject: "Introduction to Computer Science",
-      section_name: "BSCS-1B",
-      exam_date: "2024-01-15",
-      exam_start_time: "10:00",
-      exam_end_time: "11:30",
-      building_name: "Building 09",
-      room_id: "205",
-      assigned_proctor: "Dr. Santos",
-      instructor_name: "Prof. Garcia",
-      status: "assigned"
-    },
-    {
-      id: 3,
-      course_id: "IT201",
-      subject: "Data Structures",
-      section_name: "BSIT-2C",
-      exam_date: "2024-01-16",
-      exam_start_time: "01:00",
-      exam_end_time: "02:30",
-      building_name: "Building 10",
-      room_id: "401",
-      assigned_proctor: "Ms. Reyes",
-      instructor_name: "Dr. Martinez",
-      status: "assigned"
-    },
-    {
-      id: 4,
-      course_id: "CS202",
-      subject: "Database Systems",
-      section_name: "BSCS-2A",
-      exam_date: "2024-01-16",
-      exam_start_time: "03:00",
-      exam_end_time: "04:30",
-      building_name: "Building 10",
-      room_id: "402",
-      assigned_proctor: "Mr. Torres",
-      instructor_name: "Ms. Fernandez",
-      status: "assigned"
+  // Fetch proctor's assigned exams
+  const fetchAssignedExams = useCallback(async () => {
+    if (!user?.user_id) return;
+    
+    try {
+      const { data } = await api.get(`/proctor-assigned-exams/${user.user_id}/`);
+      const formattedExams: ExamDetails[] = data.map((exam: any) => ({
+        id: exam.id,
+        course_id: exam.course_id,
+        subject: exam.subject || exam.course_id,
+        section_name: exam.section_name || '',
+        exam_date: exam.exam_date || '',
+        exam_start_time: exam.exam_start_time || '',
+        exam_end_time: exam.exam_end_time || '',
+        building_name: exam.building_name || '',
+        room_id: exam.room_id || '',
+        instructor_name: exam.instructor_name || '',
+        assigned_proctor: exam.assigned_proctor || '',
+        status: exam.status || 'pending'
+      }));
+      setProctorAssignedExams(formattedExams);
+    } catch (error: any) {
+      console.error('Error fetching assigned exams:', error);
+      toast.error('Failed to load assigned exams');
     }
-  ];
+  }, [user]);
+
+  // Fetch all exams for substitution
+  const fetchAllExams = useCallback(async () => {
+    try {
+      const { data } = await api.get('/all-exams-for-substitution/');
+      const formattedExams: ExamDetails[] = data.map((exam: any) => ({
+        id: exam.id,
+        course_id: exam.course_id,
+        subject: exam.subject || exam.course_id,
+        section_name: exam.section_name || '',
+        exam_date: exam.exam_date || '',
+        exam_start_time: exam.exam_start_time || '',
+        exam_end_time: exam.exam_end_time || '',
+        building_name: exam.building_name || '',
+        room_id: exam.room_id || '',
+        instructor_name: exam.instructor_name || '',
+        assigned_proctor: exam.assigned_proctor || '',
+        status: exam.status || 'pending'
+      }));
+      setAllExams(formattedExams);
+    } catch (error: any) {
+      console.error('Error fetching all exams:', error);
+      toast.error('Failed to load exams');
+    }
+  }, []);
+
+  // Load data on mount
+  useEffect(() => {
+    const loadData = async () => {
+      setLoading(true);
+      await Promise.all([fetchAssignedExams(), fetchAllExams()]);
+      setLoading(false);
+    };
+    loadData();
+  }, [fetchAssignedExams, fetchAllExams]);
+
 
   const handleCardClick = (exam: ExamDetails, isSubstitution: boolean = false) => {
     setSelectedExam(exam);
@@ -148,42 +132,79 @@ const ProctorAttendance: React.FC<UserProps> = ({ }) => {
   };
 
   const handleVerifyOtp = async () => {
-    // TODO: Replace with actual API call
-    // For now, simulate validation
-    if (!otpCode.trim()) {
+    if (!otpCode.trim() || !user?.user_id) {
       return;
     }
 
-    // Simulate API call
-    // const response = await api.post('/api/verify-otp/', { otp_code: otpCode, schedule_id: selectedExam?.id });
-    
-    // Mock validation logic (replace with actual API response)
-    // For demonstration: if OTP contains "SUB" or it's substitution mode, show not-assigned
-    if (isSubstitutionMode || otpCode.includes('SUB')) {
-      setOtpValidationStatus('valid-not-assigned');
-    } else {
-      setOtpValidationStatus('valid-assigned');
+    setVerifyingOtp(true);
+    try {
+      const response = await api.post('/verify-otp/', {
+        otp_code: otpCode.trim(),
+        user_id: user.user_id
+      });
+
+      const { valid, verification_status, message, exam_schedule_id, ...examData } = response.data;
+
+      if (valid) {
+        setOtpValidationStatus(verification_status as 'valid-assigned' | 'valid-not-assigned');
+        setVerificationData({ exam_schedule_id, ...examData });
+        toast.success(message || 'OTP verified successfully');
+      } else {
+        setOtpValidationStatus('invalid');
+        toast.error(message || 'Invalid OTP code');
+      }
+    } catch (error: any) {
+      console.error('Error verifying OTP:', error);
+      setOtpValidationStatus('invalid');
+      const errorMessage = error.response?.data?.error || error.message || 'Failed to verify OTP';
+      toast.error(errorMessage);
+    } finally {
+      setVerifyingOtp(false);
     }
   };
 
-  const handleSubmit = () => {
-    // TODO: Add API call to submit attendance
+  const handleSubmit = async () => {
+    if (!user?.user_id || !otpCode.trim()) {
+      toast.error('Missing required information');
+      return;
+    }
+
     const role = (isSubstitutionMode || otpValidationStatus === 'valid-not-assigned') ? 'sub' : 'assigned';
     
-    console.log('Submitting attendance:', {
-      exam: selectedExam,
-      otpCode,
-      remarks,
-      role,
-      isSubstitution: isSubstitutionMode || otpValidationStatus === 'valid-not-assigned'
-    });
-    
-    // Close modal after submission
-    handleCloseModal();
+    // Validate remarks for substitute
+    if (role === 'sub' && !remarks.trim()) {
+      toast.error('Remarks are required for substitute proctors');
+      return;
+    }
+
+    setSubmittingAttendance(true);
+    try {
+      const response = await api.post('/submit-proctor-attendance/', {
+        otp_code: otpCode.trim(),
+        user_id: user.user_id,
+        remarks: remarks.trim() || undefined,
+        role: role
+      });
+
+      toast.success(response.data.message || 'Attendance recorded successfully');
+      
+      // Refresh data
+      await Promise.all([fetchAssignedExams(), fetchAllExams()]);
+      
+      // Close modal after submission
+      handleCloseModal();
+    } catch (error: any) {
+      console.error('Error submitting attendance:', error);
+      const errorMessage = error.response?.data?.error || error.message || 'Failed to submit attendance';
+      toast.error(errorMessage);
+    } finally {
+      setSubmittingAttendance(false);
+    }
   };
 
   return (
     <div className="proctor-attendance-container">
+      <ToastContainer position="top-right" autoClose={3000} />
          
       <div className="proctor-attendance-instruction">
         <p className="proctor-attendance-instruction-text">
@@ -191,12 +212,16 @@ const ProctorAttendance: React.FC<UserProps> = ({ }) => {
         </p>
       </div>
       
-      {/* First Section: Proctor's Assigned Exams */}
-      <div className="proctor-attendance-section">
-        <h3 className="proctor-attendance-section-title">My Assigned Exams</h3>
-        <div className="proctor-attendance-canvas">
-          <div className="proctor-attendance-schedules-grid">
-            {proctorAssignedExams.length > 0 ? (
+      {loading ? (
+        <div className="no-data-message">Loading exams...</div>
+      ) : (
+        <>
+          {/* First Section: Proctor's Assigned Exams */}
+          <div className="proctor-attendance-section">
+            <h3 className="proctor-attendance-section-title">My Assigned Exams</h3>
+            <div className="proctor-attendance-canvas">
+              <div className="proctor-attendance-schedules-grid">
+                {proctorAssignedExams.length > 0 ? (
               proctorAssignedExams.map((exam) => (
                 <div 
                   key={exam.id} 
@@ -314,6 +339,8 @@ const ProctorAttendance: React.FC<UserProps> = ({ }) => {
           </div>
         </div>
       </div>
+        </>
+      )}
 
       {/* Modal for Confirmation */}
       {showModal && selectedExam && (
@@ -403,9 +430,9 @@ const ProctorAttendance: React.FC<UserProps> = ({ }) => {
                     <button
                       className="proctor-attendance-verify-button"
                       onClick={handleVerifyOtp}
-                      disabled={!otpCode.trim()}
+                      disabled={!otpCode.trim() || verifyingOtp}
                     >
-                      Verify
+                      {verifyingOtp ? 'Verifying...' : 'Verify'}
                     </button>
                   </div>
                   
@@ -462,12 +489,15 @@ const ProctorAttendance: React.FC<UserProps> = ({ }) => {
                   !otpCode.trim() || 
                   otpValidationStatus === 'idle' ||
                   otpValidationStatus === 'invalid' ||
-                  ((isSubstitutionMode || otpValidationStatus === 'valid-not-assigned') && !remarks.trim())
+                  ((isSubstitutionMode || otpValidationStatus === 'valid-not-assigned') && !remarks.trim()) ||
+                  submittingAttendance
                 }
               >
-                {isSubstitutionMode || otpValidationStatus === 'valid-not-assigned' 
-                  ? 'Confirm as Substitute' 
-                  : 'Confirm Proctorship'}
+                {submittingAttendance 
+                  ? 'Submitting...' 
+                  : (isSubstitutionMode || otpValidationStatus === 'valid-not-assigned' 
+                      ? 'Confirm as Substitute' 
+                      : 'Confirm Proctorship')}
               </button>
             </div>
           </div>

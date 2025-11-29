@@ -66,10 +66,18 @@ urlpatterns = [
     path('api/notifications/<int:pk>/delete/', views.notification_delete, name='notification_delete'),
     path('api/proctors/<int:scheduler_id>/', views.proctors_list, name='proctors_list'),
     path('api/send-email/', views.send_email_notification, name='send_email_notification'),
-    path('api/send-proctor-sms/', views.send_proctor_sms, name='send_proctor_sms'),
+    # path('api/send-proctor-sms/', views.send_proctor_sms, name='send_proctor_sms'),
     path('api/tbl_available_rooms/', views.tbl_available_rooms_list, name='tbl_available_rooms_list'),
     path('api/tbl_available_rooms/<str:room_id>/<str:college_id>/', views.tbl_available_rooms_delete, name='tbl_available_rooms_delete'),
     path('api/check-existing-schedules/', views.check_existing_schedules, name='check_existing_schedules'),
+
+    # Proctor Monitoring System
+    path('api/generate-exam-otps/', views.generate_exam_otps, name='generate_exam_otps'),
+    path('api/verify-otp/', views.verify_otp, name='verify_otp'),
+    path('api/submit-proctor-attendance/', views.submit_proctor_attendance, name='submit_proctor_attendance'),
+    path('api/proctor-assigned-exams/<int:user_id>/', views.proctor_assigned_exams, name='proctor_assigned_exams'),
+    path('api/proctor-monitoring/', views.proctor_monitoring_dashboard, name='proctor_monitoring_dashboard'),
+    path('api/all-exams-for-substitution/', views.all_exams_for_substitution, name='all_exams_for_substitution'),
 
     # Redirect frontend routes to React
     re_path(r'^(?!api/).*$', RedirectView.as_view(url='https://exam-sync-frontend.onrender.com/', permanent=False)),
