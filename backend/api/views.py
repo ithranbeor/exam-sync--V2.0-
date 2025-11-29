@@ -401,24 +401,17 @@ def tbl_examdetails_list(request):
             if exam_date:
                 queryset = queryset.filter(exam_date=exam_date)
             if modality_id:
-                # ✅ FIX: Convert strings to integers
+                # ✅ FIX: Handle single modality_id (not comma-separated for GET)
                 try:
-                    modality_ids = [int(mid.strip()) for mid in modality_id.split(',') if mid.strip().isdigit()]
-                    if modality_ids:  # Only filter if we have valid IDs
-                        queryset = queryset.filter(modality_id__in=modality_ids).only(
-                            'examdetails_id', 'modality_id', 'exam_date', 
-                            'exam_start_time', 'exam_end_time', 'course_id', 
-                            'section_name', 'room_id'
-                        )
-                    else:
-                        # If no valid IDs, return empty queryset
-                        queryset = queryset.none()
-                except (ValueError, TypeError) as e:
-                    print(f"❌ Error parsing modality_ids: {str(e)}")
-                    return Response(
-                        {'error': 'Invalid modality_id format', 'detail': str(e)},
-                        status=status.HTTP_400_BAD_REQUEST
+                    modality_id_int = int(modality_id)
+                    queryset = queryset.filter(modality_id=modality_id_int).only(
+                        'examdetails_id', 'modality_id', 'exam_date', 
+                        'exam_start_time', 'exam_end_time', 'course_id', 
+                        'section_name', 'room_id'
                     )
+                except ValueError:
+                    # If not a valid integer, return empty
+                    queryset = queryset.none()
             else:
                 queryset = queryset.all()
 
@@ -550,28 +543,11 @@ def tbl_examdetails_list(request):
         print("❌ Validation errors:", serializer.errors)
         return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
 
-@api_view(['GET', 'PUT', 'DELETE'])
-@permission_classes([AllowAny])
-def tbl_examdetails_detail(request, pk):
-    try:
-        instance = TblExamdetails.objects.get(pk=pk)
-    except TblExamdetails.DoesNotExist:
-        return Response({'error': 'Not found'}, status=status.HTTP_404_NOT_FOUND)
 
-    if request.method == 'GET':
-        serializer = TblExamdetailsSerializer(instance)
-        return Response(serializer.data)
-
-    elif request.method == 'PUT':
-        serializer = TblExamdetailsSerializer(instance, data=request.data, partial=True)
-        if serializer.is_valid():
-            serializer.save()
-            return Response(serializer.data)
-        return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
-
-    elif request.method == 'DELETE':
-        instance.delete()
-        return Response(status=status.HTTP_204_NO_CONTENT)
+# ============================================================================
+# ADD THIS NEW ENDPOINT to urls.py:
+# path('api/check-existing-schedules/', views.check_existing_schedules, name='check_existing_schedules'),
+# ============================================================================
 
 @api_view(['POST'])
 @permission_classes([AllowAny])
@@ -611,6 +587,29 @@ def check_existing_schedules(request):
             {'error': str(e), 'detail': 'Failed to check existing schedules'},
             status=status.HTTP_500_INTERNAL_SERVER_ERROR
         )
+
+@api_view(['GET', 'PUT', 'DELETE'])
+@permission_classes([AllowAny])
+def tbl_examdetails_detail(request, pk):
+    try:
+        instance = TblExamdetails.objects.get(pk=pk)
+    except TblExamdetails.DoesNotExist:
+        return Response({'error': 'Not found'}, status=status.HTTP_404_NOT_FOUND)
+
+    if request.method == 'GET':
+        serializer = TblExamdetailsSerializer(instance)
+        return Response(serializer.data)
+
+    elif request.method == 'PUT':
+        serializer = TblExamdetailsSerializer(instance, data=request.data, partial=True)
+        if serializer.is_valid():
+            serializer.save()
+            return Response(serializer.data)
+        return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
+
+    elif request.method == 'DELETE':
+        instance.delete()
+        return Response(status=status.HTTP_204_NO_CONTENT)
         
 @api_view(['GET', 'POST'])
 @permission_classes([AllowAny])
