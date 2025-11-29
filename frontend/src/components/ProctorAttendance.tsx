@@ -28,8 +28,10 @@ interface ExamDetails {
 const ProctorAttendance: React.FC<UserProps> = ({ }) => {
   const [selectedExam, setSelectedExam] = useState<ExamDetails | null>(null);
   const [showModal, setShowModal] = useState(false);
+  const [isSubstitutionMode, setIsSubstitutionMode] = useState(false);
   const [otpCode, setOtpCode] = useState('');
   const [remarks, setRemarks] = useState('');
+  const [otpValidationStatus, setOtpValidationStatus] = useState<'idle' | 'valid-assigned' | 'valid-not-assigned' | 'invalid'>('idle');
   // user will be used for future functionality
   // Mock data - Proctor's assigned exams (sorted by schedule)
   const proctorAssignedExams = [
@@ -119,27 +121,63 @@ const ProctorAttendance: React.FC<UserProps> = ({ }) => {
     }
   ];
 
-  const handleCardClick = (exam: ExamDetails) => {
+  const handleCardClick = (exam: ExamDetails, isSubstitution: boolean = false) => {
     setSelectedExam(exam);
+    setIsSubstitutionMode(isSubstitution);
     setShowModal(true);
     setOtpCode('');
     setRemarks('');
+    setOtpValidationStatus('idle');
   };
 
   const handleCloseModal = () => {
     setShowModal(false);
     setSelectedExam(null);
+    setIsSubstitutionMode(false);
     setOtpCode('');
     setRemarks('');
+    setOtpValidationStatus('idle');
+  };
+
+  const handleOtpChange = (value: string) => {
+    setOtpCode(value);
+    // Reset validation status when OTP changes
+    if (otpValidationStatus !== 'idle') {
+      setOtpValidationStatus('idle');
+    }
+  };
+
+  const handleVerifyOtp = async () => {
+    // TODO: Replace with actual API call
+    // For now, simulate validation
+    if (!otpCode.trim()) {
+      return;
+    }
+
+    // Simulate API call
+    // const response = await api.post('/api/verify-otp/', { otp_code: otpCode, schedule_id: selectedExam?.id });
+    
+    // Mock validation logic (replace with actual API response)
+    // For demonstration: if OTP contains "SUB" or it's substitution mode, show not-assigned
+    if (isSubstitutionMode || otpCode.includes('SUB')) {
+      setOtpValidationStatus('valid-not-assigned');
+    } else {
+      setOtpValidationStatus('valid-assigned');
+    }
   };
 
   const handleSubmit = () => {
     // TODO: Add API call to submit attendance
+    const role = (isSubstitutionMode || otpValidationStatus === 'valid-not-assigned') ? 'sub' : 'assigned';
+    
     console.log('Submitting attendance:', {
       exam: selectedExam,
       otpCode,
-      remarks
+      remarks,
+      role,
+      isSubstitution: isSubstitutionMode || otpValidationStatus === 'valid-not-assigned'
     });
+    
     // Close modal after submission
     handleCloseModal();
   };
@@ -162,8 +200,8 @@ const ProctorAttendance: React.FC<UserProps> = ({ }) => {
               proctorAssignedExams.map((exam) => (
                 <div 
                   key={exam.id} 
-                  className="proctor-attendance-schedule-card proctor-attendance-schedule-card-clickable"
-                  onClick={() => handleCardClick(exam)}
+                  className="proctor-attendance-schedule-card proctor-attendance-schedule-card-clickable proctor-attendance-schedule-card-assigned"
+                  onClick={() => handleCardClick(exam, false)}
                 >
                   <div className="proctor-attendance-schedule-header">
                     <h3 className="proctor-attendance-schedule-subject">
@@ -217,7 +255,11 @@ const ProctorAttendance: React.FC<UserProps> = ({ }) => {
           <div className="proctor-attendance-schedules-grid">
             {allExams.length > 0 ? (
               allExams.map((exam) => (
-                <div key={exam.id} className="proctor-attendance-schedule-card">
+                <div 
+                  key={exam.id} 
+                  className="proctor-attendance-schedule-card proctor-attendance-schedule-card-clickable proctor-attendance-schedule-card-substitution"
+                  onClick={() => handleCardClick(exam, true)}
+                >
                   <div className="proctor-attendance-schedule-header">
                     <h3 className="proctor-attendance-schedule-subject">
                       {exam.course_id} - {exam.subject}
@@ -261,6 +303,9 @@ const ProctorAttendance: React.FC<UserProps> = ({ }) => {
                       </span>
                     </div>
                   </div>
+                  <div className="proctor-attendance-click-hint proctor-attendance-substitution-hint">
+                    Click to substitute as proctor
+                  </div>
                 </div>
               ))
             ) : (
@@ -275,13 +320,25 @@ const ProctorAttendance: React.FC<UserProps> = ({ }) => {
         <div className="proctor-attendance-modal-overlay" onClick={handleCloseModal}>
           <div className="proctor-attendance-modal" onClick={(e) => e.stopPropagation()}>
             <div className="proctor-attendance-modal-header">
-              <h3 className="proctor-attendance-modal-title">Confirm Proctorship</h3>
+              <h3 className="proctor-attendance-modal-title">
+                {isSubstitutionMode ? 'Substitute Proctorship' : 'Confirm Proctorship'}
+              </h3>
               <button className="proctor-attendance-modal-close" onClick={handleCloseModal}>
                 ×
               </button>
             </div>
             
             <div className="proctor-attendance-modal-content">
+              {/* Substitution Mode Indicator */}
+              {isSubstitutionMode && (
+                <div className="proctor-attendance-substitution-banner">
+                  <span className="substitution-icon">⚠️</span>
+                  <span className="substitution-text">
+                    You are substituting for: <strong>{selectedExam.assigned_proctor}</strong>
+                  </span>
+                </div>
+              )}
+
               <div className="proctor-attendance-modal-exam-details">
                 <h4>Exam Details</h4>
                 <div className="proctor-attendance-modal-details-grid">
@@ -309,6 +366,12 @@ const ProctorAttendance: React.FC<UserProps> = ({ }) => {
                     <span className="modal-detail-label">Room:</span>
                     <span className="modal-detail-value">{selectedExam.room_id}</span>
                   </div>
+                  {selectedExam.assigned_proctor && (
+                    <div className="proctor-attendance-modal-detail-item">
+                      <span className="modal-detail-label">Assigned Proctor:</span>
+                      <span className="modal-detail-value">{selectedExam.assigned_proctor}</span>
+                    </div>
+                  )}
                   {selectedExam.instructor_name && (
                     <div className="proctor-attendance-modal-detail-item">
                       <span className="modal-detail-label">Instructor:</span>
@@ -323,28 +386,64 @@ const ProctorAttendance: React.FC<UserProps> = ({ }) => {
                   <label htmlFor="otp-input" className="proctor-attendance-modal-label">
                     Exam Code (OTP):
                   </label>
-                  <input
-                    id="otp-input"
-                    type="text"
-                    className="proctor-attendance-modal-input"
-                    placeholder="Enter the exam code shown in the venue"
-                    value={otpCode}
-                    onChange={(e) => setOtpCode(e.target.value)}
-                  />
+                  <div className="proctor-attendance-otp-input-wrapper">
+                    <input
+                      id="otp-input"
+                      type="text"
+                      className="proctor-attendance-modal-input"
+                      placeholder="Enter the exam code shown in the venue"
+                      value={otpCode}
+                      onChange={(e) => handleOtpChange(e.target.value)}
+                      onKeyPress={(e) => {
+                        if (e.key === 'Enter' && otpCode.trim()) {
+                          handleVerifyOtp();
+                        }
+                      }}
+                    />
+                    <button
+                      className="proctor-attendance-verify-button"
+                      onClick={handleVerifyOtp}
+                      disabled={!otpCode.trim()}
+                    >
+                      Verify
+                    </button>
+                  </div>
+                  
+                  {/* OTP Validation Status */}
+                  {otpValidationStatus === 'valid-assigned' && (
+                    <div className="proctor-attendance-validation-message proctor-attendance-validation-success">
+                      ✅ Valid code. You are assigned to this exam.
+                    </div>
+                  )}
+                  {otpValidationStatus === 'valid-not-assigned' && (
+                    <div className="proctor-attendance-validation-message proctor-attendance-validation-warning">
+                      ⚠️ Valid code, but you are not assigned. Act as a substitute?
+                    </div>
+                  )}
+                  {otpValidationStatus === 'invalid' && (
+                    <div className="proctor-attendance-validation-message proctor-attendance-validation-error">
+                      ❌ Invalid or expired exam code.
+                    </div>
+                  )}
                 </div>
 
                 <div className="proctor-attendance-modal-input-group">
                   <label htmlFor="remarks-input" className="proctor-attendance-modal-label">
-                    Remarks (Optional):
+                    Remarks {isSubstitutionMode || otpValidationStatus === 'valid-not-assigned' ? '(Required for substitution)' : '(Optional)'}:
                   </label>
                   <textarea
                     id="remarks-input"
-                    className="proctor-attendance-modal-textarea"
-                    placeholder="Enter any remarks or notes..."
+                    className={`proctor-attendance-modal-textarea ${(isSubstitutionMode || otpValidationStatus === 'valid-not-assigned') && !remarks.trim() ? 'proctor-attendance-required-field' : ''}`}
+                    placeholder={isSubstitutionMode || otpValidationStatus === 'valid-not-assigned' 
+                      ? "Please provide a reason for substitution (e.g., emergency leave, illness, etc.)" 
+                      : "Enter any remarks or notes..."}
                     rows={3}
                     value={remarks}
                     onChange={(e) => setRemarks(e.target.value)}
                   />
+                  {(isSubstitutionMode || otpValidationStatus === 'valid-not-assigned') && !remarks.trim() && (
+                    <span className="proctor-attendance-field-error">Remarks are required for substitution</span>
+                  )}
                 </div>
               </div>
             </div>
@@ -359,9 +458,16 @@ const ProctorAttendance: React.FC<UserProps> = ({ }) => {
               <button 
                 className="proctor-attendance-modal-submit" 
                 onClick={handleSubmit}
-                disabled={!otpCode.trim()}
+                disabled={
+                  !otpCode.trim() || 
+                  otpValidationStatus === 'idle' ||
+                  otpValidationStatus === 'invalid' ||
+                  ((isSubstitutionMode || otpValidationStatus === 'valid-not-assigned') && !remarks.trim())
+                }
               >
-                Confirm Proctorship
+                {isSubstitutionMode || otpValidationStatus === 'valid-not-assigned' 
+                  ? 'Confirm as Substitute' 
+                  : 'Confirm Proctorship'}
               </button>
             </div>
           </div>
