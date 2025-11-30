@@ -1195,16 +1195,55 @@ const SchedulerPlottingSchedule: React.FC<SchedulerProps> = ({ user, onScheduleC
                 sc.section_name === selectedModality.section_name
         );
         
+        // ✅ CRITICAL FIX: Ensure enrolled_students and section_name are present
+        const enrolledCount = selectedModality.enrolled_students || 
+                            sectionCourseData?.number_of_students || 
+                            0;
+        
+        const sectionName = selectedModality.section_name || 
+                          sectionCourseData?.section_name || 
+                          'Unknown';
+        
         const enrichedSection = {
           ...selectedModality,
+          enrolled_students: enrolledCount,  // ✅ Ensure this is set
+          section_name: sectionName,         // ✅ Ensure this is set
           is_night_class: sectionCourseData?.is_night_class ?? null,
           instructor_id: sectionCourseData?.user_id ?? null
         };
+        
+        // ✅ DEBUG: Log each section as it's built
+        console.log(`📦 Building section ${modalityId}:`, {
+          modality_id: enrichedSection.modality_id,
+          section_name: enrichedSection.section_name,
+          enrolled_students: enrichedSection.enrolled_students,
+          course_id: enrichedSection.course_id
+        });
         
         allSections.push(enrichedSection);
         sectionMap.set(modalityId, enrichedSection);
       }
     });
+
+    // ✅ VALIDATION: Check for sections with 0 students
+    const sectionsWithoutStudents = allSections.filter(s => 
+      (s.enrolled_students || 0) === 0
+    );
+
+    if (sectionsWithoutStudents.length > 0) {
+      console.error('❌ Sections with 0 students:', sectionsWithoutStudents);
+      alert(
+        `Error: ${sectionsWithoutStudents.length} section(s) have no student count.\n\n` +
+        sectionsWithoutStudents.map(s => 
+          `${s.course_id} - ${s.section_name || 'Unknown'} (ID: ${s.modality_id})`
+        ).join('\n') +
+        `\n\nPlease fix the modality data before scheduling.`
+      );
+      return;
+    }
+
+    console.log(`✅ Built ${allSections.length} sections for scheduling`);
+    console.log('Sample section:', allSections[0]);
 
     const eveningTimeSlots = TIME_SLOT_RANGES["6 PM - 9 PM (Evening)"];
     const morningTimeSlots = TIME_SLOT_RANGES["7 AM - 1 PM (Morning)"];
