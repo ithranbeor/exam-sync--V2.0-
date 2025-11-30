@@ -407,10 +407,10 @@ const Buildings: React.FC = () => {
                 onMouseLeave={(e) => {
                   e.currentTarget.style.backgroundColor = '#0A3765';
                 }}
-                title="Sort"
+                title="Sort by"
               >
                 <FaSort/>
-                <span>Sort</span>
+                <span>Sort by</span>
               </button>
               {showSortDropdown && (
                 <div 
@@ -733,29 +733,31 @@ const Buildings: React.FC = () => {
       {/* Room List Modal */}
       {showRoomModal && (
         <div className="modal-overlay">
-          <div className="modal room-modal" style={{ width: 600 }}>
+          <div className="modal room-modal">
             <h3>Rooms in {selectedBuildingName}</h3>
-            <table className="accounts-table">
-              <thead>
-                <tr>
-                  <th>Room #</th>
-                  <th>Room Name</th>
-                  <th>Type</th>
-                </tr>
-              </thead>
-              <tbody>
-                {selectedBuildingRooms.map((room) => (
-                  <tr key={room.room_id}>
-                    <td>{room.room_id}</td>
-                    <td>{room.room_name}</td>
-                    <td>{room.room_type}</td>
+            <div className="room-modal-table-container">
+              <table className="accounts-table">
+                <thead>
+                  <tr>
+                    <th>Room #</th>
+                    <th>Room Name</th>
+                    <th>Type</th>
                   </tr>
-                ))}
-                {selectedBuildingRooms.length === 0 && (
-                  <tr><td colSpan={3}>No rooms found.</td></tr>
-                )}
-              </tbody>
-            </table>
+                </thead>
+                <tbody>
+                  {selectedBuildingRooms.map((room) => (
+                    <tr key={room.room_id}>
+                      <td>{room.room_id}</td>
+                      <td>{room.room_name}</td>
+                      <td>{room.room_type}</td>
+                    </tr>
+                  ))}
+                  {selectedBuildingRooms.length === 0 && (
+                    <tr><td colSpan={3}>No rooms found.</td></tr>
+                  )}
+                </tbody>
+              </table>
+            </div>
             <div className="modal-actions">
               <button type="button" onClick={() => setShowRoomModal(false)}>Close</button>
             </div>

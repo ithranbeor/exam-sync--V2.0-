@@ -534,10 +534,10 @@ const Courses: React.FC = () => {
                 onMouseLeave={(e) => {
                   e.currentTarget.style.backgroundColor = '#0A3765';
                 }}
-                title="Sort"
+                title="Sort by"
               >
                 <FaSort/>
-                <span>Sort</span>
+                <span>Sort by</span>
               </button>
               {showSortDropdown && (
                 <div 
