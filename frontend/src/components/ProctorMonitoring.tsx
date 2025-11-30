@@ -1,4 +1,7 @@
-import React from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
+import { toast, ToastContainer } from 'react-toastify';
+import 'react-toastify/dist/ReactToastify.css';
+import api from '../lib/apiClient';
 import '../styles/ProctorMonitoring.css';
 
 interface UserProps {
@@ -10,140 +13,259 @@ interface UserProps {
   } | null;
 }
 
-const ProctorMonitoring: React.FC<UserProps> = ({ }) => {
-  // user will be used for future functionality
-  // Mock data - Approved Exam Schedules (Static UI for demonstration)
-  // This will be replaced with actual API data from approved schedules
-  const approvedSchedules = [
-    {
-      id: 1,
-      course_id: "IT114",
-      subject: "Computer Programming",
-      section_name: "BSIT-3A",
-      exam_date: "2024-01-15",
-      exam_start_time: "08:00",
-      exam_end_time: "09:30",
-      building_name: "Building 09",
-      room_id: "306",
-      proctor_name: "Mr. Cruz",
-      instructor_name: "Ms. Dela Peña",
-      department: "Information Technology",
-      college: "CITC"
-    },
-    {
-      id: 2,
-      course_id: "CS101",
-      subject: "Introduction to Computer Science",
-      section_name: "BSCS-1B",
-      exam_date: "2024-01-15",
-      exam_start_time: "10:00",
-      exam_end_time: "11:30",
-      building_name: "Building 09",
-      room_id: "205",
-      proctor_name: "Dr. Santos",
-      instructor_name: "Prof. Garcia",
-      department: "Computer Science",
-      college: "CITC"
-    },
-    {
-      id: 3,
-      course_id: "IT201",
-      subject: "Data Structures",
-      section_name: "BSIT-2C",
-      exam_date: "2024-01-16",
-      exam_start_time: "01:00",
-      exam_end_time: "02:30",
-      building_name: "Building 10",
-      room_id: "401",
-      proctor_name: "Ms. Reyes",
-      instructor_name: "Dr. Martinez",
-      department: "Information Technology",
-      college: "CITC"
-    },
-    {
-      id: 4,
-      course_id: "CS202",
-      subject: "Database Systems",
-      section_name: "BSCS-2A",
-      exam_date: "2024-01-16",
-      exam_start_time: "03:00",
-      exam_end_time: "04:30",
-      building_name: "Building 10",
-      room_id: "402",
-      proctor_name: "Mr. Torres",
-      instructor_name: "Ms. Fernandez",
-      department: "Computer Science",
-      college: "CITC"
+interface MonitoringSchedule {
+  id: number;
+  course_id: string;
+  subject: string;
+  section_name: string;
+  exam_date: string;
+  exam_start_time: string;
+  exam_end_time: string;
+  building_name: string;
+  room_id: string;
+  proctor_name: string;
+  instructor_name: string;
+  department: string;
+  college: string;
+  status: string;
+  code_entry_time: string | null;
+  otp_code: string | null;
+}
+
+const ProctorMonitoring: React.FC<UserProps> = ({ user }) => {
+  const [approvedSchedules, setApprovedSchedules] = useState<MonitoringSchedule[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [generatingOtp, setGeneratingOtp] = useState(false);
+  const [collegeFilter, setCollegeFilter] = useState<string>('');
+  const [hasApprovedSchedules, setHasApprovedSchedules] = useState(false);
+
+  // Fetch monitoring data
+  const fetchMonitoringData = useCallback(async () => {
+    setLoading(true);
+    try {
+      const params: any = {};
+      if (collegeFilter) {
+        params.college_name = collegeFilter;
+      }
+      
+      const { data } = await api.get('/proctor-monitoring/', { params });
+      
+      const formattedSchedules: MonitoringSchedule[] = data.map((schedule: any) => ({
+        id: schedule.id,
+        course_id: schedule.course_id,
+        subject: schedule.subject || schedule.course_id,
+        section_name: schedule.section_name || '',
+        exam_date: schedule.exam_date || '',
+        exam_start_time: schedule.exam_start_time || '',
+        exam_end_time: schedule.exam_end_time || '',
+        building_name: schedule.building_name || '',
+        room_id: schedule.room_id || '',
+        proctor_name: schedule.proctor_name || '',
+        instructor_name: schedule.instructor_name || '',
+        department: schedule.department || '',
+        college: schedule.college || '',
+        status: schedule.status || 'pending',
+        code_entry_time: schedule.code_entry_time || null,
+        otp_code: schedule.otp_code || null
+      }));
+      
+      setApprovedSchedules(formattedSchedules);
+      setHasApprovedSchedules(formattedSchedules.length > 0);
+    } catch (error: any) {
+      console.error('Error fetching monitoring data:', error);
+      toast.error('Failed to load monitoring data');
+      setHasApprovedSchedules(false);
+    } finally {
+      setLoading(false);
     }
-  ];
+  }, [collegeFilter]);
+
+  // Load data on mount and when filter changes
+  useEffect(() => {
+    fetchMonitoringData();
+  }, [fetchMonitoringData]);
+
+  // Handle generate OTP codes
+  const handleGenerateOtpCodes = async () => {
+    setGeneratingOtp(true);
+    try {
+      // Get all schedule IDs that don't have OTP codes yet
+      const schedulesWithoutOtp = approvedSchedules
+        .filter(s => !s.otp_code)
+        .map(s => s.id);
+
+      if (schedulesWithoutOtp.length === 0) {
+        toast.info('All schedules already have OTP codes');
+        return;
+      }
+
+      const response = await api.post('/generate-exam-otps/', {
+        schedule_ids: schedulesWithoutOtp
+      });
+
+      toast.success(`Generated OTP codes for ${schedulesWithoutOtp.length} schedule(s)`);
+      
+      // Refresh data
+      await fetchMonitoringData();
+    } catch (error: any) {
+      console.error('Error generating OTP codes:', error);
+      const errorMessage = error.response?.data?.error || error.message || 'Failed to generate OTP codes';
+      toast.error(errorMessage);
+    } finally {
+      setGeneratingOtp(false);
+    }
+  };
+
 
   return (
     <div className="proctor-monitoring-container">
+      <ToastContainer position="top-right" autoClose={3000} />
+      
       <div className="proctor-monitoring-header">
         <div className="proctor-monitoring-header-left">
-          <p className="proctor-monitoring-label">
-            EXAM SCHEDULE IS APPROVE WOULD YOU LIKE TO CREATE EXAM CODES?
+          <p 
+            className="proctor-monitoring-label"
+            style={{
+              color: hasApprovedSchedules ? '#28a745' : '#666',
+              fontWeight: hasApprovedSchedules ? 'bold' : 'normal',
+              fontSize: hasApprovedSchedules ? '1.1em' : '1em'
+            }}
+          >
+            {hasApprovedSchedules 
+              ? '✅ EXAM SCHEDULE HAS BEEN APPROVED. CLICK TO GENERATE EXAM CODES'
+              : 'EXAM SCHEDULE HAS BEEN APPROVED. CLICK TO GENERATE EXAM CODES'}
           </p>
         </div>
-        <button className="proctor-monitoring-create-button">
-          CREATE BUTTON
+        <button 
+          className="proctor-monitoring-create-button"
+          onClick={handleGenerateOtpCodes}
+          disabled={generatingOtp || loading || !hasApprovedSchedules}
+          style={{
+            opacity: hasApprovedSchedules ? 1 : 0.6,
+            cursor: hasApprovedSchedules ? 'pointer' : 'not-allowed'
+          }}
+        >
+          {generatingOtp ? 'GENERATING...' : 'CLICK TO GENERATE EXAM CODES'}
         </button>
       </div>
       
-      {/* Canvas Area - Similar to Plot Schedule UI */}
-      <div className="proctor-monitoring-canvas">
-        <div className="proctor-monitoring-schedules-grid">
-          {approvedSchedules.map((schedule) => (
-            <div key={schedule.id} className="proctor-monitoring-schedule-card">
-              <div className="proctor-monitoring-schedule-header">
-                <h3 className="proctor-monitoring-schedule-subject">
-                  {schedule.course_id} - {schedule.subject}
-                </h3>
-                <span className="proctor-monitoring-schedule-code">{schedule.course_id}</span>
-              </div>
-              
-              <div className="proctor-monitoring-schedule-details">
-                <div className="proctor-monitoring-detail-row">
-                  <span className="proctor-monitoring-detail-label">Section:</span>
-                  <span className="proctor-monitoring-detail-value">{schedule.section_name}</span>
-                </div>
-                <div className="proctor-monitoring-detail-row">
-                  <span className="proctor-monitoring-detail-label">Date:</span>
-                  <span className="proctor-monitoring-detail-value">{schedule.exam_date}</span>
-                </div>
-                <div className="proctor-monitoring-detail-row">
-                  <span className="proctor-monitoring-detail-label">Time:</span>
-                  <span className="proctor-monitoring-detail-value">{schedule.exam_start_time} - {schedule.exam_end_time}</span>
-                </div>
-                <div className="proctor-monitoring-detail-row">
-                  <span className="proctor-monitoring-detail-label">Building:</span>
-                  <span className="proctor-monitoring-detail-value">{schedule.building_name}</span>
-                </div>
-                <div className="proctor-monitoring-detail-row">
-                  <span className="proctor-monitoring-detail-label">Room:</span>
-                  <span className="proctor-monitoring-detail-value">{schedule.room_id}</span>
-                </div>
-                <div className="proctor-monitoring-detail-row">
-                  <span className="proctor-monitoring-detail-label">Proctor:</span>
-                  <span className="proctor-monitoring-detail-value">{schedule.proctor_name}</span>
-                </div>
-                <div className="proctor-monitoring-detail-row">
-                  <span className="proctor-monitoring-detail-label">Instructor:</span>
-                  <span className="proctor-monitoring-detail-value">{schedule.instructor_name}</span>
-                </div>
-              </div>
+      {loading ? (
+        <div className="no-data-message">Loading monitoring data...</div>
+      ) : (
+        <>
+          {/* Table Area */}
+          <div className="proctor-monitoring-table-container">
+            <table className="proctor-monitoring-table">
+              <thead>
+                <tr>
+                  <th>#</th>
+                  <th>Course Code</th>
+                  <th>Subject</th>
+                  <th>Section</th>
+                  <th>Date</th>
+                  <th>Time</th>
+                  <th>Building</th>
+                  <th>Room</th>
+                  <th>Proctor</th>
+                  <th>Instructor</th>
+                  <th>Exam Code (OTP)</th>
+                  <th>Time In</th>
+                  <th>Status of Proctorship</th>
+                </tr>
+              </thead>
+              <tbody>
+                {approvedSchedules.length > 0 ? (
+              approvedSchedules.map((schedule, index) => {
+                // Determine status based on schedule data (can be updated to use actual status from backend)
+                const status = schedule.status || 'pending'; // 'confirmed', 'late', 'absent', 'substitute'
+                
+                const getStatusDisplay = (status: string) => {
+                  switch(status.toLowerCase()) {
+                    case 'confirmed':
+                    case 'confirm':
+                      return { text: 'Confirmed', className: 'status-confirmed' };
+                    case 'late':
+                    case 'absent':
+                      return { text: status === 'late' ? 'Late' : 'Absent', className: 'status-late-absent' };
+                    case 'substitute':
+                    case 'sub':
+                      return { text: 'Substitute', className: 'status-substitute' };
+                    default:
+                      return { text: 'Pending', className: 'status-pending' };
+                  }
+                };
 
-              {/* OTP Field - Blank for now */}
-              <div className="proctor-monitoring-otp-section">
-                <label className="proctor-monitoring-otp-label">Exam Code (OTP):</label>
-                <div className="proctor-monitoring-otp-field">
-                  {/* OTP will be generated here */}
-                </div>
-              </div>
-            </div>
-          ))}
-        </div>
+                const statusDisplay = getStatusDisplay(status);
+
+                // Format time entry
+                const formatTimeIn = (timeString: string | null | undefined) => {
+                  if (!timeString) return '-';
+                  try {
+                    const date = new Date(timeString);
+                    // Format as HH:MM (hours and minutes only)
+                    const hours = date.getHours().toString().padStart(2, '0');
+                    const minutes = date.getMinutes().toString().padStart(2, '0');
+                    return `${hours}:${minutes}`;
+                  } catch (e) {
+                    return '-';
+                  }
+                };
+
+                const codeEntryTime = schedule.code_entry_time || (schedule as any).proctor_timein;
+
+                return (
+                  <tr key={schedule.id}>
+                    <td>{index + 1}</td>
+                    <td>{schedule.course_id}</td>
+                    <td>{schedule.subject}</td>
+                    <td>{schedule.section_name}</td>
+                    <td>{schedule.exam_date}</td>
+                    <td>{schedule.exam_start_time} - {schedule.exam_end_time}</td>
+                    <td>{schedule.building_name}</td>
+                    <td>{schedule.room_id}</td>
+                    <td>{schedule.proctor_name}</td>
+                    <td>{schedule.instructor_name}</td>
+                    <td>
+                      <div className="proctor-monitoring-otp-field">
+                        {schedule.otp_code ? (
+                          <span style={{ 
+                            fontFamily: 'monospace', 
+                            fontWeight: 'bold',
+                            color: '#2c3e50',
+                            fontSize: '0.9em'
+                          }}>
+                            {schedule.otp_code}
+                          </span>
+                        ) : (
+                          <span style={{ color: '#999', fontStyle: 'italic' }}>
+                            Not generated
+                          </span>
+                        )}
+                      </div>
+                    </td>
+                    <td className="proctor-monitoring-time-in">
+                      {formatTimeIn(codeEntryTime)}
+                    </td>
+                    <td>
+                      <span className={`status-badge ${statusDisplay.className}`}>
+                        {statusDisplay.text}
+                      </span>
+                    </td>
+                  </tr>
+                );
+              })
+            ) : (
+              <tr>
+                <td colSpan={13} className="no-data-message">
+                  No approved schedules found
+                </td>
+              </tr>
+            )}
+          </tbody>
+        </table>
       </div>
+        </>
+      )}
     </div>
   );
 };

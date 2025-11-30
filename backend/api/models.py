@@ -232,6 +232,12 @@ class TblExamdetails(models.Model):
     exam_end_time = models.DateTimeField(blank=True, null=True)
     proctor_timein = models.DateTimeField(blank=True, null=True)
     proctor_timeout = models.DateTimeField(blank=True, null=True)
+    proctor_status = models.CharField(max_length=20, blank=True, null=True, choices=[
+        ('confirmed', 'Confirmed'),
+        ('late', 'Late'),
+        ('absent', 'Absent'),
+        ('substitute', 'Substitute'),
+    ], default=None, help_text="Proctor attendance status: confirmed, late, absent, or substitute")
     section_name = models.CharField(blank=True, null=True)
     academic_year = models.TextField(blank=True, null=True)
     semester = models.TextField(blank=True, null=True)
@@ -255,6 +261,76 @@ class TblExamdetails(models.Model):
             models.Index(fields=['course_id']),
             models.Index(fields=['college_name']),
         ]
+
+
+class TblExamOTP(models.Model):
+    """
+    Stores OTP codes for exam schedules.
+    Generated when dean approves a schedule.
+    Format: [Building][Room]-[CourseCode]-[RandomCode]
+    Example: 09306-IT114-X5P9K
+    """
+    otp_id = models.AutoField(primary_key=True)
+    exam_schedule = models.ForeignKey('TblExamdetails', on_delete=models.CASCADE, related_name='otp_codes')
+    otp_code = models.CharField(max_length=50, unique=True, db_index=True)
+    assigned_proctor = models.ForeignKey('TblUsers', on_delete=models.CASCADE, related_name='assigned_otps', null=True, blank=True)
+    exam_start_time = models.DateTimeField()
+    exam_end_time = models.DateTimeField()
+    is_active = models.BooleanField(default=True)
+    is_used = models.BooleanField(default=False)
+    used_at = models.DateTimeField(blank=True, null=True)
+    used_by = models.ForeignKey('TblUsers', on_delete=models.SET_NULL, related_name='used_otps', null=True, blank=True)
+    created_at = models.DateTimeField(auto_now_add=True)
+    expires_at = models.DateTimeField(blank=True, null=True)
+
+    class Meta:
+        managed = True
+        db_table = 'tbl_exam_otp'
+        indexes = [
+            models.Index(fields=['otp_code']),
+            models.Index(fields=['exam_schedule']),
+            models.Index(fields=['assigned_proctor']),
+            models.Index(fields=['is_active', 'is_used']),
+            models.Index(fields=['exam_start_time', 'exam_end_time']),
+        ]
+
+    def __str__(self):
+        return f"{self.otp_code} - {self.exam_schedule.course_id if self.exam_schedule else 'N/A'}"
+
+
+class TblProctorAttendance(models.Model):
+    """
+    Records proctor attendance for exam schedules.
+    Tracks both assigned proctors and substitutes.
+    """
+    attendance_id = models.AutoField(primary_key=True)
+    exam_schedule = models.ForeignKey('TblExamdetails', on_delete=models.CASCADE, related_name='attendance_records')
+    proctor = models.ForeignKey('TblUsers', on_delete=models.CASCADE, related_name='proctor_attendances')
+    otp_used = models.ForeignKey('TblExamOTP', on_delete=models.SET_NULL, null=True, blank=True, related_name='attendance_records')
+    role = models.CharField(max_length=20, choices=[
+        ('assigned', 'Assigned Proctor'),
+        ('sub', 'Substitute Proctor'),
+    ], default='assigned')
+    remarks = models.TextField(blank=True, null=True, help_text="Required for substitute proctors")
+    time_in = models.DateTimeField(auto_now_add=True)
+    time_out = models.DateTimeField(blank=True, null=True)
+    is_locked = models.BooleanField(default=False, help_text="Locked after exam end time")
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        managed = True
+        db_table = 'tbl_proctor_attendance'
+        unique_together = (('exam_schedule', 'proctor'),)  # One attendance record per proctor per exam
+        indexes = [
+            models.Index(fields=['exam_schedule']),
+            models.Index(fields=['proctor']),
+            models.Index(fields=['role']),
+            models.Index(fields=['time_in']),
+            models.Index(fields=['is_locked']),
+        ]
+
+    def __str__(self):
+        return f"{self.proctor.first_name} {self.proctor.last_name} - {self.exam_schedule.course_id if self.exam_schedule else 'N/A'} ({self.role})"
 
 
 class TblExamperiod(models.Model):
