@@ -1186,34 +1186,51 @@ const SchedulerPlottingSchedule: React.FC<SchedulerProps> = ({ user, onScheduleC
 
     const allSections: any[] = [];
     const sectionMap = new Map<number, any>();
+
     formData.selectedModalities.forEach(modalityId => {
       const selectedModality = modalities.find(m => m.modality_id === modalityId);
-      if (selectedModality) {
+      if (!selectedModality) return;
+      
+      // ✅ FIX: Modality has `sections` array, not `section_name` string
+      const sectionsArray = selectedModality.sections || [];
+      
+      console.log(`🔍 Processing modality ${modalityId}:`, {
+        modality_id: modalityId,
+        sections_array: sectionsArray,
+        course_id: selectedModality.course_id,
+        program_id: selectedModality.program_id
+      });
+      
+      // ✅ FIX: Process EACH section in the array
+      sectionsArray.forEach((sectionName: string) => {
+        // Find the section course data for THIS specific section
         const sectionCourseData = sectionCourses.find(
           sc => sc.program_id === selectedModality.program_id &&
                 sc.course_id === selectedModality.course_id &&
-                sc.section_name === selectedModality.section_name
+                sc.section_name === sectionName  // ✅ Now using the section from array
         );
         
-        // ✅ CRITICAL FIX: Ensure enrolled_students and section_name are present
-        const enrolledCount = selectedModality.enrolled_students || 
-                            sectionCourseData?.number_of_students || 
-                            0;
+        if (!sectionCourseData) {
+          console.warn(`⚠️ No section course data found for ${sectionName}`);
+          return;
+        }
         
-        const sectionName = selectedModality.section_name || 
-                          sectionCourseData?.section_name || 
-                          'Unknown';
+        // ✅ FIX: Get student count from section course data
+        const enrolledCount = sectionCourseData.number_of_students || 0;
         
+        // ✅ FIX: Build enriched section with correct data
         const enrichedSection = {
           ...selectedModality,
-          enrolled_students: enrolledCount,  // ✅ Ensure this is set
-          section_name: sectionName,         // ✅ Ensure this is set
-          is_night_class: sectionCourseData?.is_night_class ?? null,
-          instructor_id: sectionCourseData?.user_id ?? null
+          modality_id: modalityId,  // Keep original modality ID
+          section_name: sectionName,  // ✅ Use section from array
+          enrolled_students: enrolledCount,  // ✅ From section course data
+          is_night_class: sectionCourseData.is_night_class ?? null,
+          instructor_id: sectionCourseData.user_id ?? null,
+          course_id: selectedModality.course_id,
+          program_id: selectedModality.program_id
         };
         
-        // ✅ DEBUG: Log each section as it's built
-        console.log(`📦 Building section ${modalityId}:`, {
+        console.log(`✅ Built section:`, {
           modality_id: enrichedSection.modality_id,
           section_name: enrichedSection.section_name,
           enrolled_students: enrichedSection.enrolled_students,
@@ -1221,8 +1238,9 @@ const SchedulerPlottingSchedule: React.FC<SchedulerProps> = ({ user, onScheduleC
         });
         
         allSections.push(enrichedSection);
+        // ✅ IMPORTANT: Still map by original modality_id
         sectionMap.set(modalityId, enrichedSection);
-      }
+      });
     });
 
     // ✅ VALIDATION: Check for sections with 0 students
