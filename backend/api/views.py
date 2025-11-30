@@ -2572,6 +2572,28 @@ def proctor_monitoring_dashboard(request):
     GET /api/proctor-monitoring/?college_name=CITC&status=approved
     """
     try:
+        # First, get all approved schedule approvals for the college
+        college_name = request.GET.get('college_name')
+        approved_approvals = TblScheduleapproval.objects.filter(
+            status='approved'
+        )
+        
+        if college_name:
+            approved_approvals = approved_approvals.filter(college_name=college_name)
+        
+        # Extract schedule identifiers from approved requests
+        approved_schedule_keys = set()
+        for approval in approved_approvals:
+            if approval.schedule_data and 'schedules' in approval.schedule_data:
+                for schedule_item in approval.schedule_data['schedules']:
+                    # Create a unique key: course_id + exam_date + exam_start_time
+                    key = (
+                        schedule_item.get('course_id', ''),
+                        schedule_item.get('exam_date', ''),
+                        schedule_item.get('exam_start_time', '')
+                    )
+                    approved_schedule_keys.add(key)
+        
         # Get all exam details
         exams = TblExamdetails.objects.select_related(
             'room',
@@ -2582,7 +2604,6 @@ def proctor_monitoring_dashboard(request):
         ).prefetch_related('attendance_records', 'otp_codes')
         
         # Filter by college
-        college_name = request.GET.get('college_name')
         if college_name:
             exams = exams.filter(college_name=college_name)
         
@@ -2599,17 +2620,63 @@ def proctor_monitoring_dashboard(request):
         if date_to:
             exams = exams.filter(exam_date__lte=date_to)
         
-        # Only show exams that have been approved (have OTP codes)
-        # This assumes OTP is only generated for approved schedules
-        exams = exams.filter(otp_codes__is_active=True).distinct()
+        # Filter to only show exams from approved schedule requests
+        if approved_schedule_keys:
+            # Filter exams that match approved schedule keys
+            filtered_exams = []
+            for exam in exams:
+                # Try to match by course_id, exam_date, and exam_start_time
+                exam_date_str = exam.exam_date or ''
+                exam_time_str = ''
+                if exam.exam_start_time:
+                    if isinstance(exam.exam_start_time, str):
+                        exam_time_str = exam.exam_start_time
+                    else:
+                        exam_time_str = exam.exam_start_time.strftime('%H:%M:%S')
+                
+                exam_key = (
+                    exam.course_id or '',
+                    exam_date_str,
+                    exam_time_str
+                )
+                # Also check with just time (HH:MM) format
+                exam_key_alt = (
+                    exam.course_id or '',
+                    exam_date_str,
+                    exam_time_str[:5] if len(exam_time_str) >= 5 else exam_time_str
+                )
+                
+                # Check if this exam matches any approved schedule
+                matches = False
+                for approved_key in approved_schedule_keys:
+                    # Match course_id and exam_date (time might vary slightly)
+                    if (exam.course_id and approved_key[0] and 
+                        exam.course_id == approved_key[0] and
+                        exam_date_str == approved_key[1]):
+                        matches = True
+                        break
+                
+                if matches:
+                    filtered_exams.append(exam)
+            
+            # Convert to queryset-like list and sort
+            exams_list = filtered_exams
+            exams_list = sorted(exams_list, key=lambda e: (
+                e.exam_date or '', 
+                e.exam_start_time if isinstance(e.exam_start_time, str) 
+                else (e.exam_start_time.strftime('%H:%M:%S') if e.exam_start_time else '')
+            ))
+        else:
+            # If no approved approvals, return empty
+            exams_list = []
         
-        # Order by date and time
-        exams = exams.order_by('exam_date', 'exam_start_time')
-        
-        serializer = ProctorMonitoringSerializer(exams, many=True)
+        # Serialize the filtered list
+        serializer = ProctorMonitoringSerializer(exams_list, many=True)
         return Response(serializer.data, status=status.HTTP_200_OK)
         
     except Exception as e:
+        import traceback
+        traceback.print_exc()
         return Response({
             'error': str(e)
         }, status=status.HTTP_500_INTERNAL_SERVER_ERROR)

@@ -37,6 +37,7 @@ const ProctorMonitoring: React.FC<UserProps> = ({ user }) => {
   const [loading, setLoading] = useState(true);
   const [generatingOtp, setGeneratingOtp] = useState(false);
   const [collegeFilter, setCollegeFilter] = useState<string>('');
+  const [hasApprovedSchedules, setHasApprovedSchedules] = useState(false);
 
   // Fetch monitoring data
   const fetchMonitoringData = useCallback(async () => {
@@ -69,9 +70,11 @@ const ProctorMonitoring: React.FC<UserProps> = ({ user }) => {
       }));
       
       setApprovedSchedules(formattedSchedules);
+      setHasApprovedSchedules(formattedSchedules.length > 0);
     } catch (error: any) {
       console.error('Error fetching monitoring data:', error);
       toast.error('Failed to load monitoring data');
+      setHasApprovedSchedules(false);
     } finally {
       setLoading(false);
     }
@@ -120,14 +123,27 @@ const ProctorMonitoring: React.FC<UserProps> = ({ user }) => {
       
       <div className="proctor-monitoring-header">
         <div className="proctor-monitoring-header-left">
-          <p className="proctor-monitoring-label">
-            EXAM SCHEDULE HAS BEEN APPROVED. CLICK TO GENERATE EXAM CODES
+          <p 
+            className="proctor-monitoring-label"
+            style={{
+              color: hasApprovedSchedules ? '#28a745' : '#666',
+              fontWeight: hasApprovedSchedules ? 'bold' : 'normal',
+              fontSize: hasApprovedSchedules ? '1.1em' : '1em'
+            }}
+          >
+            {hasApprovedSchedules 
+              ? '✅ EXAM SCHEDULE HAS BEEN APPROVED. CLICK TO GENERATE EXAM CODES'
+              : 'EXAM SCHEDULE HAS BEEN APPROVED. CLICK TO GENERATE EXAM CODES'}
           </p>
         </div>
         <button 
           className="proctor-monitoring-create-button"
           onClick={handleGenerateOtpCodes}
-          disabled={generatingOtp || loading}
+          disabled={generatingOtp || loading || !hasApprovedSchedules}
+          style={{
+            opacity: hasApprovedSchedules ? 1 : 0.6,
+            cursor: hasApprovedSchedules ? 'pointer' : 'not-allowed'
+          }}
         >
           {generatingOtp ? 'GENERATING...' : 'CLICK TO GENERATE EXAM CODES'}
         </button>
