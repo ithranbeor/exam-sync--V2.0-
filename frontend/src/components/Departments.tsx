@@ -358,8 +358,7 @@ const Departments: React.FC = () => {
   return (
     <div className="colleges-container">
       <div className="colleges-header">
-        <h2 className="colleges-title">Manage Departments</h2>
-        <div className="search-bar">
+        <div className="search-bar" style={{ marginLeft: 'auto' }}>
           <input
             type="text"
             placeholder="Search for Departments"

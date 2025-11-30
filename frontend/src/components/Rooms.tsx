@@ -347,8 +347,7 @@ const Rooms: React.FC = () => {
   return (
     <div className="colleges-container">
       <div className="colleges-header">
-        <h2 className="colleges-title">Manage Rooms</h2>
-        <div className="search-bar">
+        <div className="search-bar" style={{ marginLeft: 'auto' }}>
           <input
             type="text"
             placeholder="Search Room Name"

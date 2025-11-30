@@ -428,8 +428,7 @@ const ExamPeriodComponent: React.FC = () => {
   return (
     <div className="colleges-container">
       <div className="colleges-header">
-        <h2 className="colleges-title">Exam Periods</h2>
-        <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 12, marginLeft: 'auto' }}>
           <div className="search-bar">
             <input
               type="text"

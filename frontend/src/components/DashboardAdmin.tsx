@@ -273,7 +273,11 @@ const DashboardAdmin: React.FC = () => {
 
         <main className={`main-content ${isSidebarOpen ? 'sidebar-open' : 'sidebar-closed'}`}>
           <div className="content-header">
-            <h1>{activeMenu.charAt(0).toUpperCase() + activeMenu.slice(1).replace(/-/g, ' ')}</h1>
+            <h1>
+              {['colleges', 'departments', 'programs', 'courses', 'section-courses', 'terms', 'buildings', 'rooms', 'exam-period'].includes(activeMenu)
+                ? `Manage ${activeMenu.charAt(0).toUpperCase() + activeMenu.slice(1).replace(/-/g, ' ')}`
+                : activeMenu.charAt(0).toUpperCase() + activeMenu.slice(1).replace(/-/g, ' ')}
+            </h1>
           </div>
           {renderContent()}
         </main>
