@@ -510,10 +510,18 @@ class TblModalitySerializer(serializers.ModelSerializer):
     user = TblUsersSerializer(read_only=True)
     course = CourseSerializer(read_only=True)
     
-    # Write-only FKs for POST/PUT - ✅ CHANGED: removed write_only=True
+    # Write-only FKs for POST/PUT
     room_id = serializers.CharField(required=False, allow_null=True, allow_blank=True)
     user_id = serializers.IntegerField()
     course_id = serializers.CharField()
+    
+    # ✅ CHANGED: Handle sections as array (like possible_rooms)
+    sections = serializers.ListField(
+        child=serializers.CharField(),
+        required=False,
+        allow_empty=True,
+        allow_null=True
+    )
     
     # Handle possible_rooms as array
     possible_rooms = serializers.ListField(
@@ -538,7 +546,7 @@ class TblModalitySerializer(serializers.ModelSerializer):
             'user',
             'user_id',
             'created_at',
-            'section_name',
+            'sections',  # ✅ CHANGED: from section_name to sections
             'possible_rooms',
         ]
     
