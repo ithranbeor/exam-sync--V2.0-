@@ -388,24 +388,25 @@ def tbl_scheduleapproval_detail(request, pk):
 def tbl_examdetails_list(request):
     if request.method == 'GET':
         try:
-            # Start with a more efficient base query
+            # ✅ FIX: Use select_related only for non-nullable foreign keys
             queryset = TblExamdetails.objects.select_related(
+                'examperiod'
+            ).prefetch_related(
                 'room',
                 'room__building',
                 'modality',
                 'modality__course',
                 'modality__user',
-                'proctor',
-                'examperiod'
-            )
+                'proctor'
+            ).all()
 
             college_name = request.GET.get('college_name')
             room_id = request.GET.get('room_id')
             exam_date = request.GET.get('exam_date')
             modality_id = request.GET.get('modality_id')
-            proctor_id = request.GET.get('proctor_id')  # ✅ ADD THIS LINE
+            proctor_id = request.GET.get('proctor_id')
 
-            # ✅ Apply all filters, then get results
+            # ✅ Apply all filters
             if college_name:
                 queryset = queryset.filter(college_name=college_name)
             if room_id:
@@ -413,15 +414,12 @@ def tbl_examdetails_list(request):
             if exam_date:
                 queryset = queryset.filter(exam_date=exam_date)
             if modality_id:
-                # Handle single modality_id (not comma-separated for GET)
                 try:
                     modality_id_int = int(modality_id)
                     queryset = queryset.filter(modality_id=modality_id_int)
                 except ValueError:
-                    # If not a valid integer, return empty
                     return Response([], status=status.HTTP_200_OK)
             
-            # ✅ ADD THIS FILTER BLOCK
             if proctor_id:
                 try:
                     proctor_id_int = int(proctor_id)
@@ -430,7 +428,7 @@ def tbl_examdetails_list(request):
                 except ValueError:
                     return Response([], status=status.HTTP_200_OK)
             
-            # ✅ Order and serialize the filtered queryset
+            # ✅ Order and serialize
             queryset = queryset.order_by('room_id', 'exam_date', 'exam_start_time')
             
             print(f"📋 Returning {queryset.count()} exam details")
@@ -493,12 +491,12 @@ def tbl_examdetails_list(request):
                 if time_key not in room_time_usage:
                     room_time_usage[time_key] = {
                         'capacity': room_capacity,
-                        'batch_occupancy': 0,  # Only count items in THIS batch
+                        'batch_occupancy': 0,
                         'room_id': room_id,
                         'date': exam_date
                     }
                 
-                # Check if total would exceed capacity (using only batch occupancy)
+                # Check if total would exceed capacity
                 total_students = room_time_usage[time_key]['batch_occupancy'] + needed_capacity
                 
                 if total_students > room_time_usage[time_key]['capacity']:
@@ -515,7 +513,7 @@ def tbl_examdetails_list(request):
                 # Add to batch occupancy
                 room_time_usage[time_key]['batch_occupancy'] += needed_capacity
         
-        # ✅ Check for duplicate schedules (existing validation)
+        # ✅ Check for duplicate schedules
         if many:
             modality_ids = [item.get('modality_id') for item in request.data if item.get('modality_id')]
         else:
@@ -542,7 +540,7 @@ def tbl_examdetails_list(request):
                 'duplicates': duplicate_info
             }, status=status.HTTP_409_CONFLICT)
         
-        # Proceed with saving if all validations pass
+        # Proceed with saving
         serializer = TblExamdetailsSerializer(data=request.data, many=many)
         if serializer.is_valid():
             try:
@@ -561,7 +559,6 @@ def tbl_examdetails_list(request):
         
         print("❌ Validation errors:", serializer.errors)
         return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
-
 
 # ============================================================================
 # ADD THIS NEW ENDPOINT to urls.py:
