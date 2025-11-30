@@ -622,26 +622,36 @@ def tbl_examdetails_detail(request, pk):
 @api_view(['GET', 'POST'])
 @permission_classes([AllowAny])
 def tbl_modality_list(request):
-    if 'possible_rooms' in request.data and 'section_name' in request.data:
-        section = TblSectioncourse.objects.filter(
-            course_id=request.data.get('course_id'),
-            program_id=request.data.get('program_id'),
-            section_name=request.data.get('section_name')
-        ).first()
+    # ✅ VALIDATION: Check capacity before creating modality
+    if request.method == 'POST' and 'possible_rooms' in request.data and 'sections' in request.data:
+        sections = request.data['sections']  # Array of section names
         
-        if section:
-            total_capacity = 0
-            for room_id in request.data['possible_rooms']:
-                room = TblRooms.objects.filter(room_id=room_id).first()
-                if room:
-                    total_capacity += room.room_capacity
+        # Calculate total students from all sections
+        total_students = 0
+        for section_name in sections:
+            section = TblSectioncourse.objects.filter(
+                course_id=request.data.get('course_id'),
+                program_id=request.data.get('program_id'),
+                section_name=section_name
+            ).first()
             
-            if total_capacity < section.number_of_students:
-                return Response({
-                    'error': 'Insufficient room capacity',
-                    'detail': f'Total capacity ({total_capacity}) < Students ({section.number_of_students})'
-                }, status=status.HTTP_400_BAD_REQUEST)
-            
+            if section:
+                total_students += section.number_of_students
+        
+        # Calculate total room capacity
+        total_capacity = 0
+        for room_id in request.data['possible_rooms']:
+            room = TblRooms.objects.filter(room_id=room_id).first()
+            if room:
+                total_capacity += room.room_capacity
+        
+        # Validate capacity
+        if total_capacity < total_students:
+            return Response({
+                'error': 'Insufficient room capacity',
+                'detail': f'Total capacity ({total_capacity}) < Total students ({total_students})'
+            }, status=status.HTTP_400_BAD_REQUEST)
+    
     if request.method == 'GET':
         try:
             queryset = TblModality.objects.select_related(
@@ -655,14 +665,13 @@ def tbl_modality_list(request):
             # Optional filtering by query params
             course_id = request.GET.get('course_id')
             program_id = request.GET.get('program_id')
-            section_name = request.GET.get('section_name')
+            section_name = request.GET.get('section_name')  # ✅ Filter by section in array
             modality_type = request.GET.get('modality_type')
             room_type = request.GET.get('room_type')
-            user_id = request.GET.get('user_id')  # ✅ ADD THIS
+            user_id = request.GET.get('user_id')
 
             print(f"📥 Modality GET request - course_id: {course_id}, program_id: {program_id}, user_id: {user_id}")
 
-            # ✅ ADD: Filter by user_id
             if user_id:
                 queryset = queryset.filter(user__user_id=user_id)
                 print(f"🔍 Filtering by user_id: {user_id}")
@@ -679,8 +688,10 @@ def tbl_modality_list(request):
                 print(f"🔍 Filtering by program_ids: {program_ids}")
                 queryset = queryset.filter(program_id__in=program_ids)
             
+            # ✅ CHANGED: Filter by section in array
             if section_name:
-                queryset = queryset.filter(section_name=section_name)
+                queryset = queryset.filter(sections__contains=[section_name])
+                
             if modality_type:
                 queryset = queryset.filter(modality_type=modality_type)
             if room_type:
@@ -701,7 +712,6 @@ def tbl_modality_list(request):
             )
     
     elif request.method == 'POST':
-        # ✅ ADD: Log incoming data
         print("📥 Incoming modality POST data:", request.data)
         
         serializer = TblModalitySerializer(data=request.data)

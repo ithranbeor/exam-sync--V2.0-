@@ -287,9 +287,16 @@ class TblModality(models.Model):
     room = models.ForeignKey('TblRooms', models.DO_NOTHING, blank=True, null=True)
     user = models.ForeignKey('TblUsers', models.DO_NOTHING)
     created_at = models.DateTimeField(blank=True, null=True)
-    section_name = models.CharField(blank=True, null=True)
     
-    # ✅ FIXED: Proper ArrayField
+    # ✅ CHANGED: Store multiple sections as array instead of single section
+    sections = ArrayField(
+        models.CharField(max_length=50),
+        blank=True,
+        null=True,
+        default=list
+    )
+    
+    # ✅ Keep possible_rooms as array
     possible_rooms = ArrayField(
         models.CharField(max_length=50),
         blank=True,
