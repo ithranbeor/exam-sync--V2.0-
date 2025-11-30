@@ -454,79 +454,45 @@ const BayanihanModality: React.FC<UserProps> = ({ user }) => {
 
     setIsSubmitting(true);
 
-    const submissions = form.sections.map(async (sectionName) => {
-      const section = sectionOptions.find(
-        s => s.course_id === form.course && s.section_name === sectionName
-      );
-      if (!section) {
-        return { status: 'rejected', reason: `Section ${sectionName} not found` };
-      }
+    try {
+      // ✅ FIXED: Single API call with sections array instead of loop
+      await api.post('/tbl_modality/', {
+        modality_type: form.modality,
+        room_type: form.roomType,
+        modality_remarks: form.remarks,
+        course_id: form.course,
+        program_id: form.program,
+        sections: form.sections,  // ✅ Array of section names
+        possible_rooms: form.rooms,
+        user_id: user.user_id,
+        created_at: new Date().toISOString(),
+      });
 
-      try {
-        const { data: existing } = await api.get('/tbl_modality/', {
-          params: {
-            course_id: section.course_id,
-            program_id: section.program_id,
-            section_name: section.section_name,
-            modality_type: form.modality,
-            room_type: form.roomType
-          }
-        });
-
-        if (existing && existing.length > 0) {
-          return { status: 'skipped', section: sectionName };
-        }
-
-        await api.post('/tbl_modality/', {
-          modality_type: form.modality,
-          room_type: form.roomType,
-          modality_remarks: form.remarks,
-          course_id: section.course_id,
-          program_id: section.program_id,
-          section_name: section.section_name,
-          possible_rooms: form.rooms,
-          user_id: user.user_id,
-          created_at: new Date().toISOString(),
-        });
-
-        return { status: 'success', section: sectionName };
-      } catch (error) {
-        return { status: 'error', section: sectionName, error };
-      }
-    });
-
-    const results = await Promise.allSettled(submissions);
-
-    let successCount = 0;
-    let skippedCount = 0;
-    let errorCount = 0;
-
-    results.forEach((result) => {
-      if (result.status === 'fulfilled') {
-        const value = result.value as any;
-        if (value.status === 'success') successCount++;
-        else if (value.status === 'skipped') skippedCount++;
-        else errorCount++;
+      toast.success(`Successfully saved modality for ${form.sections.length} section(s)!`);
+      
+      // Refresh user modalities
+      await fetchUserModalities();
+      
+      // Reset form
+      setForm({
+        modality: '',
+        rooms: [],
+        roomType: '',
+        program: '',
+        sections: [],
+        course: '',
+        remarks: '',
+      });
+    } catch (error: any) {
+      console.error('Error saving modality:', error);
+      if (error.response?.data?.error) {
+        toast.error(error.response.data.error);
       } else {
-        errorCount++;
+        toast.error('Failed to save modality');
       }
-    });
-
-    if (successCount > 0) toast.success(`Successfully saved ${successCount} section(s)`);
-    if (skippedCount > 0) toast.info(`Skipped ${skippedCount} section(s) (already submitted)`);
-    if (errorCount > 0) toast.error(`Failed to save ${errorCount} section(s)`);
-
-    setIsSubmitting(false);
-
-    setForm({
-      modality: '',
-      rooms: [],
-      roomType: '',
-      program: '',
-      sections: [],
-      course: '',
-      remarks: '',
-    });
+    } finally {
+      setIsSubmitting(false);
+    }
   };
 
   const getRoomTimeslots = useCallback((roomId: string) => {
@@ -980,11 +946,7 @@ const BayanihanModality: React.FC<UserProps> = ({ user }) => {
                   You haven't created any modalities yet.
                 </div>
                 
-                <div style={{ 
-                  marginTop: '1rem', 
-                  display: 'flex', 
-                  justifyContent: 'center'
-                }}>
+                <div style={{ marginTop: '1rem', display: 'flex', justifyContent: 'center' }}>
                   <button
                     type="button"
                     className="close-modal"
@@ -1055,8 +1017,11 @@ const BayanihanModality: React.FC<UserProps> = ({ user }) => {
                           />
                           
                           <div style={{ flex: 1 }}>
+                            {/* ✅ FIXED: Display sections array */}
                             <div style={{ fontWeight: 'bold', marginBottom: '4px' }}>
-                              {modality.section_name || 'No Section'}
+                              {modality.sections && modality.sections.length > 0 
+                                ? modality.sections.join(', ') 
+                                : 'No Sections'}
                             </div>
                             
                             <div style={{ fontSize: '14px', color: '#666' }}>
@@ -1080,6 +1045,7 @@ const BayanihanModality: React.FC<UserProps> = ({ user }) => {
                   })}
                 </div>
 
+                {/* Buttons remain the same */}
                 <div style={{ 
                   marginTop: '1rem', 
                   display: 'flex', 

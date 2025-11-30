@@ -1,5 +1,4 @@
 import React, { useState, useEffect } from 'react';
-import { useNavigate } from 'react-router-dom';
 import { api } from '../lib/apiClient.ts';
 import '../styles/notification.css';
 import { FaCheckCircle, FaTimesCircle, FaTrash, FaEnvelopeOpenText, FaTimes } from "react-icons/fa";
@@ -36,7 +35,6 @@ const Notification: React.FC<UserProps> = ({ user }) => {
   const [selectedNotificationIds, setSelectedNotificationIds] = useState<Set<number>>(new Set());
   const [isBulkDeleting, setIsBulkDeleting] = useState(false);
   const [selectedNotification, setSelectedNotification] = useState<Notification | null>(null);
-  const navigate = useNavigate();
 
   const fetchNotifications = async () => {
     if (!user?.user_id) {
