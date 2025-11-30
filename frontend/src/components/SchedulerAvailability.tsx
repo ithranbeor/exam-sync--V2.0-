@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useRef, useMemo } from 'react';
 import '../styles/proctorSetAvailability.css';
 import '../styles/colleges.css';
-import { FaChevronLeft, FaChevronRight, FaEye, FaTrash, FaPenAlt, FaPlus, FaSearch } from 'react-icons/fa';
+import { FaChevronLeft, FaChevronRight, FaEye, FaTrash, FaPenAlt, FaPlus, FaSearch, FaSort } from 'react-icons/fa';
 import { api } from '../lib/apiClient.ts';
 import { ToastContainer, toast } from 'react-toastify';
 import Select, { components } from 'react-select';
@@ -71,6 +71,8 @@ const SchedulerAvailability: React.FC<ProctorSetAvailabilityProps> = ({ user }) 
   const [canScrollLeft, setCanScrollLeft] = useState(false);
   const [canScrollRight, setCanScrollRight] = useState(false);
   const tableContainerRef = useRef<HTMLDivElement>(null);
+  const [sortBy, setSortBy] = useState<string>('none');
+  const [showSortDropdown, setShowSortDropdown] = useState(false);
 
   const MultiValue = (props: any) => {
     if (props.data.value === 'all') return null;
@@ -85,6 +87,24 @@ const SchedulerAvailability: React.FC<ProctorSetAvailabilityProps> = ({ user }) 
       checkExistingSubmission()
     ]);
   }, []);
+
+  // Close dropdown when clicking outside
+  useEffect(() => {
+    const handleClickOutside = (event: MouseEvent) => {
+      const target = event.target as HTMLElement;
+      if (showSortDropdown && !target.closest('[data-sort-dropdown]')) {
+        setShowSortDropdown(false);
+      }
+    };
+
+    if (showSortDropdown) {
+      document.addEventListener('mousedown', handleClickOutside);
+    }
+
+    return () => {
+      document.removeEventListener('mousedown', handleClickOutside);
+    };
+  }, [showSortDropdown]);
 
   // ✅ Combined function to fetch both instructors and availability in one go
   const fetchInstructorsAndAvailability = async () => {
@@ -509,13 +529,68 @@ const SchedulerAvailability: React.FC<ProctorSetAvailabilityProps> = ({ user }) 
 
   useEffect(() => {
     setCurrentPage(1);
-  }, [searchTerm]);
+  }, [searchTerm, sortBy]);
+
+  // Helper function to determine if a string is numeric
+  const isNumeric = (str: string): boolean => {
+    return !isNaN(Number(str)) && !isNaN(parseFloat(str));
+  };
+
+  // Smart sort function that handles both text and numbers
+  const smartSort = (a: string, b: string): number => {
+    const aIsNumeric = isNumeric(a);
+    const bIsNumeric = isNumeric(b);
+
+    if (aIsNumeric && bIsNumeric) {
+      // Both are numbers - sort numerically
+      return parseFloat(a) - parseFloat(b);
+    } else if (aIsNumeric && !bIsNumeric) {
+      // a is number, b is text - numbers come first
+      return -1;
+    } else if (!aIsNumeric && bIsNumeric) {
+      // a is text, b is number - numbers come first
+      return 1;
+    } else {
+      // Both are text - sort alphabetically
+      return a.localeCompare(b);
+    }
+  };
 
   const filteredEntries = useMemo(() => {
-    return entries.filter((entry) =>
+    let filtered = entries.filter((entry) =>
       (entry.user_fullname || '').toLowerCase().includes(searchTerm.toLowerCase())
     );
-  }, [entries, searchTerm]);
+
+    // Apply sorting
+    if (sortBy !== 'none') {
+      filtered = [...filtered].sort((a, b) => {
+        if (sortBy === 'proctor_name') {
+          const aName = (a.user_fullname || '').toLowerCase();
+          const bName = (b.user_fullname || '').toLowerCase();
+          return smartSort(aName, bName);
+        } else if (sortBy === 'day') {
+          // Sort by first day in the days array
+          const aDay = a.days && a.days.length > 0 ? new Date(a.days[0]).getTime() : 0;
+          const bDay = b.days && b.days.length > 0 ? new Date(b.days[0]).getTime() : 0;
+          return aDay - bDay;
+        } else if (sortBy === 'time_slot') {
+          // Sort by first time slot
+          const aSlot = a.time_slots && a.time_slots.length > 0 ? a.time_slots[0] : '';
+          const bSlot = b.time_slots && b.time_slots.length > 0 ? b.time_slots[0] : '';
+          return smartSort(aSlot.toLowerCase(), bSlot.toLowerCase());
+        } else if (sortBy === 'status') {
+          return smartSort(a.status.toLowerCase(), b.status.toLowerCase());
+        } else if (sortBy === 'remarks') {
+          const aRemarks = (a.remarks || '').toLowerCase();
+          const bRemarks = (b.remarks || '').toLowerCase();
+          return smartSort(aRemarks, bRemarks);
+        }
+        return 0;
+      });
+    }
+
+    return filtered;
+  }, [entries, searchTerm, sortBy]);
 
   const paginatedEntries = useMemo(() => {
     return filteredEntries.slice((currentPage - 1) * itemsPerPage, currentPage * itemsPerPage);
@@ -603,6 +678,211 @@ const SchedulerAvailability: React.FC<ProctorSetAvailabilityProps> = ({ user }) 
             <button type="button" className="action-button add-new" onClick={openAddModal}>
               <FaPlus />
             </button>
+            <div style={{ position: 'relative' }} data-sort-dropdown>
+              <button 
+                type='button' 
+                className="action-button" 
+                onClick={() => setShowSortDropdown(!showSortDropdown)}
+                style={{ 
+                  backgroundColor: sortBy !== 'none' ? '#0A3765' : '#0A3765',
+                  color: 'white',
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  gap: '6px',
+                  padding: '8px 16px',
+                  borderRadius: '8px',
+                  border: 'none',
+                  cursor: 'pointer',
+                  fontSize: '14px',
+                  fontWeight: '500',
+                  minWidth: '100px',
+                  transition: 'background-color 0.2s ease'
+                }}
+                onMouseEnter={(e) => {
+                  e.currentTarget.style.backgroundColor = '#0d4a7a';
+                }}
+                onMouseLeave={(e) => {
+                  e.currentTarget.style.backgroundColor = '#0A3765';
+                }}
+                title="Sort"
+              >
+                <FaSort/>
+                <span>Sort</span>
+              </button>
+              {showSortDropdown && (
+                <div 
+                  style={{
+                    position: 'absolute',
+                    top: '100%',
+                    left: 0,
+                    marginTop: '4px',
+                    backgroundColor: 'white',
+                    border: '1px solid #ddd',
+                    borderRadius: '8px',
+                    boxShadow: '0 2px 8px rgba(0,0,0,0.15)',
+                    zIndex: 1000,
+                    minWidth: '150px'
+                  }}
+                >
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setSortBy('none');
+                      setShowSortDropdown(false);
+                    }}
+                    style={{
+                      width: '100%',
+                      padding: '8px 12px',
+                      textAlign: 'left',
+                      border: 'none',
+                      backgroundColor: sortBy === 'none' ? '#f0f0f0' : 'white',
+                      color: '#000',
+                      cursor: 'pointer',
+                      fontSize: '14px'
+                    }}
+                    onMouseEnter={(e) => {
+                      if (sortBy !== 'none') e.currentTarget.style.backgroundColor = '#f5f5f5';
+                    }}
+                    onMouseLeave={(e) => {
+                      if (sortBy !== 'none') e.currentTarget.style.backgroundColor = 'white';
+                    }}
+                  >
+                    None
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setSortBy('proctor_name');
+                      setShowSortDropdown(false);
+                    }}
+                    style={{
+                      width: '100%',
+                      padding: '8px 12px',
+                      textAlign: 'left',
+                      border: 'none',
+                      backgroundColor: sortBy === 'proctor_name' ? '#f0f0f0' : 'white',
+                      color: '#000',
+                      cursor: 'pointer',
+                      fontSize: '14px',
+                      borderTop: '1px solid #eee'
+                    }}
+                    onMouseEnter={(e) => {
+                      if (sortBy !== 'proctor_name') e.currentTarget.style.backgroundColor = '#f5f5f5';
+                    }}
+                    onMouseLeave={(e) => {
+                      if (sortBy !== 'proctor_name') e.currentTarget.style.backgroundColor = 'white';
+                    }}
+                  >
+                    Proctor Name
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setSortBy('day');
+                      setShowSortDropdown(false);
+                    }}
+                    style={{
+                      width: '100%',
+                      padding: '8px 12px',
+                      textAlign: 'left',
+                      border: 'none',
+                      backgroundColor: sortBy === 'day' ? '#f0f0f0' : 'white',
+                      color: '#000',
+                      cursor: 'pointer',
+                      fontSize: '14px',
+                      borderTop: '1px solid #eee'
+                    }}
+                    onMouseEnter={(e) => {
+                      if (sortBy !== 'day') e.currentTarget.style.backgroundColor = '#f5f5f5';
+                    }}
+                    onMouseLeave={(e) => {
+                      if (sortBy !== 'day') e.currentTarget.style.backgroundColor = 'white';
+                    }}
+                  >
+                    Day
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setSortBy('time_slot');
+                      setShowSortDropdown(false);
+                    }}
+                    style={{
+                      width: '100%',
+                      padding: '8px 12px',
+                      textAlign: 'left',
+                      border: 'none',
+                      backgroundColor: sortBy === 'time_slot' ? '#f0f0f0' : 'white',
+                      color: '#000',
+                      cursor: 'pointer',
+                      fontSize: '14px',
+                      borderTop: '1px solid #eee'
+                    }}
+                    onMouseEnter={(e) => {
+                      if (sortBy !== 'time_slot') e.currentTarget.style.backgroundColor = '#f5f5f5';
+                    }}
+                    onMouseLeave={(e) => {
+                      if (sortBy !== 'time_slot') e.currentTarget.style.backgroundColor = 'white';
+                    }}
+                  >
+                    Time Slot
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setSortBy('status');
+                      setShowSortDropdown(false);
+                    }}
+                    style={{
+                      width: '100%',
+                      padding: '8px 12px',
+                      textAlign: 'left',
+                      border: 'none',
+                      backgroundColor: sortBy === 'status' ? '#f0f0f0' : 'white',
+                      color: '#000',
+                      cursor: 'pointer',
+                      fontSize: '14px',
+                      borderTop: '1px solid #eee'
+                    }}
+                    onMouseEnter={(e) => {
+                      if (sortBy !== 'status') e.currentTarget.style.backgroundColor = '#f5f5f5';
+                    }}
+                    onMouseLeave={(e) => {
+                      if (sortBy !== 'status') e.currentTarget.style.backgroundColor = 'white';
+                    }}
+                  >
+                    Status
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setSortBy('remarks');
+                      setShowSortDropdown(false);
+                    }}
+                    style={{
+                      width: '100%',
+                      padding: '8px 12px',
+                      textAlign: 'left',
+                      border: 'none',
+                      backgroundColor: sortBy === 'remarks' ? '#f0f0f0' : 'white',
+                      color: '#000',
+                      cursor: 'pointer',
+                      fontSize: '14px',
+                      borderTop: '1px solid #eee'
+                    }}
+                    onMouseEnter={(e) => {
+                      if (sortBy !== 'remarks') e.currentTarget.style.backgroundColor = '#f5f5f5';
+                    }}
+                    onMouseLeave={(e) => {
+                      if (sortBy !== 'remarks') e.currentTarget.style.backgroundColor = 'white';
+                    }}
+                  >
+                    Remarks
+                  </button>
+                </div>
+              )}
+            </div>
           </div>
           <div style={{ marginLeft: 'auto', display: 'flex', alignItems: 'center', gap: 8 }}>
             <button
