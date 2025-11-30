@@ -32,11 +32,11 @@ interface MonitoringSchedule {
   otp_code: string | null;
 }
 
-const ProctorMonitoring: React.FC<UserProps> = ({ user }) => {
+const ProctorMonitoring: React.FC<UserProps> = ({ }) => {
   const [approvedSchedules, setApprovedSchedules] = useState<MonitoringSchedule[]>([]);
   const [loading, setLoading] = useState(true);
   const [generatingOtp, setGeneratingOtp] = useState(false);
-  const [collegeFilter, setCollegeFilter] = useState<string>('');
+  const [collegeFilter, _setCollegeFilter] = useState<string>('');
   const [hasApprovedSchedules, setHasApprovedSchedules] = useState(false);
 
   // Fetch monitoring data
@@ -99,9 +99,9 @@ const ProctorMonitoring: React.FC<UserProps> = ({ user }) => {
         return;
       }
 
-      const response = await api.post('/generate-exam-otps/', {
+      // const _response = await api.post('/generate-exam-otps/', {
         schedule_ids: schedulesWithoutOtp
-      });
+      //});
 
       toast.success(`Generated OTP codes for ${schedulesWithoutOtp.length} schedule(s)`);
       

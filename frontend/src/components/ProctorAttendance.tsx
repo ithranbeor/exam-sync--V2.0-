@@ -40,7 +40,7 @@ const ProctorAttendance: React.FC<UserProps> = ({ user }) => {
   const [loading, setLoading] = useState(true);
   const [verifyingOtp, setVerifyingOtp] = useState(false);
   const [submittingAttendance, setSubmittingAttendance] = useState(false);
-  const [verificationData, setVerificationData] = useState<any>(null);
+  const [_verificationData, setVerificationData] = useState<any>(null);
 
   // Fetch proctor's assigned exams
   const fetchAssignedExams = useCallback(async () => {

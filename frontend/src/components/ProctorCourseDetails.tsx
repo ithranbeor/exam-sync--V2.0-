@@ -27,7 +27,7 @@ interface ProctorCourseDetailsProps {
 
 const ProctorCourseDetails = ({ user }: ProctorCourseDetailsProps) => {
   const [assignments, setAssignments] = useState<ProctorAssignment[]>([]);
-  const [loading, setLoading] = useState(true);
+  const [_loading, setLoading] = useState(true);
   const [filter, setFilter] = useState<'all' | 'upcoming' | 'completed'>('upcoming');
   const [expandedCard, setExpandedCard] = useState<number | null>(null);
 
