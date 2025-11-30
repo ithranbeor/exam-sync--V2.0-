@@ -7,6 +7,41 @@
   width: 100%;
 }
 
+/* Top navigation buttons positioning - consistent with ProctorExamDate */
+.top-navigation {
+  display: flex;
+  gap: 8px;
+  align-items: center;
+  margin-left: auto;
+}
+
+.top-navigation .nav-arrow {
+  background-color: #00173D;
+  color: #FCB316;
+  border: 1px solid #00173D;
+  padding: 0;
+  border-radius: 50%;
+  font-weight: bold;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: 0.2s ease;
+  width: 36px;
+  height: 36px;
+  font-size: 1em;
+}
+
+.top-navigation .nav-arrow svg {
+  width: 14px;
+  height: 14px;
+}
+
+.top-navigation .nav-arrow:hover {
+  background-color: #FCB316;
+  color: #00173D;
+}
+
 .top-bar {
   display: flex;
   justify-content: space-between;

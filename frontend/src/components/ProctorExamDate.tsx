@@ -304,10 +304,21 @@ const ProctorExamDate = () => {
   return (
     <div className="dashboard">
       <div className="dashboard-header">
-        <div className="left-date-label">
-          <h2>
-            {monthNames[currentMonthIndex]} {currentYear}
-          </h2>
+        <div className="dashboard-header-top">
+          <div className="left-date-label">
+            <h2>
+              {monthNames[currentMonthIndex]} {currentYear}
+            </h2>
+          </div>
+
+          <div className="top-navigation">
+            <button type="button" className="nav-arrow" onClick={goToPreviousMonth}>
+              <FaChevronLeft />
+            </button>
+            <button type="button" className="nav-arrow" onClick={goToNextMonth}>
+              <FaChevronRight />
+            </button>
+          </div>
         </div>
 
         <div className="filters">
@@ -396,15 +407,6 @@ const ProctorExamDate = () => {
       </div>
 
       <div className="calendar-grid">{calendarCells}</div>
-
-      <div className="bottom-navigation">
-        <button type="button" className="nav-arrow" onClick={goToPreviousMonth}>
-          <FaChevronLeft />
-        </button>
-        <button type="button" className="nav-arrow" onClick={goToNextMonth}>
-          <FaChevronRight />
-        </button>
-      </div>
 
       <div className="legend">
         {colleges.map((college, index) => (

@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react';
 import '../styles/ProctorViewExam.css';
 import { api } from '../lib/apiClient.ts';
+import { FaChevronLeft, FaChevronRight } from 'react-icons/fa';
 
 interface ProctorSchedule {
   assignment_id: number;
@@ -223,6 +224,14 @@ const ProctorViewExam = () => {
             <div>
               <label style={{ fontSize: '1.1em' }}>{formatDate(currentDate, true)}</label>
             </div>
+            <div className="top-navigation">
+              <button type="button" className="nav-arrow" onClick={handlePrev}>
+                <FaChevronLeft />
+              </button>
+              <button type="button" className="nav-arrow" onClick={handleNext}>
+                <FaChevronRight />
+              </button>
+            </div>
           </div>
 
           <div
@@ -230,7 +239,7 @@ const ProctorViewExam = () => {
             style={{
               flexDirection: 'row',
               gap: 10,
-              justifyContent: 'space-between',
+              justifyContent: 'flex-start',
             }}
           >
             <div className="view-mode-controls">
@@ -247,14 +256,6 @@ const ProctorViewExam = () => {
                 onClick={() => setViewMode('day')}
               >
                 Day View
-              </button>
-            </div>
-            <div>
-              <button type="button" className="submit-button" onClick={handlePrev}>
-                {'<'}
-              </button>
-              <button type="button" className="submit-button" onClick={handleNext}>
-                {'>'}
               </button>
             </div>
           </div>

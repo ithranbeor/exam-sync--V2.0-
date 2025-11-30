@@ -490,6 +490,8 @@ button.view-button {
   gap: 20px;
   margin-top: 1rem;
   height: 80vh;
+  overflow: visible;
+  min-width: 0;
 }
 
 .try-thing-card {
@@ -502,7 +504,60 @@ button.view-button {
   background-color: transparent; 
   border-radius: 15px;
   height: 100%;
+  overflow: visible;
+  min-width: 0;
+}
+
+/* Calendar inside try-thing-card - prevent overlap and ensure proper sizing */
+.try-thing-card .dashboard {
+  width: 100%;
+  max-width: 100%;
+  padding: 10px;
+  overflow-x: auto;
+  overflow-y: visible;
+}
+
+.try-thing-card .calendar-weekdays,
+.try-thing-card .calendar-grid {
+  width: 100%;
+  min-width: 0;
+  overflow: visible;
+}
+
+.try-thing-card .calendar-cell {
+  width: 100%;
+  max-width: 100%;
+  box-sizing: border-box;
+  word-wrap: break-word;
   overflow: hidden;
+}
+
+/* Consistent navigation buttons for both calendar and schedule tables */
+.try-thing-card .top-navigation .nav-arrow {
+  background-color: #00173D;
+  color: #FCB316;
+  border: 1px solid #00173D;
+  padding: 0;
+  border-radius: 50%;
+  font-weight: bold;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: 0.2s ease;
+  width: 32px;
+  height: 32px;
+  font-size: 0.9em;
+}
+
+.try-thing-card .top-navigation .nav-arrow svg {
+  width: 12px;
+  height: 12px;
+}
+
+.try-thing-card .top-navigation .nav-arrow:hover {
+  background-color: #FCB316;
+  color: #00173D;
 }
 
 /* Ensure grid cells in ProctorViewExam have black text */
