@@ -362,7 +362,7 @@ const Colleges: React.FC = () => {
                   justifyContent: 'center',
                   gap: '6px',
                   padding: '8px 16px',
-                  borderRadius: '4px',
+                  borderRadius: '8px',
                   border: 'none',
                   cursor: 'pointer',
                   fontSize: '14px',
@@ -390,7 +390,7 @@ const Colleges: React.FC = () => {
                     marginTop: '4px',
                     backgroundColor: 'white',
                     border: '1px solid #ddd',
-                    borderRadius: '4px',
+                    borderRadius: '8px',
                     boxShadow: '0 2px 8px rgba(0,0,0,0.15)',
                     zIndex: 1000,
                     minWidth: '150px'
@@ -408,6 +408,7 @@ const Colleges: React.FC = () => {
                       textAlign: 'left',
                       border: 'none',
                       backgroundColor: sortBy === 'none' ? '#f0f0f0' : 'white',
+                      color: '#000',
                       cursor: 'pointer',
                       fontSize: '14px'
                     }}
@@ -432,6 +433,7 @@ const Colleges: React.FC = () => {
                       textAlign: 'left',
                       border: 'none',
                       backgroundColor: sortBy === 'college_id' ? '#f0f0f0' : 'white',
+                      color: '#000',
                       cursor: 'pointer',
                       fontSize: '14px',
                       borderTop: '1px solid #eee'
@@ -457,6 +459,7 @@ const Colleges: React.FC = () => {
                       textAlign: 'left',
                       border: 'none',
                       backgroundColor: sortBy === 'college_name' ? '#f0f0f0' : 'white',
+                      color: '#000',
                       cursor: 'pointer',
                       fontSize: '14px',
                       borderTop: '1px solid #eee'

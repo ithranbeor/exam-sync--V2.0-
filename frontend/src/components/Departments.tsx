@@ -1,6 +1,6 @@
 // deno-lint-ignore-file no-explicit-any
 import React, { useState, useEffect, useRef, useMemo } from 'react';
-import { FaTrash, FaEdit, FaSearch, FaDownload,  FaPlus, FaFileImport, FaChevronLeft, FaChevronRight } from 'react-icons/fa';
+import { FaTrash, FaEdit, FaSearch, FaDownload,  FaPlus, FaFileImport, FaChevronLeft, FaChevronRight, FaSort } from 'react-icons/fa';
 import { api } from '../lib/apiClient.ts';
 import { ToastContainer, toast } from 'react-toastify';
 import * as XLSX from 'xlsx';
@@ -36,6 +36,8 @@ const Departments: React.FC = () => {
   const itemsPerPage = 20;
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
   const [isBulkDeleting, setIsBulkDeleting] = useState(false);
+  const [sortBy, setSortBy] = useState<string>('none');
+  const [showSortDropdown, setShowSortDropdown] = useState(false);
   const [canScrollLeft, setCanScrollLeft] = useState(false);
   const [canScrollRight, setCanScrollRight] = useState(false);
   const tableContainerRef = useRef<HTMLDivElement>(null);
@@ -44,6 +46,24 @@ const Departments: React.FC = () => {
     fetchDepartments();
     fetchColleges();
   }, []);
+
+  // Close dropdown when clicking outside
+  useEffect(() => {
+    const handleClickOutside = (event: MouseEvent) => {
+      const target = event.target as HTMLElement;
+      if (showSortDropdown && !target.closest('[data-sort-dropdown]')) {
+        setShowSortDropdown(false);
+      }
+    };
+
+    if (showSortDropdown) {
+      document.addEventListener('mousedown', handleClickOutside);
+    }
+
+    return () => {
+      document.removeEventListener('mousedown', handleClickOutside);
+    };
+  }, [showSortDropdown]);
 
   // Handle scroll position and update button states
   useEffect(() => {
@@ -121,10 +141,35 @@ const Departments: React.FC = () => {
 
   useEffect(() => {
     setCurrentPage(1);
-  }, [searchTerm]);
+  }, [searchTerm, sortBy]);
+
+  // Helper function to determine if a string is numeric
+  const isNumeric = (str: string): boolean => {
+    return !isNaN(Number(str)) && !isNaN(parseFloat(str));
+  };
+
+  // Smart sort function that handles both text and numbers
+  const smartSort = (a: string, b: string): number => {
+    const aIsNumeric = isNumeric(a);
+    const bIsNumeric = isNumeric(b);
+
+    if (aIsNumeric && bIsNumeric) {
+      // Both are numbers - sort numerically
+      return parseFloat(a) - parseFloat(b);
+    } else if (aIsNumeric && !bIsNumeric) {
+      // a is number, b is text - numbers come first
+      return -1;
+    } else if (!aIsNumeric && bIsNumeric) {
+      // a is text, b is number - numbers come first
+      return 1;
+    } else {
+      // Both are text - sort alphabetically
+      return a.localeCompare(b);
+    }
+  };
 
   const filteredDepartments = useMemo(() => {
-    return departments.filter((dept) => {
+    let filtered = departments.filter((dept) => {
       const collegeName = dept.college?.college_name || '';
       return (
         dept.department_name.toLowerCase().includes(searchTerm.toLowerCase()) ||
@@ -132,7 +177,25 @@ const Departments: React.FC = () => {
         collegeName.toLowerCase().includes(searchTerm.toLowerCase())
       );
     });
-  }, [departments, searchTerm]);
+
+    // Apply sorting
+    if (sortBy !== 'none') {
+      filtered = [...filtered].sort((a, b) => {
+        if (sortBy === 'department_id') {
+          return smartSort(a.department_id, b.department_id);
+        } else if (sortBy === 'department_name') {
+          return smartSort(a.department_name.toLowerCase(), b.department_name.toLowerCase());
+        } else if (sortBy === 'college') {
+          const aCollege = a.college?.college_name || a.college?.college_id || '';
+          const bCollege = b.college?.college_name || b.college?.college_id || '';
+          return smartSort(aCollege.toLowerCase(), bCollege.toLowerCase());
+        }
+        return 0;
+      });
+    }
+
+    return filtered;
+  }, [departments, searchTerm, sortBy]);
 
   const paginatedDepartments = useMemo(() => {
     return filteredDepartments.slice((currentPage - 1) * itemsPerPage, currentPage * itemsPerPage);
@@ -312,6 +375,159 @@ const Departments: React.FC = () => {
           <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
             <button type="button" className="action-button add-new" onClick={handleAddDepartment}><FaPlus/></button>
             <button type="button" className="action-button import" onClick={() => setShowImport(true)}><FaFileImport/></button>
+            <div style={{ position: 'relative' }} data-sort-dropdown>
+              <button 
+                type='button' 
+                className="action-button" 
+                onClick={() => setShowSortDropdown(!showSortDropdown)}
+                style={{ 
+                  backgroundColor: sortBy !== 'none' ? '#0A3765' : '#0A3765',
+                  color: 'white',
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  gap: '6px',
+                  padding: '8px 16px',
+                  borderRadius: '8px',
+                  border: 'none',
+                  cursor: 'pointer',
+                  fontSize: '14px',
+                  fontWeight: '500',
+                  minWidth: '100px',
+                  transition: 'background-color 0.2s ease'
+                }}
+                onMouseEnter={(e) => {
+                  e.currentTarget.style.backgroundColor = '#0d4a7a';
+                }}
+                onMouseLeave={(e) => {
+                  e.currentTarget.style.backgroundColor = '#0A3765';
+                }}
+                title="Sort"
+              >
+                <FaSort/>
+                <span>Sort</span>
+              </button>
+              {showSortDropdown && (
+                <div 
+                  style={{
+                    position: 'absolute',
+                    top: '100%',
+                    left: 0,
+                    marginTop: '4px',
+                    backgroundColor: 'white',
+                    border: '1px solid #ddd',
+                    borderRadius: '8px',
+                    boxShadow: '0 2px 8px rgba(0,0,0,0.15)',
+                    zIndex: 1000,
+                    minWidth: '150px'
+                  }}
+                >
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setSortBy('none');
+                      setShowSortDropdown(false);
+                    }}
+                    style={{
+                      width: '100%',
+                      padding: '8px 12px',
+                      textAlign: 'left',
+                      border: 'none',
+                      backgroundColor: sortBy === 'none' ? '#f0f0f0' : 'white',
+                      color: '#000',
+                      cursor: 'pointer',
+                      fontSize: '14px'
+                    }}
+                    onMouseEnter={(e) => {
+                      if (sortBy !== 'none') e.currentTarget.style.backgroundColor = '#f5f5f5';
+                    }}
+                    onMouseLeave={(e) => {
+                      if (sortBy !== 'none') e.currentTarget.style.backgroundColor = 'white';
+                    }}
+                  >
+                    None
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setSortBy('department_id');
+                      setShowSortDropdown(false);
+                    }}
+                    style={{
+                      width: '100%',
+                      padding: '8px 12px',
+                      textAlign: 'left',
+                      border: 'none',
+                      backgroundColor: sortBy === 'department_id' ? '#f0f0f0' : 'white',
+                      color: '#000',
+                      cursor: 'pointer',
+                      fontSize: '14px',
+                      borderTop: '1px solid #eee'
+                    }}
+                    onMouseEnter={(e) => {
+                      if (sortBy !== 'department_id') e.currentTarget.style.backgroundColor = '#f5f5f5';
+                    }}
+                    onMouseLeave={(e) => {
+                      if (sortBy !== 'department_id') e.currentTarget.style.backgroundColor = 'white';
+                    }}
+                  >
+                    Department ID
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setSortBy('department_name');
+                      setShowSortDropdown(false);
+                    }}
+                    style={{
+                      width: '100%',
+                      padding: '8px 12px',
+                      textAlign: 'left',
+                      border: 'none',
+                      backgroundColor: sortBy === 'department_name' ? '#f0f0f0' : 'white',
+                      color: '#000',
+                      cursor: 'pointer',
+                      fontSize: '14px',
+                      borderTop: '1px solid #eee'
+                    }}
+                    onMouseEnter={(e) => {
+                      if (sortBy !== 'department_name') e.currentTarget.style.backgroundColor = '#f5f5f5';
+                    }}
+                    onMouseLeave={(e) => {
+                      if (sortBy !== 'department_name') e.currentTarget.style.backgroundColor = 'white';
+                    }}
+                  >
+                    Department Name
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setSortBy('college');
+                      setShowSortDropdown(false);
+                    }}
+                    style={{
+                      width: '100%',
+                      padding: '8px 12px',
+                      textAlign: 'left',
+                      border: 'none',
+                      backgroundColor: sortBy === 'college' ? '#f0f0f0' : 'white',
+                      color: '#000',
+                      cursor: 'pointer',
+                      fontSize: '14px',
+                      borderTop: '1px solid #eee'
+                    }}
+                    onMouseEnter={(e) => {
+                      if (sortBy !== 'college') e.currentTarget.style.backgroundColor = '#f5f5f5';
+                    }}
+                    onMouseLeave={(e) => {
+                      if (sortBy !== 'college') e.currentTarget.style.backgroundColor = 'white';
+                    }}
+                  >
+                    College
+                  </button>
+                </div>
+              )}
+            </div>
           </div>
           <div style={{ marginLeft: 'auto', display: 'flex', alignItems: 'center', gap: 8 }}>
             <button

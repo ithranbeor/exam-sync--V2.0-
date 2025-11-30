@@ -1,6 +1,6 @@
 // deno-lint-ignore-file no-explicit-any
 import React, { useState, useEffect, useRef, useMemo } from 'react';
-import { FaTrash, FaEdit, FaSearch, FaDownload, FaPlus, FaFileImport, FaChevronLeft, FaChevronRight } from 'react-icons/fa';
+import { FaTrash, FaEdit, FaSearch, FaDownload, FaPlus, FaFileImport, FaChevronLeft, FaChevronRight, FaSort } from 'react-icons/fa';
 import { api } from '../lib/apiClient.ts';
 import { ToastContainer, toast } from 'react-toastify';
 import * as XLSX from 'xlsx';
@@ -46,6 +46,8 @@ const Programs: React.FC<ProgramsProps> = ({ user: _user }) => {
   const itemsPerPage = 20;
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
   const [isBulkDeleting, setIsBulkDeleting] = useState(false);
+  const [sortBy, setSortBy] = useState<string>('none');
+  const [showSortDropdown, setShowSortDropdown] = useState(false);
   const [canScrollLeft, setCanScrollLeft] = useState(false);
   const [canScrollRight, setCanScrollRight] = useState(false);
   const tableContainerRef = useRef<HTMLDivElement>(null);
@@ -54,6 +56,24 @@ const Programs: React.FC<ProgramsProps> = ({ user: _user }) => {
     fetchDepartments();
     fetchPrograms();
   }, []);
+
+  // Close dropdown when clicking outside
+  useEffect(() => {
+    const handleClickOutside = (event: MouseEvent) => {
+      const target = event.target as HTMLElement;
+      if (showSortDropdown && !target.closest('[data-sort-dropdown]')) {
+        setShowSortDropdown(false);
+      }
+    };
+
+    if (showSortDropdown) {
+      document.addEventListener('mousedown', handleClickOutside);
+    }
+
+    return () => {
+      document.removeEventListener('mousedown', handleClickOutside);
+    };
+  }, [showSortDropdown]);
 
   // Handle scroll position and update button states
   useEffect(() => {
@@ -150,10 +170,35 @@ const Programs: React.FC<ProgramsProps> = ({ user: _user }) => {
 
   useEffect(() => {
     setCurrentPage(1);
-  }, [searchTerm]);
+  }, [searchTerm, sortBy]);
+
+  // Helper function to determine if a string is numeric
+  const isNumeric = (str: string): boolean => {
+    return !isNaN(Number(str)) && !isNaN(parseFloat(str));
+  };
+
+  // Smart sort function that handles both text and numbers
+  const smartSort = (a: string, b: string): number => {
+    const aIsNumeric = isNumeric(a);
+    const bIsNumeric = isNumeric(b);
+
+    if (aIsNumeric && bIsNumeric) {
+      // Both are numbers - sort numerically
+      return parseFloat(a) - parseFloat(b);
+    } else if (aIsNumeric && !bIsNumeric) {
+      // a is number, b is text - numbers come first
+      return -1;
+    } else if (!aIsNumeric && bIsNumeric) {
+      // a is text, b is number - numbers come first
+      return 1;
+    } else {
+      // Both are text - sort alphabetically
+      return a.localeCompare(b);
+    }
+  };
 
   const filteredPrograms = useMemo(() => {
-    return programs.filter((p) => {
+    let filtered = programs.filter((p) => {
       const deptName = getDepartmentName(p).toLowerCase();
       return (
         p.program_name.toLowerCase().includes(searchTerm.toLowerCase()) ||
@@ -161,7 +206,25 @@ const Programs: React.FC<ProgramsProps> = ({ user: _user }) => {
         deptName.includes(searchTerm.toLowerCase())
       );
     });
-  }, [programs, searchTerm]);
+
+    // Apply sorting
+    if (sortBy !== 'none') {
+      filtered = [...filtered].sort((a, b) => {
+        if (sortBy === 'program_id') {
+          return smartSort(a.program_id, b.program_id);
+        } else if (sortBy === 'program_name') {
+          return smartSort(a.program_name.toLowerCase(), b.program_name.toLowerCase());
+        } else if (sortBy === 'department') {
+          const aDept = getDepartmentName(a).toLowerCase();
+          const bDept = getDepartmentName(b).toLowerCase();
+          return smartSort(aDept, bDept);
+        }
+        return 0;
+      });
+    }
+
+    return filtered;
+  }, [programs, searchTerm, sortBy]);
 
   const paginatedPrograms = useMemo(() => {
     return filteredPrograms.slice((currentPage - 1) * itemsPerPage, currentPage * itemsPerPage);
@@ -343,6 +406,159 @@ const Programs: React.FC<ProgramsProps> = ({ user: _user }) => {
             <button type="button" onClick={() => setShowImport(true)} className="action-button import">
               <FaFileImport/>
             </button>
+            <div style={{ position: 'relative' }} data-sort-dropdown>
+              <button 
+                type='button' 
+                className="action-button" 
+                onClick={() => setShowSortDropdown(!showSortDropdown)}
+                style={{ 
+                  backgroundColor: sortBy !== 'none' ? '#0A3765' : '#0A3765',
+                  color: 'white',
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  gap: '6px',
+                  padding: '8px 16px',
+                  borderRadius: '8px',
+                  border: 'none',
+                  cursor: 'pointer',
+                  fontSize: '14px',
+                  fontWeight: '500',
+                  minWidth: '100px',
+                  transition: 'background-color 0.2s ease'
+                }}
+                onMouseEnter={(e) => {
+                  e.currentTarget.style.backgroundColor = '#0d4a7a';
+                }}
+                onMouseLeave={(e) => {
+                  e.currentTarget.style.backgroundColor = '#0A3765';
+                }}
+                title="Sort"
+              >
+                <FaSort/>
+                <span>Sort</span>
+              </button>
+              {showSortDropdown && (
+                <div 
+                  style={{
+                    position: 'absolute',
+                    top: '100%',
+                    left: 0,
+                    marginTop: '4px',
+                    backgroundColor: 'white',
+                    border: '1px solid #ddd',
+                    borderRadius: '8px',
+                    boxShadow: '0 2px 8px rgba(0,0,0,0.15)',
+                    zIndex: 1000,
+                    minWidth: '150px'
+                  }}
+                >
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setSortBy('none');
+                      setShowSortDropdown(false);
+                    }}
+                    style={{
+                      width: '100%',
+                      padding: '8px 12px',
+                      textAlign: 'left',
+                      border: 'none',
+                      backgroundColor: sortBy === 'none' ? '#f0f0f0' : 'white',
+                      color: '#000',
+                      cursor: 'pointer',
+                      fontSize: '14px'
+                    }}
+                    onMouseEnter={(e) => {
+                      if (sortBy !== 'none') e.currentTarget.style.backgroundColor = '#f5f5f5';
+                    }}
+                    onMouseLeave={(e) => {
+                      if (sortBy !== 'none') e.currentTarget.style.backgroundColor = 'white';
+                    }}
+                  >
+                    None
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setSortBy('program_id');
+                      setShowSortDropdown(false);
+                    }}
+                    style={{
+                      width: '100%',
+                      padding: '8px 12px',
+                      textAlign: 'left',
+                      border: 'none',
+                      backgroundColor: sortBy === 'program_id' ? '#f0f0f0' : 'white',
+                      color: '#000',
+                      cursor: 'pointer',
+                      fontSize: '14px',
+                      borderTop: '1px solid #eee'
+                    }}
+                    onMouseEnter={(e) => {
+                      if (sortBy !== 'program_id') e.currentTarget.style.backgroundColor = '#f5f5f5';
+                    }}
+                    onMouseLeave={(e) => {
+                      if (sortBy !== 'program_id') e.currentTarget.style.backgroundColor = 'white';
+                    }}
+                  >
+                    Program ID
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setSortBy('program_name');
+                      setShowSortDropdown(false);
+                    }}
+                    style={{
+                      width: '100%',
+                      padding: '8px 12px',
+                      textAlign: 'left',
+                      border: 'none',
+                      backgroundColor: sortBy === 'program_name' ? '#f0f0f0' : 'white',
+                      color: '#000',
+                      cursor: 'pointer',
+                      fontSize: '14px',
+                      borderTop: '1px solid #eee'
+                    }}
+                    onMouseEnter={(e) => {
+                      if (sortBy !== 'program_name') e.currentTarget.style.backgroundColor = '#f5f5f5';
+                    }}
+                    onMouseLeave={(e) => {
+                      if (sortBy !== 'program_name') e.currentTarget.style.backgroundColor = 'white';
+                    }}
+                  >
+                    Program Name
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setSortBy('department');
+                      setShowSortDropdown(false);
+                    }}
+                    style={{
+                      width: '100%',
+                      padding: '8px 12px',
+                      textAlign: 'left',
+                      border: 'none',
+                      backgroundColor: sortBy === 'department' ? '#f0f0f0' : 'white',
+                      color: '#000',
+                      cursor: 'pointer',
+                      fontSize: '14px',
+                      borderTop: '1px solid #eee'
+                    }}
+                    onMouseEnter={(e) => {
+                      if (sortBy !== 'department') e.currentTarget.style.backgroundColor = '#f5f5f5';
+                    }}
+                    onMouseLeave={(e) => {
+                      if (sortBy !== 'department') e.currentTarget.style.backgroundColor = 'white';
+                    }}
+                  >
+                    Department
+                  </button>
+                </div>
+              )}
+            </div>
           </div>
           <div style={{ marginLeft: 'auto', display: 'flex', alignItems: 'center', gap: 8 }}>
             <button

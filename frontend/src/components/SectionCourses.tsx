@@ -1,6 +1,6 @@
 // deno-lint-ignore-file no-explicit-any
 import React, { useState, useEffect, useMemo, useCallback, useRef } from 'react';
-import { FaTrash, FaEdit, FaSearch, FaDownload,  FaPlus, FaFileImport, FaChevronLeft, FaChevronRight } from 'react-icons/fa';
+import { FaTrash, FaEdit, FaSearch, FaDownload,  FaPlus, FaFileImport, FaChevronLeft, FaChevronRight, FaSort } from 'react-icons/fa';
 import { api } from '../lib/apiClient.ts';
 import { ToastContainer, toast } from 'react-toastify';
 import * as XLSX from 'xlsx';
@@ -64,6 +64,8 @@ const SectionCourses: React.FC = () => {
   const itemsPerPage = 20;
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
   const [isBulkDeleting, setIsBulkDeleting] = useState(false);
+  const [sortBy, setSortBy] = useState<string>('none');
+  const [showSortDropdown, setShowSortDropdown] = useState(false);
   const [canScrollLeft, setCanScrollLeft] = useState(false);
   const [canScrollRight, setCanScrollRight] = useState(false);
   const tableContainerRef = useRef<HTMLDivElement>(null);
@@ -172,9 +174,27 @@ const SectionCourses: React.FC = () => {
     fetchAll(); 
   }, [fetchAll]);
 
+  // Close dropdown when clicking outside
+  useEffect(() => {
+    const handleClickOutside = (event: MouseEvent) => {
+      const target = event.target as HTMLElement;
+      if (showSortDropdown && !target.closest('[data-sort-dropdown]')) {
+        setShowSortDropdown(false);
+      }
+    };
+
+    if (showSortDropdown) {
+      document.addEventListener('mousedown', handleClickOutside);
+    }
+
+    return () => {
+      document.removeEventListener('mousedown', handleClickOutside);
+    };
+  }, [showSortDropdown]);
+
   useEffect(() => {
     setCurrentPage(1);
-  }, [searchTerm]);
+  }, [searchTerm, sortBy]);
 
   const handleSubmit = async () => {
     const { course_id, program_id, section_name, number_of_students, year_level, term_id, user_id } = newSection;
@@ -533,28 +553,87 @@ const SectionCourses: React.FC = () => {
     XLSX.writeFile(wb, 'sectioncourses_template.xlsx');
   };
 
+  // Helper function to determine if a string is numeric
+  const isNumeric = (str: string): boolean => {
+    return !isNaN(Number(str)) && !isNaN(parseFloat(str));
+  };
+
+  // Smart sort function that handles both text and numbers
+  const smartSort = (a: string, b: string): number => {
+    const aIsNumeric = isNumeric(a);
+    const bIsNumeric = isNumeric(b);
+
+    if (aIsNumeric && bIsNumeric) {
+      // Both are numbers - sort numerically
+      return parseFloat(a) - parseFloat(b);
+    } else if (aIsNumeric && !bIsNumeric) {
+      // a is number, b is text - numbers come first
+      return -1;
+    } else if (!aIsNumeric && bIsNumeric) {
+      // a is text, b is number - numbers come first
+      return 1;
+    } else {
+      // Both are text - sort alphabetically
+      return a.localeCompare(b);
+    }
+  };
+
   const filtered = useMemo(() => {
-    if (!searchTerm) return sectionCourses;
+    let filtered = sectionCourses;
     
-    const lowerSearch = searchTerm.toLowerCase();
-    return sectionCourses.filter(sc => {
-      const termName = sc.term?.term_name || '';
-      const courseName = sc.course?.course_name || '';
-      const programName = sc.program?.program_name || '';
-      const instructor = sc.user?.full_name || '';
-      return (
-        sc.section_name.toLowerCase().includes(lowerSearch) ||
-        courseName.toLowerCase().includes(lowerSearch) ||
-        programName.toLowerCase().includes(lowerSearch) ||
-        instructor.toLowerCase().includes(lowerSearch) ||
-        termName.toLowerCase().includes(lowerSearch)
-      );
-    });
-  }, [searchTerm, sectionCourses]);
+    if (searchTerm) {
+      const lowerSearch = searchTerm.toLowerCase();
+      filtered = sectionCourses.filter(sc => {
+        const termName = sc.term?.term_name || '';
+        const courseName = sc.course?.course_name || '';
+        const programName = sc.program?.program_name || '';
+        const instructor = sc.user?.full_name || '';
+        return (
+          sc.section_name.toLowerCase().includes(lowerSearch) ||
+          courseName.toLowerCase().includes(lowerSearch) ||
+          programName.toLowerCase().includes(lowerSearch) ||
+          instructor.toLowerCase().includes(lowerSearch) ||
+          termName.toLowerCase().includes(lowerSearch)
+        );
+      });
+    }
+
+    // Apply sorting
+    if (sortBy !== 'none') {
+      filtered = [...filtered].sort((a, b) => {
+        if (sortBy === 'section_name') {
+          return smartSort(a.section_name.toLowerCase(), b.section_name.toLowerCase());
+        } else if (sortBy === 'course') {
+          const aCourse = a.course?.course_name || a.course_id || '';
+          const bCourse = b.course?.course_name || b.course_id || '';
+          return smartSort(aCourse.toLowerCase(), bCourse.toLowerCase());
+        } else if (sortBy === 'program') {
+          const aProgram = a.program?.program_name || a.program_id || '';
+          const bProgram = b.program?.program_name || b.program_id || '';
+          return smartSort(aProgram.toLowerCase(), bProgram.toLowerCase());
+        } else if (sortBy === 'students') {
+          return a.number_of_students - b.number_of_students;
+        } else if (sortBy === 'year') {
+          return smartSort(a.year_level.toLowerCase(), b.year_level.toLowerCase());
+        } else if (sortBy === 'term') {
+          const aTerm = a.term?.term_name || '';
+          const bTerm = b.term?.term_name || '';
+          return smartSort(aTerm.toLowerCase(), bTerm.toLowerCase());
+        } else if (sortBy === 'instructor') {
+          const aInstructor = a.user?.full_name || '';
+          const bInstructor = b.user?.full_name || '';
+          return smartSort(aInstructor.toLowerCase(), bInstructor.toLowerCase());
+        }
+        return 0;
+      });
+    }
+    // Note: Removed default sort to improve performance - only sort when explicitly requested
+
+    return filtered;
+  }, [searchTerm, sectionCourses, sortBy]);
 
   const paginated = useMemo(() => {
-    const sorted = [...filtered].sort((a, b) => a.section_name.localeCompare(b.section_name));
-    return sorted.slice((currentPage - 1) * itemsPerPage, currentPage * itemsPerPage);
+    return filtered.slice((currentPage - 1) * itemsPerPage, currentPage * itemsPerPage);
   }, [filtered, currentPage, itemsPerPage]);
 
   const totalPages = Math.ceil(filtered.length / itemsPerPage);
@@ -687,6 +766,263 @@ const SectionCourses: React.FC = () => {
           <FaPlus/>
         </button>
             <button type='button' className="action-button import" onClick={() => setShowImport(true)}><FaFileImport/></button>
+            <div style={{ position: 'relative' }} data-sort-dropdown>
+              <button 
+                type='button' 
+                className="action-button" 
+                onClick={() => setShowSortDropdown(!showSortDropdown)}
+                style={{ 
+                  backgroundColor: sortBy !== 'none' ? '#0A3765' : '#0A3765',
+                  color: 'white',
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  gap: '6px',
+                  padding: '8px 16px',
+                  borderRadius: '8px',
+                  border: 'none',
+                  cursor: 'pointer',
+                  fontSize: '14px',
+                  fontWeight: '500',
+                  minWidth: '100px',
+                  transition: 'background-color 0.2s ease'
+                }}
+                onMouseEnter={(e) => {
+                  e.currentTarget.style.backgroundColor = '#0d4a7a';
+                }}
+                onMouseLeave={(e) => {
+                  e.currentTarget.style.backgroundColor = '#0A3765';
+                }}
+                title="Sort"
+              >
+                <FaSort/>
+                <span>Sort</span>
+              </button>
+              {showSortDropdown && (
+                <div 
+                  style={{
+                    position: 'absolute',
+                    top: '100%',
+                    left: 0,
+                    marginTop: '4px',
+                    backgroundColor: 'white',
+                    border: '1px solid #ddd',
+                    borderRadius: '8px',
+                    boxShadow: '0 2px 8px rgba(0,0,0,0.15)',
+                    zIndex: 1000,
+                    minWidth: '150px'
+                  }}
+                >
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setSortBy('none');
+                      setShowSortDropdown(false);
+                    }}
+                    style={{
+                      width: '100%',
+                      padding: '8px 12px',
+                      textAlign: 'left',
+                      border: 'none',
+                      backgroundColor: sortBy === 'none' ? '#f0f0f0' : 'white',
+                      color: '#000',
+                      cursor: 'pointer',
+                      fontSize: '14px'
+                    }}
+                    onMouseEnter={(e) => {
+                      if (sortBy !== 'none') e.currentTarget.style.backgroundColor = '#f5f5f5';
+                    }}
+                    onMouseLeave={(e) => {
+                      if (sortBy !== 'none') e.currentTarget.style.backgroundColor = 'white';
+                    }}
+                  >
+                    None
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setSortBy('section_name');
+                      setShowSortDropdown(false);
+                    }}
+                    style={{
+                      width: '100%',
+                      padding: '8px 12px',
+                      textAlign: 'left',
+                      border: 'none',
+                      backgroundColor: sortBy === 'section_name' ? '#f0f0f0' : 'white',
+                      color: '#000',
+                      cursor: 'pointer',
+                      fontSize: '14px',
+                      borderTop: '1px solid #eee'
+                    }}
+                    onMouseEnter={(e) => {
+                      if (sortBy !== 'section_name') e.currentTarget.style.backgroundColor = '#f5f5f5';
+                    }}
+                    onMouseLeave={(e) => {
+                      if (sortBy !== 'section_name') e.currentTarget.style.backgroundColor = 'white';
+                    }}
+                  >
+                    Section
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setSortBy('course');
+                      setShowSortDropdown(false);
+                    }}
+                    style={{
+                      width: '100%',
+                      padding: '8px 12px',
+                      textAlign: 'left',
+                      border: 'none',
+                      backgroundColor: sortBy === 'course' ? '#f0f0f0' : 'white',
+                      color: '#000',
+                      cursor: 'pointer',
+                      fontSize: '14px',
+                      borderTop: '1px solid #eee'
+                    }}
+                    onMouseEnter={(e) => {
+                      if (sortBy !== 'course') e.currentTarget.style.backgroundColor = '#f5f5f5';
+                    }}
+                    onMouseLeave={(e) => {
+                      if (sortBy !== 'course') e.currentTarget.style.backgroundColor = 'white';
+                    }}
+                  >
+                    Course
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setSortBy('program');
+                      setShowSortDropdown(false);
+                    }}
+                    style={{
+                      width: '100%',
+                      padding: '8px 12px',
+                      textAlign: 'left',
+                      border: 'none',
+                      backgroundColor: sortBy === 'program' ? '#f0f0f0' : 'white',
+                      color: '#000',
+                      cursor: 'pointer',
+                      fontSize: '14px',
+                      borderTop: '1px solid #eee'
+                    }}
+                    onMouseEnter={(e) => {
+                      if (sortBy !== 'program') e.currentTarget.style.backgroundColor = '#f5f5f5';
+                    }}
+                    onMouseLeave={(e) => {
+                      if (sortBy !== 'program') e.currentTarget.style.backgroundColor = 'white';
+                    }}
+                  >
+                    Program
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setSortBy('students');
+                      setShowSortDropdown(false);
+                    }}
+                    style={{
+                      width: '100%',
+                      padding: '8px 12px',
+                      textAlign: 'left',
+                      border: 'none',
+                      backgroundColor: sortBy === 'students' ? '#f0f0f0' : 'white',
+                      color: '#000',
+                      cursor: 'pointer',
+                      fontSize: '14px',
+                      borderTop: '1px solid #eee'
+                    }}
+                    onMouseEnter={(e) => {
+                      if (sortBy !== 'students') e.currentTarget.style.backgroundColor = '#f5f5f5';
+                    }}
+                    onMouseLeave={(e) => {
+                      if (sortBy !== 'students') e.currentTarget.style.backgroundColor = 'white';
+                    }}
+                  >
+                    Students
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setSortBy('year');
+                      setShowSortDropdown(false);
+                    }}
+                    style={{
+                      width: '100%',
+                      padding: '8px 12px',
+                      textAlign: 'left',
+                      border: 'none',
+                      backgroundColor: sortBy === 'year' ? '#f0f0f0' : 'white',
+                      color: '#000',
+                      cursor: 'pointer',
+                      fontSize: '14px',
+                      borderTop: '1px solid #eee'
+                    }}
+                    onMouseEnter={(e) => {
+                      if (sortBy !== 'year') e.currentTarget.style.backgroundColor = '#f5f5f5';
+                    }}
+                    onMouseLeave={(e) => {
+                      if (sortBy !== 'year') e.currentTarget.style.backgroundColor = 'white';
+                    }}
+                  >
+                    Year
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setSortBy('term');
+                      setShowSortDropdown(false);
+                    }}
+                    style={{
+                      width: '100%',
+                      padding: '8px 12px',
+                      textAlign: 'left',
+                      border: 'none',
+                      backgroundColor: sortBy === 'term' ? '#f0f0f0' : 'white',
+                      color: '#000',
+                      cursor: 'pointer',
+                      fontSize: '14px',
+                      borderTop: '1px solid #eee'
+                    }}
+                    onMouseEnter={(e) => {
+                      if (sortBy !== 'term') e.currentTarget.style.backgroundColor = '#f5f5f5';
+                    }}
+                    onMouseLeave={(e) => {
+                      if (sortBy !== 'term') e.currentTarget.style.backgroundColor = 'white';
+                    }}
+                  >
+                    Term
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setSortBy('instructor');
+                      setShowSortDropdown(false);
+                    }}
+                    style={{
+                      width: '100%',
+                      padding: '8px 12px',
+                      textAlign: 'left',
+                      border: 'none',
+                      backgroundColor: sortBy === 'instructor' ? '#f0f0f0' : 'white',
+                      color: '#000',
+                      cursor: 'pointer',
+                      fontSize: '14px',
+                      borderTop: '1px solid #eee'
+                    }}
+                    onMouseEnter={(e) => {
+                      if (sortBy !== 'instructor') e.currentTarget.style.backgroundColor = '#f5f5f5';
+                    }}
+                    onMouseLeave={(e) => {
+                      if (sortBy !== 'instructor') e.currentTarget.style.backgroundColor = 'white';
+                    }}
+                  >
+                    Instructor
+                  </button>
+                </div>
+              )}
+            </div>
           </div>
           <div style={{ marginLeft: 'auto', display: 'flex', alignItems: 'center', gap: 8 }}>
             <button

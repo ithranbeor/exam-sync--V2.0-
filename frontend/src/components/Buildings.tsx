@@ -1,6 +1,6 @@
 // deno-lint-ignore-file no-explicit-any
 import React, { useEffect, useState, useRef, useMemo } from 'react';
-import { FaSearch, FaTrash, FaEdit, FaDownload, FaEye, FaPlus, FaFileImport, FaChevronLeft, FaChevronRight } from 'react-icons/fa';
+import { FaSearch, FaTrash, FaEdit, FaDownload, FaEye, FaPlus, FaFileImport, FaChevronLeft, FaChevronRight, FaSort } from 'react-icons/fa';
 import { ToastContainer, toast } from 'react-toastify';
 import * as XLSX from 'xlsx';
 import { api } from '../lib/apiClient.ts'; // <-- Axios instance
@@ -34,6 +34,8 @@ const Buildings: React.FC = () => {
   const [currentPage, setCurrentPage] = useState(1);
   const itemsPerPage = 20;
   const [isBulkDeleting, setIsBulkDeleting] = useState(false);
+  const [sortBy, setSortBy] = useState<string>('none');
+  const [showSortDropdown, setShowSortDropdown] = useState(false);
   const [newBuilding, setNewBuilding] = useState<Building>({
     building_id: '',
     building_name: '',
@@ -51,6 +53,24 @@ const Buildings: React.FC = () => {
     const interval = setInterval(fetchBuildings, 2000);
     return () => clearInterval(interval);
   }, [showModal, showImport]);
+
+  // Close dropdown when clicking outside
+  useEffect(() => {
+    const handleClickOutside = (event: MouseEvent) => {
+      const target = event.target as HTMLElement;
+      if (showSortDropdown && !target.closest('[data-sort-dropdown]')) {
+        setShowSortDropdown(false);
+      }
+    };
+
+    if (showSortDropdown) {
+      document.addEventListener('mousedown', handleClickOutside);
+    }
+
+    return () => {
+      document.removeEventListener('mousedown', handleClickOutside);
+    };
+  }, [showSortDropdown]);
 
   // ✅ Fetch buildings and rooms using Axios
   const fetchBuildings = async () => {
@@ -241,13 +261,56 @@ const Buildings: React.FC = () => {
 
   useEffect(() => {
     setCurrentPage(1);
-  }, [searchTerm]);
+  }, [searchTerm, sortBy]);
+
+  // Helper function to determine if a string is numeric
+  const isNumeric = (str: string): boolean => {
+    return !isNaN(Number(str)) && !isNaN(parseFloat(str));
+  };
+
+  // Smart sort function that handles both text and numbers
+  const smartSort = (a: string, b: string): number => {
+    const aIsNumeric = isNumeric(a);
+    const bIsNumeric = isNumeric(b);
+
+    if (aIsNumeric && bIsNumeric) {
+      // Both are numbers - sort numerically
+      return parseFloat(a) - parseFloat(b);
+    } else if (aIsNumeric && !bIsNumeric) {
+      // a is number, b is text - numbers come first
+      return -1;
+    } else if (!aIsNumeric && bIsNumeric) {
+      // a is text, b is number - numbers come first
+      return 1;
+    } else {
+      // Both are text - sort alphabetically
+      return a.localeCompare(b);
+    }
+  };
 
   const filtered = useMemo(() => {
-    return buildings.filter((b) =>
+    let filtered = buildings.filter((b) =>
       b.building_name.toLowerCase().includes(searchTerm.toLowerCase())
     );
-  }, [buildings, searchTerm]);
+
+    // Apply sorting
+    if (sortBy !== 'none') {
+      filtered = [...filtered].sort((a, b) => {
+        if (sortBy === 'building_id') {
+          return smartSort(a.building_id, b.building_id);
+        } else if (sortBy === 'building_name') {
+          return smartSort(a.building_name.toLowerCase(), b.building_name.toLowerCase());
+        } else if (sortBy === 'room_count') {
+          const aCount = roomCounts[a.building_id] || 0;
+          const bCount = roomCounts[b.building_id] || 0;
+          return aCount - bCount;
+        }
+        return 0;
+      });
+    }
+
+    return filtered;
+  }, [buildings, searchTerm, sortBy, roomCounts]);
 
   const paginatedBuildings = useMemo(() => {
     return filtered.slice((currentPage - 1) * itemsPerPage, currentPage * itemsPerPage);
@@ -318,6 +381,159 @@ const Buildings: React.FC = () => {
             >
               <FaFileImport/>
             </button>
+            <div style={{ position: 'relative' }} data-sort-dropdown>
+              <button 
+                type='button' 
+                className="action-button" 
+                onClick={() => setShowSortDropdown(!showSortDropdown)}
+                style={{ 
+                  backgroundColor: sortBy !== 'none' ? '#0A3765' : '#0A3765',
+                  color: 'white',
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  gap: '6px',
+                  padding: '8px 16px',
+                  borderRadius: '8px',
+                  border: 'none',
+                  cursor: 'pointer',
+                  fontSize: '14px',
+                  fontWeight: '500',
+                  minWidth: '100px',
+                  transition: 'background-color 0.2s ease'
+                }}
+                onMouseEnter={(e) => {
+                  e.currentTarget.style.backgroundColor = '#0d4a7a';
+                }}
+                onMouseLeave={(e) => {
+                  e.currentTarget.style.backgroundColor = '#0A3765';
+                }}
+                title="Sort"
+              >
+                <FaSort/>
+                <span>Sort</span>
+              </button>
+              {showSortDropdown && (
+                <div 
+                  style={{
+                    position: 'absolute',
+                    top: '100%',
+                    left: 0,
+                    marginTop: '4px',
+                    backgroundColor: 'white',
+                    border: '1px solid #ddd',
+                    borderRadius: '8px',
+                    boxShadow: '0 2px 8px rgba(0,0,0,0.15)',
+                    zIndex: 1000,
+                    minWidth: '150px'
+                  }}
+                >
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setSortBy('none');
+                      setShowSortDropdown(false);
+                    }}
+                    style={{
+                      width: '100%',
+                      padding: '8px 12px',
+                      textAlign: 'left',
+                      border: 'none',
+                      backgroundColor: sortBy === 'none' ? '#f0f0f0' : 'white',
+                      color: '#000',
+                      cursor: 'pointer',
+                      fontSize: '14px'
+                    }}
+                    onMouseEnter={(e) => {
+                      if (sortBy !== 'none') e.currentTarget.style.backgroundColor = '#f5f5f5';
+                    }}
+                    onMouseLeave={(e) => {
+                      if (sortBy !== 'none') e.currentTarget.style.backgroundColor = 'white';
+                    }}
+                  >
+                    None
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setSortBy('building_id');
+                      setShowSortDropdown(false);
+                    }}
+                    style={{
+                      width: '100%',
+                      padding: '8px 12px',
+                      textAlign: 'left',
+                      border: 'none',
+                      backgroundColor: sortBy === 'building_id' ? '#f0f0f0' : 'white',
+                      color: '#000',
+                      cursor: 'pointer',
+                      fontSize: '14px',
+                      borderTop: '1px solid #eee'
+                    }}
+                    onMouseEnter={(e) => {
+                      if (sortBy !== 'building_id') e.currentTarget.style.backgroundColor = '#f5f5f5';
+                    }}
+                    onMouseLeave={(e) => {
+                      if (sortBy !== 'building_id') e.currentTarget.style.backgroundColor = 'white';
+                    }}
+                  >
+                    Building ID
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setSortBy('building_name');
+                      setShowSortDropdown(false);
+                    }}
+                    style={{
+                      width: '100%',
+                      padding: '8px 12px',
+                      textAlign: 'left',
+                      border: 'none',
+                      backgroundColor: sortBy === 'building_name' ? '#f0f0f0' : 'white',
+                      color: '#000',
+                      cursor: 'pointer',
+                      fontSize: '14px',
+                      borderTop: '1px solid #eee'
+                    }}
+                    onMouseEnter={(e) => {
+                      if (sortBy !== 'building_name') e.currentTarget.style.backgroundColor = '#f5f5f5';
+                    }}
+                    onMouseLeave={(e) => {
+                      if (sortBy !== 'building_name') e.currentTarget.style.backgroundColor = 'white';
+                    }}
+                  >
+                    Building Name
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setSortBy('room_count');
+                      setShowSortDropdown(false);
+                    }}
+                    style={{
+                      width: '100%',
+                      padding: '8px 12px',
+                      textAlign: 'left',
+                      border: 'none',
+                      backgroundColor: sortBy === 'room_count' ? '#f0f0f0' : 'white',
+                      color: '#000',
+                      cursor: 'pointer',
+                      fontSize: '14px',
+                      borderTop: '1px solid #eee'
+                    }}
+                    onMouseEnter={(e) => {
+                      if (sortBy !== 'room_count') e.currentTarget.style.backgroundColor = '#f5f5f5';
+                    }}
+                    onMouseLeave={(e) => {
+                      if (sortBy !== 'room_count') e.currentTarget.style.backgroundColor = 'white';
+                    }}
+                  >
+                    Room Count
+                  </button>
+                </div>
+              )}
+            </div>
           </div>
           <div style={{ marginLeft: 'auto', display: 'flex', alignItems: 'center', gap: 8 }}>
             <button
