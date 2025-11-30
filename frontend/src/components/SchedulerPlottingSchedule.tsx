@@ -22,24 +22,10 @@ interface Gene {
   timeSlot: string;
   roomId: string;
   proctorId: number;
+  sharedRoom?: boolean;
 }
 
 type Chromosome = Gene[];
-
-interface RoomTimeRange {
-  start: number;
-  end: number;
-  sectionId: number;
-  studentCount: number;
-}
-
-interface FinalRoomTimeRange {
-  start: number;
-  end: number;
-  course: string;
-  section: string;
-  studentCount: number;
-}
 
 const SchedulerPlottingSchedule: React.FC<SchedulerProps> = ({ user, onScheduleCreated }) => {
   const [formData, setFormData] = useState({
@@ -72,7 +58,6 @@ const SchedulerPlottingSchedule: React.FC<SchedulerProps> = ({ user, onScheduleC
 
   const [alreadyScheduledIds, setAlreadyScheduledIds] = useState<Set<number>>(new Set());
   const [_checkingSchedules, setCheckingSchedules] = useState(false);
-  const [roomOptions, _setRoomOptions] = useState<{ room_id: string; room_name: string; room_type: string; room_capacity: number; building_id?: string }[]>([]);
 
   const times = [
     "07:00", "07:30", "08:00", "08:30", "09:00", "09:30", "10:00", "10:30", "11:00", "11:30",
@@ -447,6 +432,7 @@ const SchedulerPlottingSchedule: React.FC<SchedulerProps> = ({ user, onScheduleC
     }
     return slots;
   };
+  
 
   // ============================================================================
   // GENERATE RANDOM CHROMOSOME - EXACT MATCH TO WORKING SUPABASE VERSION
@@ -461,31 +447,38 @@ const SchedulerPlottingSchedule: React.FC<SchedulerProps> = ({ user, onScheduleC
     totalDurationMinutes: number,
     getAvailableProctors: (date: string, time: string) => number[],
     sectionMap: Map<number, any>,
-    courseDateAssignment: Map<string, string>
+    courseDateAssignment: Map<string, string>,
+    roomCapacityMap: Map<string, number>,  // ✅ ADD THIS PARAMETER
+    programs: any[],
+    departments: any[]
   ): Chromosome => {
     const chromosome: Chromosome = [];
-    const roomTimeRanges = new Map<string, Array<{ start: number; end: number; sectionId: number; studentCount: number }>>();
-    const proctorTimeRanges = new Map<string, Array<{
-      start: number;
-      end: number;
-      sectionId: number;
-      deptId: string;
+
+    // ✅ TEMPORARY DEBUG - Remove after fixing
+    console.log('=== SECTION DATA STRUCTURE ===');
+    if (allSections.length > 0) {
+      console.log('First section sample:', allSections[0]);
+      console.log('Available properties:', Object.keys(allSections[0]));
+      console.log('enrolled_students:', allSections[0].enrolled_students);
+      console.log('number_of_students:', allSections[0].number_of_students);
+      console.log('section_name:', allSections[0].section_name);
+    }
+    console.log('==============================');
+    
+    // ✅ CAPACITY-BASED: Track room occupancy with capacity
+    const roomTimeRanges = new Map<string, Array<{ 
+      start: number; 
+      end: number; 
+      capacity: number; 
+      occupied: number;
+      sections: number[];  // Track which sections are in this room
     }>>();
+    
+    const proctorTimeRanges = new Map<string, Array<{ start: number; end: number }>>();
     const scheduledSections = new Set<number>();
     const globalTimeSlotYearLevels = new Map<string, Map<string, Set<string>>>();
 
-    // ✅ NEW: Helper function to check capacity
-    const getRoomCurrentOccupancy = (roomId: string, date: string, startMin: number, endMin: number): number => {
-      const roomDateKey = `${date}|${roomId}`;
-      const existingRanges = roomTimeRanges.get(roomDateKey) || [];
-      
-      // Sum up all students currently scheduled in overlapping time slots
-      return existingRanges
-        .filter(range => rangesOverlap(startMin, endMin, range.start, range.end))
-        .reduce((sum, range) => sum + (range.studentCount || 0), 0);
-    };
-
-    // ✅ Group sections by course and night class status
+    // ✅ CAPACITY-BASED: Group sections by course and night class status
     const sectionsByCourseType = new Map<string, any[]>();
     allSections.forEach(section => {
       const isNightClass = section.is_night_class === "YES";
@@ -497,7 +490,7 @@ const SchedulerPlottingSchedule: React.FC<SchedulerProps> = ({ user, onScheduleC
       sectionsByCourseType.get(courseKey)!.push(section);
     });
 
-    // ✅ Assign one time slot per course type
+    // ✅ CAPACITY-BASED: Assign one time slot per course type
     const courseTypeTimeSlots = new Map<string, { date: string; timeSlot: string }>();
     
     sectionsByCourseType.forEach((sections, courseKey) => {
@@ -519,6 +512,26 @@ const SchedulerPlottingSchedule: React.FC<SchedulerProps> = ({ user, onScheduleC
         courseDateAssignment.set(courseId, date);
       }
 
+      // ✅ CAPACITY-BASED: Calculate total students needed for this course
+      const totalStudents = sections.reduce((sum, sec) => {
+        // ✅ Try both properties for compatibility
+        const count = sec.enrolled_students || sec.number_of_students || 0;
+        return sum + count;
+      }, 0);
+      
+      console.log(`📊 Course ${courseKey}: ${sections.length} sections, ${totalStudents} total students`);
+      
+      // Get all possible rooms with their capacities
+      const allPossibleRooms = Array.from(new Set(
+        sections.flatMap(sec => sectionRoomsMap.get(sec.modality_id) || [])
+      )).map(roomId => ({
+        roomId,
+        capacity: roomCapacityMap.get(roomId) || 0
+      })).filter(r => r.capacity > 0);
+
+      console.log(`📍 Available rooms for ${courseKey}:`, allPossibleRooms.map(r => `${r.roomId}(${r.capacity})`).join(', '));
+
+      // ✅ CAPACITY-BASED: Find a time slot with sufficient total capacity
       let foundTimeSlot = false;
       const maxAttempts = validTimesForCourse.length * 3;
       
@@ -527,61 +540,48 @@ const SchedulerPlottingSchedule: React.FC<SchedulerProps> = ({ user, onScheduleC
         const startMinutes = timeToMinutes(candidateTime);
         const endMinutes = startMinutes + totalDurationMinutes;
         
-        // Check if we can fit all sections with room sharing
-        let canFitAllSections = true;
-
-        for (const section of sections) {
-          const suitableRooms = sectionRoomsMap.get(section.modality_id) || [];
-          let foundRoom = false;
-          const neededCapacity = section.enrolled_students || 0;  // ✅ Use enrolled_students
+        // ✅ CAPACITY-BASED: Calculate available capacity at this time
+        let availableCapacity = 0;
+        const availableRooms: typeof allPossibleRooms = [];
+        
+        for (const { roomId, capacity } of allPossibleRooms) {
+          const roomDateKey = `${date}|${roomId}`;
+          const existingRanges = roomTimeRanges.get(roomDateKey) || [];
           
-          // ✅ CRITICAL FIX: Only check rooms that have enough TOTAL capacity
-          for (const roomId of suitableRooms) {
-            const room = roomOptions.find(r => r.room_id === roomId);
-            if (!room) continue;
-            
-            // Get current occupancy for THIS specific room at this time
-            const currentOccupancy = getRoomCurrentOccupancy(roomId, date, startMinutes, endMinutes);
-            
-            // ✅ KEY FIX: Check if adding this section would exceed capacity
-            if (currentOccupancy + neededCapacity <= room.room_capacity) {
-              // This room can accommodate this section
-              foundRoom = true;
-              
-              // Mark this room as used by this section for this time slot
-              if (!roomTimeRanges.has(`${date}|${roomId}`)) {
-                roomTimeRanges.set(`${date}|${roomId}`, []);
-              }
-              roomTimeRanges.get(`${date}|${roomId}`)!.push({
-                start: startMinutes,
-                end: endMinutes,
-                sectionId: section.modality_id,
-                studentCount: neededCapacity
-              });
-              
-              break;  // Found a suitable room, move to next section
-            }
-          }
+          // Check if room is free or has available capacity
+          const overlappingRange = existingRanges.find(range => 
+            rangesOverlap(startMinutes, endMinutes, range.start, range.end)
+          );
           
-          if (!foundRoom) {
-            canFitAllSections = false;
-            break;
+          if (!overlappingRange) {
+            // Room is completely free
+            availableCapacity += capacity;
+            availableRooms.push({ roomId, capacity });
+          } else if ((overlappingRange.capacity - overlappingRange.occupied) > 0) {
+            // Room has partial capacity
+            const remaining = overlappingRange.capacity - overlappingRange.occupied;
+            availableCapacity += remaining;
+            availableRooms.push({ roomId, capacity: remaining });
           }
         }
         
-        if (canFitAllSections) {
+        // ✅ CAPACITY-BASED: Check if total capacity is sufficient
+        if (availableCapacity >= totalStudents) {
           courseTypeTimeSlots.set(courseKey, { date, timeSlot: candidateTime });
           foundTimeSlot = true;
+          console.log(`✅ Found timeslot for ${courseKey}: ${candidateTime} on ${date} (capacity: ${availableCapacity})`);
         }
       }
       
+      // Fallback
       if (!foundTimeSlot && validTimesForCourse.length > 0) {
         const timeSlot = validTimesForCourse[Math.floor(Math.random() * validTimesForCourse.length)];
         courseTypeTimeSlots.set(courseKey, { date, timeSlot });
+        console.warn(`⚠️ Using fallback timeslot for ${courseKey}: ${timeSlot}`);
       }
     });
 
-    // ✅ Schedule all sections using their assigned course time slot
+    // ✅ CAPACITY-BASED: Assign rooms to sections based on capacity
     allSections.forEach(section => {
       if (scheduledSections.has(section.modality_id)) {
         return;
@@ -604,49 +604,60 @@ const SchedulerPlottingSchedule: React.FC<SchedulerProps> = ({ user, onScheduleC
       const { date, timeSlot } = assignment;
       const startMinutes = timeToMinutes(timeSlot);
       const endMinutes = startMinutes + totalDurationMinutes;
+      const studentCount = section.enrolled_students || section.number_of_students || 0;
 
-      // ✅ Find available room (with capacity sharing support)
+      // ✅ CAPACITY-BASED: Find room with available capacity
       let roomId = "";
-      const suitableRooms = sectionRoomsMap.get(section.modality_id) || [];
-      const neededCapacity = section.enrolled_students || 0;  // ✅ Use enrolled_students
-
-      // ✅ CRITICAL: Try each suitable room until we find one with enough remaining capacity
-      for (const room of suitableRooms) {
-        const roomObj = roomOptions.find(r => r.room_id === room);
-        if (!roomObj) continue;
+      let assignedToSharedRoom = false;
+      
+      const suitableRooms = (sectionRoomsMap.get(section.modality_id) || [])
+        .map(rid => ({
+          roomId: rid,
+          capacity: roomCapacityMap.get(rid) || 0
+        }))
+        .filter(r => r.capacity >= studentCount)
+        .sort((a, b) => a.capacity - b.capacity); // Prefer smaller rooms first (better fit)
+      
+      for (const { roomId: rid, capacity } of suitableRooms) {
+        const roomDateKey = `${date}|${rid}`;
+        const existingRanges = roomTimeRanges.get(roomDateKey) || [];
         
-        // ✅ KEY FIX: Check actual capacity before assigning
-        if (roomObj.room_capacity < neededCapacity) {
-          // This room is too small for this section alone - skip it
-          continue;
-        }
+        // Check if room has enough remaining capacity
+        const currentRange = existingRanges.find(range => 
+          rangesOverlap(startMinutes, endMinutes, range.start, range.end)
+        );
         
-        const roomDateKey = `${date}|${room}`;
-        
-        // Check if room has capacity for this section (considering other sections already assigned)
-        const currentOccupancy = getRoomCurrentOccupancy(room, date, startMinutes, endMinutes);
-        
-        if (currentOccupancy + neededCapacity <= roomObj.room_capacity) {
-          roomId = room;
-          
-          // Mark room as occupied with capacity tracking
+        if (!currentRange) {
+          // ✅ CAPACITY-BASED: Room is completely free - create new range
+          roomId = rid;
           if (!roomTimeRanges.has(roomDateKey)) roomTimeRanges.set(roomDateKey, []);
           roomTimeRanges.get(roomDateKey)!.push({ 
             start: startMinutes, 
             end: endMinutes,
-            sectionId: section.modality_id,
-            studentCount: neededCapacity  // ✅ Track actual student count
+            capacity: capacity,
+            occupied: studentCount,
+            sections: [section.modality_id]
           });
+          console.log(`✅ Assigned ${section.section_name} to new room ${rid} (${studentCount}/${capacity} seats)`);
+          break;
+        } else if ((currentRange.capacity - currentRange.occupied) >= studentCount) {
+          // ✅ CAPACITY-BASED: Room has partial capacity - add to existing range
+          roomId = rid;
+          currentRange.occupied += studentCount;
+          currentRange.sections.push(section.modality_id);
+          assignedToSharedRoom = true;
+          console.log(`✅ Assigned ${section.section_name} to SHARED room ${rid} (${currentRange.occupied}/${currentRange.capacity} seats, ${currentRange.sections.length} sections)`);
           break;
         }
       }
 
-      // Fallback if no room found
+      // Fallback
       if (!roomId && suitableRooms.length > 0) {
-        roomId = suitableRooms[Math.floor(Math.random() * suitableRooms.length)];
+        roomId = suitableRooms[0].roomId;
+        console.warn(`⚠️ Using fallback room ${roomId} for ${section.section_name}`);
       }
 
-      // Year level tracking
+      // Year level tracking (unchanged)
       const yearLevel = extractYearLevel(section.section_name);
       const programId = section.program_id;
       const program = programs.find(p => p.program_id === programId);
@@ -674,7 +685,7 @@ const SchedulerPlottingSchedule: React.FC<SchedulerProps> = ({ user, onScheduleC
         collegeYearMap.get(collegeId)!.add(yearLevel);
       }
 
-      // ✅ Proctor assignment (one per section)
+      // Proctor assignment (unchanged)
       let proctorId = -1;
       
       if (isNightClass && section.instructor_id) {
@@ -685,7 +696,7 @@ const SchedulerPlottingSchedule: React.FC<SchedulerProps> = ({ user, onScheduleC
           if (!existingRanges.some(range => rangesOverlap(startMinutes, endMinutes, range.start, range.end))) {
             proctorId = section.instructor_id;
             if (!proctorTimeRanges.has(proctorDateKey)) proctorTimeRanges.set(proctorDateKey, []);
-            proctorTimeRanges.get(proctorDateKey)!.push({ start: startMinutes, end: endMinutes, sectionId: section.modality_id, deptId: departmentId });
+            proctorTimeRanges.get(proctorDateKey)!.push({ start: startMinutes, end: endMinutes });
           }
         }
       }
@@ -700,7 +711,7 @@ const SchedulerPlottingSchedule: React.FC<SchedulerProps> = ({ user, onScheduleC
             if (!existingRanges.some(range => rangesOverlap(startMinutes, endMinutes, range.start, range.end))) {
               proctorId = proctor;
               if (!proctorTimeRanges.has(proctorDateKey)) proctorTimeRanges.set(proctorDateKey, []);
-              proctorTimeRanges.get(proctorDateKey)!.push({ start: startMinutes, end: endMinutes, sectionId: section.modality_id, deptId: departmentId });
+              proctorTimeRanges.get(proctorDateKey)!.push({ start: startMinutes, end: endMinutes });
               break;
             }
           }
@@ -713,13 +724,26 @@ const SchedulerPlottingSchedule: React.FC<SchedulerProps> = ({ user, onScheduleC
 
       // Add to chromosome
       scheduledSections.add(section.modality_id);
-      chromosome.push({ sectionId: section.modality_id, date, timeSlot, roomId, proctorId });
+      chromosome.push({ 
+        sectionId: section.modality_id, 
+        date, 
+        timeSlot, 
+        roomId, 
+        proctorId,
+        sharedRoom: assignedToSharedRoom  // ✅ NEW: Track if room is shared
+      });
     });
+
+    // ✅ CAPACITY-BASED: Log summary
+    console.log(`📋 Chromosome created: ${chromosome.length} sections scheduled`);
+    const sharedRoomCount = chromosome.filter(g => g.sharedRoom).length;
+    console.log(`🔗 ${sharedRoomCount} sections assigned to shared rooms`);
 
     return chromosome;
   };
+
   // ============================================================================
-  // CALCULATE FITNESS - EXACT MATCH TO WORKING ORIGINAL
+  // UPDATED: calculateFitness - CAPACITY-BASED VERSION
   // ============================================================================
 
   const calculateFitness = (
@@ -727,17 +751,21 @@ const SchedulerPlottingSchedule: React.FC<SchedulerProps> = ({ user, onScheduleC
     sectionMap: Map<number, any>,
     totalDurationMinutes: number,
     programs: any[],
-    departments: any[]
+    departments: any[],
+    roomCapacityMap: Map<string, number>  // ✅ ADD THIS PARAMETER
   ): number => {
     let fitness = 0;
 
-    const roomTimeRanges = new Map<string, RoomTimeRange[]>();
-    const proctorTimeRanges = new Map<string, Array<{
-      start: number;
-      end: number;
+    // ✅ CAPACITY-BASED: Track room usage with capacity
+    const roomTimeRanges = new Map<string, Array<{ 
+      start: number; 
+      end: number; 
       sectionId: number;
-      deptId: string;
+      capacity: number;
+      occupied: number;
     }>>();
+    
+    const proctorTimeRanges = new Map<string, Array<{ start: number; end: number; sectionId: number; deptId: string }>>();
     const studentSchedule = new Map<string, Set<string>>();
     const sectionScheduledCount = new Map<number, number>();
     const yearLevelByTimeSlotAndCollege = new Map<string, Map<string, Set<string>>>();
@@ -754,6 +782,7 @@ const SchedulerPlottingSchedule: React.FC<SchedulerProps> = ({ user, onScheduleC
       const yearLevel = extractYearLevel(section.section_name);
       const courseId = section.course_id;
       const programId = section.program_id;
+      const studentCount = section.enrolled_students || section.number_of_students || 0;
 
       const program = programs.find(p => p.program_id === programId);
       const departmentId = program ? String(program.department_id) : "unknown";
@@ -818,46 +847,57 @@ const SchedulerPlottingSchedule: React.FC<SchedulerProps> = ({ user, onScheduleC
         fitness -= 8000;
       }
 
-      // Room overlaps - allow sharing for same course
+      // ✅ CAPACITY-BASED: Room capacity validation
       if (!roomId) {
         fitness -= 8000;
       } else {
+        const roomCapacity = roomCapacityMap.get(roomId) || 0;
         const roomDateKey = `${date}|${roomId}`;
+        
         if (!roomTimeRanges.has(roomDateKey)) {
           roomTimeRanges.set(roomDateKey, []);
         }
+        
         const existingRanges = roomTimeRanges.get(roomDateKey)!;
         
-        // Get the room object to check capacity
-        const room = roomOptions.find(r => r.room_id === roomId);
-        const roomCapacity = room?.room_capacity || 0;
+        // Check for overlapping time ranges
+        const overlappingRange = existingRanges.find(existing => 
+          rangesOverlap(startMinutes, endMinutes, existing.start, existing.end)
+        );
         
-        // Calculate cumulative student count
-        let currentOccupancy = 0;
-        
-        existingRanges.forEach(existing => {
-          if (rangesOverlap(startMinutes, endMinutes, existing.start, existing.end)) {
-            currentOccupancy += existing.studentCount;
+        if (overlappingRange) {
+          // ✅ CAPACITY-BASED: Check if adding this section exceeds capacity
+          const totalOccupied = overlappingRange.occupied + studentCount;
+          
+          if (totalOccupied > roomCapacity) {
+            // Penalize capacity overflow
+            const overflow = totalOccupied - roomCapacity;
+            fitness -= (overflow * 500);  // Heavy penalty for capacity violation
+            console.warn(`⚠️ Capacity exceeded in room ${roomId}: ${totalOccupied}/${roomCapacity} (overflow: ${overflow})`);
+          } else {
+            // ✅ CAPACITY-BASED: Room sharing is allowed and valid
+            overlappingRange.occupied = totalOccupied;
+            fitness += 500;  // Reward efficient room usage
+            console.log(`✅ Room ${roomId} shared: ${totalOccupied}/${roomCapacity} seats used`);
           }
-        });
-        
-        // Check if adding this section would exceed capacity
-        const sectionStudents = section.enrolled_students || 0;
-        if (currentOccupancy + sectionStudents > roomCapacity) {
-          fitness -= 20000; // Penalize over-capacity
         } else {
-          // Room sharing allowed and rewarded
-          if (currentOccupancy > 0) {
-            fitness += 1000; // Reward efficient room sharing
+          // New time range for this room
+          existingRanges.push({ 
+            start: startMinutes, 
+            end: endMinutes, 
+            sectionId: gene.sectionId,
+            capacity: roomCapacity,
+            occupied: studentCount
+          });
+          
+          // Reward if room capacity is well-utilized (not too much waste)
+          const utilization = studentCount / roomCapacity;
+          if (utilization >= 0.7) {
+            fitness += 300;  // Good utilization
+          } else if (utilization < 0.3) {
+            fitness -= 200;  // Poor utilization (too much waste)
           }
         }
-        
-        existingRanges.push({ 
-          start: startMinutes, 
-          end: endMinutes, 
-          sectionId: gene.sectionId,
-          studentCount: sectionStudents
-        });
       }
 
       // Proctor assignment
@@ -899,7 +939,7 @@ const SchedulerPlottingSchedule: React.FC<SchedulerProps> = ({ user, onScheduleC
         });
       }
 
-      // Reward
+      // Reward valid assignments
       if (roomId && proctorId !== -1) {
         fitness += 1000;
       }
@@ -940,32 +980,8 @@ const SchedulerPlottingSchedule: React.FC<SchedulerProps> = ({ user, onScheduleC
     eveningTimeSlots: string[],
     sectionRoomsMap: Map<number, string[]>,
     getAvailableProctors: (date: string, time: string) => number[],
-    mutationRate: number,
-    totalDurationMinutes: number  // ✅ ADD THIS PARAMETER
+    mutationRate: number
   ): Chromosome => {
-    // ✅ ADD: Build roomTimeRanges from current chromosome state
-    const roomTimeRanges = new Map<string, Array<{ start: number; end: number; sectionId: number; studentCount: number }>>();
-    
-    chromosome.forEach(gene => {
-      const section = sectionMap.get(gene.sectionId);
-      if (!section) return;
-      
-      const startMinutes = timeToMinutes(gene.timeSlot);
-      const endMinutes = startMinutes + totalDurationMinutes;
-      const roomDateKey = `${gene.date}|${gene.roomId}`;
-      
-      if (!roomTimeRanges.has(roomDateKey)) {
-        roomTimeRanges.set(roomDateKey, []);
-      }
-      
-      roomTimeRanges.get(roomDateKey)!.push({
-        start: startMinutes,
-        end: endMinutes,
-        sectionId: gene.sectionId,
-        studentCount: section.enrolled_students || 0
-      });
-    });
-
     // ✅ NEW: Build course-to-timeslot map to preserve course consistency
     const courseTypeTimeSlots = new Map<string, { date: string; timeSlot: string }>();
     
@@ -994,13 +1010,14 @@ const SchedulerPlottingSchedule: React.FC<SchedulerProps> = ({ user, onScheduleC
         const validTimesForSection = isNightClass 
           ? eveningTimeSlots.filter(t => {
               const [h, m] = t.split(":").map(Number);
+              const totalDurationMinutes = duration.hours * 60 + duration.minutes;
               const end = (h * 60 + m) + totalDurationMinutes;
               return end <= 21 * 60;
             })
           : validTimes;
 
         if (mutationType === 0 && Math.random() < 0.3) {
-          // Mutate date
+          // ✅ Mutate date - update for entire course
           const newDate = sortedDates[Math.floor(Math.random() * sortedDates.length)];
           courseTypeTimeSlots.set(courseKey, { date: newDate, timeSlot: gene.timeSlot });
           
@@ -1017,7 +1034,7 @@ const SchedulerPlottingSchedule: React.FC<SchedulerProps> = ({ user, onScheduleC
           
           return { ...gene, date: newDate, proctorId: newProctorId };
         } else if (mutationType === 1) {
-          // Mutate time slot
+          // ✅ Mutate time slot - update for entire course
           const newTimeSlot = validTimesForSection[Math.floor(Math.random() * validTimesForSection.length)];
           courseTypeTimeSlots.set(courseKey, { date: gene.date, timeSlot: newTimeSlot });
           
@@ -1034,52 +1051,13 @@ const SchedulerPlottingSchedule: React.FC<SchedulerProps> = ({ user, onScheduleC
           
           return { ...gene, timeSlot: newTimeSlot, proctorId: newProctorId };
         } else if (mutationType === 2) {
-          // ✅ Mutate room with capacity validation
-          let newRoomId = "";
-          const sectionStudents = section.enrolled_students || 0;  // ✅ Use enrolled_students
-          const startMinutes = timeToMinutes(gene.timeSlot);
-          const endMinutes = startMinutes + totalDurationMinutes;
-          
-          // ✅ CRITICAL: Only try rooms that can fit this section
-          for (const roomId of suitableRooms) {
-            const roomObj = roomOptions.find(r => r.room_id === roomId);
-            if (!roomObj) continue;
-            
-            // ✅ First check: Can this room fit the section at all?
-            if (roomObj.room_capacity < sectionStudents) {
-              continue;  // Room too small, skip it
-            }
-            
-            // Check current occupancy at this time
-            const roomDateKey = `${gene.date}|${roomId}`;
-            const existingRanges = roomTimeRanges.get(roomDateKey) || [];
-            
-            let currentOccupancy = 0;
-            for (const range of existingRanges) {
-              // Don't count this gene's current usage
-              if (range.sectionId === gene.sectionId) continue;
-              
-              if (rangesOverlap(startMinutes, endMinutes, range.start, range.end)) {
-                currentOccupancy += range.studentCount || 0;
-              }
-            }
-            
-            // Check if room has capacity
-            if (currentOccupancy + sectionStudents <= roomObj.room_capacity) {
-              newRoomId = roomId;
-              break;
-            }
-          }
-          
-          // ✅ Only assign if we found a valid room
-          if (newRoomId) {
-            return { ...gene, roomId: newRoomId };
-          }
-          
-          // Keep original room if no better option found
-          return { ...gene };
+          // Mutate room only (doesn't affect other sections)
+          const newRoomId = suitableRooms.length > 0
+            ? suitableRooms[Math.floor(Math.random() * suitableRooms.length)]
+            : "";
+          return { ...gene, roomId: newRoomId };
         } else {
-          // Mutate proctor
+          // Mutate proctor only (doesn't affect other sections)
           const availableProctors = getAvailableProctors(gene.date, gene.timeSlot);
           let newProctorId = -1;
           
@@ -1220,8 +1198,7 @@ const SchedulerPlottingSchedule: React.FC<SchedulerProps> = ({ user, onScheduleC
         const enrichedSection = {
           ...selectedModality,
           is_night_class: sectionCourseData?.is_night_class ?? null,
-          instructor_id: sectionCourseData?.user_id ?? null,
-          enrolled_students: sectionCourseData?.number_of_students ?? 0  // ✅ ADD THIS LINE
+          instructor_id: sectionCourseData?.user_id ?? null
         };
         
         allSections.push(enrichedSection);
@@ -1267,49 +1244,31 @@ const SchedulerPlottingSchedule: React.FC<SchedulerProps> = ({ user, onScheduleC
 
     // ✅ Build section rooms map with ALL suitable rooms
     const sectionRoomsMap = new Map<number, string[]>();
-      allSections.forEach(section => {
-        const enrolledCount = section.enrolled_students ?? 0;
-        const possibleRooms = section.possible_rooms ?? [];
-        
-        console.log(`📍 Section ${section.modality_id} (${section.course_id} - ${section.section_name}):`, {
-          enrolled: enrolledCount,
-          possible_rooms: possibleRooms
-        });
-        
-        if (possibleRooms.length === 0) {
-          console.warn(`⚠️ Section ${section.modality_id} has NO possible_rooms assigned!`);
-          sectionRoomsMap.set(section.modality_id, []);
-          return;
-        }
-        
-        // Filter possible_rooms by capacity and availability
-        const validRooms = possibleRooms.filter((roomId: string) => {
-          const capacity = roomCapacityMap.get(roomId);
-          
-          if (!capacity) {
-            console.warn(`⚠️ Room ${roomId} not found in roomCapacityMap`);
-            return false;
-          }
-          
-          if (capacity < enrolledCount) {
-            console.warn(`⚠️ Room ${roomId} (capacity: ${capacity}) too small for ${enrolledCount} students`);
-            return false;
-          }
-          
-          return true;
-        });
-        
-        // Sort by capacity (smallest fitting room first to minimize waste)
-        const sortedRooms = validRooms.sort((a: string, b: string) => {
+    allSections.forEach(section => {
+      const enrolledCount = section.enrolled_students ?? 0;
+      const possibleRooms = section.possible_rooms ?? [];
+      
+      // Get ALL rooms that can fit this section
+      const allSuitable = Array.from(roomCapacityMap.entries())
+        .filter(([_, capacity]) => capacity >= enrolledCount)
+        .map(([id, _]) => id)
+        .sort((a, b) => {
           const capA = roomCapacityMap.get(a) || 0;
           const capB = roomCapacityMap.get(b) || 0;
-          return capA - capB;
+          const wasteA = Math.abs(capA - enrolledCount);
+          const wasteB = Math.abs(capB - enrolledCount);
+          return wasteA - wasteB;
         });
-        
-        sectionRoomsMap.set(section.modality_id, sortedRooms);
-        
-        console.log(`✅ Section ${section.modality_id} assigned ${sortedRooms.length} valid rooms:`, sortedRooms);
-      });
+      
+      // Prioritize preferred rooms, then add all other suitable rooms
+      const preferred = possibleRooms.filter((r: string) => allSuitable.includes(r));
+      const others = allSuitable.filter(r => !preferred.includes(r));
+      const allRoomsForSection = [...preferred, ...others];
+      
+      sectionRoomsMap.set(section.modality_id, allRoomsForSection);
+      
+      console.log(`📍 Section ${section.modality_id} can use ${allRoomsForSection.length} rooms (${preferred.length} preferred, ${others.length} others)`);
+    });
 
     // Pre-validation
     const violations: string[] = [];
@@ -1501,7 +1460,10 @@ const SchedulerPlottingSchedule: React.FC<SchedulerProps> = ({ user, onScheduleC
         totalDurationMinutes,
         getAvailableProctors,
         sectionMap,
-        courseDateAssignment
+        courseDateAssignment,
+        roomCapacityMap,  // ✅ ADD THIS LINE
+        programs,         // ✅ ADD THIS LINE
+        departments 
       ));
     }
 
@@ -1513,7 +1475,7 @@ const SchedulerPlottingSchedule: React.FC<SchedulerProps> = ({ user, onScheduleC
         await new Promise(resolve => setTimeout(resolve, 0));
       }
 
-      const fitnesses = population.map(c => calculateFitness(c, sectionMap, totalDurationMinutes, programs, departments));
+      const fitnesses = population.map(c => calculateFitness(c, sectionMap, totalDurationMinutes, programs, departments, roomCapacityMap));
       const currentBestIdx = fitnesses.indexOf(Math.max(...fitnesses));
       
       if (fitnesses[currentBestIdx] > bestFitness) {
@@ -1538,9 +1500,9 @@ const SchedulerPlottingSchedule: React.FC<SchedulerProps> = ({ user, onScheduleC
         const parent1 = tournamentSelection(population, fitnesses);
         const parent2 = tournamentSelection(population, fitnesses);
         const [child1, child2] = crossover(parent1, parent2);
-        nextPopulation.push(mutate(child1, sectionMap, sortedDates, validTimes, eveningTimeSlots, sectionRoomsMap, getAvailableProctors, MUTATION_RATE, totalDurationMinutes));
+        nextPopulation.push(mutate(child1, sectionMap, sortedDates, validTimes, eveningTimeSlots, sectionRoomsMap, getAvailableProctors, MUTATION_RATE));
         if (nextPopulation.length < POPULATION_SIZE) {
-          nextPopulation.push(mutate(child2, sectionMap, sortedDates, validTimes, eveningTimeSlots, sectionRoomsMap, getAvailableProctors, MUTATION_RATE, totalDurationMinutes));
+          nextPopulation.push(mutate(child2, sectionMap, sortedDates, validTimes, eveningTimeSlots, sectionRoomsMap, getAvailableProctors, MUTATION_RATE));
         }
       }
 
@@ -1557,7 +1519,8 @@ const SchedulerPlottingSchedule: React.FC<SchedulerProps> = ({ user, onScheduleC
     // Convert to schedule with validation
     const scheduledExams: any[] = [];
     const unscheduledSections: string[] = [];
-    const finalRoomTimeRanges = new Map<string, FinalRoomTimeRange[]>();
+    const finalRoomTimeRanges = new Map<string, Array<{ start: number; end: number; course: string; section: string }>>();
+    const finalProctorTimeRanges = new Map<string, Array<{ start: number; end: number; course: string; section: string }>>();
     const finalCourseDates = new Map<string, Set<string>>();
 
     for (const gene of bestChromosome) {
@@ -1620,36 +1583,29 @@ const SchedulerPlottingSchedule: React.FC<SchedulerProps> = ({ user, onScheduleC
 
       const roomDateKey = `${date}|${roomId}`;
       const existingRoomRanges = finalRoomTimeRanges.get(roomDateKey) || [];
-
-      // Get room capacity
-      const room = roomsCache.find(r => r.room_id === roomId);
-      const roomCapacity = room?.room_capacity || 0;
-
-      // Calculate if we can fit this section with existing sections
-      let currentOccupancy = 0;
       for (const existing of existingRoomRanges) {
         if (rangesOverlap(startMinutes, endMinutes, existing.start, existing.end)) {
-          currentOccupancy += existing.studentCount || 0;
+          console.warn(`⚠️ Room overlap detected`);
+          hasOverlap = true;
+          break;
         }
       }
 
-      const sectionStudents = section.enrolled_students || 0;
-
-      // ALLOW overlap if capacity permits, REJECT if over capacity
-      if (currentOccupancy + sectionStudents > roomCapacity) {
-        console.warn(
-          `⚠️ Room ${roomId} capacity exceeded: ` +
-          `Current: ${currentOccupancy}, Adding: ${sectionStudents}, Capacity: ${roomCapacity}`
-        );
-        hasOverlap = true;
+      const proctorDateKey = `${date}|${proctorId}`;
+      const existingProctorRanges = finalProctorTimeRanges.get(proctorDateKey) || [];
+      for (const existing of existingProctorRanges) {
+        if (rangesOverlap(startMinutes, endMinutes, existing.start, existing.end)) {
+          console.warn(`⚠️ Proctor overlap detected`);
+          hasOverlap = true;
+          break;
+        }
       }
 
       if (hasOverlap) {
-        unscheduledSections.push(`${section.course_id} - ${section.section_name} (room capacity exceeded)`);
+        unscheduledSections.push(`${section.course_id} - ${section.section_name} (time overlap conflict)`);
         continue;
       }
 
-      // Track room usage with student count for future validation
       if (!finalRoomTimeRanges.has(roomDateKey)) {
         finalRoomTimeRanges.set(roomDateKey, []);
       }
@@ -1657,8 +1613,17 @@ const SchedulerPlottingSchedule: React.FC<SchedulerProps> = ({ user, onScheduleC
         start: startMinutes,
         end: endMinutes,
         course: section.course_id,
-        section: section.section_name,
-        studentCount: sectionStudents
+        section: section.section_name
+      });
+
+      if (!finalProctorTimeRanges.has(proctorDateKey)) {
+        finalProctorTimeRanges.set(proctorDateKey, []);
+      }
+      finalProctorTimeRanges.get(proctorDateKey)!.push({
+        start: startMinutes,
+        end: endMinutes,
+        course: section.course_id,
+        section: section.section_name
       });
 
       const startTimestamp = `${date}T${timeSlot}:00`;
