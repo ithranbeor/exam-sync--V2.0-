@@ -53,6 +53,7 @@ const ExamPeriodComponent: React.FC = () => {
   const tableContainerRef = useRef<HTMLDivElement>(null);
   const [sortBy, setSortBy] = useState<string>('none');
   const [showSortDropdown, setShowSortDropdown] = useState(false);
+  const [activeDate, setActiveDate] = useState<Date>(new Date());
 
   const [newExam, setNewExam] = useState<ExamPeriod>({
     start_date: '',
@@ -440,47 +441,10 @@ const ExamPeriodComponent: React.FC = () => {
               <FaSearch />
             </button>
           </div>
-          <button
-            type="button"
-            className="action-button"
-            style={{ minWidth: 90 }}
-            onClick={() => setShowFilters(prev => !prev)}
-          >
-            {showFilters ? 'Hide Filters' : 'Show Filters'}
-          </button>
         </div>
       </div>
 
-      {showFilters && (
-        <div className="advanced-filters" style={{ marginBottom: 16 }}>
-          <select value={filterYear} onChange={(e) => setFilterYear(e.target.value)}>
-            <option value="">All Years</option>
-            {academicYears.map(y => <option key={y} value={y}>{y}</option>)}
-          </select>
-
-          <select value={filterCategory} onChange={(e) => setFilterCategory(e.target.value)}>
-            <option value="">All Categories</option>
-            {examCategories.map(c => <option key={c} value={c}>{c}</option>)}
-          </select>
-
-          <select value={filterTerm} onChange={(e) => setFilterTerm(e.target.value)}>
-            <option value="">All Terms</option>
-            {terms.map(t => <option key={t.term_id} value={t.term_id.toString()}>{t.term_name}</option>)}
-          </select>
-
-          <select value={filterDept} onChange={(e) => setFilterDept(e.target.value)}>
-            <option value="">All Departments</option>
-            {departments.map(d => <option key={d.department_id} value={d.department_id}>{d.department_name}</option>)}
-          </select>
-
-          <select value={filterCollege} onChange={(e) => setFilterCollege(e.target.value)}>
-            <option value="">All Colleges</option>
-            {colleges.map(c => <option key={c.college_id} value={c.college_id}>{c.college_name}</option>)}
-          </select>
-        </div>
-      )}
-
-      <div className="colleges-actions" style={{ display: 'flex', width: '100%', alignItems: 'center' }}>
+      <div className="colleges-actions" style={{ display: 'flex', width: '100%', alignItems: 'center', flexWrap: 'wrap', gap: 8 }}>
         <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
           <button type='button' className="action-button add-new" onClick={() => {
             setEditMode(false);
@@ -494,6 +458,7 @@ const ExamPeriodComponent: React.FC = () => {
               college_id: null,
             });
             setSelectedDates([]);
+            setActiveDate(new Date());
             setShowModal(true);
           }}><FaPlus/></button>
           <div style={{ position: 'relative' }} data-sort-dropdown>
@@ -753,6 +718,35 @@ const ExamPeriodComponent: React.FC = () => {
               </div>
             )}
           </div>
+          <button
+            type="button"
+            className="action-button filter-toggle"
+            onClick={() => setShowFilters(prev => !prev)}
+            style={{
+              backgroundColor: '#ffb800',
+              color: 'white',
+              padding: '8px 16px',
+              borderRadius: '8px',
+              border: 'none',
+              cursor: 'pointer',
+              fontSize: '14px',
+              fontWeight: '500',
+              minWidth: '120px',
+              height: '38px',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              transition: 'background-color 0.2s ease'
+            }}
+            onMouseEnter={(e) => {
+              e.currentTarget.style.backgroundColor = '#e6a700';
+            }}
+            onMouseLeave={(e) => {
+              e.currentTarget.style.backgroundColor = '#ffb800';
+            }}
+          >
+            {showFilters ? 'Hide Filters' : 'Show Filters'}
+          </button>
         </div>
         <div style={{ marginLeft: 'auto' }}>
           <button
@@ -774,6 +768,35 @@ const ExamPeriodComponent: React.FC = () => {
           </button>
         </div>
       </div>
+
+      {showFilters && (
+        <div className="advanced-filters">
+          <select value={filterYear} onChange={(e) => setFilterYear(e.target.value)}>
+            <option value="">All Years</option>
+            {academicYears.map(y => <option key={y} value={y}>{y}</option>)}
+          </select>
+
+          <select value={filterCategory} onChange={(e) => setFilterCategory(e.target.value)}>
+            <option value="">All Categories</option>
+            {examCategories.map(c => <option key={c} value={c}>{c}</option>)}
+          </select>
+
+          <select value={filterTerm} onChange={(e) => setFilterTerm(e.target.value)}>
+            <option value="">All Terms</option>
+            {terms.map(t => <option key={t.term_id} value={t.term_id.toString()}>{t.term_name}</option>)}
+          </select>
+
+          <select value={filterDept} onChange={(e) => setFilterDept(e.target.value)}>
+            <option value="">All Departments</option>
+            {departments.map(d => <option key={d.department_id} value={d.department_id}>{d.department_name}</option>)}
+          </select>
+
+          <select value={filterCollege} onChange={(e) => setFilterCollege(e.target.value)}>
+            <option value="">All Colleges</option>
+            {colleges.map(c => <option key={c.college_id} value={c.college_id}>{c.college_name}</option>)}
+          </select>
+        </div>
+      )}
 
       <div className="pagination-controls">
         <button type='button'
@@ -871,9 +894,9 @@ const ExamPeriodComponent: React.FC = () => {
                     <button type='button' className="icon-button edit-button" onClick={() => {
                       setEditMode(true);
                       setNewExam(e);
-                      setSelectedDates([
-                        new Date(e.start_date)
-                      ]);
+                      const startDate = new Date(e.start_date);
+                      setSelectedDates([startDate]);
+                      setActiveDate(startDate);
                       setShowModal(true);
                     }}><FaEdit /></button>
                     <input
@@ -903,26 +926,117 @@ const ExamPeriodComponent: React.FC = () => {
               {/* Left side - Calendar */}
               <div className="examperiod-calendar-section">
                 <label className="examperiod-label">Select Exam Duration</label>
+                
+                {/* Month and Year Dropdowns */}
+                <div className="examperiod-date-selectors">
+                  <div className="examperiod-date-selector-group">
+                    <label className="examperiod-date-selector-label">Month</label>
+                    <select
+                      className="examperiod-date-selector"
+                      value={activeDate.getMonth()}
+                      onChange={(e) => {
+                        const newDate = new Date(activeDate);
+                        newDate.setMonth(parseInt(e.target.value));
+                        setActiveDate(newDate);
+                      }}
+                    >
+                      {[
+                        'January', 'February', 'March', 'April', 'May', 'June',
+                        'July', 'August', 'September', 'October', 'November', 'December'
+                      ].map((month, index) => (
+                        <option key={month} value={index}>
+                          {month}
+                        </option>
+                      ))}
+                    </select>
+                  </div>
+                  
+                  <div className="examperiod-date-selector-group">
+                    <label className="examperiod-date-selector-label">Year</label>
+                    <select
+                      className="examperiod-date-selector"
+                      value={activeDate.getFullYear()}
+                      onChange={(e) => {
+                        const newDate = new Date(activeDate);
+                        newDate.setFullYear(parseInt(e.target.value));
+                        setActiveDate(newDate);
+                      }}
+                    >
+                      {(() => {
+                        const currentYear = new Date().getFullYear();
+                        const baseYears = Array.from({ length: 10 }, (_, i) => currentYear - 2 + i);
+                        
+                        // Get unique years from selected dates
+                        const selectedYears = new Set<number>();
+                        selectedDates.forEach(date => {
+                          selectedYears.add(date.getFullYear());
+                        });
+                        
+                        // Combine base years with selected years and sort
+                        const allYears = new Set([...baseYears, ...selectedYears]);
+                        const sortedYears = Array.from(allYears).sort((a, b) => a - b);
+                        
+                        return sortedYears.map(year => (
+                          <option key={year} value={year}>
+                            {year}
+                          </option>
+                        ));
+                      })()}
+                    </select>
+                  </div>
+                </div>
+                
                 <Calendar
                   calendarType="gregory"    // 👈 forces Sunday as first day
                   value={undefined}
-                  onClickDay={(date) => {
-                    const exists = selectedDates.some(d =>
-                      toLocalDateString(d) === toLocalDateString(date)
-                    );
-                    if (exists) {
-                      setSelectedDates(prev =>
-                        prev.filter(d => toLocalDateString(d) !== toLocalDateString(date))
-                      );
-                    } else {
-                      setSelectedDates(prev => [...prev, date]);
+                  activeStartDate={activeDate}
+                  onActiveStartDateChange={({ activeStartDate }) => {
+                    if (activeStartDate) {
+                      setActiveDate(activeStartDate);
                     }
                   }}
-                  tileClassName={({ date }) =>
-                    selectedDates.some(d => toLocalDateString(d) === toLocalDateString(date))
-                      ? 'examperiod-selected-day'
-                      : undefined
-                  }
+                  onClickDay={(date) => {
+                    // Normalize the clicked date to midnight for accurate comparison
+                    const normalizedDate = new Date(date);
+                    normalizedDate.setHours(0, 0, 0, 0);
+                    
+                    // Check if this date already exists in selectedDates
+                    const dateString = toLocalDateString(normalizedDate);
+                    const exists = selectedDates.some(d => {
+                      const normalizedD = new Date(d);
+                      normalizedD.setHours(0, 0, 0, 0);
+                      return toLocalDateString(normalizedD) === dateString;
+                    });
+                    
+                    if (exists) {
+                      // Remove the date if it exists (toggle off)
+                      setSelectedDates(prev =>
+                        prev.filter(d => {
+                          const normalizedD = new Date(d);
+                          normalizedD.setHours(0, 0, 0, 0);
+                          return toLocalDateString(normalizedD) !== dateString;
+                        })
+                      );
+                    } else {
+                      // Add the date if it doesn't exist (toggle on)
+                      setSelectedDates(prev => {
+                        const updated = [...prev, normalizedDate];
+                        // Update activeDate to show the year of the newly selected date
+                        setActiveDate(normalizedDate);
+                        return updated;
+                      });
+                    }
+                  }}
+                  tileClassName={({ date }) => {
+                    // Normalize dates for comparison
+                    const dateString = toLocalDateString(date);
+                    const isSelected = selectedDates.some(d => {
+                      const normalizedD = new Date(d);
+                      normalizedD.setHours(0, 0, 0, 0);
+                      return toLocalDateString(normalizedD) === dateString;
+                    });
+                    return isSelected ? 'examperiod-selected-day' : undefined;
+                  }}
                 />
               </div>
 
