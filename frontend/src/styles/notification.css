@@ -146,6 +146,45 @@
   font-weight: bold;
 }
 
+/* Sidebar notification badge icon */
+.sidebar-icon-wrapper {
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  overflow: visible;
+}
+
+.notification-badge-icon {
+  position: absolute;
+  top: -6px;
+  right: -8px;
+  background-color: #F2994A;
+  color: white;
+  border-radius: 50%;
+  min-width: 16px;
+  height: 16px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 10px;
+  font-weight: bold;
+  padding: 0 4px;
+  border: 2px solid #092C4C;
+  box-sizing: border-box;
+  line-height: 1;
+  z-index: 100;
+  white-space: nowrap;
+  visibility: visible !important;
+  opacity: 1 !important;
+  pointer-events: none;
+}
+
+/* Adjust badge for active state */
+.sidebar-nav li.active button .notification-badge-icon {
+  border-color: #f5f7fa;
+}
+
 
 /* Modal */
 .modal-overlay {
@@ -496,6 +535,15 @@
 
 /* Small Mobile (max-width: 480px) */
 @media (max-width: 480px) {
+  .notification-badge-icon {
+    min-width: 14px;
+    height: 14px;
+    font-size: 9px;
+    top: -5px;
+    right: -7px;
+    padding: 0 3px;
+  }
+
   .notification-container {
     padding: 12px;
   }

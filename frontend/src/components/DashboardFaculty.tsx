@@ -75,6 +75,7 @@ const DashboardFaculty = () => {
   const [roles, setRoles] = useState<string[]>([]);
   const [showLogoutModal, setShowLogoutModal] = useState(false);
   const [isMobile, setIsMobile] = useState(window.innerWidth <= 1024);
+  const [unreadNotificationCount, setUnreadNotificationCount] = useState(0);
   const navigate = useNavigate();
 
   useEffect(() => {
@@ -126,6 +127,23 @@ const DashboardFaculty = () => {
       }
     };
     fetchUserRoles();
+  }, [user]);
+
+  useEffect(() => {
+    const fetchUnreadCount = async () => {
+      if (!user?.user_id) return;
+      try {
+        const res = await api.get(`/notifications/${user.user_id}/`);
+        const unreadCount = res.data.filter((n: any) => !n.is_seen).length;
+        setUnreadNotificationCount(unreadCount);
+      } catch (err) {
+        console.error('Error fetching notification count:', err);
+      }
+    };
+
+    fetchUnreadCount();
+    const interval = setInterval(fetchUnreadCount, 10000);
+    return () => clearInterval(interval);
   }, [user]);
 
   useEffect(() => {
@@ -258,7 +276,12 @@ const DashboardFaculty = () => {
                 {mergedSidebarItems.map(({ key, label, icon }) => (
                   <li key={key} className={activeMenu === key ? 'active' : ''}>
                     <button type="button" onClick={() => handleMenuClick(key)}>
-                      {icon}
+                      <div className="sidebar-icon-wrapper">
+                        {icon}
+                        {key === 'notification' && unreadNotificationCount > 0 && (
+                          <span className="notification-badge-icon">{unreadNotificationCount}</span>
+                        )}
+                      </div>
                       {isSidebarOpen && <span>{label}</span>}
                     </button>
                   </li>

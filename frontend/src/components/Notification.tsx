@@ -179,9 +179,6 @@ const Notification: React.FC<UserProps> = ({ user }) => {
     <div className="notification-container">
       <div className="notification-banner">
         <span>Notifications</span>
-        {unreadCount > 0 && (
-          <span className="notif-badge">{unreadCount}</span>
-        )}
         <div style={{ marginLeft: 'auto', display: 'flex', alignItems: 'center', gap: '1px' }}>
           <button className="notif-btn" title="Mark all as unread" onClick={handleMarkAllUnread}>
             <FaEnvelopeOpenText />
