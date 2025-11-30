@@ -70,13 +70,13 @@
 .notification-card {
   display: flex;
   justify-content: space-between;
-  align-items: flex-start;
+  align-items: center;
   background-color: #eeeeee;
-  padding: 12px 18px;
+  padding: 14px 18px;
   border-radius: 10px;
   margin-bottom: 12px;
   box-shadow: 0 1px 4px rgba(0, 0, 0, 0.04);
-  transition: background-color 0.2s ease;
+  transition: background-color 0.2s ease, transform 0.2s ease;
   cursor: pointer;
   gap: 16px;
   position: relative;
@@ -85,6 +85,7 @@
 
 .notification-card:hover {
   background-color: #e2e2e2;
+  transform: translateX(2px);
 }
 
 
@@ -94,6 +95,7 @@
   gap: 10px;
   font-weight: 600;
   color: #2c2c2c;
+  flex-shrink: 0;
 }
 
 
@@ -105,9 +107,25 @@
 
 .notif-center {
   flex: 1;
-  margin-left: 20px;
+  margin-left: 12px;
   color: #555;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.notif-sender-name {
+  font-size: 15px;
+  font-weight: 600;
+  color: #2c2c2c;
+  margin-bottom: 2px;
+}
+
+.notif-title {
+  font-size: 14px;
   font-weight: 500;
+  color: #555;
+  line-height: 1.4;
 }
 
 
@@ -205,7 +223,8 @@
 
 .modal-message-pane {
   background: #fff;
-  width: 600px;
+  width: 900px;
+  max-width: 95vw;
   max-height: 90vh;
   overflow-y: auto;
   border-radius: 16px;
@@ -217,6 +236,30 @@
   font-size: 15px;
   position: relative;
   animation: fadeIn 0.3s ease-in-out;
+}
+
+.modal-close-btn {
+  position: absolute;
+  top: 15px;
+  right: 15px;
+  background: transparent;
+  border: none;
+  font-size: 20px;
+  color: #666;
+  cursor: pointer;
+  padding: 5px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 50%;
+  width: 32px;
+  height: 32px;
+  transition: background-color 0.2s ease, color 0.2s ease;
+}
+
+.modal-close-btn:hover {
+  background-color: #f0f0f0;
+  color: #333;
 }
 
 
@@ -410,7 +453,7 @@
 
   .modal-message-pane {
     width: 90%;
-    max-width: 600px;
+    max-width: 900px;
     padding: 20px 24px;
   }
 }
@@ -476,21 +519,21 @@
     font-size: 16px;
   }
 
-  .notif-sender {
-    font-size: 0.9em;
-  }
-
   .notif-center {
     flex: 1;
     margin-left: 0;
-    font-size: 0.9em;
-    line-height: 1.5;
     width: 100%;
+    gap: 6px;
   }
 
-  .notif-center strong {
-    display: block;
-    margin-bottom: 4px;
+  .notif-sender-name {
+    font-size: 0.95em;
+    font-weight: 600;
+  }
+
+  .notif-title {
+    font-size: 0.9em;
+    line-height: 1.4;
   }
 
   .notif-right {
@@ -591,11 +634,15 @@
     font-size: 14px;
   }
 
-  .notif-sender {
-    font-size: 0.85em;
+  .notif-center {
+    gap: 4px;
   }
 
-  .notif-center {
+  .notif-sender-name {
+    font-size: 0.9em;
+  }
+
+  .notif-title {
     font-size: 0.85em;
   }
 

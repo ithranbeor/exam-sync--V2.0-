@@ -2,7 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { api } from '../lib/apiClient.ts';
 import '../styles/notification.css';
-import { FaCheckCircle, FaTimesCircle, FaTrash, FaEnvelopeOpenText } from "react-icons/fa";
+import { FaCheckCircle, FaTimesCircle, FaTrash, FaEnvelopeOpenText, FaTimes } from "react-icons/fa";
 
 interface UserProps {
   user: {
@@ -35,6 +35,7 @@ const Notification: React.FC<UserProps> = ({ user }) => {
   const [loading, setLoading] = useState(true);
   const [selectedNotificationIds, setSelectedNotificationIds] = useState<Set<number>>(new Set());
   const [isBulkDeleting, setIsBulkDeleting] = useState(false);
+  const [selectedNotification, setSelectedNotification] = useState<Notification | null>(null);
   const navigate = useNavigate();
 
   const fetchNotifications = async () => {
@@ -86,26 +87,43 @@ const Notification: React.FC<UserProps> = ({ user }) => {
     });
   }, [notifications]);
 
-  // Handle click on notification
+  // Handle click on notification - open modal
   const handleNotificationClick = async (notif: Notification) => {
-    try {
-      await api.patch(`/notifications/${notif.notification_id}/update/`, {
-        is_seen: true
-      });
+    // Mark as read
+    if (!notif.is_seen) {
+      try {
+        await api.patch(`/notifications/${notif.notification_id}/update/`, {
+          is_seen: true
+        });
 
-      setNotifications(prev =>
-        prev.map(n =>
-          n.notification_id === notif.notification_id
-            ? { ...n, is_seen: true, read_at: new Date().toISOString() }
-            : n
-        )
-      );
-
-      if (notif.link_url) {
-        navigate(notif.link_url);
+        setNotifications(prev =>
+          prev.map(n =>
+            n.notification_id === notif.notification_id
+              ? { ...n, is_seen: true, read_at: new Date().toISOString() }
+              : n
+          )
+        );
+      } catch (err) {
+        console.error("Error marking notification as read:", err);
       }
-    } catch (err) {
-      console.error("Error marking notification as read:", err);
+    }
+
+    // Open modal with full message
+    setSelectedNotification(notif);
+  };
+
+  // Close modal
+  const handleCloseModal = () => {
+    setSelectedNotification(null);
+  };
+
+  // Handle navigation from modal if link_url exists
+  const handleModalAction = () => {
+    if (selectedNotification?.link_url) {
+      navigate(selectedNotification.link_url);
+      handleCloseModal();
+    } else {
+      handleCloseModal();
     }
   };
 
@@ -235,17 +253,13 @@ const Notification: React.FC<UserProps> = ({ user }) => {
                   '⏵'
                 )}
               </span>
-              <span className="notif-sender">{notif.sender_name || 'System'}</span>
             </div>
 
             <div className="notif-center">
+              <div className="notif-sender-name">{notif.sender_name || 'System'}</div>
               {notif.title && (
-                <>
-                  <strong>{notif.title}</strong>
-                  <br />
-                </>
+                <div className="notif-title">{notif.title}</div>
               )}
-              {notif.message}
             </div>
 
             <div className="notif-right" onClick={(e) => e.stopPropagation()}>
@@ -259,6 +273,35 @@ const Notification: React.FC<UserProps> = ({ user }) => {
             </div>
           </div>
         ))
+      )}
+
+      {/* Modal for viewing full notification */}
+      {selectedNotification && (
+        <div className="modal-overlay" onClick={handleCloseModal}>
+          <div className="modal-message-pane" onClick={(e) => e.stopPropagation()}>
+            <button 
+              className="modal-close-btn" 
+              onClick={handleCloseModal}
+              aria-label="Close modal"
+            >
+              <FaTimes />
+            </button>
+            <h3>{selectedNotification.sender_name || 'System'}</h3>
+            {selectedNotification.title && (
+              <h4>{selectedNotification.title}</h4>
+            )}
+            <div className="message-body">
+              <div style={{ whiteSpace: 'pre-wrap', wordWrap: 'break-word' }}>
+                {selectedNotification.message}
+              </div>
+            </div>
+            <div className="modal-actions">
+              <button className="modal-button cancel" onClick={handleModalAction}>
+                {selectedNotification.link_url ? 'View Details' : 'Close'}
+              </button>
+            </div>
+          </div>
+        </div>
       )}
     </div>
   );
