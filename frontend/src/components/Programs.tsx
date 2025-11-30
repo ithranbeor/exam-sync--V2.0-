@@ -1,5 +1,5 @@
 // deno-lint-ignore-file no-explicit-any
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect, useRef, useMemo } from 'react';
 import { FaTrash, FaEdit, FaSearch, FaDownload, FaPlus, FaFileImport, FaChevronLeft, FaChevronRight } from 'react-icons/fa';
 import { api } from '../lib/apiClient.ts';
 import { ToastContainer, toast } from 'react-toastify';
@@ -42,6 +42,8 @@ const Programs: React.FC<ProgramsProps> = ({ user: _user }) => {
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [loading, setLoading] = useState(true); // new state
   const [isImporting, setIsImporting] = useState(false);
+  const [currentPage, setCurrentPage] = useState(1);
+  const itemsPerPage = 20;
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
   const [isBulkDeleting, setIsBulkDeleting] = useState(false);
   const [canScrollLeft, setCanScrollLeft] = useState(false);
@@ -146,14 +148,26 @@ const Programs: React.FC<ProgramsProps> = ({ user: _user }) => {
   const handleSearchChange = (e: React.ChangeEvent<HTMLInputElement>) =>
     setSearchTerm(e.target.value);
 
-  const filteredPrograms = programs.filter((p) => {
-    const deptName = getDepartmentName(p).toLowerCase();
-    return (
-      p.program_name.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      p.program_id.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      deptName.includes(searchTerm.toLowerCase())
-    );
-  });
+  useEffect(() => {
+    setCurrentPage(1);
+  }, [searchTerm]);
+
+  const filteredPrograms = useMemo(() => {
+    return programs.filter((p) => {
+      const deptName = getDepartmentName(p).toLowerCase();
+      return (
+        p.program_name.toLowerCase().includes(searchTerm.toLowerCase()) ||
+        p.program_id.toLowerCase().includes(searchTerm.toLowerCase()) ||
+        deptName.includes(searchTerm.toLowerCase())
+      );
+    });
+  }, [programs, searchTerm]);
+
+  const paginatedPrograms = useMemo(() => {
+    return filteredPrograms.slice((currentPage - 1) * itemsPerPage, currentPage * itemsPerPage);
+  }, [filteredPrograms, currentPage, itemsPerPage]);
+
+  const totalPages = Math.ceil(filteredPrograms.length / itemsPerPage);
 
   const toggleSelect = (id: string) => {
     setSelectedIds((prev) => {
@@ -344,6 +358,24 @@ const Programs: React.FC<ProgramsProps> = ({ user: _user }) => {
         </div>
       </div>
 
+      <div className="pagination-controls">
+        <button type='button'
+          onClick={() => setCurrentPage((prev) => Math.max(prev - 1, 1))}
+          disabled={currentPage === 1}
+          className="pagination-arrow-btn"
+        >
+          &lt;
+        </button>
+        <span className="pagination-page-number">{currentPage} of {totalPages}</span>
+        <button type='button'
+          onClick={() => setCurrentPage((prev) => Math.min(prev + 1, totalPages))}
+          disabled={currentPage === totalPages}
+          className="pagination-arrow-btn"
+        >
+          &gt;
+        </button>
+      </div>
+
       <div className="table-scroll-wrapper">
         <div className="table-scroll-hint">
           <FaChevronLeft /> Swipe or use buttons to scroll <FaChevronRight />
@@ -404,9 +436,9 @@ const Programs: React.FC<ProgramsProps> = ({ user: _user }) => {
                 </td>
               </tr>
             ) : (
-              filteredPrograms.map((p, idx) => (
+              paginatedPrograms.map((p, idx) => (
                 <tr key={p.program_id}>
-                  <td>{idx + 1}</td>
+                  <td>{(currentPage - 1) * itemsPerPage + idx + 1}</td>
                   <td>{p.program_id}</td>
                   <td>{p.program_name}</td>
                   <td>{getDepartmentName(p)}</td>

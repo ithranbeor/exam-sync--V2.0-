@@ -1,5 +1,5 @@
 // deno-lint-ignore-file no-explicit-any
-import React, { useEffect, useState, useRef } from 'react';
+import React, { useEffect, useState, useRef, useMemo } from 'react';
 import { FaSearch, FaTrash, FaEdit, FaDownload, FaEye, FaPlus, FaFileImport, FaChevronLeft, FaChevronRight } from 'react-icons/fa';
 import { ToastContainer, toast } from 'react-toastify';
 import * as XLSX from 'xlsx';
@@ -31,6 +31,8 @@ const Buildings: React.FC = () => {
   const [editMode, setEditMode] = useState(false);
   const [loading, setLoading] = useState(true); // new state
   const [isImporting, setIsImporting] = useState(false);
+  const [currentPage, setCurrentPage] = useState(1);
+  const itemsPerPage = 20;
   const [isBulkDeleting, setIsBulkDeleting] = useState(false);
   const [newBuilding, setNewBuilding] = useState<Building>({
     building_id: '',
@@ -237,9 +239,21 @@ const Buildings: React.FC = () => {
     XLSX.writeFile(wb, 'buildings_template.xlsx');
   };
 
-  const filtered = buildings.filter((b) =>
-    b.building_name.toLowerCase().includes(searchTerm.toLowerCase())
-  );
+  useEffect(() => {
+    setCurrentPage(1);
+  }, [searchTerm]);
+
+  const filtered = useMemo(() => {
+    return buildings.filter((b) =>
+      b.building_name.toLowerCase().includes(searchTerm.toLowerCase())
+    );
+  }, [buildings, searchTerm]);
+
+  const paginatedBuildings = useMemo(() => {
+    return filtered.slice((currentPage - 1) * itemsPerPage, currentPage * itemsPerPage);
+  }, [filtered, currentPage, itemsPerPage]);
+
+  const totalPages = Math.ceil(filtered.length / itemsPerPage);
 
   const handleBulkDelete = async () => {
     const ids = Array.from(selectedBuildingIds);
@@ -319,6 +333,24 @@ const Buildings: React.FC = () => {
         </div>
       </div>
 
+      <div className="pagination-controls">
+        <button type='button'
+          onClick={() => setCurrentPage((prev) => Math.max(prev - 1, 1))}
+          disabled={currentPage === 1}
+          className="pagination-arrow-btn"
+        >
+          &lt;
+        </button>
+        <span className="pagination-page-number">{currentPage} of {totalPages}</span>
+        <button type='button'
+          onClick={() => setCurrentPage((prev) => Math.min(prev + 1, totalPages))}
+          disabled={currentPage === totalPages}
+          className="pagination-arrow-btn"
+        >
+          &gt;
+        </button>
+      </div>
+
       <div className="table-scroll-wrapper">
         <div className="table-scroll-hint">
           <FaChevronLeft /> Swipe or use buttons to scroll <FaChevronRight />
@@ -379,9 +411,9 @@ const Buildings: React.FC = () => {
                 </td>
               </tr>
             ) : (
-              filtered.map((b, index) => (
+              paginatedBuildings.map((b, index) => (
                 <tr key={b.building_id}>
-                  <td>{index + 1}</td>
+                  <td>{(currentPage - 1) * itemsPerPage + index + 1}</td>
                   <td>{b.building_id}</td>
                   <td>{b.building_name}</td>
                   <td>{roomCounts[b.building_id] || 0}</td>

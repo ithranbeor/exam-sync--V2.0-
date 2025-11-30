@@ -1,5 +1,5 @@
 // deno-lint-ignore-file no-explicit-any
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect, useRef, useMemo } from 'react';
 import { FaTrash, FaEdit, FaSearch, FaDownload, FaPlus, FaFileImport, FaChevronLeft, FaChevronRight } from 'react-icons/fa';
 import { api } from '../lib/apiClient.ts';
 import { ToastContainer, toast } from 'react-toastify';
@@ -24,6 +24,8 @@ const Colleges: React.FC = () => {
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [loading, setLoading] = useState(true); // new state
   const [isImporting, setIsImporting] = useState(false);
+  const [currentPage, setCurrentPage] = useState(1);
+  const itemsPerPage = 20;
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
   const [isBulkDeleting, setIsBulkDeleting] = useState(false);
   const [canScrollLeft, setCanScrollLeft] = useState(false);
@@ -97,11 +99,23 @@ const Colleges: React.FC = () => {
     setSearchTerm(e.target.value);
   };
 
-  const filteredColleges = colleges.filter(
-    (college) =>
-      college.college_name.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      college.college_id.toLowerCase().includes(searchTerm.toLowerCase())
-  );
+  useEffect(() => {
+    setCurrentPage(1);
+  }, [searchTerm]);
+
+  const filteredColleges = useMemo(() => {
+    return colleges.filter(
+      (college) =>
+        college.college_name.toLowerCase().includes(searchTerm.toLowerCase()) ||
+        college.college_id.toLowerCase().includes(searchTerm.toLowerCase())
+    );
+  }, [colleges, searchTerm]);
+
+  const paginatedColleges = useMemo(() => {
+    return filteredColleges.slice((currentPage - 1) * itemsPerPage, currentPage * itemsPerPage);
+  }, [filteredColleges, currentPage, itemsPerPage]);
+
+  const totalPages = Math.ceil(filteredColleges.length / itemsPerPage);
 
   const toggleSelect = (id: string) => {
     setSelectedIds((prev) => {
@@ -291,6 +305,24 @@ const Colleges: React.FC = () => {
         </div>
       </div>
 
+      <div className="pagination-controls">
+        <button type='button'
+          onClick={() => setCurrentPage((prev) => Math.max(prev - 1, 1))}
+          disabled={currentPage === 1}
+          className="pagination-arrow-btn"
+        >
+          &lt;
+        </button>
+        <span className="pagination-page-number">{currentPage} of {totalPages}</span>
+        <button type='button'
+          onClick={() => setCurrentPage((prev) => Math.min(prev + 1, totalPages))}
+          disabled={currentPage === totalPages}
+          className="pagination-arrow-btn"
+        >
+          &gt;
+        </button>
+      </div>
+
       <div className="table-scroll-wrapper">
         <div className="table-scroll-hint">
           <FaChevronLeft /> Swipe or use buttons to scroll <FaChevronRight />
@@ -350,9 +382,9 @@ const Colleges: React.FC = () => {
                 </td>
               </tr>
             ) : (
-              filteredColleges.map((college, index) => (
+              paginatedColleges.map((college, index) => (
                 <tr key={college.college_id}>
-                  <td>{index + 1}</td>
+                  <td>{(currentPage - 1) * itemsPerPage + index + 1}</td>
                   <td>{college.college_id}</td>
                   <td>{college.college_name}</td>
                   <td className="action-buttons" style={{ display: 'flex', alignItems: 'center', gap: 8 }}>

@@ -1,5 +1,5 @@
 // deno-lint-ignore-file no-explicit-any
-import React, { useState, useEffect, useRef } from "react";
+import React, { useState, useEffect, useRef, useMemo } from "react";
 import { FaTrash, FaEdit, FaSearch, FaDownload,  FaPlus, FaFileImport, FaChevronLeft, FaChevronRight } from "react-icons/fa";
 import { api } from "../lib/apiClient.ts";
 import { ToastContainer, toast } from "react-toastify";
@@ -23,6 +23,8 @@ const Terms: React.FC = () => {
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [loading, setLoading] = useState(true); // new state
   const [isImporting, setIsImporting] = useState(false);
+  const [currentPage, setCurrentPage] = useState(1);
+  const itemsPerPage = 20;
   const [selectedIds, setSelectedIds] = useState<Set<number>>(new Set());
   const [isBulkDeleting, setIsBulkDeleting] = useState(false);
   const [canScrollLeft, setCanScrollLeft] = useState(false);
@@ -92,9 +94,21 @@ const Terms: React.FC = () => {
     }
   };
 
-  const filteredTerms = terms.filter((term) =>
-    term.term_name.toLowerCase().includes(searchTerm.toLowerCase())
-  );
+  useEffect(() => {
+    setCurrentPage(1);
+  }, [searchTerm]);
+
+  const filteredTerms = useMemo(() => {
+    return terms.filter((term) =>
+      term.term_name.toLowerCase().includes(searchTerm.toLowerCase())
+    );
+  }, [terms, searchTerm]);
+
+  const paginatedTerms = useMemo(() => {
+    return filteredTerms.slice((currentPage - 1) * itemsPerPage, currentPage * itemsPerPage);
+  }, [filteredTerms, currentPage, itemsPerPage]);
+
+  const totalPages = Math.ceil(filteredTerms.length / itemsPerPage);
 
   // ✅ Add or edit term
   const handleModalSubmit = async () => {
@@ -305,6 +319,24 @@ const Terms: React.FC = () => {
         </div>
       </div>
 
+      <div className="pagination-controls">
+        <button type='button'
+          onClick={() => setCurrentPage((prev) => Math.max(prev - 1, 1))}
+          disabled={currentPage === 1}
+          className="pagination-arrow-btn"
+        >
+          &lt;
+        </button>
+        <span className="pagination-page-number">{currentPage} of {totalPages}</span>
+        <button type='button'
+          onClick={() => setCurrentPage((prev) => Math.min(prev + 1, totalPages))}
+          disabled={currentPage === totalPages}
+          className="pagination-arrow-btn"
+        >
+          &gt;
+        </button>
+      </div>
+
       <div className="table-scroll-wrapper">
         <div className="table-scroll-hint">
           <FaChevronLeft /> Swipe or use buttons to scroll <FaChevronRight />
@@ -363,9 +395,9 @@ const Terms: React.FC = () => {
                 </td>
               </tr>
             ) : (
-              filteredTerms.map((term, index) => (
+              paginatedTerms.map((term, index) => (
                 <tr key={term.term_id}>
-                  <td>{index + 1}</td>
+                  <td>{(currentPage - 1) * itemsPerPage + index + 1}</td>
                   <td>{term.term_name}</td>
                   <td className="action-buttons" style={{ display: "flex", alignItems: "center", gap: 8 }}>
                     <button

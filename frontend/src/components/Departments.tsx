@@ -32,6 +32,8 @@ const Departments: React.FC = () => {
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [loading, setLoading] = useState(true);
   const [isImporting, setIsImporting] = useState(false);
+  const [currentPage, setCurrentPage] = useState(1);
+  const itemsPerPage = 20;
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
   const [isBulkDeleting, setIsBulkDeleting] = useState(false);
   const [canScrollLeft, setCanScrollLeft] = useState(false);
@@ -117,6 +119,10 @@ const Departments: React.FC = () => {
     setSearchTerm(e.target.value);
   };
 
+  useEffect(() => {
+    setCurrentPage(1);
+  }, [searchTerm]);
+
   const filteredDepartments = useMemo(() => {
     return departments.filter((dept) => {
       const collegeName = dept.college?.college_name || '';
@@ -127,6 +133,12 @@ const Departments: React.FC = () => {
       );
     });
   }, [departments, searchTerm]);
+
+  const paginatedDepartments = useMemo(() => {
+    return filteredDepartments.slice((currentPage - 1) * itemsPerPage, currentPage * itemsPerPage);
+  }, [filteredDepartments, currentPage, itemsPerPage]);
+
+  const totalPages = Math.ceil(filteredDepartments.length / itemsPerPage);
 
   const toggleSelect = (id: string) => {
     setSelectedIds((prev) => {
@@ -315,6 +327,24 @@ const Departments: React.FC = () => {
         </div>
       </div>
 
+      <div className="pagination-controls">
+        <button type='button'
+          onClick={() => setCurrentPage((prev) => Math.max(prev - 1, 1))}
+          disabled={currentPage === 1}
+          className="pagination-arrow-btn"
+        >
+          &lt;
+        </button>
+        <span className="pagination-page-number">{currentPage} of {totalPages}</span>
+        <button type='button'
+          onClick={() => setCurrentPage((prev) => Math.min(prev + 1, totalPages))}
+          disabled={currentPage === totalPages}
+          className="pagination-arrow-btn"
+        >
+          &gt;
+        </button>
+      </div>
+
       <div className="table-scroll-wrapper">
         <div className="table-scroll-hint">
           <FaChevronLeft /> Swipe or use buttons to scroll <FaChevronRight />
@@ -375,9 +405,9 @@ const Departments: React.FC = () => {
                 </td>
               </tr>
             ) : (
-              filteredDepartments.map((dept, index) => (
+              paginatedDepartments.map((dept, index) => (
                 <tr key={dept.department_id}>
-                  <td>{index + 1}</td>
+                  <td>{(currentPage - 1) * itemsPerPage + index + 1}</td>
                   <td>{dept.department_id}</td>
                   <td>{dept.department_name}</td>
                   <td>{dept.college?.college_name || dept.college?.college_id}</td>

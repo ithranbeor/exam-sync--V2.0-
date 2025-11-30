@@ -49,6 +49,8 @@ const Courses: React.FC = () => {
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [loading, setLoading] = useState(true);
   const [isImporting, setIsImporting] = useState(false);
+  const [currentPage, setCurrentPage] = useState(1);
+  const itemsPerPage = 20;
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
   const [isBulkDeleting, setIsBulkDeleting] = useState(false);
   const [canScrollLeft, setCanScrollLeft] = useState(false);
@@ -154,6 +156,10 @@ const Courses: React.FC = () => {
     }
   }, []);
 
+  useEffect(() => {
+    setCurrentPage(1);
+  }, [searchTerm]);
+
   // 🧠 Memoize filtered results
   const filteredCourses = useMemo(
     () =>
@@ -164,6 +170,12 @@ const Courses: React.FC = () => {
       ),
     [courses, searchTerm]
   );
+
+  const paginatedCourses = useMemo(() => {
+    return filteredCourses.slice((currentPage - 1) * itemsPerPage, currentPage * itemsPerPage);
+  }, [filteredCourses, currentPage, itemsPerPage]);
+
+  const totalPages = Math.ceil(filteredCourses.length / itemsPerPage);
 
   const toggleSelect = (id: string) => {
     setSelectedIds((prev) => {
@@ -450,6 +462,24 @@ const Courses: React.FC = () => {
         </div>
       </div>
 
+      <div className="pagination-controls">
+        <button type='button'
+          onClick={() => setCurrentPage((prev) => Math.max(prev - 1, 1))}
+          disabled={currentPage === 1}
+          className="pagination-arrow-btn"
+        >
+          &lt;
+        </button>
+        <span className="pagination-page-number">{currentPage} of {totalPages}</span>
+        <button type='button'
+          onClick={() => setCurrentPage((prev) => Math.min(prev + 1, totalPages))}
+          disabled={currentPage === totalPages}
+          className="pagination-arrow-btn"
+        >
+          &gt;
+        </button>
+      </div>
+
       <div className="table-scroll-wrapper">
         <div className="table-scroll-hint">
           <FaChevronLeft /> Swipe or use buttons to scroll <FaChevronRight />
@@ -511,9 +541,9 @@ const Courses: React.FC = () => {
                 </td>
               </tr>
             ) : (
-              filteredCourses.map((c, i) => (
+              paginatedCourses.map((c, i) => (
                 <tr key={c.course_id}>
-                  <td>{i + 1}</td>
+                  <td>{(currentPage - 1) * itemsPerPage + i + 1}</td>
                   <td>{c.course_id}</td>
                   <td>{c.course_name}</td>
                   <td>{c.term_name}</td>

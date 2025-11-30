@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect, useRef, useMemo } from 'react';
 import '../styles/proctorSetAvailability.css';
 import '../styles/colleges.css';
 import { FaChevronLeft, FaChevronRight, FaEye, FaTrash, FaPenAlt, FaPlus, FaSearch } from 'react-icons/fa';
@@ -63,6 +63,8 @@ const SchedulerAvailability: React.FC<ProctorSetAvailabilityProps> = ({ user }) 
 
   const [loading, setLoading] = useState(false);
   const [isBulkDeleting, setIsBulkDeleting] = useState(false);
+  const [currentPage, setCurrentPage] = useState(1);
+  const itemsPerPage = 20;
 
   const [userCache, setUserCache] = useState<Map<number, any>>(new Map());
   const [selectedAvailabilityIds, setSelectedAvailabilityIds] = useState<Set<number>>(new Set());
@@ -505,9 +507,21 @@ const SchedulerAvailability: React.FC<ProctorSetAvailabilityProps> = ({ user }) 
     });
   };
 
-  const filteredEntries = entries.filter((entry) =>
-    (entry.user_fullname || '').toLowerCase().includes(searchTerm.toLowerCase())
-  );
+  useEffect(() => {
+    setCurrentPage(1);
+  }, [searchTerm]);
+
+  const filteredEntries = useMemo(() => {
+    return entries.filter((entry) =>
+      (entry.user_fullname || '').toLowerCase().includes(searchTerm.toLowerCase())
+    );
+  }, [entries, searchTerm]);
+
+  const paginatedEntries = useMemo(() => {
+    return filteredEntries.slice((currentPage - 1) * itemsPerPage, currentPage * itemsPerPage);
+  }, [filteredEntries, currentPage, itemsPerPage]);
+
+  const totalPages = Math.ceil(filteredEntries.length / itemsPerPage);
 
   const isAllSelected = filteredEntries.length > 0 && filteredEntries.every((entry) => selectedAvailabilityIds.has(entry.availability_id));
 
@@ -604,6 +618,24 @@ const SchedulerAvailability: React.FC<ProctorSetAvailabilityProps> = ({ user }) 
         </div>
       </div>
 
+      <div className="pagination-controls">
+        <button type='button'
+          onClick={() => setCurrentPage((prev) => Math.max(prev - 1, 1))}
+          disabled={currentPage === 1}
+          className="pagination-arrow-btn"
+        >
+          &lt;
+        </button>
+        <span className="pagination-page-number">{currentPage} of {totalPages}</span>
+        <button type='button'
+          onClick={() => setCurrentPage((prev) => Math.min(prev + 1, totalPages))}
+          disabled={currentPage === totalPages}
+          className="pagination-arrow-btn"
+        >
+          &gt;
+        </button>
+      </div>
+
       <div className="table-scroll-wrapper">
         <div className="table-scroll-hint">
           <FaChevronLeft /> Swipe or use buttons to scroll <FaChevronRight />
@@ -660,9 +692,9 @@ const SchedulerAvailability: React.FC<ProctorSetAvailabilityProps> = ({ user }) 
                   </td>
                 </tr>
               ) : (
-                filteredEntries.map((entry, idx) => (
+                paginatedEntries.map((entry, idx) => (
                     <tr key={entry.availability_id}>
-                      <td>{idx + 1}</td>
+                      <td>{(currentPage - 1) * itemsPerPage + idx + 1}</td>
                       <td>{entry.user_fullname}</td>
                       <td>{entry.days?.map(d => new Date(d).toLocaleDateString()).join(', ')}</td>
                       <td>{entry.time_slots?.join(', ')}</td>

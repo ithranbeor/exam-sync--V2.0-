@@ -1,5 +1,5 @@
 // deno-lint-ignore-file no-explicit-any
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect, useRef, useMemo } from 'react';
 import { FaTrash, FaEdit, FaSearch, FaDownload,  FaPlus, FaFileImport, FaChevronLeft, FaChevronRight } from 'react-icons/fa';
 import { api } from '../lib/apiClient.ts';
 import { ToastContainer, toast } from 'react-toastify';
@@ -32,6 +32,8 @@ const Rooms: React.FC = () => {
   const [showImport, setShowImport] = useState(false);
   const [loading, setLoading] = useState(true); // new state
   const [isImporting, setIsImporting] = useState(false);
+  const [currentPage, setCurrentPage] = useState(1);
+  const itemsPerPage = 20;
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
   const [isBulkDeleting, setIsBulkDeleting] = useState(false);
   const [canScrollLeft, setCanScrollLeft] = useState(false);
@@ -257,11 +259,23 @@ const Rooms: React.FC = () => {
     XLSX.writeFile(wb, 'rooms_template.xlsx');
   };
 
-  const filtered = rooms.filter(
-    (r) =>
-      r.room_name.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      r.room_id.toLowerCase().includes(searchTerm.toLowerCase())
-  );
+  useEffect(() => {
+    setCurrentPage(1);
+  }, [searchTerm]);
+
+  const filtered = useMemo(() => {
+    return rooms.filter(
+      (r) =>
+        r.room_name.toLowerCase().includes(searchTerm.toLowerCase()) ||
+        r.room_id.toLowerCase().includes(searchTerm.toLowerCase())
+    );
+  }, [rooms, searchTerm]);
+
+  const paginatedRooms = useMemo(() => {
+    return filtered.slice((currentPage - 1) * itemsPerPage, currentPage * itemsPerPage);
+  }, [filtered, currentPage, itemsPerPage]);
+
+  const totalPages = Math.ceil(filtered.length / itemsPerPage);
 
   return (
     <div className="colleges-container">
@@ -317,6 +331,24 @@ const Rooms: React.FC = () => {
             </button>
           </div>
         </div>
+      </div>
+
+      <div className="pagination-controls">
+        <button type='button'
+          onClick={() => setCurrentPage((prev) => Math.max(prev - 1, 1))}
+          disabled={currentPage === 1}
+          className="pagination-arrow-btn"
+        >
+          &lt;
+        </button>
+        <span className="pagination-page-number">{currentPage} of {totalPages}</span>
+        <button type='button'
+          onClick={() => setCurrentPage((prev) => Math.min(prev + 1, totalPages))}
+          disabled={currentPage === totalPages}
+          className="pagination-arrow-btn"
+        >
+          &gt;
+        </button>
       </div>
 
       <div className="table-scroll-wrapper">
@@ -381,9 +413,9 @@ const Rooms: React.FC = () => {
                 </td>
               </tr>
             ) : (
-              filtered.map((r, i) => (
+              paginatedRooms.map((r, i) => (
                 <tr key={r.room_id}>
-                  <td>{i + 1}</td>
+                  <td>{(currentPage - 1) * itemsPerPage + i + 1}</td>
                   <td>{r.room_id}</td>
                   <td>{r.room_name}</td>
                   <td>{r.room_type}</td>

@@ -1,5 +1,5 @@
 // deno-lint-ignore-file no-explicit-any
-import React, { useEffect, useState, useRef } from 'react';
+import React, { useEffect, useState, useRef, useMemo } from 'react';
 import { FaTrash, FaEdit, FaSearch,  FaPlus, FaChevronLeft, FaChevronRight } from 'react-icons/fa';
 import { api } from '../lib/apiClient.ts';
 import * as XLSX from 'xlsx';
@@ -44,6 +44,8 @@ const ExamPeriodComponent: React.FC = () => {
   const [filterCollege, setFilterCollege] = useState('');
   const [showFilters, setShowFilters] = useState(false);
   const [loading, setLoading] = useState(true); // new state
+  const [currentPage, setCurrentPage] = useState(1);
+  const itemsPerPage = 20;
   const [selectedDates, setSelectedDates] = useState<Date[]>([]);
   const [selectedExamIds, setSelectedExamIds] = useState<Set<number>>(new Set());
   const [canScrollLeft, setCanScrollLeft] = useState(false);
@@ -185,15 +187,27 @@ const ExamPeriodComponent: React.FC = () => {
     }
   };
 
-  const filtered = examPeriods.filter(e =>
-    (!search || e.academic_year.toLowerCase().includes(search.toLowerCase())) &&
-    (!filterYear || e.academic_year === filterYear) &&
-    (!filterCategory || e.exam_category === filterCategory) &&
-    (!filterTerm || e.term_id.toString() === filterTerm) &&
-    (!filterDept || e.department_id === filterDept) &&
-    (!filterCollege || e.college_id === filterCollege) &&
+  useEffect(() => {
+    setCurrentPage(1);
+  }, [search, filterYear, filterCategory, filterTerm, filterDept, filterCollege]);
+
+  const filtered = useMemo(() => {
+    return examPeriods.filter(e =>
+      (!search || e.academic_year.toLowerCase().includes(search.toLowerCase())) &&
+      (!filterYear || e.academic_year === filterYear) &&
+      (!filterCategory || e.exam_category === filterCategory) &&
+      (!filterTerm || e.term_id.toString() === filterTerm) &&
+      (!filterDept || e.department_id === filterDept) &&
+      (!filterCollege || e.college_id === filterCollege) &&
     (e.start_date)
-  );
+    );
+  }, [examPeriods, search, filterYear, filterCategory, filterTerm, filterDept, filterCollege]);
+
+  const paginatedExamPeriods = useMemo(() => {
+    return filtered.slice((currentPage - 1) * itemsPerPage, currentPage * itemsPerPage);
+  }, [filtered, currentPage, itemsPerPage]);
+
+  const totalPages = Math.ceil(filtered.length / itemsPerPage);
 
   useEffect(() => {
     setSelectedExamIds(prev => {
@@ -429,6 +443,24 @@ const ExamPeriodComponent: React.FC = () => {
         </div>
       </div>
 
+      <div className="pagination-controls">
+        <button type='button'
+          onClick={() => setCurrentPage((prev) => Math.max(prev - 1, 1))}
+          disabled={currentPage === 1}
+          className="pagination-arrow-btn"
+        >
+          &lt;
+        </button>
+        <span className="pagination-page-number">{currentPage} of {totalPages}</span>
+        <button type='button'
+          onClick={() => setCurrentPage((prev) => Math.min(prev + 1, totalPages))}
+          disabled={currentPage === totalPages}
+          className="pagination-arrow-btn"
+        >
+          &gt;
+        </button>
+      </div>
+
       <div className="table-scroll-wrapper">
         <div className="table-scroll-hint">
           <FaChevronLeft /> Swipe or use buttons to scroll <FaChevronRight />
@@ -493,9 +525,9 @@ const ExamPeriodComponent: React.FC = () => {
                 </td>
               </tr>
             ) : (
-              filtered.map((e, i) => (
+              paginatedExamPeriods.map((e, i) => (
                 <tr key={e.examperiod_id}>
-                  <td>{i + 1}</td>
+                  <td>{(currentPage - 1) * itemsPerPage + i + 1}</td>
                   <td>{new Date(e.start_date).toLocaleDateString()}</td>
                   <td>{new Date(e.end_date).toLocaleDateString()}</td>
                   <td>{e.academic_year}</td>
