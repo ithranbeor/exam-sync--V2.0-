@@ -886,7 +886,7 @@ body {
   display: flex;
   align-items: center;
   justify-content: center;
-  gap: 20px;
+  gap: 8px;
   margin-bottom: 20px;
   padding: 10px;
 }
@@ -929,6 +929,24 @@ body {
   font-size: 14px;
   min-width: 100px;
   text-align: center;
+}
+
+.pagination-controls .pagination-arrow-btn {
+  font-weight: 900;
+  font-size: 22px;
+  line-height: 1;
+  color: #fff !important;
+  text-shadow: 0 1px 2px rgba(0, 0, 0, 0.3);
+}
+
+.pagination-controls .pagination-arrow-btn:disabled {
+  color: #999 !important;
+}
+
+.pagination-controls .pagination-page-number {
+  font-size: 15px;
+  font-weight: 600;
+  color: #333;
 }
 
 /* ============================================

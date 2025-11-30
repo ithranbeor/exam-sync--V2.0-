@@ -706,15 +706,17 @@ const SectionCourses: React.FC = () => {
         <button type='button'
           onClick={() => setCurrentPage((prev) => Math.max(prev - 1, 1))}
           disabled={currentPage === 1}
+          className="pagination-arrow-btn"
         >
-          ←
+          &lt;
         </button>
-        <span>Page {currentPage} of {totalPages}</span>
+        <span className="pagination-page-number">{currentPage} of {totalPages}</span>
         <button type='button'
           onClick={() => setCurrentPage((prev) => Math.min(prev + 1, totalPages))}
           disabled={currentPage === totalPages}
+          className="pagination-arrow-btn"
         >
-           →
+          &gt;
         </button>
       </div>
 

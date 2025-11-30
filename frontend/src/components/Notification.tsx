@@ -117,16 +117,6 @@ const Notification: React.FC<UserProps> = ({ user }) => {
     setSelectedNotification(null);
   };
 
-  // Handle navigation from modal if link_url exists
-  const handleModalAction = () => {
-    if (selectedNotification?.link_url) {
-      navigate(selectedNotification.link_url);
-      handleCloseModal();
-    } else {
-      handleCloseModal();
-    }
-  };
-
   // Mark all as unread
   const handleMarkAllUnread = async () => {
     if (!user?.user_id) return;
@@ -294,11 +284,6 @@ const Notification: React.FC<UserProps> = ({ user }) => {
               <div style={{ whiteSpace: 'pre-wrap', wordWrap: 'break-word' }}>
                 {selectedNotification.message}
               </div>
-            </div>
-            <div className="modal-actions">
-              <button className="modal-button cancel" onClick={handleModalAction}>
-                {selectedNotification.link_url ? 'View Details' : 'Close'}
-              </button>
             </div>
           </div>
         </div>
