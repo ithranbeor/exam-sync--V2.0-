@@ -58,25 +58,19 @@ User = get_user_model()
 
 def generate_otp_code(exam_schedule):
     """
-    Generate OTP in format: [Building][Room]-[CourseCode]-[RandomCode]
-    Example: 09306-IT114-X5P9K
+    Generate OTP in format: [Building]-[Room]-[CourseCode]-[RandomCode]
+    Example: 09-306-IT114-X5P9K
     """
-    # Extract building number from building_name (e.g., "Building 09" -> "09")
     building_str = exam_schedule.building_name or "00"
     building_parts = building_str.split()
     building_num = building_parts[-1] if building_parts else "00"
     
-    # Get room ID
     room_id = exam_schedule.room.room_id if exam_schedule.room else "000"
-    
-    # Get course code
     course_code = exam_schedule.course_id or "XXXXX"
-    
-    # Generate random 5-character alphanumeric code
     random_code = ''.join(random.choices(string.ascii_uppercase + string.digits, k=5))
     
-    # Combine: Building + Room - Course - Random
-    otp_code = f"{building_num}{room_id}-{course_code}-{random_code}"
+    # ✅ FIXED: Added hyphen between building and room
+    otp_code = f"{building_num}-{room_id}-{course_code}-{random_code}"
     
     return otp_code
 
@@ -131,7 +125,27 @@ def generate_exam_otps(request):
                     otp_code = generate_otp_code(schedule)
                 
                 # Calculate expiry (exam end time)
-                expires_at = schedule.exam_end_time or timezone.now() + timedelta(hours=3)
+                if schedule.exam_end_time:
+                    # Check if it's already a datetime object
+                    if isinstance(schedule.exam_end_time, datetime):
+                        expires_at = schedule.exam_end_time
+                    else:
+                        # It's a time object, need to combine with date
+                        from datetime import datetime as dt
+                        
+                        # Parse exam_date (string format: "2025-06-15")
+                        if schedule.exam_date:
+                            exam_date_obj = dt.strptime(schedule.exam_date, '%Y-%m-%d').date()
+                            # Combine date and time
+                            expires_at = timezone.make_aware(
+                                dt.combine(exam_date_obj, schedule.exam_end_time)
+                            )
+                        else:
+                            # Fallback: 3 hours from now
+                            expires_at = timezone.now() + timedelta(hours=3)
+                else:
+                    # Fallback: 3 hours from now
+                    expires_at = timezone.now() + timedelta(hours=3)
                 
                 # Create OTP record
                 otp_record = TblExamOtp.objects.create(
@@ -166,6 +180,17 @@ def generate_exam_otps(request):
             'error': str(e),
             'detail': 'Failed to generate OTP codes'
         }, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+    
+@api_view(['POST'])
+def reset_exam_otps(request):
+    schedule_ids = request.data.get('schedule_ids', [])
+    deleted_count = TblExamOtp.objects.filter(
+        examdetails_id__in=schedule_ids
+    ).delete()[0]
+    return Response({
+        'success': True,
+        'deleted_count': deleted_count
+    })
 
 
 # ============================================================

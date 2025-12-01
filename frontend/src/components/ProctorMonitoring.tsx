@@ -36,8 +36,10 @@ const ProctorMonitoring: React.FC<UserProps> = ({ }) => {
   const [approvedSchedules, setApprovedSchedules] = useState<MonitoringSchedule[]>([]);
   const [loading, setLoading] = useState(true);
   const [generatingOtp, setGeneratingOtp] = useState(false);
+  const [resettingOtp, setResettingOtp] = useState(false);
   const [collegeFilter, _setCollegeFilter] = useState<string>('');
   const [hasApprovedSchedules, setHasApprovedSchedules] = useState(false);
+  const [showResetConfirm, setShowResetConfirm] = useState(false);
 
   // Fetch monitoring data
   const fetchMonitoringData = useCallback(async () => {
@@ -103,7 +105,7 @@ const ProctorMonitoring: React.FC<UserProps> = ({ }) => {
         schedule_ids: schedulesWithoutOtp
       });
 
-          toast.success(`Generated OTP codes for ${response.data.generated_count} schedule(s)`);
+      toast.success(`Generated OTP codes for ${response.data.generated_count} schedule(s)`);
       
       // Refresh data
       await fetchMonitoringData();
@@ -116,6 +118,40 @@ const ProctorMonitoring: React.FC<UserProps> = ({ }) => {
     }
   };
 
+  // Handle reset OTP codes
+  const handleResetOtpCodes = async () => {
+    setResettingOtp(true);
+    setShowResetConfirm(false);
+    
+    try {
+      // Get all schedule IDs that have OTP codes
+      const schedulesWithOtp = approvedSchedules
+        .filter(s => s.otp_code)
+        .map(s => s.id);
+
+      if (schedulesWithOtp.length === 0) {
+        toast.info('No OTP codes to reset');
+        return;
+      }
+
+      const response = await api.post('/reset-exam-otps/', {
+        schedule_ids: schedulesWithOtp
+      });
+
+      toast.success(`Reset ${response.data.deleted_count} OTP code(s)`);
+      
+      // Refresh data
+      await fetchMonitoringData();
+    } catch (error: any) {
+      console.error('Error resetting OTP codes:', error);
+      const errorMessage = error.response?.data?.error || error.message || 'Failed to reset OTP codes';
+      toast.error(errorMessage);
+    } finally {
+      setResettingOtp(false);
+    }
+  };
+
+  const hasOtpCodes = approvedSchedules.some(s => s.otp_code);
 
   return (
     <div className="proctor-monitoring-container">
@@ -136,17 +172,38 @@ const ProctorMonitoring: React.FC<UserProps> = ({ }) => {
               : 'EXAM SCHEDULE HAS BEEN APPROVED. CLICK TO GENERATE EXAM CODES'}
           </p>
         </div>
-        <button 
-          className="proctor-monitoring-create-button"
-          onClick={handleGenerateOtpCodes}
-          disabled={generatingOtp || loading || !hasApprovedSchedules}
-          style={{
-            opacity: hasApprovedSchedules ? 1 : 0.6,
-            cursor: hasApprovedSchedules ? 'pointer' : 'not-allowed'
-          }}
-        >
-          {generatingOtp ? 'GENERATING...' : 'GENERATE EXAM CODES'}
-        </button>
+        <div style={{ display: 'flex', gap: '10px' }}>
+          <button 
+            className="proctor-monitoring-create-button"
+            onClick={handleGenerateOtpCodes}
+            disabled={generatingOtp || loading || !hasApprovedSchedules}
+            style={{
+              opacity: hasApprovedSchedules ? 1 : 0.6,
+              cursor: hasApprovedSchedules ? 'pointer' : 'not-allowed'
+            }}
+          >
+            {generatingOtp ? 'GENERATING...' : 'GENERATE EXAM CODES'}
+          </button>
+          
+          <button 
+            className="proctor-monitoring-reset-button"
+            onClick={() => setShowResetConfirm(true)}
+            disabled={resettingOtp || loading || !hasOtpCodes}
+            style={{
+              opacity: hasOtpCodes ? 1 : 0.6,
+              cursor: hasOtpCodes ? 'pointer' : 'not-allowed',
+              backgroundColor: '#dc3545',
+              color: 'white',
+              border: 'none',
+              padding: '10px 20px',
+              borderRadius: '5px',
+              fontWeight: 'bold',
+              fontSize: '14px'
+            }}
+          >
+            {resettingOtp ? 'RESETTING...' : 'RESET EXAM CODES'}
+          </button>
+        </div>
       </div>
       
       {loading ? (
@@ -266,9 +323,79 @@ const ProctorMonitoring: React.FC<UserProps> = ({ }) => {
       </div>
         </>
       )}
+
+      {/* Reset Confirmation Modal */}
+      {showResetConfirm && (
+        <div 
+          style={{
+            position: 'fixed',
+            top: 0,
+            left: 0,
+            right: 0,
+            bottom: 0,
+            backgroundColor: 'rgba(0, 0, 0, 0.5)',
+            display: 'flex',
+            justifyContent: 'center',
+            alignItems: 'center',
+            zIndex: 9999
+          }}
+          onClick={() => setShowResetConfirm(false)}
+        >
+          <div 
+            style={{
+              backgroundColor: 'white',
+              padding: '30px',
+              borderRadius: '10px',
+              maxWidth: '500px',
+              width: '90%',
+              boxShadow: '0 4px 6px rgba(0, 0, 0, 0.1)'
+            }}
+            onClick={(e) => e.stopPropagation()}
+          >
+            <h3 style={{ marginTop: 0, color: '#dc3545' }}>⚠️ Reset Exam Codes</h3>
+            <p style={{ marginBottom: '20px', color: '#666' }}>
+              Are you sure you want to reset all exam codes? This action will:
+            </p>
+            <ul style={{ textAlign: 'left', color: '#666', marginBottom: '20px' }}>
+              <li>Delete all existing OTP codes</li>
+              <li>Require generating new codes</li>
+              <li>Cannot be undone</li>
+            </ul>
+            <div style={{ display: 'flex', gap: '10px', justifyContent: 'flex-end' }}>
+              <button
+                onClick={() => setShowResetConfirm(false)}
+                style={{
+                  padding: '10px 20px',
+                  backgroundColor: '#6c757d',
+                  color: 'white',
+                  border: 'none',
+                  borderRadius: '5px',
+                  cursor: 'pointer',
+                  fontWeight: 'bold'
+                }}
+              >
+                Cancel
+              </button>
+              <button
+                onClick={handleResetOtpCodes}
+                style={{
+                  padding: '10px 20px',
+                  backgroundColor: '#dc3545',
+                  color: 'white',
+                  border: 'none',
+                  borderRadius: '5px',
+                  cursor: 'pointer',
+                  fontWeight: 'bold'
+                }}
+              >
+                Yes, Reset All
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 };
 
 export default ProctorMonitoring;
-

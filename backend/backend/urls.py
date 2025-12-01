@@ -75,6 +75,8 @@ urlpatterns = [
     path('api/proctor-assigned-exams/<int:user_id>/', views.proctor_assigned_exams, name='proctor_assigned_exams'),
     path('api/all-exams-for-substitution/', views.all_exams_for_substitution, name='all_exams_for_substitution'),
     path('api/proctor-monitoring/', views.proctor_monitoring_dashboard, name='proctor_monitoring_dashboard'),
+    path('api/reset-exam-otps/', views.reset_exam_otps, name='reset-exam-otps'),
+
     # Redirect frontend routes to React
     re_path(r'^(?!api/).*$', RedirectView.as_view(url='https://exam-sync-frontend.onrender.com/', permanent=False)),
 ]
