@@ -618,40 +618,152 @@ def tbl_examdetails_detail(request, pk):
     elif request.method == 'DELETE':
         instance.delete()
         return Response(status=status.HTTP_204_NO_CONTENT)
+
+@api_view(['POST'])
+@permission_classes([AllowAny])
+def tbl_modality_batch_create(request):
+    """
+    Create a single modality record with multiple sections and rooms.
+    Expects:
+    {
+        "modality_type": "Written (Lecture)",
+        "room_type": "Lecture",
+        "course_id": "CS101",
+        "program_id": "BSCS",
+        "sections": ["1A", "1B", "1C"],  // Array of section names
+        "possible_rooms": ["R101", "R102"],  // Array of room IDs
+        "modality_remarks": "...",
+        "user_id": 123
+    }
+    """
+    try:
+        data = request.data
         
+        # Validate required fields
+        required_fields = ['modality_type', 'course_id', 'program_id', 'sections', 'user_id']
+        for field in required_fields:
+            if field not in data:
+                return Response({
+                    'error': f'Missing required field: {field}'
+                }, status=status.HTTP_400_BAD_REQUEST)
+        
+        sections = data.get('sections', [])
+        possible_rooms = data.get('possible_rooms', [])
+        
+        if not sections:
+            return Response({
+                'error': 'At least one section is required'
+            }, status=status.HTTP_400_BAD_REQUEST)
+        
+        # Calculate total students
+        total_students = 0
+        section_details = []
+        
+        for section_name in sections:
+            try:
+                section = TblSectioncourse.objects.get(
+                    course_id=data['course_id'],
+                    program_id=data['program_id'],
+                    section_name=section_name
+                )
+                total_students += section.number_of_students
+                section_details.append({
+                    'section_name': section_name,
+                    'students': section.number_of_students
+                })
+            except TblSectioncourse.DoesNotExist:
+                return Response({
+                    'error': f'Section {section_name} not found for course {data["course_id"]}'
+                }, status=status.HTTP_400_BAD_REQUEST)
+        
+        # Validate room capacity if rooms are provided
+        if possible_rooms:
+            total_capacity = 0
+            room_details = []
+            
+            for room_id in possible_rooms:
+                try:
+                    room = TblRooms.objects.get(room_id=room_id)
+                    total_capacity += room.room_capacity
+                    room_details.append({
+                        'room_id': room_id,
+                        'capacity': room.room_capacity
+                    })
+                except TblRooms.DoesNotExist:
+                    return Response({
+                        'error': f'Room {room_id} not found'
+                    }, status=status.HTTP_400_BAD_REQUEST)
+            
+            # Check if total capacity can accommodate all students
+            if total_capacity < total_students:
+                return Response({
+                    'error': 'Insufficient room capacity',
+                    'detail': f'Total capacity ({total_capacity}) < Total students ({total_students})',
+                    'total_students': total_students,
+                    'total_capacity': total_capacity,
+                    'sections': section_details,
+                    'rooms': room_details
+                }, status=status.HTTP_400_BAD_REQUEST)
+        
+        # Create single modality record with arrays
+        modality = TblModality.objects.create(
+            modality_type=data['modality_type'],
+            room_type=data.get('room_type', ''),
+            modality_remarks=data.get('modality_remarks', ''),
+            course_id=data['course_id'],
+            program_id=data['program_id'],
+            sections=sections,  # Store as array
+            possible_rooms=possible_rooms,  # Store as array
+            user_id=data['user_id'],
+            created_at=timezone.now()
+        )
+        
+        serializer = TblModalitySerializer(modality)
+        
+        return Response({
+            'modality': serializer.data,
+            'summary': {
+                'total_students': total_students,
+                'total_capacity': sum(r['capacity'] for r in room_details) if possible_rooms else 0,
+                'sections_count': len(sections),
+                'rooms_count': len(possible_rooms),
+                'sections': section_details,
+                'rooms': room_details if possible_rooms else []
+            }
+        }, status=status.HTTP_201_CREATED)
+        
+    except Exception as e:
+        print(f"❌ Error in batch modality creation: {str(e)}")
+        import traceback
+        traceback.print_exc()
+        return Response({
+            'error': str(e),
+            'detail': 'Failed to create modality'
+        }, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+            
 @api_view(['GET', 'POST'])
 @permission_classes([AllowAny])
 def tbl_modality_list(request):
-    # ✅ VALIDATION: Check capacity before creating modality
-    if request.method == 'POST' and 'possible_rooms' in request.data and 'sections' in request.data:
-        sections = request.data['sections']  # Array of section names
+    if 'possible_rooms' in request.data and 'section_name' in request.data:
+        section = TblSectioncourse.objects.filter(
+            course_id=request.data.get('course_id'),
+            program_id=request.data.get('program_id'),
+            section_name=request.data.get('section_name')
+        ).first()
         
-        # Calculate total students from all sections
-        total_students = 0
-        for section_name in sections:
-            section = TblSectioncourse.objects.filter(
-                course_id=request.data.get('course_id'),
-                program_id=request.data.get('program_id'),
-                section_name=section_name
-            ).first()
+        if section:
+            total_capacity = 0
+            for room_id in request.data['possible_rooms']:
+                room = TblRooms.objects.filter(room_id=room_id).first()
+                if room:
+                    total_capacity += room.room_capacity
             
-            if section:
-                total_students += section.number_of_students
-        
-        # Calculate total room capacity
-        total_capacity = 0
-        for room_id in request.data['possible_rooms']:
-            room = TblRooms.objects.filter(room_id=room_id).first()
-            if room:
-                total_capacity += room.room_capacity
-        
-        # Validate capacity
-        if total_capacity < total_students:
-            return Response({
-                'error': 'Insufficient room capacity',
-                'detail': f'Total capacity ({total_capacity}) < Total students ({total_students})'
-            }, status=status.HTTP_400_BAD_REQUEST)
-    
+            if total_capacity < section.number_of_students:
+                return Response({
+                    'error': 'Insufficient room capacity',
+                    'detail': f'Total capacity ({total_capacity}) < Students ({section.number_of_students})'
+                }, status=status.HTTP_400_BAD_REQUEST)
+            
     if request.method == 'GET':
         try:
             queryset = TblModality.objects.select_related(
@@ -665,13 +777,14 @@ def tbl_modality_list(request):
             # Optional filtering by query params
             course_id = request.GET.get('course_id')
             program_id = request.GET.get('program_id')
-            section_name = request.GET.get('section_name')  # ✅ Filter by section in array
+            section_name = request.GET.get('section_name')
             modality_type = request.GET.get('modality_type')
             room_type = request.GET.get('room_type')
-            user_id = request.GET.get('user_id')
+            user_id = request.GET.get('user_id')  # ✅ ADD THIS
 
             print(f"📥 Modality GET request - course_id: {course_id}, program_id: {program_id}, user_id: {user_id}")
 
+            # ✅ ADD: Filter by user_id
             if user_id:
                 queryset = queryset.filter(user__user_id=user_id)
                 print(f"🔍 Filtering by user_id: {user_id}")
@@ -688,10 +801,8 @@ def tbl_modality_list(request):
                 print(f"🔍 Filtering by program_ids: {program_ids}")
                 queryset = queryset.filter(program_id__in=program_ids)
             
-            # ✅ CHANGED: Filter by section in array
             if section_name:
-                queryset = queryset.filter(sections__contains=[section_name])
-                
+                queryset = queryset.filter(section_name=section_name)
             if modality_type:
                 queryset = queryset.filter(modality_type=modality_type)
             if room_type:
@@ -712,6 +823,7 @@ def tbl_modality_list(request):
             )
     
     elif request.method == 'POST':
+        # ✅ ADD: Log incoming data
         print("📥 Incoming modality POST data:", request.data)
         
         serializer = TblModalitySerializer(data=request.data)

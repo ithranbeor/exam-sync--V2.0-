@@ -445,30 +445,42 @@ const BayanihanModality: React.FC<UserProps> = ({ user }) => {
       return;
     }
 
-    const { canAccommodate } = calculateRoomsNeeded(form.rooms);
+    // ✅ Rooms required unless "No Room" type
+    if (form.roomType !== "No Room" && form.rooms.length === 0) {
+      toast.error('Please select at least one room.');
+      return;
+    }
+
+    const { canAccommodate, totalCapacity, remainingCapacity } = calculateRoomsNeeded(form.rooms);
     
-    if (!canAccommodate) {
-      toast.error('Selected rooms do not have enough capacity for all students!');
+    if (form.roomType !== "No Room" && !canAccommodate) {
+      toast.error(`Selected rooms cannot accommodate all students! Need ${Math.abs(remainingCapacity)} more seats.`);
       return;
     }
 
     setIsSubmitting(true);
 
     try {
-      // ✅ FIXED: Single API call with sections array instead of loop
-      await api.post('/tbl_modality/', {
+      // ✅ Single API call with sections array
+      const response = await api.post('/tbl_modality/batch/', {
         modality_type: form.modality,
         room_type: form.roomType,
         modality_remarks: form.remarks,
         course_id: form.course,
         program_id: form.program,
-        sections: form.sections,  // ✅ Array of section names
-        possible_rooms: form.rooms,
+        sections: form.sections,  // Array of section names
+        possible_rooms: form.rooms,  // Array of room IDs
         user_id: user.user_id,
-        created_at: new Date().toISOString(),
       });
 
-      toast.success(`Successfully saved modality for ${form.sections.length} section(s)!`);
+      console.log('✅ Modality created:', response.data);
+      
+      toast.success(
+        `Successfully saved modality!\n` +
+        `Sections: ${form.sections.length}\n` +
+        `Students: ${selectedSectionsInfo.totalStudents}\n` +
+        `Rooms: ${form.rooms.length} (${totalCapacity} seats)`
+      );
       
       // Refresh user modalities
       await fetchUserModalities();
@@ -485,8 +497,11 @@ const BayanihanModality: React.FC<UserProps> = ({ user }) => {
       });
     } catch (error: any) {
       console.error('Error saving modality:', error);
+      
       if (error.response?.data?.error) {
-        toast.error(error.response.data.error);
+        const errorMsg = error.response.data.error;
+        const detail = error.response.data.detail;
+        toast.error(`${errorMsg}${detail ? '\n' + detail : ''}`);
       } else {
         toast.error('Failed to save modality');
       }
