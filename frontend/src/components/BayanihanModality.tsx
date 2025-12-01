@@ -495,6 +495,9 @@ const BayanihanModality: React.FC<UserProps> = ({ user }) => {
     // Initialize assignments
     const assignments: { roomId: string; sections: string[]; totalStudents: number; isNightClass: boolean }[] = [];
 
+    // ✅ Track which sections were successfully assigned
+    const assignedSections = new Set<string>();
+
     // Helper function to assign sections to rooms (bin packing)
     const assignSectionsToRooms = (
       sections: typeof sectionStudentCounts,
@@ -522,6 +525,7 @@ const BayanihanModality: React.FC<UserProps> = ({ user }) => {
           if (remainingCapacity >= section.studentCount) {
             assignment.sections.push(section.sectionName);
             assignment.totalStudents += section.studentCount;
+            assignedSections.add(section.sectionName); // ✅ Track assignment
             assigned = true;
             break;
           }
@@ -540,6 +544,7 @@ const BayanihanModality: React.FC<UserProps> = ({ user }) => {
               totalStudents: section.studentCount,
               isNightClass
             });
+            assignedSections.add(section.sectionName); // ✅ Track assignment
             assigned = true;
           }
         }
@@ -562,6 +567,7 @@ const BayanihanModality: React.FC<UserProps> = ({ user }) => {
 
           targetAssignment.sections.push(section.sectionName);
           targetAssignment.totalStudents += section.studentCount;
+          assignedSections.add(section.sectionName); // ✅ Track assignment
         }
       });
     };
@@ -574,6 +580,30 @@ const BayanihanModality: React.FC<UserProps> = ({ user }) => {
     // Then assign night sections
     if (nightSections.length > 0) {
       assignSectionsToRooms(nightSections, true);
+    }
+
+    // ✅ NEW: Check if all sections were assigned
+    const unassignedSections = form.sections.filter(s => !assignedSections.has(s));
+    
+    // ✅ If there are unassigned sections, add warning assignment
+    if (unassignedSections.length > 0) {
+      const unassignedNightSections = unassignedSections.filter(s => 
+        s.toLowerCase().includes('night') || s.toLowerCase().includes('n-')
+      );
+      
+      if (unassignedNightSections.length > 0) {
+        assignments.push({
+          roomId: '⚠️ NOT ASSIGNED',
+          sections: unassignedNightSections,
+          totalStudents: unassignedNightSections.reduce((sum, sectionName) => {
+            const section = sectionOptions.find(
+              s => s.course_id === form.course && s.section_name === sectionName
+            );
+            return sum + (section?.number_of_students || 0);
+          }, 0),
+          isNightClass: true
+        });
+      }
     }
 
     // Filter out empty assignments and return
@@ -635,6 +665,16 @@ const BayanihanModality: React.FC<UserProps> = ({ user }) => {
       }
     } else if (totalStudents > totalRoomCapacity) {
       toast.error(`Total students (${totalStudents}) exceed total room capacity (${totalRoomCapacity}). Please select more or larger rooms.`);
+      return;
+    }
+
+    // Check if any room assignment exceeds capacity
+    const hasUnassigned = calculateRoomAssignments.some(
+      assignment => assignment.roomId === '⚠️ NOT ASSIGNED'
+    );
+
+    if (hasUnassigned) {
+      toast.error('Some night class sections are not assigned to any room. Please select more rooms.');
       return;
     }
 
@@ -1022,19 +1062,23 @@ const BayanihanModality: React.FC<UserProps> = ({ user }) => {
                   paddingRight: '5px'
                 }}>
                   {calculateRoomAssignments.map((assignment, idx) => {
+                    const isUnassigned = assignment.roomId === '⚠️ NOT ASSIGNED';
                     const room = roomOptions.find(r => r.room_id === assignment.roomId);
-                    const isOverCapacity = assignment.totalStudents > (room?.room_capacity || 0);
+                    const isOverCapacity = !isUnassigned && assignment.totalStudents > (room?.room_capacity || 0);
 
                     return (
                       <div key={idx} style={{
                         marginBottom: '10px',
                         padding: '10px',
-                        backgroundColor: isOverCapacity ? '#fff3cd' : 'white',
+                        backgroundColor: isUnassigned ? '#ffebee' : (isOverCapacity ? '#fff3cd' : 'white'),
                         borderRadius: '4px',
-                        border: isOverCapacity ? '2px solid #ffc107' : '1px solid #ddd',
+                        border: isUnassigned ? '2px solid #d32f2f' : (isOverCapacity ? '2px solid #ffc107' : '1px solid #ddd'),
                         color: '#333'
                       }}>
-                        <strong>Room {assignment.roomId}</strong> (Capacity: {room?.room_capacity || 'N/A'})
+                        <strong>
+                          {isUnassigned ? '⚠️ NOT ASSIGNED TO ANY ROOM' : `Room ${assignment.roomId}`}
+                        </strong>
+                        {!isUnassigned && ` (Capacity: ${room?.room_capacity || 'N/A'})`}
                         {assignment.isNightClass && (
                           <span style={{
                             marginLeft: '8px',
@@ -1055,11 +1099,12 @@ const BayanihanModality: React.FC<UserProps> = ({ user }) => {
                         <br />
                         <span style={{
                           fontSize: '14px',
-                          color: isOverCapacity ? '#d32f2f' : '#4caf50',
+                          color: isUnassigned ? '#d32f2f' : (isOverCapacity ? '#d32f2f' : '#4caf50'),
                           fontWeight: 'bold'
                         }}>
                           Total Students: {assignment.totalStudents}
-                          {isOverCapacity && ' ⚠️ OVER CAPACITY'}
+                          {isUnassigned && ' ⚠️ NEEDS ROOM ASSIGNMENT'}
+                          {!isUnassigned && isOverCapacity && ' ⚠️ OVER CAPACITY'}
                         </span>
                       </div>
                     );

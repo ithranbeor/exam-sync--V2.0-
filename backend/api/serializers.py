@@ -2,7 +2,7 @@
 
 from rest_framework import serializers
 from django.utils import timezone
-from .models import TblScheduleapproval, TblAvailableRooms, TblNotification, TblUsers, TblRoles, TblExamdetails, TblAvailability, TblModality, TblSectioncourse, TblBuildings, TblUserRoleHistory, TblRooms, TblUserRole, TblCourseUsers, TblCourse, TblProgram, TblExamperiod, TblUserRole, TblTerm, TblCollege, TblDepartment
+from .models import TblScheduleapproval, TblAvailableRooms, TblExamOtp, TblProctorAttendance, TblProctorSubstitution, TblNotification, TblUsers, TblRoles, TblExamdetails, TblAvailability, TblModality, TblSectioncourse, TblBuildings, TblUserRoleHistory, TblRooms, TblUserRole, TblCourseUsers, TblCourse, TblProgram, TblExamperiod, TblUserRole, TblTerm, TblCollege, TblDepartment
 from django.contrib.auth.hashers import make_password
 
 class CourseSerializer(serializers.Serializer):
@@ -904,3 +904,160 @@ class TblAvailableRoomsSerializer(serializers.ModelSerializer):
             room_id=room_id,
             college_id=college_id,
         )
+    
+class TblExamOtpSerializer(serializers.ModelSerializer):
+    """Serializer for Exam OTP records"""
+    
+    # Include related exam details
+    course_id = serializers.CharField(source='examdetails.course_id', read_only=True)
+    section_name = serializers.CharField(source='examdetails.section_name', read_only=True)
+    exam_date = serializers.CharField(source='examdetails.exam_date', read_only=True)
+    exam_start_time = serializers.DateTimeField(source='examdetails.exam_start_time', read_only=True)
+    building_name = serializers.CharField(source='examdetails.building_name', read_only=True)
+    room_id = serializers.CharField(source='examdetails.room.room_id', read_only=True)
+    
+    # Write-only field for creating OTP
+    examdetails_id = serializers.IntegerField(write_only=True, required=False)
+    
+    class Meta:
+        model = TblExamOtp
+        fields = [
+            'otp_id',
+            'examdetails',
+            'examdetails_id',
+            'otp_code',
+            'created_at',
+            'expires_at',
+            # Related fields
+            'course_id',
+            'section_name',
+            'exam_date',
+            'exam_start_time',
+            'building_name',
+            'room_id'
+        ]
+        read_only_fields = ['otp_id', 'created_at']
+    
+    def create(self, validated_data):
+        examdetails_id = validated_data.pop('examdetails_id', None)
+        if examdetails_id:
+            from .models import TblExamdetails
+            validated_data['examdetails'] = TblExamdetails.objects.get(pk=examdetails_id)
+        return super().create(validated_data)
+
+
+class TblProctorAttendanceSerializer(serializers.ModelSerializer):
+    """Serializer for Proctor Attendance records"""
+    
+    # Include related information
+    proctor_name = serializers.SerializerMethodField()
+    course_id = serializers.CharField(source='examdetails.course_id', read_only=True)
+    section_name = serializers.CharField(source='examdetails.section_name', read_only=True)
+    exam_date = serializers.CharField(source='examdetails.exam_date', read_only=True)
+    room_id = serializers.CharField(source='examdetails.room.room_id', read_only=True)
+    
+    # Write-only fields for creating attendance
+    examdetails_id = serializers.IntegerField(write_only=True, required=False)
+    proctor_id = serializers.IntegerField(write_only=True, required=False)
+    
+    class Meta:
+        model = TblProctorAttendance
+        fields = [
+            'attendance_id',
+            'examdetails',
+            'examdetails_id',
+            'proctor',
+            'proctor_id',
+            'proctor_name',
+            'is_substitute',
+            'remarks',
+            'time_in',
+            'time_out',
+            'otp_used',
+            # Related fields
+            'course_id',
+            'section_name',
+            'exam_date',
+            'room_id'
+        ]
+        read_only_fields = ['attendance_id', 'time_in']
+    
+    def get_proctor_name(self, obj):
+        """Return proctor's full name"""
+        return f"{obj.proctor.first_name} {obj.proctor.last_name}"
+    
+    def create(self, validated_data):
+        examdetails_id = validated_data.pop('examdetails_id', None)
+        proctor_id = validated_data.pop('proctor_id', None)
+        
+        if examdetails_id:
+            from .models import TblExamdetails
+            validated_data['examdetails'] = TblExamdetails.objects.get(pk=examdetails_id)
+        
+        if proctor_id:
+            from .models import TblUsers
+            validated_data['proctor'] = TblUsers.objects.get(user_id=proctor_id)
+        
+        return super().create(validated_data)
+
+
+class TblProctorSubstitutionSerializer(serializers.ModelSerializer):
+    """Serializer for Proctor Substitution records"""
+    
+    # Include names for display
+    original_proctor_name = serializers.SerializerMethodField()
+    substitute_proctor_name = serializers.SerializerMethodField()
+    course_id = serializers.CharField(source='examdetails.course_id', read_only=True)
+    exam_date = serializers.CharField(source='examdetails.exam_date', read_only=True)
+    
+    # Write-only fields for creating substitution
+    examdetails_id = serializers.IntegerField(write_only=True, required=False)
+    original_proctor_id = serializers.IntegerField(write_only=True, required=False)
+    substitute_proctor_id = serializers.IntegerField(write_only=True, required=False)
+    
+    class Meta:
+        model = TblProctorSubstitution
+        fields = [
+            'substitution_id',
+            'examdetails',
+            'examdetails_id',
+            'original_proctor',
+            'original_proctor_id',
+            'original_proctor_name',
+            'substitute_proctor',
+            'substitute_proctor_id',
+            'substitute_proctor_name',
+            'justification',
+            'created_at',
+            # Related fields
+            'course_id',
+            'exam_date'
+        ]
+        read_only_fields = ['substitution_id', 'created_at']
+    
+    def get_original_proctor_name(self, obj):
+        """Return original proctor's full name"""
+        return f"{obj.original_proctor.first_name} {obj.original_proctor.last_name}"
+    
+    def get_substitute_proctor_name(self, obj):
+        """Return substitute proctor's full name"""
+        return f"{obj.substitute_proctor.first_name} {obj.substitute_proctor.last_name}"
+    
+    def create(self, validated_data):
+        examdetails_id = validated_data.pop('examdetails_id', None)
+        original_proctor_id = validated_data.pop('original_proctor_id', None)
+        substitute_proctor_id = validated_data.pop('substitute_proctor_id', None)
+        
+        if examdetails_id:
+            from .models import TblExamdetails
+            validated_data['examdetails'] = TblExamdetails.objects.get(pk=examdetails_id)
+        
+        if original_proctor_id:
+            from .models import TblUsers
+            validated_data['original_proctor'] = TblUsers.objects.get(user_id=original_proctor_id)
+        
+        if substitute_proctor_id:
+            from .models import TblUsers
+            validated_data['substitute_proctor'] = TblUsers.objects.get(user_id=substitute_proctor_id)
+        
+        return super().create(validated_data)

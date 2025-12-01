@@ -509,3 +509,104 @@ class TblUsers(models.Model):
             models.Index(fields=['email_address']),
             models.Index(fields=['status']),
         ]
+
+class TblExamOtp(models.Model):
+    """
+    Stores generated OTP codes for each exam schedule
+    Format: [Building][Room]-[CourseCode]-[RandomCode]
+    Example: 09306-IT114-X5P9K
+    """
+    otp_id = models.AutoField(primary_key=True)
+    examdetails = models.OneToOneField(
+        'TblExamdetails', 
+        on_delete=models.CASCADE,
+        related_name='otp_record'
+    )
+    otp_code = models.CharField(max_length=50, unique=True)
+    created_at = models.DateTimeField(auto_now_add=True)
+    expires_at = models.DateTimeField()  # Based on exam end time
+
+    class Meta:
+        managed = True
+        db_table = 'tbl_exam_otp'
+        indexes = [
+            models.Index(fields=['otp_code']),
+            models.Index(fields=['examdetails']),
+        ]
+    
+    def __str__(self):
+        return f"{self.otp_code} - {self.examdetails.course_id}"
+
+
+class TblProctorAttendance(models.Model):
+    """
+    Stores proctor attendance records
+    Records time-in, time-out, substitution status, and remarks
+    """
+    attendance_id = models.AutoField(primary_key=True)
+    examdetails = models.ForeignKey(
+        'TblExamdetails', 
+        on_delete=models.CASCADE,
+        related_name='attendance_records'
+    )
+    proctor = models.ForeignKey(
+        'TblUsers', 
+        on_delete=models.CASCADE,
+        related_name='proctor_attendances'
+    )
+    is_substitute = models.BooleanField(default=False)
+    remarks = models.TextField(blank=True, null=True)
+    time_in = models.DateTimeField(auto_now_add=True)
+    time_out = models.DateTimeField(blank=True, null=True)
+    otp_used = models.CharField(max_length=50)
+
+    class Meta:
+        managed = True
+        db_table = 'tbl_proctor_attendance'
+        indexes = [
+            models.Index(fields=['examdetails']),
+            models.Index(fields=['proctor']),
+            models.Index(fields=['time_in']),
+        ]
+        # Prevent duplicate attendance for same proctor-exam combination
+        unique_together = [['examdetails', 'proctor']]
+    
+    def __str__(self):
+        role = "Substitute" if self.is_substitute else "Assigned"
+        return f"{self.proctor.first_name} {self.proctor.last_name} - {role} - {self.examdetails.course_id}"
+
+
+class TblProctorSubstitution(models.Model):
+    """
+    Tracks when a non-assigned proctor substitutes
+    Requires justification and notifies admin/dean
+    """
+    substitution_id = models.AutoField(primary_key=True)
+    examdetails = models.ForeignKey(
+        'TblExamdetails', 
+        on_delete=models.CASCADE,
+        related_name='substitutions'
+    )
+    original_proctor = models.ForeignKey(
+        'TblUsers', 
+        on_delete=models.CASCADE, 
+        related_name='substitutions_as_original'
+    )
+    substitute_proctor = models.ForeignKey(
+        'TblUsers', 
+        on_delete=models.CASCADE, 
+        related_name='substitutions_as_substitute'
+    )
+    justification = models.TextField()
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        managed = True
+        db_table = 'tbl_proctor_substitution'
+        indexes = [
+            models.Index(fields=['examdetails']),
+            models.Index(fields=['created_at']),
+        ]
+    
+    def __str__(self):
+        return f"{self.substitute_proctor.first_name} substituting {self.original_proctor.first_name} - {self.examdetails.course_id}"

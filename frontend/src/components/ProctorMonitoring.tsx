@@ -99,11 +99,11 @@ const ProctorMonitoring: React.FC<UserProps> = ({ }) => {
         return;
       }
 
-      // const _response = await api.post('/generate-exam-otps/', {
+      const response = await api.post('/generate-exam-otps/', {
         schedule_ids: schedulesWithoutOtp
-      //});
+      });
 
-      toast.success(`Generated OTP codes for ${schedulesWithoutOtp.length} schedule(s)`);
+          toast.success(`Generated OTP codes for ${response.data.generated_count} schedule(s)`);
       
       // Refresh data
       await fetchMonitoringData();

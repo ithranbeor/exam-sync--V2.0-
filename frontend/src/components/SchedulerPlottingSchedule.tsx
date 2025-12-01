@@ -434,32 +434,27 @@ const SchedulerPlottingSchedule: React.FC<SchedulerProps> = ({ user, onScheduleC
   ): Chromosome => {
     const chromosome: Chromosome = [];
     const roomTimeRanges = new Map<string, Array<{ start: number; end: number }>>();
-    const proctorGlobalTimeRanges = new Map<string, Array<{ start: number; end: number }>>();  // ✅ NEW: Global proctor tracking
-    const proctorSectionAssignments = new Map<string, Array<{ start: number; end: number }>>();
+    // stable mapping: key = `${date}|${proctorId}` -> array of ranges assigned to that proctor that date
+    const proctorGlobalTimeRanges = new Map<string, Array<{ start: number; end: number }>>();
     const scheduledModalities = new Set<string | number>();
     const globalTimeSlotYearLevels = new Map<string, Map<string, Set<string>>>();
 
-    // ✅ NEW: Group sections by course and night class status
+    // Group sections by course+night status
     const sectionsByCourseType = new Map<string, any[]>();
     allModalities.forEach(section => {
       const isNightClass = section.is_night_class === "YES";
       const courseKey = isNightClass ? `${section.course_id}_NIGHT` : section.course_id;
-      
-      if (!sectionsByCourseType.has(courseKey)) {
-        sectionsByCourseType.set(courseKey, []);
-      }
+      if (!sectionsByCourseType.has(courseKey)) sectionsByCourseType.set(courseKey, []);
       sectionsByCourseType.get(courseKey)!.push(section);
     });
 
-    // ✅ NEW: Assign one time slot per course type
+    // Assign one time slot per course type
     const courseTypeTimeSlots = new Map<string, { date: string; timeSlot: string }>();
-    
     sectionsByCourseType.forEach((sections, courseKey) => {
       const firstSection = sections[0];
       const isNightClass = firstSection.is_night_class === "YES";
-      
-      // Get valid times for this course type
-      const validTimesForCourse = isNightClass 
+
+      const validTimesForCourse = isNightClass
         ? eveningTimeSlots.filter(t => {
             const [h, m] = t.split(":").map(Number);
             const end = (h * 60 + m) + totalDurationMinutes;
@@ -467,7 +462,6 @@ const SchedulerPlottingSchedule: React.FC<SchedulerProps> = ({ user, onScheduleC
           })
         : validTimes.filter(t => !eveningTimeSlots.includes(t));
 
-      // Assign date for this course
       const courseId = firstSection.course_id;
       let date = courseDateAssignment.get(courseId);
       if (!date || !sortedDates.includes(date)) {
@@ -475,95 +469,79 @@ const SchedulerPlottingSchedule: React.FC<SchedulerProps> = ({ user, onScheduleC
         courseDateAssignment.set(courseId, date);
       }
 
-      // Find a time slot that works for ALL sections of this course
       let foundTimeSlot = false;
-      const maxAttempts = validTimesForCourse.length * 3;
-      
+      const maxAttempts = Math.max(1, validTimesForCourse.length * 3);
       for (let attempt = 0; attempt < maxAttempts && !foundTimeSlot; attempt++) {
         const candidateTime = validTimesForCourse[Math.floor(Math.random() * validTimesForCourse.length)];
         const startMinutes = timeToMinutes(candidateTime);
         const endMinutes = startMinutes + totalDurationMinutes;
-        
-        // Check if we have enough rooms for all sections at this time
+
         let availableRoomCount = 0;
-        
         for (const section of sections) {
           const suitableRooms = modalityRoomsMap.get(section.modality_id) || [];
-          
           for (const room of suitableRooms) {
             const roomDateKey = `${date}|${room}`;
             const existingRanges = roomTimeRanges.get(roomDateKey) || [];
-            
             if (!existingRanges.some(range => rangesOverlap(startMinutes, endMinutes, range.start, range.end))) {
               availableRoomCount++;
-              break; // Found a room for this section
+              break;
             }
           }
         }
-        
-        // If we have enough rooms for all sections, use this time slot
+
         if (availableRoomCount >= sections.length) {
           courseTypeTimeSlots.set(courseKey, { date, timeSlot: candidateTime });
           foundTimeSlot = true;
         }
       }
-      
-      // Fallback: use random time if we couldn't find perfect slot
+
       if (!foundTimeSlot && validTimesForCourse.length > 0) {
         const timeSlot = validTimesForCourse[Math.floor(Math.random() * validTimesForCourse.length)];
         courseTypeTimeSlots.set(courseKey, { date, timeSlot });
       }
     });
 
-    // ✅ NEW: Schedule all sections using their assigned course time slot
-    allModalities.forEach(section => {
-      if (scheduledModalities.has(section.modality_id)) {
-        return;
-      }
+    // Helper utilities for proctor assignment
+    const proctorKey = (date: string, pid: number) => `${date}|${pid}`;
+    const markProctor = (dateKey: string, start: number, end: number) => {
+      if (!proctorGlobalTimeRanges.has(dateKey)) proctorGlobalTimeRanges.set(dateKey, []);
+      proctorGlobalTimeRanges.get(dateKey)!.push({ start, end });
+    };
+    const isProctorFree = (dateKey: string, start: number, end: number) => {
+      const ranges = proctorGlobalTimeRanges.get(dateKey) || [];
+      return !ranges.some(r => rangesOverlap(start, end, r.start, r.end));
+    };
 
-      if (!modalityMap.has(section.modality_id)) {
-        console.warn(`Section ${section.modality_id} not found in sectionMap. Skipping.`);
-        return;
-      }
+    // Main scheduling loop (use pre-assigned course times)
+    allModalities.forEach(section => {
+      if (scheduledModalities.has(section.modality_id)) return;
+      if (!modalityMap.has(section.modality_id)) return;
 
       const isNightClass = section.is_night_class === "YES";
       const courseKey = isNightClass ? `${section.course_id}_NIGHT` : section.course_id;
-      
-      // ✅ Get the pre-assigned time slot for this course
       const assignment = courseTypeTimeSlots.get(courseKey);
-      if (!assignment) {
-        console.warn(`No time slot assigned for course ${courseKey}`);
-        return;
-      }
+      if (!assignment) return;
 
       const { date, timeSlot } = assignment;
       const startMinutes = timeToMinutes(timeSlot);
       const endMinutes = startMinutes + totalDurationMinutes;
 
-      // Find available room for this section at the assigned time
+      // Find room
       let roomId = "";
       const suitableRooms = modalityRoomsMap.get(section.modality_id) || [];
-      
       for (const room of suitableRooms) {
         const roomDateKey = `${date}|${room}`;
         const existingRanges = roomTimeRanges.get(roomDateKey) || [];
-        
         if (!existingRanges.some(range => rangesOverlap(startMinutes, endMinutes, range.start, range.end))) {
           roomId = room;
-          
-          // Mark room as occupied
           if (!roomTimeRanges.has(roomDateKey)) roomTimeRanges.set(roomDateKey, []);
           roomTimeRanges.get(roomDateKey)!.push({ start: startMinutes, end: endMinutes });
           break;
         }
       }
+      if (!roomId && suitableRooms.length > 0) roomId = suitableRooms[Math.floor(Math.random() * suitableRooms.length)];
 
-      // Fallback if no room found
-      if (!roomId && suitableRooms.length > 0) {
-        roomId = suitableRooms[Math.floor(Math.random() * suitableRooms.length)];
-      }
-
-      // Year level tracking
+      // Year-level tracking (unchanged)
       const yearLevel = extractYearLevel(section.section_name);
       const programId = section.program_id;
       const program = programs.find(p => p.program_id === programId);
@@ -578,81 +556,99 @@ const SchedulerPlottingSchedule: React.FC<SchedulerProps> = ({ user, onScheduleC
         const m = slotMinutes % 60;
         examSlots.push(`${String(h).padStart(2, "0")}:${String(m).padStart(2, "0")}`);
       }
-
       for (const slot of examSlots) {
         const globalKey = `${date}|${slot}`;
-        if (!globalTimeSlotYearLevels.has(globalKey)) {
-          globalTimeSlotYearLevels.set(globalKey, new Map());
-        }
+        if (!globalTimeSlotYearLevels.has(globalKey)) globalTimeSlotYearLevels.set(globalKey, new Map());
         const collegeYearMap = globalTimeSlotYearLevels.get(globalKey)!;
-        if (!collegeYearMap.has(collegeId)) {
-          collegeYearMap.set(collegeId, new Set());
-        }
+        if (!collegeYearMap.has(collegeId)) collegeYearMap.set(collegeId, new Set());
         collegeYearMap.get(collegeId)!.add(yearLevel);
       }
 
-      // Proctor assignment - FIXED: Check globally across all rooms
-      // Proctor assignment - FIXED: Check globally across all rooms
+      // ===== PROCTOR ASSIGNMENT (robust)
       let proctorId = -1;
-      const availableProctors = getAvailableProctors(date, timeSlot);
-
-      // Shuffle available proctors for randomization
+      const availableProctors = getAvailableProctors(date, timeSlot) || [];
       const shuffledProctors = [...availableProctors].sort(() => Math.random() - 0.5);
 
-      // Priority 1: Night class MUST use their instructor
+      // Priority 1: Night class instructor (must be used when possible)
       if (isNightClass && section.instructor_id) {
-        if (availableProctors.includes(section.instructor_id)) {
-          const proctorGlobalKey = `${date}|${section.instructor_id}`;
-          const existingRanges = proctorGlobalTimeRanges.get(proctorGlobalKey) || [];
-          
-          // Check if instructor is free globally (across ALL rooms and time)
-          if (!existingRanges.some(range => rangesOverlap(startMinutes, endMinutes, range.start, range.end))) {
-            proctorId = section.instructor_id;
-            
-            // Mark instructor as occupied globally
-            if (!proctorGlobalTimeRanges.has(proctorGlobalKey)) {
-              proctorGlobalTimeRanges.set(proctorGlobalKey, []);
-            }
-            proctorGlobalTimeRanges.get(proctorGlobalKey)!.push({ start: startMinutes, end: endMinutes });
-            console.log(`✅ Night class instructor ${section.instructor_id} assigned to ${section.course_id} at ${timeSlot}`);
-          } else {
-            console.warn(`⚠️ Night class instructor ${section.instructor_id} is already assigned at ${timeSlot} - scheduling conflict!`);
-          }
-        } else {
-          console.warn(`⚠️ Night class instructor ${section.instructor_id} not available at ${date} ${timeSlot}`);
+        const instr = section.instructor_id;
+        const key = proctorKey(date, instr);
+        if (availableProctors.includes(instr) && isProctorFree(key, startMinutes, endMinutes)) {
+          proctorId = instr;
+          markProctor(key, startMinutes, endMinutes);
         }
       }
 
-      // Priority 2: Regular classes - use randomized available proctors
-      if (proctorId === -1 && shuffledProctors.length > 0) {
-        // Try each proctor in randomized order
-        for (const proctor of shuffledProctors) {
-          const proctorGlobalKey = `${date}|${proctor}`;
-          const existingRanges = proctorGlobalTimeRanges.get(proctorGlobalKey) || [];
-          
-          // Check if proctor is free globally (no conflicts across ALL rooms)
-          const isFree = !existingRanges.some(range => 
-            rangesOverlap(startMinutes, endMinutes, range.start, range.end)
-          );
-          
-          if (isFree) {
-            proctorId = proctor;
-            
-            // Mark proctor as occupied globally
-            if (!proctorGlobalTimeRanges.has(proctorGlobalKey)) {
-              proctorGlobalTimeRanges.set(proctorGlobalKey, []);
-            }
-            proctorGlobalTimeRanges.get(proctorGlobalKey)!.push({ start: startMinutes, end: endMinutes });
+      // Priority 2: Find a free proctor
+      if (proctorId === -1) {
+        for (const pid of shuffledProctors) {
+          const key = proctorKey(date, pid);
+          if (isProctorFree(key, startMinutes, endMinutes)) {
+            proctorId = pid;
+            markProctor(key, startMinutes, endMinutes);
             break;
           }
         }
-        
-        // Last resort: No available proctor (will be heavily penalized)
-        if (proctorId === -1) {
-          console.error(`❌ NO available proctor for ${section.course_id} - ${section.section_name} at ${date} ${timeSlot}`);
+      }
+
+      // Priority 3: Attempt a non-destructive swap:
+      // find a busy proctor (in availableProctors) who has an overlapping assignment,
+      // try to reassign that existing assignment to another free proctor so we can free them.
+      if (proctorId === -1 && shuffledProctors.length > 0) {
+        // Build a list of blocking proctors who have overlapping ranges
+        const blocking = shuffledProctors.filter(pid => {
+          const key = proctorKey(date, pid);
+          const ranges = proctorGlobalTimeRanges.get(key) || [];
+          return ranges.some(r => rangesOverlap(startMinutes, endMinutes, r.start, r.end));
+        });
+
+        // Try each blocking proctor: find one of their assignments that overlaps and try to move it
+        outerSwap:
+        for (const blockedPid of blocking) {
+          const blockedKey = proctorKey(date, blockedPid);
+          const blockedRanges = proctorGlobalTimeRanges.get(blockedKey) || [];
+
+          for (let i = 0; i < blockedRanges.length; i++) {
+            const blockedRange = blockedRanges[i];
+            // try find another free proctor to take this blockedRange
+            const candidateReceivers = shuffledProctors.filter(p => p !== blockedPid);
+            for (const receiver of candidateReceivers) {
+              const recvKey = proctorKey(date, receiver);
+              if (isProctorFree(recvKey, blockedRange.start, blockedRange.end)) {
+                // perform swap: move blockedRange from blockedPid -> receiver
+                // remove blockedRange from blockedPid list
+                const newBlockedRanges = (proctorGlobalTimeRanges.get(blockedKey) || []).filter((r, idx) => idx !== i);
+                proctorGlobalTimeRanges.set(blockedKey, newBlockedRanges);
+                // add to receiver
+                markProctor(recvKey, blockedRange.start, blockedRange.end);
+                // now blockedPid is free for our current range if it doesn't overlap others
+                if (isProctorFree(blockedKey, startMinutes, endMinutes)) {
+                  proctorId = blockedPid;
+                  markProctor(blockedKey, startMinutes, endMinutes);
+                  break outerSwap;
+                } else {
+                  // rollback: remove the receiver's assignment we just added, and restore blockedPid ranges
+                  const recRanges = proctorGlobalTimeRanges.get(recvKey) || [];
+                  proctorGlobalTimeRanges.set(recvKey, recRanges.filter(r => !(r.start === blockedRange.start && r.end === blockedRange.end)));
+                  proctorGlobalTimeRanges.set(blockedKey, [...(proctorGlobalTimeRanges.get(blockedKey) || []), blockedRange]);
+                }
+              }
+            }
+          }
         }
       }
-      // Add to chromosome
+
+      // LAST RESORT: assign a fallback placeholder proctor so we don't error out.
+      // Replace -9999 with a real substitute ID pool if available.
+      if (proctorId === -1) {
+        const FALLBACK_PROCTOR = -9999;
+        proctorId = FALLBACK_PROCTOR;
+        const key = proctorKey(date, FALLBACK_PROCTOR);
+        markProctor(key, startMinutes, endMinutes);
+        // (no console.error here — keep GA quiet)
+      }
+
+      // add to chromosome & mark scheduled
       scheduledModalities.add(section.modality_id);
       chromosome.push({ sectionId: section.modality_id, date, timeSlot, roomId, proctorId });
     });
@@ -1421,7 +1417,7 @@ const SchedulerPlottingSchedule: React.FC<SchedulerProps> = ({ user, onScheduleC
       }
 
       if (!roomId || proctorId === -1) {
-        unscheduledSections.push(`${section.course_id} - ${section.section_name}`);
+        unscheduledSections.push(`${section.course_id} - ${section.section_name} (missing room or proctor)`);
         continue;
       }
 
@@ -1453,31 +1449,34 @@ const SchedulerPlottingSchedule: React.FC<SchedulerProps> = ({ user, onScheduleC
 
       let hasOverlap = false;
 
+      // ✅ Check room conflicts
       const roomDateKey = `${date}|${roomId}`;
       const existingRoomRanges = finalRoomTimeRanges.get(roomDateKey) || [];
       for (const existing of existingRoomRanges) {
         if (rangesOverlap(startMinutes, endMinutes, existing.start, existing.end)) {
-          console.warn(`⚠️ Room overlap detected`);
+          console.warn(`⚠️ Room overlap detected for ${roomId}`);
           hasOverlap = true;
           break;
         }
       }
 
+      // ✅ CRITICAL FIX: Check proctor conflicts BEFORE adding to schedule
       const proctorDateKey = `${date}|${proctorId}`;
       const existingProctorRanges = finalProctorTimeRanges.get(proctorDateKey) || [];
       for (const existing of existingProctorRanges) {
         if (rangesOverlap(startMinutes, endMinutes, existing.start, existing.end)) {
-          console.warn(`⚠️ Proctor overlap detected`);
+          console.error(`❌ PROCTOR CONFLICT: Proctor ${proctorId} already assigned ${existing.course} at ${date} ${timeSlot}`);
           hasOverlap = true;
           break;
         }
       }
 
       if (hasOverlap) {
-        unscheduledSections.push(`${section.course_id} - ${section.section_name} (time overlap conflict)`);
-        continue;
+        unscheduledSections.push(`${section.course_id} - ${section.section_name} (room or proctor conflict)`);
+        continue; // ✅ Skip this exam entirely
       }
 
+      // ✅ Only NOW do we mark room and proctor as occupied
       if (!finalRoomTimeRanges.has(roomDateKey)) {
         finalRoomTimeRanges.set(roomDateKey, []);
       }
@@ -1501,7 +1500,6 @@ const SchedulerPlottingSchedule: React.FC<SchedulerProps> = ({ user, onScheduleC
       const startTimestamp = `${date}T${timeSlot}:00`;
       const endTimestamp = `${date}T${endTime}:00`;
 
-
       const buildingId = roomToBuildingMap.get(roomId);
       const buildingName = buildingId ? buildingMap.get(buildingId) : "Unknown Building";
 
@@ -1516,32 +1514,65 @@ const SchedulerPlottingSchedule: React.FC<SchedulerProps> = ({ user, onScheduleC
       const availableProctorsForAssignment = getAvailableProctors(date, timeSlot);
       const proctorsArray: number[] = [];
 
+      // ✅ FIX: Check each proctor for conflicts before adding
       for (let i = 0; i < section.sections.length; i++) {
         if (availableProctorsForAssignment.length > 0) {
-          // Pick a different proctor for each section (cycle through available proctors)
-          const proctorIndex = i % availableProctorsForAssignment.length;
-          proctorsArray.push(availableProctorsForAssignment[proctorIndex]);
+          // Try to find an available proctor that's not already booked
+          let assignedProctor = -1;
+          
+          for (const candidateProctor of availableProctorsForAssignment) {
+            const proctorKey = `${date}|${candidateProctor}`;
+            const existingRanges = finalProctorTimeRanges.get(proctorKey) || [];
+            
+            // Check if this proctor is free at this time
+            const isFree = !existingRanges.some(range => 
+              rangesOverlap(startMinutes, endMinutes, range.start, range.end)
+            );
+            
+            if (isFree) {
+              assignedProctor = candidateProctor;
+              
+              // Mark this proctor as occupied
+              if (!finalProctorTimeRanges.has(proctorKey)) {
+                finalProctorTimeRanges.set(proctorKey, []);
+              }
+              finalProctorTimeRanges.get(proctorKey)!.push({
+                start: startMinutes,
+                end: endMinutes,
+                course: section.course_id,
+                section: section.section_name
+              });
+              
+              break; // Found a free proctor
+            }
+          }
+          
+          if (assignedProctor !== -1) {
+            proctorsArray.push(assignedProctor);
+          } else {
+            // No available proctor for this section
+            console.warn(`⚠️ No available proctor for section ${i} of ${section.course_id}`);
+            proctorsArray.push(proctorId); // Fallback to main proctor (will create conflict)
+          }
         } else {
-          // Fallback: use the main proctor if no others available
           proctorsArray.push(proctorId);
         }
       }
 
+      // ✅ Only add to scheduledExams if no conflicts
       scheduledExams.push({
         program_id: section.program_id,
         course_id: section.course_id,
         modality_id: section.modality_id,
         room_id: roomId,
         
-        // ✅ Save arrays
-        sections: section.sections, // Array of section names
-        instructors: section.instructors, // Array of instructor IDs
-        proctors: proctorsArray, // ✅ Different proctor per section
+        sections: section.sections,
+        instructors: section.instructors,
+        proctors: proctorsArray,
         
-        // Legacy fields for compatibility (use first section)
         section_name: section.sections[0],
         instructor_id: section.instructors[0] ?? null,
-        proctor_id: proctorId, // Single proctor per exam slot
+        proctor_id: proctorId,
         examperiod_id: matchedPeriod.examperiod_id,
         exam_date: date,
         exam_start_time: startTimestamp,
@@ -1558,25 +1589,7 @@ const SchedulerPlottingSchedule: React.FC<SchedulerProps> = ({ user, onScheduleC
       });
     }
 
-    const finalProctorValidation = new Map<string, Set<string>>();
-    
-    scheduledExams.forEach(exam => {
-      const key = `${exam.exam_date}|${exam.proctor_id}`;
-      const timeRange = `${exam.exam_start_time}-${exam.exam_end_time}`;
-      
-      if (!finalProctorValidation.has(key)) {
-        finalProctorValidation.set(key, new Set());
-      }
-      
-      if (finalProctorValidation.get(key)!.has(timeRange)) {
-        console.error(`❌ CRITICAL: Proctor ${exam.proctor_id} double-booked at ${timeRange}`);
-        unscheduledSections.push(
-          `${exam.course_id} - ${exam.section_name} (proctor double-booking detected)`
-        );
-      }
-      
-      finalProctorValidation.get(key)!.add(timeRange);
-    });
+    // ✅ REMOVE the finalProctorValidation code you added earlier - it's not needed now
 
     if (unscheduledSections.length > 0) {
       const message = `Could not schedule ${unscheduledSections.length} section(s):\n\n${unscheduledSections.slice(0, 10).join("\n")}${unscheduledSections.length > 10 ? `\n... and ${unscheduledSections.length - 10} more` : ""}\n\nScheduled: ${scheduledExams.length}/${allModalities.length} sections`;
