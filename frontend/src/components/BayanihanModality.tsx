@@ -37,8 +37,8 @@ const BayanihanModality: React.FC<UserProps> = ({ user }) => {
 
   const [programOptions, setProgramOptions] = useState<{ program_id: string; program_name: string }[]>([]);
   const [courseOptions, setCourseOptions] = useState<{ course_id: string; course_name: string }[]>([]);
-  const [sectionOptions, setSectionOptions] = useState<{ course_id: string; program_id: string; section_name: string }[]>([]);
-  const [roomOptions, setRoomOptions] = useState<{ room_id: string; room_name: string; room_type: string; building_id?: string }[]>([]);
+  const [sectionOptions, setSectionOptions] = useState<{ course_id: string; program_id: string; section_name: string; number_of_students?: number }[]>([]);
+  const [roomOptions, setRoomOptions] = useState<{ room_id: string; room_name: string; room_type: string; building_id?: string; room_capacity?: number }[]>([]);
   const [availableRoomIds, setAvailableRoomIds] = useState<string[]>([]);
   const [_sectionDropdownOpen, _setSectionDropdownOpen] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
@@ -256,7 +256,8 @@ const BayanihanModality: React.FC<UserProps> = ({ user }) => {
           const allSections = sectionCourses.map((sc: any) => ({
             course_id: sc.course_id || sc.course?.course_id,
             program_id: sc.program_id || sc.program?.program_id,
-            section_name: sc.section_name
+            section_name: sc.section_name,
+            number_of_students: sc.number_of_students || 0
           }));
           setSectionOptions(allSections);
 
@@ -364,15 +365,16 @@ const BayanihanModality: React.FC<UserProps> = ({ user }) => {
           courseIds.includes(c.course_id)
         );
         setCourseOptions(coursesWithNames);
-
         // Filter sections
         const filteredSections = sectionCourses
           ?.filter((sc: any) => courseIds.includes(sc.course_id || sc.course?.course_id))
           .map((sc: any) => ({
             course_id: sc.course_id || sc.course?.course_id,
             program_id: sc.program_id || sc.program?.program_id,
-            section_name: sc.section_name
+            section_name: sc.section_name,
+            number_of_students: sc.number_of_students || 0
           })) ?? [];
+        setSectionOptions(filteredSections);
         setSectionOptions(filteredSections);
 
         // BAYANIHAN LEADER: Fetch available rooms for their college(s)
@@ -452,11 +454,89 @@ const BayanihanModality: React.FC<UserProps> = ({ user }) => {
   const handleChange = (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement | HTMLTextAreaElement>) => {
     const { name, value } = e.target;
     if (name === 'program') {
-      setForm(prev => ({ ...prev, program: value, course: '', sections: [] }));
+      setForm(prev => ({ ...prev, program: value }));
     } else {
       setForm(prev => ({ ...prev, [name]: value }));
     }
   };
+
+  /** HANDLE FORM SUBMIT */
+  const calculateRoomAssignments = useMemo(() => {
+    if (form.rooms.length === 0 || form.sections.length === 0) return [];
+
+    // Get student counts for each section
+    const sectionStudentCounts = form.sections.map(sectionName => {
+      const section = sectionOptions.find(
+        s => s.course_id === form.course && s.section_name === sectionName
+      );
+      return {
+        sectionName,
+        studentCount: section?.number_of_students || 0
+      };
+    });
+
+    // Get room capacities
+    const roomCapacities = form.rooms.map(roomId => {
+      const room = roomOptions.find(r => r.room_id === roomId);
+      return {
+        roomId,
+        capacity: room?.room_capacity || 0
+      };
+    }).sort((a, b) => b.capacity - a.capacity); // Sort by capacity descending
+
+    // Greedy bin packing algorithm
+    const assignments: { roomId: string; sections: string[]; totalStudents: number }[] = [];
+    
+    roomCapacities.forEach(room => {
+      assignments.push({
+        roomId: room.roomId,
+        sections: [],
+        totalStudents: 0
+      });
+    });
+
+    // Sort sections by student count descending (fit larger sections first)
+    const sortedSections = [...sectionStudentCounts].sort((a, b) => b.studentCount - a.studentCount);
+
+    sortedSections.forEach(section => {
+      // Find the room with minimum remaining capacity that can fit this section
+      let bestFit = -1;
+      let minWaste = Infinity;
+
+      for (let i = 0; i < assignments.length; i++) {
+        const roomCapacity = roomCapacities[i].capacity;
+        const currentOccupancy = assignments[i].totalStudents;
+        const remainingCapacity = roomCapacity - currentOccupancy;
+
+        if (remainingCapacity >= section.studentCount) {
+          const waste = remainingCapacity - section.studentCount;
+          if (waste < minWaste) {
+            minWaste = waste;
+            bestFit = i;
+          }
+        }
+      }
+
+      // If best fit found, assign to that room
+      if (bestFit !== -1) {
+        assignments[bestFit].sections.push(section.sectionName);
+        assignments[bestFit].totalStudents += section.studentCount;
+      } else {
+        // If no room can fit, try to find any room with space (even if over capacity)
+        const roomWithMostSpace = assignments.reduce((max, curr, idx) => {
+          const currRemaining = roomCapacities[idx].capacity - curr.totalStudents;
+          const maxRemaining = roomCapacities[max].capacity - assignments[max].totalStudents;
+          return currRemaining > maxRemaining ? idx : max;
+        }, 0);
+        
+        assignments[roomWithMostSpace].sections.push(section.sectionName);
+        assignments[roomWithMostSpace].totalStudents += section.studentCount;
+      }
+    });
+
+    // Filter out empty assignments
+    return assignments.filter(a => a.sections.length > 0);
+  }, [form.rooms, form.sections, form.course, sectionOptions, roomOptions]);
 
   /** HANDLE FORM SUBMIT */
   const handleSubmit = async (e: React.FormEvent) => {
@@ -469,53 +549,66 @@ const BayanihanModality: React.FC<UserProps> = ({ user }) => {
       return;
     }
 
-    if (form.sections.length !== form.rooms.length) {
-      toast.error(`Number of sections must be equal to the number of rooms! (${form.sections.length} of ${form.rooms.length} selected)`);
+    if (form.rooms.length === 0) {
+      toast.error('Please select at least one room.');
+      return;
+    }
+
+    // ✅ NEW: Validate room capacity
+    const totalStudents = form.sections.reduce((sum, sectionName) => {
+      const section = sectionOptions.find(
+        s => s.course_id === form.course && s.section_name === sectionName
+      );
+      return sum + (section?.number_of_students || 0);
+    }, 0);
+
+    const totalRoomCapacity = form.rooms.reduce((sum, roomId) => {
+      const room = roomOptions.find(r => r.room_id === roomId);
+      return sum + (room?.room_capacity || 0);
+    }, 0);
+
+    if (totalStudents > totalRoomCapacity) {
+      toast.error(`Total students (${totalStudents}) exceed total room capacity (${totalRoomCapacity}). Please select more or larger rooms.`);
       return;
     }
 
     setIsSubmitting(true);
 
-    const submissions = form.sections.map(async (sectionName) => {
-      const section = sectionOptions.find(
-        s => s.course_id === form.course && s.section_name === sectionName
-      );
-      if (!section) {
-        return { status: 'rejected', reason: `Section ${sectionName} not found` };
-      }
-
+    // ✅ NEW: Create one modality per room assignment
+    const submissions = calculateRoomAssignments.map(async (assignment) => {
       try {
         // Check for existing record
         const { data: existing } = await api.get('/tbl_modality/', {
           params: {
-            course_id: section.course_id,
-            program_id: section.program_id,
-            section_name: section.section_name,
+            course_id: form.course,
+            program_id: form.program,
+            sections: assignment.sections.join(','),
             modality_type: form.modality,
             room_type: form.roomType
           }
         });
 
         if (existing && existing.length > 0) {
-          return { status: 'skipped', section: sectionName };
+          return { status: 'skipped', sections: assignment.sections };
         }
 
-        // Insert new record
+        // Insert new record with multiple sections
         await api.post('/tbl_modality/', {
           modality_type: form.modality,
           room_type: form.roomType,
           modality_remarks: form.remarks,
-          course_id: section.course_id,
-          program_id: section.program_id,
-          section_name: section.section_name,
-          possible_rooms: form.rooms,
+          course_id: form.course,
+          program_id: form.program,
+          sections: assignment.sections,
+          total_students: assignment.totalStudents,
+          possible_rooms: [assignment.roomId],
           user_id: user.user_id,
           created_at: new Date().toISOString(),
         });
 
-        return { status: 'success', section: sectionName };
+        return { status: 'success', sections: assignment.sections };
       } catch (error) {
-        return { status: 'error', section: sectionName, error };
+        return { status: 'error', sections: assignment.sections, error };
       }
     });
 
@@ -536,13 +629,13 @@ const BayanihanModality: React.FC<UserProps> = ({ user }) => {
       }
     });
 
-    if (successCount > 0) toast.success(`Successfully saved ${successCount} section(s)`);
-    if (skippedCount > 0) toast.info(`Skipped ${skippedCount} section(s) (already submitted)`);
-    if (errorCount > 0) toast.error(`Failed to save ${errorCount} section(s)`);
+    if (successCount > 0) toast.success(`Successfully saved ${successCount} modality group(s)`);
+    if (skippedCount > 0) toast.info(`Skipped ${skippedCount} group(s) (already submitted)`);
+    if (errorCount > 0) toast.error(`Failed to save ${errorCount} group(s)`);
 
     setIsSubmitting(false);
 
-    // Reset form after submit
+    // Reset form
     setForm({
       modality: '',
       rooms: [],
@@ -552,6 +645,9 @@ const BayanihanModality: React.FC<UserProps> = ({ user }) => {
       course: '',
       remarks: '',
     });
+
+    // Refresh modalities list
+    await fetchUserModalities();
   };
 
   /** GET ROOM TIMESLOTS WITH 30-MINUTE VACANT INTERVALS */
@@ -835,15 +931,52 @@ const BayanihanModality: React.FC<UserProps> = ({ user }) => {
                   placeholder="Enter any notes or remarks here..."
                 />
               </div>
-
             </div>
+            {calculateRoomAssignments.length > 0 && (
+              <div style={{ 
+                marginTop: '20px', 
+                padding: '15px', 
+                backgroundColor: '#e3f2fd', 
+                borderRadius: '8px',
+                border: '2px solid #2196F3'
+              }}>
+                <h4 style={{ marginBottom: '10px', color: '#092C4C' }}>
+                  📋 Room Assignment Preview
+                </h4>
+                {calculateRoomAssignments.map((assignment, idx) => {
+                  const room = roomOptions.find(r => r.room_id === assignment.roomId);
+                  const isOverCapacity = assignment.totalStudents > (room?.room_capacity || 0);
+                  
+                  return (
+                    <div key={idx} style={{ 
+                      marginBottom: '10px', 
+                      padding: '10px', 
+                      backgroundColor: isOverCapacity ? '#fff3cd' : 'white',
+                      borderRadius: '4px',
+                      border: isOverCapacity ? '2px solid #ffc107' : '1px solid #ddd'
+                    }}>
+                      <strong>Room {assignment.roomId}</strong> (Capacity: {room?.room_capacity || 'N/A'})
+                      <br />
+                      <span style={{ fontSize: '14px' }}>
+                        Sections: {assignment.sections.join(', ')}
+                      </span>
+                      <br />
+                      <span style={{ 
+                        fontSize: '14px', 
+                        color: isOverCapacity ? '#d32f2f' : '#4caf50',
+                        fontWeight: 'bold'
+                      }}>
+                        Total Students: {assignment.totalStudents}
+                        {isOverCapacity && ' ⚠️ OVER CAPACITY'}
+                      </span>
+                    </div>
+                  );
+                })}
+              </div>
+            )}
 
-            <button type="submit" className="submit-button" disabled={isSubmitting}>
-              {isSubmitting ? (
-                <span className="spinner"></span>
-              ) : (
-                'Submit'
-              )}
+            <button type="submit" disabled={isSubmitting || calculateRoomAssignments.length === 0}>
+              Submit
             </button>
 
             {/* Add this after the submit button or create a new section */}

@@ -232,7 +232,34 @@ class TblExamdetails(models.Model):
     exam_end_time = models.DateTimeField(blank=True, null=True)
     proctor_timein = models.DateTimeField(blank=True, null=True)
     proctor_timeout = models.DateTimeField(blank=True, null=True)
+    
+    # ✅ NEW: Changed to ArrayField for multiple sections
+    sections = ArrayField(
+        models.CharField(max_length=100),
+        blank=True,
+        null=True,
+        default=list
+    )
+    
+    # ✅ NEW: Store multiple instructors and proctors
+    instructors = ArrayField(
+        models.IntegerField(),
+        blank=True,
+        null=True,
+        default=list
+    )
+    
+    proctors = ArrayField(
+        models.IntegerField(),
+        blank=True,
+        null=True,
+        default=list
+    )
+    
+    # Keep legacy fields for backward compatibility
     section_name = models.CharField(blank=True, null=True)
+    instructor_id = models.IntegerField(blank=True, null=True)
+    
     academic_year = models.TextField(blank=True, null=True)
     semester = models.TextField(blank=True, null=True)
     exam_category = models.TextField(blank=True, null=True)
@@ -240,12 +267,10 @@ class TblExamdetails(models.Model):
     exam_date = models.TextField(blank=True, null=True)
     college_name = models.TextField(blank=True, null=True)
     building_name = models.CharField(blank=True, null=True)
-    instructor_id = models.IntegerField(blank=True, null=True)
 
     class Meta:
         managed = True
         db_table = 'tbl_examdetails'
-        unique_together = (('modality', 'exam_date', 'exam_start_time'),)
         indexes = [
             models.Index(fields=['room']),
             models.Index(fields=['modality']),
@@ -286,9 +311,19 @@ class TblModality(models.Model):
     room = models.ForeignKey('TblRooms', models.DO_NOTHING, blank=True, null=True)
     user = models.ForeignKey('TblUsers', models.DO_NOTHING)
     created_at = models.DateTimeField(blank=True, null=True)
-    section_name = models.CharField(blank=True, null=True)
     
-    # ✅ FIXED: Proper ArrayField
+    # ✅ NEW: Changed to ArrayField for multiple sections
+    sections = ArrayField(
+        models.CharField(max_length=100),
+        blank=True,
+        null=True,
+        default=list
+    )
+    
+    # ✅ NEW: Store total student count across all sections
+    total_students = models.IntegerField(default=0, blank=True, null=True)
+    
+    # Keep possible_rooms as is
     possible_rooms = ArrayField(
         models.CharField(max_length=50),
         blank=True,

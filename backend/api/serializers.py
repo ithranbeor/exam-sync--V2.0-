@@ -505,20 +505,25 @@ class TblAvailabilitySerializer(serializers.ModelSerializer):
         return instance
 
 class TblModalitySerializer(serializers.ModelSerializer):
-    # Foreign Keys (expanded for read)
     room = TblRoomsSerializer(read_only=True)
     user = TblUsersSerializer(read_only=True)
     course = CourseSerializer(read_only=True)
     
-    # Write-only FKs for POST/PUT
     room_id = serializers.CharField(required=False, allow_null=True, allow_blank=True)
     user_id = serializers.IntegerField()
     course_id = serializers.CharField()
     
-    # ✅ FIXED: Change sections (array) to section_name (string)
-    section_name = serializers.CharField(required=False, allow_blank=True, allow_null=True)
+    # ✅ NEW: Support array of sections
+    sections = serializers.ListField(
+        child=serializers.CharField(),
+        required=False,
+        allow_empty=True,
+        allow_null=True
+    )
     
-    # Handle possible_rooms as array
+    # ✅ NEW: Total students field
+    total_students = serializers.IntegerField(required=False, default=0)
+    
     possible_rooms = serializers.ListField(
         child=serializers.CharField(),
         required=False,
@@ -541,18 +546,19 @@ class TblModalitySerializer(serializers.ModelSerializer):
             'user',
             'user_id',
             'created_at',
-            'section_name',  # ✅ FIXED: Changed from 'sections' to 'section_name'
+            'sections',
+            'total_students',
             'possible_rooms',
         ]
     
     def to_representation(self, instance):
-        """Ensure all IDs are included"""
         representation = super().to_representation(instance)
         representation['course_id'] = instance.course.course_id if instance.course else None
         representation['user_id'] = instance.user.user_id if instance.user else None
         representation['room_id'] = instance.room.room_id if instance.room else None
         representation['program_id'] = instance.program_id
-        representation['section_name'] = instance.section_name  # ✅ Add this
+        representation['sections'] = instance.sections or []
+        representation['total_students'] = instance.total_students or 0
         return representation
     
     def create(self, validated_data):
@@ -592,20 +598,39 @@ class TblModalitySerializer(serializers.ModelSerializer):
         return instance
 
 class TblExamdetailsSerializer(serializers.ModelSerializer):
-    # FKs (expanded for reading)
     room = TblRoomsSerializer(read_only=True, allow_null=True)
     modality = TblModalitySerializer(read_only=True, allow_null=True)
     proctor = TblUsersSerializer(read_only=True, allow_null=True)
     examperiod = serializers.SerializerMethodField()
 
-    # ✅ FIXED: Remove write_only=True from room_id so it's available in GET responses
     room_id = serializers.CharField(required=False, allow_null=True, allow_blank=True)
     modality_id = serializers.IntegerField(write_only=True, required=False, allow_null=True)
     proctor_id = serializers.IntegerField(required=False, allow_null=True)
     examperiod_id = serializers.IntegerField(write_only=True, required=False, allow_null=True)
     
+    # ✅ NEW: Support arrays
+    sections = serializers.ListField(
+        child=serializers.CharField(),
+        required=False,
+        allow_empty=True,
+        allow_null=True
+    )
+    
+    instructors = serializers.ListField(
+        child=serializers.IntegerField(),
+        required=False,
+        allow_empty=True,
+        allow_null=True
+    )
+    
+    proctors = serializers.ListField(
+        child=serializers.IntegerField(),
+        required=False,
+        allow_empty=True,
+        allow_null=True
+    )
+    
     def get_examperiod(self, obj):
-        """Handle examperiod serialization with null safety"""
         if obj.examperiod:
             return {
                 'examperiod_id': obj.examperiod.examperiod_id,
@@ -616,10 +641,12 @@ class TblExamdetailsSerializer(serializers.ModelSerializer):
             }
         return None
     
-    # ✅ ADD: Ensure room_id is always included in response
     def to_representation(self, instance):
         representation = super().to_representation(instance)
         representation['room_id'] = instance.room.room_id if instance.room else None
+        representation['sections'] = instance.sections or []
+        representation['instructors'] = instance.instructors or []
+        representation['proctors'] = instance.proctors or []
         return representation
 
     class Meta:
@@ -629,7 +656,7 @@ class TblExamdetailsSerializer(serializers.ModelSerializer):
             'course_id',
             'program_id',
             'room',
-            'room_id',  # Now available for both read and write
+            'room_id',
             'modality',
             'modality_id',
             'proctor',
@@ -641,7 +668,11 @@ class TblExamdetailsSerializer(serializers.ModelSerializer):
             'exam_end_time',
             'proctor_timein',
             'proctor_timeout',
+            'sections',
+            'instructors',
+            'proctors',
             'section_name',
+            'instructor_id',
             'academic_year',
             'semester',
             'exam_category',
@@ -649,17 +680,14 @@ class TblExamdetailsSerializer(serializers.ModelSerializer):
             'exam_date',
             'college_name',
             'building_name',
-            'instructor_id',
         ]
 
     def create(self, validated_data):
-        # Extract FK IDs
         room_id = validated_data.pop('room_id', None)
         modality_id = validated_data.pop('modality_id', None)
         proctor_id = validated_data.pop('proctor_id', None)
         examperiod_id = validated_data.pop('examperiod_id', None)
 
-        # Get FK instances
         if room_id:
             validated_data['room'] = TblRooms.objects.get(room_id=room_id)
         if modality_id:
@@ -672,13 +700,11 @@ class TblExamdetailsSerializer(serializers.ModelSerializer):
         return super().create(validated_data)
 
     def update(self, instance, validated_data):
-        # Extract FK IDs
         room_id = validated_data.pop('room_id', None)
         modality_id = validated_data.pop('modality_id', None)
         proctor_id = validated_data.pop('proctor_id', None)
         examperiod_id = validated_data.pop('examperiod_id', None)
 
-        # Update FK instances
         if room_id is not None:
             instance.room = TblRooms.objects.get(room_id=room_id)
         if modality_id is not None:
@@ -688,7 +714,6 @@ class TblExamdetailsSerializer(serializers.ModelSerializer):
         if examperiod_id is not None:
             instance.examperiod = TblExamperiod.objects.get(examperiod_id=examperiod_id)
 
-        # Update other fields
         for attr, value in validated_data.items():
             setattr(instance, attr, value)
 

@@ -55,6 +55,9 @@ const SchedulerPlottingSchedule: React.FC<SchedulerProps> = ({ user, onScheduleC
   const [duration, setDuration] = useState({ hours: 1, minutes: 0 });
   const [selectedStartTime, setSelectedStartTime] = useState<string>("");
 
+  const [alreadyScheduledIds, setAlreadyScheduledIds] = useState<Set<number>>(new Set());
+  const [_checkingSchedules, setCheckingSchedules] = useState(false);
+
   const times = [
     "07:00", "07:30", "08:00", "08:30", "09:00", "09:30", "10:00", "10:30", "11:00", "11:30",
     "12:00", "12:30", "13:00", "13:30", "14:00", "14:30", "15:00", "15:30", "16:00", "16:30",
@@ -293,27 +296,39 @@ const SchedulerPlottingSchedule: React.FC<SchedulerProps> = ({ user, onScheduleC
   // COMPUTED DATA
   // ============================================================================
 
-  const checkExistingSchedules = async (modalityIds: number[]): Promise<Set<number>> => {
-    try {
-      const response = await api.get('/tbl_examdetails', {
-        params: {
-          modality_id: modalityIds.join(',')
+  useEffect(() => {
+    const checkExistingSchedules = async () => {
+      if (formData.selectedModalities.length === 0) {
+        setAlreadyScheduledIds(new Set());
+        return;
+      }
+
+      setCheckingSchedules(true);
+      try {
+        const response = await api.get('/tbl_examdetails', {
+          params: {
+            modality_id: formData.selectedModalities.join(',')
+          }
+        });
+
+        const scheduled = new Set<number>(
+          response.data.map((s: any) => Number(s.modality_id))
+        );
+        
+        setAlreadyScheduledIds(scheduled);
+        
+        if (scheduled.size > 0) {
+          console.log(`⚠️ ${scheduled.size} section(s) already scheduled`);
         }
-      });
+      } catch (error) {
+        console.error('Error checking schedules:', error);
+      } finally {
+        setCheckingSchedules(false);
+      }
+    };
 
-      const existingSchedules = response.data;
-      
-      // Filter schedules that match any of the modality IDs
-      const matchingSchedules = existingSchedules.filter((s: any) => 
-        modalityIds.includes(s.modality_id)
-      );
-
-      return new Set(matchingSchedules.map((s: any) => s.modality_id) || []);
-    } catch (error) {
-      console.error("Error checking existing schedules:", error);
-      return new Set();
-    }
-  };
+    checkExistingSchedules();
+  }, [formData.selectedModalities]);
 
   const termNameById = useMemo(() => {
     const map = new Map<number | string, string>();
@@ -422,25 +437,25 @@ const SchedulerPlottingSchedule: React.FC<SchedulerProps> = ({ user, onScheduleC
   // ============================================================================
 
   const generateRandomChromosome = (
-    allSections: any[],
+    allModalities: any[], // ✅ Changed from allSections to allModalities
     sortedDates: string[],
     validTimes: string[],
     eveningTimeSlots: string[],
-    sectionRoomsMap: Map<number, string[]>,
+    modalityRoomsMap: Map<number, string[]>, // ✅ Changed from sectionRoomsMap
     totalDurationMinutes: number,
     getAvailableProctors: (date: string, time: string) => number[],
-    sectionMap: Map<number, any>,
+    modalityMap: Map<number, any>, // ✅ Changed from sectionMap
     courseDateAssignment: Map<string, string>
   ): Chromosome => {
     const chromosome: Chromosome = [];
     const roomTimeRanges = new Map<string, Array<{ start: number; end: number }>>();
     const proctorTimeRanges = new Map<string, Array<{ start: number; end: number }>>();
-    const scheduledSections = new Set<number>();
+    const scheduledModalities = new Set<number>();
     const globalTimeSlotYearLevels = new Map<string, Map<string, Set<string>>>();
 
     // ✅ NEW: Group sections by course and night class status
     const sectionsByCourseType = new Map<string, any[]>();
-    allSections.forEach(section => {
+    allModalities.forEach(section => {
       const isNightClass = section.is_night_class === "YES";
       const courseKey = isNightClass ? `${section.course_id}_NIGHT` : section.course_id;
       
@@ -487,7 +502,7 @@ const SchedulerPlottingSchedule: React.FC<SchedulerProps> = ({ user, onScheduleC
         let availableRoomCount = 0;
         
         for (const section of sections) {
-          const suitableRooms = sectionRoomsMap.get(section.modality_id) || [];
+          const suitableRooms = modalityRoomsMap.get(section.modality_id) || [];
           
           for (const room of suitableRooms) {
             const roomDateKey = `${date}|${room}`;
@@ -515,12 +530,12 @@ const SchedulerPlottingSchedule: React.FC<SchedulerProps> = ({ user, onScheduleC
     });
 
     // ✅ NEW: Schedule all sections using their assigned course time slot
-    allSections.forEach(section => {
-      if (scheduledSections.has(section.modality_id)) {
+    allModalities.forEach(section => {
+      if (scheduledModalities.has(section.modality_id)) {
         return;
       }
 
-      if (!sectionMap.has(section.modality_id)) {
+      if (!modalityMap.has(section.modality_id)) {
         console.warn(`Section ${section.modality_id} not found in sectionMap. Skipping.`);
         return;
       }
@@ -541,7 +556,7 @@ const SchedulerPlottingSchedule: React.FC<SchedulerProps> = ({ user, onScheduleC
 
       // Find available room for this section at the assigned time
       let roomId = "";
-      const suitableRooms = sectionRoomsMap.get(section.modality_id) || [];
+      const suitableRooms = modalityRoomsMap.get(section.modality_id) || [];
       
       for (const room of suitableRooms) {
         const roomDateKey = `${date}|${room}`;
@@ -628,7 +643,7 @@ const SchedulerPlottingSchedule: React.FC<SchedulerProps> = ({ user, onScheduleC
       }
 
       // Add to chromosome
-      scheduledSections.add(section.modality_id);
+      scheduledModalities.add(section.modality_id);
       chromosome.push({ sectionId: section.modality_id, date, timeSlot, roomId, proctorId });
     });
 
@@ -825,7 +840,7 @@ const SchedulerPlottingSchedule: React.FC<SchedulerProps> = ({ user, onScheduleC
     sortedDates: string[],
     validTimes: string[],
     eveningTimeSlots: string[],
-    sectionRoomsMap: Map<number, string[]>,
+    modalityRoomsMap: Map<number, string[]>,
     getAvailableProctors: (date: string, time: string) => number[],
     mutationRate: number
   ): Chromosome => {
@@ -852,7 +867,7 @@ const SchedulerPlottingSchedule: React.FC<SchedulerProps> = ({ user, onScheduleC
         const isNightClass = section.is_night_class === "YES";
         const courseKey = isNightClass ? `${section.course_id}_NIGHT` : section.course_id;
         const mutationType = Math.floor(Math.random() * 4);
-        const suitableRooms = sectionRoomsMap.get(gene.sectionId) || [];
+        const suitableRooms = modalityRoomsMap.get(gene.sectionId) || [];
 
         const validTimesForSection = isNightClass 
           ? eveningTimeSlots.filter(t => {
@@ -1031,18 +1046,7 @@ const SchedulerPlottingSchedule: React.FC<SchedulerProps> = ({ user, onScheduleC
     const collegeObj = collegesCache?.find(c => c.college_id === schedulerCollegeId);
     const collegeNameForCourse = collegeObj?.college_name ?? "Unknown College";
 
-    const existingScheduledIds = await checkExistingSchedules(formData.selectedModalities);
-
-    if (existingScheduledIds.size > 0) {
-      const count = existingScheduledIds.size;
-      toast.error(
-        `${count} section${count > 1 ? 's are' : ' is'} already scheduled. Please deselect them.`,
-        { autoClose: 5000 }
-      );
-      return;
-    }
-
-    const allSections: any[] = [];
+    const allModalities: any[] = [];
     const sectionMap = new Map<number, any>();
     formData.selectedModalities.forEach(modalityId => {
       const selectedModality = modalities.find(m => m.modality_id === modalityId);
@@ -1059,7 +1063,7 @@ const SchedulerPlottingSchedule: React.FC<SchedulerProps> = ({ user, onScheduleC
           instructor_id: sectionCourseData?.user_id ?? null
         };
         
-        allSections.push(enrichedSection);
+        allModalities.push(enrichedSection);
         sectionMap.set(modalityId, enrichedSection);
       }
     });
@@ -1101,8 +1105,8 @@ const SchedulerPlottingSchedule: React.FC<SchedulerProps> = ({ user, onScheduleC
       eveningTimeSlots.filter(t => isValidTimeSlot(t, true)));
 
     // ✅ Build section rooms map with ALL suitable rooms
-    const sectionRoomsMap = new Map<number, string[]>();
-    allSections.forEach(section => {
+    const modalityRoomsMap = new Map<number, string[]>();
+    allModalities.forEach(section => {
       const enrolledCount = section.enrolled_students ?? 0;
       const possibleRooms = section.possible_rooms ?? [];
       
@@ -1123,7 +1127,7 @@ const SchedulerPlottingSchedule: React.FC<SchedulerProps> = ({ user, onScheduleC
       const others = allSuitable.filter(r => !preferred.includes(r));
       const allRoomsForSection = [...preferred, ...others];
       
-      sectionRoomsMap.set(section.modality_id, allRoomsForSection);
+      modalityRoomsMap.set(section.modality_id, allRoomsForSection);
       
       console.log(`📍 Section ${section.modality_id} can use ${allRoomsForSection.length} rooms (${preferred.length} preferred, ${others.length} others)`);
     });
@@ -1132,7 +1136,7 @@ const SchedulerPlottingSchedule: React.FC<SchedulerProps> = ({ user, onScheduleC
     const violations: string[] = [];
     const maxRoomCapacity = Math.max(...Array.from(roomCapacityMap.values()));
     
-    allSections.forEach(section => {
+    allModalities.forEach(section => {
       const enrolledCount = section.enrolled_students ?? 0;
       if (enrolledCount > maxRoomCapacity) {
         violations.push(
@@ -1141,7 +1145,7 @@ const SchedulerPlottingSchedule: React.FC<SchedulerProps> = ({ user, onScheduleC
       }
       
       // Check if section has any suitable rooms
-      const suitableRooms = sectionRoomsMap.get(section.modality_id) || [];
+      const suitableRooms = modalityRoomsMap.get(section.modality_id) || [];
       if (suitableRooms.length === 0) {
         violations.push(
           `Section ${section.course_id} - ${section.section_name} has no available rooms (needs capacity for ${enrolledCount} students)`
@@ -1177,7 +1181,7 @@ const SchedulerPlottingSchedule: React.FC<SchedulerProps> = ({ user, onScheduleC
     }
 
     // Check night class constraints
-    allSections.forEach(section => {
+    allModalities.forEach(section => {
       if (section.is_night_class === "YES") {
         const validEveningSlots = eveningTimeSlots.filter(slot => {
           const [h, m] = slot.split(":").map(Number);
@@ -1220,10 +1224,79 @@ const SchedulerPlottingSchedule: React.FC<SchedulerProps> = ({ user, onScheduleC
       return;
     }
 
+    console.log('🔍 Checking for existing schedules...');
+    
+    try {
+      const modalityIds = formData.selectedModalities;
+      const existingSchedulesResponse = await api.get('/tbl_examdetails', {
+        params: {
+          modality_id: modalityIds.join(',')
+        }
+      });
+      
+      const existingSchedules = existingSchedulesResponse.data || [];
+      
+      if (existingSchedules.length > 0) {
+        // Group by modality to show which ones are already scheduled
+        const scheduledModalities = new Map<number, any>();
+        existingSchedules.forEach((schedule: any) => {
+          if (!scheduledModalities.has(schedule.modality_id)) {
+            scheduledModalities.set(schedule.modality_id, []);
+          }
+          scheduledModalities.get(schedule.modality_id)!.push(schedule);
+        });
+        
+        // Build detailed error message
+        const duplicateDetails: string[] = [];
+        scheduledModalities.forEach((schedules, modalityId) => {
+          const modality = modalities.find(m => m.modality_id === modalityId);
+          if (modality) {
+            const schedule = schedules[0]; // Get first schedule for details
+            duplicateDetails.push(
+              `• ${modality.course_id} - ${modality.section_name}\n` +
+              `  Already scheduled on: ${new Date(schedule.exam_date).toLocaleDateString('en-US', { 
+                year: 'numeric', 
+                month: 'long', 
+                day: 'numeric' 
+              })}\n` +
+              `  Time: ${new Date(schedule.exam_start_time).toLocaleTimeString('en-US', { 
+                hour: '2-digit', 
+                minute: '2-digit' 
+              })} - ${new Date(schedule.exam_end_time).toLocaleTimeString('en-US', { 
+                hour: '2-digit', 
+                minute: '2-digit' 
+              })}\n` +
+              `  Room: ${schedule.room?.room_name || 'N/A'}\n` +
+              `  Exam Period: ${schedule.exam_period || 'N/A'}`
+            );
+          }
+        });
+        
+        const errorMessage = 
+          `❌ Cannot generate schedule - ${scheduledModalities.size} section(s) already have scheduled exams:\n\n` +
+          duplicateDetails.slice(0, 5).join('\n\n') +
+          (duplicateDetails.length > 5 ? `\n\n... and ${duplicateDetails.length - 5} more` : '') +
+          `\n\n📋 Options:\n` +
+          `1. Deselect these sections from your modality selection\n` +
+          `2. Delete the existing schedules first if you want to reschedule\n` +
+          `3. Use the "Edit Schedule" feature to modify existing schedules`;
+        
+        alert(errorMessage);
+        return; // Exit the function
+      }
+      
+      console.log('✅ No existing schedules found - safe to proceed');
+      
+    } catch (error) {
+      console.error('Error checking for existing schedules:', error);
+      toast.error('Failed to check for existing schedules');
+      return;
+    }
+
     // Assign each course to a specific date
     const courseDateAssignment = new Map<string, string>();
     const sectionsByCourse = new Map<string, any[]>();
-    allSections.forEach(section => {
+    allModalities.forEach(section => {
       const courseId = section.course_id;
       if (!sectionsByCourse.has(courseId)) {
         sectionsByCourse.set(courseId, []);
@@ -1241,11 +1314,11 @@ const SchedulerPlottingSchedule: React.FC<SchedulerProps> = ({ user, onScheduleC
     let population: Chromosome[] = [];
     for (let i = 0; i < POPULATION_SIZE; i++) {
       population.push(generateRandomChromosome(
-        allSections,
+        allModalities,
         sortedDates,
         validTimes,
         eveningTimeSlots,
-        sectionRoomsMap,
+        modalityRoomsMap,
         totalDurationMinutes,
         getAvailableProctors,
         sectionMap,
@@ -1286,9 +1359,9 @@ const SchedulerPlottingSchedule: React.FC<SchedulerProps> = ({ user, onScheduleC
         const parent1 = tournamentSelection(population, fitnesses);
         const parent2 = tournamentSelection(population, fitnesses);
         const [child1, child2] = crossover(parent1, parent2);
-        nextPopulation.push(mutate(child1, sectionMap, sortedDates, validTimes, eveningTimeSlots, sectionRoomsMap, getAvailableProctors, MUTATION_RATE));
+        nextPopulation.push(mutate(child1, sectionMap, sortedDates, validTimes, eveningTimeSlots, modalityRoomsMap, getAvailableProctors, MUTATION_RATE));
         if (nextPopulation.length < POPULATION_SIZE) {
-          nextPopulation.push(mutate(child2, sectionMap, sortedDates, validTimes, eveningTimeSlots, sectionRoomsMap, getAvailableProctors, MUTATION_RATE));
+          nextPopulation.push(mutate(child2, sectionMap, sortedDates, validTimes, eveningTimeSlots, modalityRoomsMap, getAvailableProctors, MUTATION_RATE));
         }
       }
 
@@ -1458,7 +1531,7 @@ const SchedulerPlottingSchedule: React.FC<SchedulerProps> = ({ user, onScheduleC
     }
 
     if (unscheduledSections.length > 0) {
-      const message = `Could not schedule ${unscheduledSections.length} section(s):\n\n${unscheduledSections.slice(0, 10).join("\n")}${unscheduledSections.length > 10 ? `\n... and ${unscheduledSections.length - 10} more` : ""}\n\nScheduled: ${scheduledExams.length}/${allSections.length} sections`;
+      const message = `Could not schedule ${unscheduledSections.length} section(s):\n\n${unscheduledSections.slice(0, 10).join("\n")}${unscheduledSections.length > 10 ? `\n... and ${unscheduledSections.length - 10} more` : ""}\n\nScheduled: ${scheduledExams.length}/${allModalities.length} sections`;
       if (scheduledExams.length === 0) {
         alert(message + "\n\nNo schedules to save. Please adjust constraints or add more resources.");
         return;
@@ -1481,7 +1554,7 @@ const SchedulerPlottingSchedule: React.FC<SchedulerProps> = ({ user, onScheduleC
 
     try {
       await api.post('/tbl_examdetails', scheduledExams);
-      toast.success(`Successfully scheduled ${scheduledExams.length}/${allSections.length} sections!`);
+      toast.success(`Successfully scheduled ${scheduledExams.length}/${allModalities.length} sections!`);
       console.log(`✅ Successfully saved ${scheduledExams.length} exam schedules`);
       
       if (onScheduleCreated) {
@@ -1767,7 +1840,19 @@ const SchedulerPlottingSchedule: React.FC<SchedulerProps> = ({ user, onScheduleC
         </div>
 
         <div className="preview-column">
-          <h3 className="preview-header">Selected Modality Preview ({formData.selectedModalities.length})</h3>
+          <h3 className="preview-header">
+            Selected Modality Preview ({formData.selectedModalities.length})
+            {alreadyScheduledIds.size > 0 && (
+              <span style={{ 
+                color: '#f59e0b', 
+                fontSize: '14px', 
+                marginLeft: '10px',
+                fontWeight: 'normal' 
+              }}>
+                ⚠️ {alreadyScheduledIds.size} already scheduled
+              </span>
+            )}
+          </h3>
           <input
             type="text"
             placeholder="Search within selected modalities"
@@ -1781,16 +1866,50 @@ const SchedulerPlottingSchedule: React.FC<SchedulerProps> = ({ user, onScheduleC
                 .map(modalityId => {
                   const modality = filteredModalitiesBySelection.find(m => m.modality_id === modalityId);
                   const course = filteredCoursesByPrograms.find(c => c.course_id === modality?.course_id);
+                  const isScheduled = alreadyScheduledIds.has(modalityId);
                   const searchString = [course?.course_id, modality?.section_name, modality?.modality_type].join(' ').toLowerCase();
-                  return { modality, course, searchString, modalityId };
+                  return { modality, course, searchString, modalityId, isScheduled };
                 })
                 .filter(item => !modalityPreviewSearchTerm || item.searchString.includes(modalityPreviewSearchTerm.toLowerCase()))
-                .map(({ modality, course, modalityId }) => (
-                  <div key={modalityId} className="modality-item">
+                .map(({ modality, course, modalityId, isScheduled }) => (
+                  <div 
+                    key={modalityId} 
+                    className="modality-item"
+                    style={{
+                      backgroundColor: isScheduled ? '#fef3c7' : 'transparent',
+                      border: isScheduled ? '2px solid #f59e0b' : '1px solid #e5e7eb',
+                      position: 'relative'
+                    }}
+                  >
+                    {isScheduled && (
+                      <div style={{
+                        position: 'absolute',
+                        top: '8px',
+                        right: '8px',
+                        background: '#f59e0b',
+                        color: 'white',
+                        padding: '4px 8px',
+                        borderRadius: '4px',
+                        fontSize: '12px',
+                        fontWeight: 'bold'
+                      }}>
+                        ⚠️ ALREADY SCHEDULED
+                      </div>
+                    )}
                     <p className="modality-detail">Course: {course ? course.course_id : 'N/A'}</p>
                     <p className="modality-detail">Section: {modality?.section_name ?? 'N/A'}</p>
                     <p className="modality-detail">Modality Type: {modality?.modality_type ?? 'N/A'}</p>
                     <p className="modality-detail">Remarks: {modality?.modality_remarks ?? 'N/A'}</p>
+                    {isScheduled && (
+                      <p style={{ 
+                        color: '#f59e0b', 
+                        fontSize: '13px', 
+                        marginTop: '8px',
+                        fontWeight: '500' 
+                      }}>
+                        ⚠️ This section already has an exam schedule
+                      </p>
+                    )}
                     <hr className="modality-divider" />
                   </div>
                 ))}
@@ -1801,16 +1920,65 @@ const SchedulerPlottingSchedule: React.FC<SchedulerProps> = ({ user, onScheduleC
         </div>
       </div>
 
+      {alreadyScheduledIds.size > 0 && (
+        <button
+          onClick={() => {
+            setFormData(prev => ({
+              ...prev,
+              selectedModalities: prev.selectedModalities.filter(
+                id => !alreadyScheduledIds.has(id)
+              )
+            }));
+            toast.success(`Removed ${alreadyScheduledIds.size} already scheduled section(s)`);
+          }}
+          style={{
+            marginLeft: '10px',
+            padding: '6px 12px',
+            background: '#f59e0b',
+            color: 'white',
+            border: 'none',
+            borderRadius: '4px',
+            cursor: 'pointer',
+            fontSize: '13px',
+            fontWeight: '500'
+          }}
+        >
+          Remove Already Scheduled ({alreadyScheduledIds.size})
+        </button>
+      )}
+
       <div className="save-button-wrapper">
         <button
           type="button"
           onClick={handleSaveClick}
           className="btn-save"
-          disabled={loading}
-          style={{ display: "flex", alignItems: "center", justifyContent: "center", gap: "8px", fontSize: "20px", width: "45px" }}
+          disabled={loading || alreadyScheduledIds.size > 0}
+          style={{ 
+            display: "flex", 
+            alignItems: "center", 
+            justifyContent: "center", 
+            gap: "8px", 
+            fontSize: "20px", 
+            width: "45px",
+            opacity: alreadyScheduledIds.size > 0 ? 0.5 : 1,
+            cursor: alreadyScheduledIds.size > 0 ? 'not-allowed' : 'pointer'
+          }}
+          title={alreadyScheduledIds.size > 0 
+            ? 'Cannot generate - some sections are already scheduled' 
+            : 'Generate schedule'}
         >
           {loading ? <FaSpinner className="spin" /> : <FaPlay />}
         </button>
+        {alreadyScheduledIds.size > 0 && (
+          <p style={{ 
+            color: '#f59e0b', 
+            fontSize: '14px', 
+            marginTop: '8px',
+            textAlign: 'center' 
+          }}>
+            Remove already scheduled sections to proceed
+          </p>
+        )}
       </div>
       <ToastContainer position="top-center" autoClose={3000} />
     </div>
