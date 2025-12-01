@@ -62,7 +62,6 @@ def generate_otp_code(exam_schedule):
     building_str = exam_schedule.building_name or "00"
     
     building_match = re.search(r'\d+', building_str)
-    building_num = building_match.group() if building_match else "00"
     building_num = building_num.zfill(2)
     room_id = exam_schedule.room.room_id if exam_schedule.room else "000"
     course_code = exam_schedule.course_id or "XXXXX"
@@ -70,7 +69,7 @@ def generate_otp_code(exam_schedule):
     
     # ✅ Format: Building-Room-Course-Random
     # Example output: 09-207-IT215-X5P9K (NOT 09)-09-207-IT215-X5P9K)
-    otp_code = f"{building_num}-{room_id}-{course_code}-{random_code}"
+    otp_code = f"{room_id}-{course_code}-{random_code}"
     
     return otp_code
 
