@@ -145,7 +145,7 @@ const ProctorMonitoring: React.FC<UserProps> = ({ }) => {
             cursor: hasApprovedSchedules ? 'pointer' : 'not-allowed'
           }}
         >
-          {generatingOtp ? 'GENERATING...' : 'CLICK TO GENERATE EXAM CODES'}
+          {generatingOtp ? 'GENERATING...' : 'GENERATE EXAM CODES'}
         </button>
       </div>
       
@@ -170,7 +170,7 @@ const ProctorMonitoring: React.FC<UserProps> = ({ }) => {
                   <th>Instructor</th>
                   <th>Exam Code (OTP)</th>
                   <th>Time In</th>
-                  <th>Status of Proctorship</th>
+                  <th>Status</th>
                 </tr>
               </thead>
               <tbody>

@@ -570,14 +570,14 @@ def proctor_monitoring_dashboard(request):
         college_name = request.GET.get('college_name')
         exam_date = request.GET.get('exam_date')
         
-        # Base query
+        # Base query with proper prefetch
         queryset = TblExamdetails.objects.select_related(
             'room',
             'room__building',
             'proctor',
             'modality'
         ).prefetch_related(
-            'tblproctorattendance_set'
+            'attendance_records'  # ✅ FIXED: Use correct related_name
         )
         
         # Apply filters
@@ -592,11 +592,15 @@ def proctor_monitoring_dashboard(request):
         result = []
         for exam in queryset:
             # Get OTP code
-            otp_record = TblExamOtp.objects.filter(examdetails=exam).first()
-            otp_code = otp_record.otp_code if otp_record else None
+            try:
+                otp_record = TblExamOtp.objects.filter(examdetails=exam).first()
+                otp_code = otp_record.otp_code if otp_record else None
+            except Exception as e:
+                print(f"⚠️ Error fetching OTP for exam {exam.examdetails_id}: {str(e)}")
+                otp_code = None
             
-            # Get attendance record
-            attendance = exam.tblproctorattendance_set.first()
+            # ✅ FIXED: Use correct related_name 'attendance_records'
+            attendance = exam.attendance_records.first()
             
             # Determine status
             if attendance:
@@ -651,6 +655,7 @@ def proctor_monitoring_dashboard(request):
                 'otp_code': otp_code
             })
         
+        print(f"✅ Returning {len(result)} exam schedules")
         return Response(result, status=status.HTTP_200_OK)
         
     except Exception as e:
