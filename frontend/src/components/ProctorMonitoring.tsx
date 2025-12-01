@@ -279,7 +279,7 @@ const ProctorMonitoring: React.FC<UserProps> = ({ }) => {
                     <td>{schedule.subject}</td>
                     <td>{schedule.section_name}</td>
                     <td>{schedule.exam_date}</td>
-                    <td>{schedule.exam_start_time} - {schedule.exam_end_time}</td>
+                    <td>{schedule.exam_start_time?.slice(11, 16)} - {schedule.exam_end_time?.slice(11, 16)}</td>
                     <td>{schedule.building_name}</td>
                     <td>{schedule.room_id}</td>
                     <td>{schedule.proctor_name}</td>
