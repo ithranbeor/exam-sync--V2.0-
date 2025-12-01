@@ -617,7 +617,7 @@ const SchedulerPlottingSchedule: React.FC<SchedulerProps> = ({ user, onScheduleC
               if (isProctorFree(recvKey, blockedRange.start, blockedRange.end)) {
                 // perform swap: move blockedRange from blockedPid -> receiver
                 // remove blockedRange from blockedPid list
-                const newBlockedRanges = (proctorGlobalTimeRanges.get(blockedKey) || []).filter((r, idx) => idx !== i);
+                const newBlockedRanges = (proctorGlobalTimeRanges.get(blockedKey) || []).filter((_, idx) => idx !== i);
                 proctorGlobalTimeRanges.set(blockedKey, newBlockedRanges);
                 // add to receiver
                 markProctor(recvKey, blockedRange.start, blockedRange.end);
