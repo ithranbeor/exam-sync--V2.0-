@@ -131,6 +131,7 @@ const ProctorMonitoring: React.FC<UserProps> = ({ }) => {
 
       if (schedulesWithOtp.length === 0) {
         toast.info('No OTP codes to reset');
+        setResettingOtp(false);
         return;
       }
 
@@ -151,6 +152,7 @@ const ProctorMonitoring: React.FC<UserProps> = ({ }) => {
     }
   };
 
+  // Check if any schedules have OTP codes
   const hasOtpCodes = approvedSchedules.some(s => s.otp_code);
 
   return (

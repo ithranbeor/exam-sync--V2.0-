@@ -49,6 +49,7 @@ import string
 from datetime import datetime, timedelta
 import secrets
 from django.core.cache import cache
+import re
 
 User = get_user_model()
 
@@ -57,34 +58,27 @@ User = get_user_model()
 # ============================================================
 
 def generate_otp_code(exam_schedule):
-    """
-    Generate OTP in format: [Building]-[Room]-[CourseCode]-[RandomCode]
-    Example: 09-306-IT114-X5P9K
-    """
+    # Extract building number from building name
     building_str = exam_schedule.building_name or "00"
-    building_parts = building_str.split()
-    building_num = building_parts[-1] if building_parts else "00"
     
+    building_match = re.search(r'\d+', building_str)
+    building_num = building_match.group() if building_match else "00"
+    building_num = building_num.zfill(2)
     room_id = exam_schedule.room.room_id if exam_schedule.room else "000"
     course_code = exam_schedule.course_id or "XXXXX"
     random_code = ''.join(random.choices(string.ascii_uppercase + string.digits, k=5))
     
-    # ✅ FIXED: Added hyphen between building and room
+    # ✅ Format: Building-Room-Course-Random
+    # Example output: 09-207-IT215-X5P9K (NOT 09)-09-207-IT215-X5P9K)
     otp_code = f"{building_num}-{room_id}-{course_code}-{random_code}"
     
     return otp_code
-
 
 @api_view(['POST'])
 @permission_classes([AllowAny])
 def generate_exam_otps(request):
     """
     Generate OTP codes for approved exam schedules
-    
-    Expected payload:
-    {
-        "schedule_ids": [1, 2, 3, ...] (optional - if not provided, generates for all approved schedules without OTP)
-    }
     """
     try:
         schedule_ids = request.data.get('schedule_ids', [])
@@ -124,7 +118,7 @@ def generate_exam_otps(request):
                 while TblExamOtp.objects.filter(otp_code=otp_code).exists():
                     otp_code = generate_otp_code(schedule)
                 
-                # Calculate expiry (exam end time)
+                # ✅ CRITICAL FIX: Calculate expiry properly
                 if schedule.exam_end_time:
                     # Check if it's already a datetime object
                     if isinstance(schedule.exam_end_time, datetime):
@@ -133,13 +127,18 @@ def generate_exam_otps(request):
                         # It's a time object, need to combine with date
                         from datetime import datetime as dt
                         
-                        # Parse exam_date (string format: "2025-06-15")
+                        # Parse exam_date (string format: "2025-06-15" or "2025-11-24")
                         if schedule.exam_date:
-                            exam_date_obj = dt.strptime(schedule.exam_date, '%Y-%m-%d').date()
-                            # Combine date and time
-                            expires_at = timezone.make_aware(
-                                dt.combine(exam_date_obj, schedule.exam_end_time)
-                            )
+                            try:
+                                exam_date_obj = dt.strptime(schedule.exam_date, '%Y-%m-%d').date()
+                                # Combine date and time into full datetime
+                                expires_at = timezone.make_aware(
+                                    dt.combine(exam_date_obj, schedule.exam_end_time)
+                                )
+                            except Exception as e:
+                                print(f"⚠️ Error parsing date {schedule.exam_date}: {str(e)}")
+                                # Fallback: 3 hours from now
+                                expires_at = timezone.now() + timedelta(hours=3)
                         else:
                             # Fallback: 3 hours from now
                             expires_at = timezone.now() + timedelta(hours=3)
@@ -160,11 +159,13 @@ def generate_exam_otps(request):
                     'section_name': schedule.section_name,
                     'otp_code': otp_code,
                     'exam_date': schedule.exam_date,
-                    'exam_start_time': schedule.exam_start_time
+                    'exam_start_time': str(schedule.exam_start_time),
+                    'expires_at': expires_at.isoformat()
                 })
                 
                 generated_count += 1
-                print(f"✅ Generated OTP for schedule {schedule.examdetails_id}: {otp_code}")
+                print(f"✅ Generated OTP: {otp_code} for schedule {schedule.examdetails_id}")
+                print(f"   Expires at: {expires_at}")
         
         return Response({
             'message': f'Successfully generated {generated_count} OTP codes',
@@ -184,14 +185,37 @@ def generate_exam_otps(request):
 @api_view(['POST'])
 @permission_classes([AllowAny])
 def reset_exam_otps(request):
-    schedule_ids = request.data.get('schedule_ids', [])
-    deleted_count = TblExamOtp.objects.filter(
-        examdetails_id__in=schedule_ids
-    ).delete()[0]
-    return Response({
-        'success': True,
-        'deleted_count': deleted_count
-    })
+    """
+    Reset (delete) OTP codes for specified exam schedules
+    """
+    try:
+        schedule_ids = request.data.get('schedule_ids', [])
+        
+        with transaction.atomic():
+            if schedule_ids and len(schedule_ids) > 0:
+                # Delete OTP codes for specific schedules
+                deleted_count = TblExamOtp.objects.filter(
+                    examdetails_id__in=schedule_ids
+                ).delete()[0]
+            else:
+                # Delete all OTP codes if no schedule_ids provided
+                deleted_count = TblExamOtp.objects.all().delete()[0]
+        
+        print(f"✅ Reset {deleted_count} OTP code(s)")
+        
+        return Response({
+            'success': True,
+            'deleted_count': deleted_count,
+            'message': f'Successfully reset {deleted_count} OTP code(s)'
+        }, status=status.HTTP_200_OK)
+        
+    except Exception as e:
+        print(f"❌ Error resetting OTP codes: {str(e)}")
+        return Response({
+            'success': False,
+            'error': str(e)
+        }, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+
 
 
 # ============================================================
@@ -201,14 +225,19 @@ def reset_exam_otps(request):
 @api_view(['POST'])
 @permission_classes([AllowAny])
 def verify_otp(request):
+    """
+    Verify OTP code and check if user is assigned proctor
+    """
     try:
         otp_code = request.data.get('otp_code', '').strip()
         user_id = request.data.get('user_id')
         
+        print(f"🔍 Verifying OTP: '{otp_code}' for user {user_id}")
+        
         if not otp_code or not user_id:
             return Response({
                 'valid': False,
-                'error': 'OTP code and user_id are required'
+                'message': 'OTP code and user_id are required'
             }, status=status.HTTP_400_BAD_REQUEST)
         
         # Find OTP record
@@ -219,49 +248,96 @@ def verify_otp(request):
                 'examdetails__proctor',
                 'examdetails__modality'
             ).get(otp_code=otp_code)
+            print(f"✅ Found OTP record: {otp_record.otp_id}")
         except TblExamOtp.DoesNotExist:
+            print(f"❌ OTP not found in database: '{otp_code}'")
+            # ✅ Debug: Show what's in the database
+            all_otps = TblExamOtp.objects.all()[:5]
+            print(f"📊 Database has {TblExamOtp.objects.count()} total OTPs")
+            print(f"📊 First 5 OTPs in database:")
+            for otp in all_otps:
+                print(f"   - '{otp.otp_code}'")
             return Response({
                 'valid': False,
                 'message': 'Invalid OTP code'
             }, status=status.HTTP_200_OK)
         
         # Check if expired
-        if timezone.now() > otp_record.expires_at:
+        now = timezone.now()
+        print(f"⏰ Current time: {now}")
+        print(f"⏰ Expires at: {otp_record.expires_at}")
+        
+        if now > otp_record.expires_at:
+            print(f"❌ OTP expired")
             return Response({
                 'valid': False,
                 'message': 'OTP code has expired'
             }, status=status.HTTP_200_OK)
         
         exam_schedule = otp_record.examdetails
+        print(f"📅 Exam schedule: {exam_schedule.examdetails_id}")
+        print(f"📅 Exam date: {exam_schedule.exam_date}")
+        print(f"📅 Exam time: {exam_schedule.exam_start_time} - {exam_schedule.exam_end_time}")
         
-        # Check if within exam time window (allow entry 30 mins before start)
-        exam_start = exam_schedule.exam_start_time
-        exam_end = exam_schedule.exam_end_time
-        current_time = timezone.now()
-        
-        early_entry_window = exam_start - timedelta(minutes=30)
-        
-        if current_time < early_entry_window:
-            return Response({
-                'valid': False,
-                'message': 'Too early to verify. You can verify 30 minutes before the exam starts.'
-            }, status=status.HTTP_200_OK)
-        
-        if current_time > exam_end:
-            return Response({
-                'valid': False,
-                'message': 'Exam has already ended. Attendance recording is closed.'
-            }, status=status.HTTP_200_OK)
+        # ✅ Check if within exam time window (allow entry 30 mins before start)
+        if exam_schedule.exam_start_time and exam_schedule.exam_end_time:
+            from datetime import datetime as dt
+            
+            # Parse exam date
+            if exam_schedule.exam_date:
+                try:
+                    exam_date_obj = dt.strptime(exam_schedule.exam_date, '%Y-%m-%d').date()
+                    
+                    # Combine date with start and end times
+                    exam_start_datetime = timezone.make_aware(
+                        dt.combine(exam_date_obj, exam_schedule.exam_start_time)
+                    )
+                    exam_end_datetime = timezone.make_aware(
+                        dt.combine(exam_date_obj, exam_schedule.exam_end_time)
+                    )
+                    
+                    # Allow entry 30 minutes before start
+                    early_entry_window = exam_start_datetime - timedelta(minutes=30)
+                    
+                    print(f"⏰ Early entry: {early_entry_window}")
+                    print(f"⏰ Exam start: {exam_start_datetime}")
+                    print(f"⏰ Exam end: {exam_end_datetime}")
+                    
+                    if now < early_entry_window:
+                        print(f"❌ Too early - before 30-minute window")
+                        return Response({
+                            'valid': False,
+                            'message': 'Too early to verify. You can verify 30 minutes before the exam starts.'
+                        }, status=status.HTTP_200_OK)
+                    
+                    if now > exam_end_datetime:
+                        print(f"❌ Too late - exam has ended")
+                        return Response({
+                            'valid': False,
+                            'message': 'Exam has already ended. Attendance recording is closed.'
+                        }, status=status.HTTP_200_OK)
+                    
+                except Exception as e:
+                    print(f"⚠️ Error parsing exam times: {str(e)}")
+                    # Continue anyway
         
         # Check if user is the assigned proctor
         is_assigned = False
         assigned_proctor_name = None
         
+        print(f"👤 Checking if user {user_id} is assigned proctor")
+        print(f"👤 Schedule proctor_id: {exam_schedule.proctor_id}")
+        print(f"👤 Schedule proctors array: {exam_schedule.proctors}")
+        
         # Check both single proctor_id and proctors array
         if exam_schedule.proctor_id == user_id:
             is_assigned = True
+            print(f"✅ User is assigned proctor (proctor_id match)")
         elif exam_schedule.proctors and user_id in exam_schedule.proctors:
             is_assigned = True
+            print(f"✅ User is assigned proctor (in proctors array)")
+        else:
+            print(f"⚠️ User is NOT assigned proctor")
         
         # Get assigned proctor name
         if exam_schedule.proctor:
@@ -272,6 +348,8 @@ def verify_otp(request):
         
         # Get sections display
         sections_display = ', '.join(exam_schedule.sections) if exam_schedule.sections else exam_schedule.section_name
+        
+        print(f"✅ OTP verification successful: {verification_status}")
         
         return Response({
             'valid': True,
