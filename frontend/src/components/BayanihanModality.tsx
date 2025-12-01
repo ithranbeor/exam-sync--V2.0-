@@ -452,7 +452,7 @@ const BayanihanModality: React.FC<UserProps> = ({ user }) => {
   const handleChange = (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement | HTMLTextAreaElement>) => {
     const { name, value } = e.target;
     if (name === 'program') {
-      setForm(prev => ({ ...prev, program: value }));
+      setForm(prev => ({ ...prev, program: value, course: '', sections: [] }));
     } else {
       setForm(prev => ({ ...prev, [name]: value }));
     }
@@ -838,7 +838,13 @@ const BayanihanModality: React.FC<UserProps> = ({ user }) => {
 
             </div>
 
-            <button type="submit" disabled={isSubmitting}>Submit</button>
+            <button type="submit" className="submit-button" disabled={isSubmitting}>
+              {isSubmitting ? (
+                <span className="spinner"></span>
+              ) : (
+                'Submit'
+              )}
+            </button>
 
             {/* Add this after the submit button or create a new section */}
             <div style={{ marginTop: '20px', textAlign: 'center' }}>

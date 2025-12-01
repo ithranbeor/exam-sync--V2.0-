@@ -515,13 +515,8 @@ class TblModalitySerializer(serializers.ModelSerializer):
     user_id = serializers.IntegerField()
     course_id = serializers.CharField()
     
-    # ✅ CHANGED: Handle sections as array (like possible_rooms)
-    sections = serializers.ListField(
-        child=serializers.CharField(),
-        required=False,
-        allow_empty=True,
-        allow_null=True
-    )
+    # ✅ FIXED: Change sections (array) to section_name (string)
+    section_name = serializers.CharField(required=False, allow_blank=True, allow_null=True)
     
     # Handle possible_rooms as array
     possible_rooms = serializers.ListField(
@@ -546,7 +541,7 @@ class TblModalitySerializer(serializers.ModelSerializer):
             'user',
             'user_id',
             'created_at',
-            'sections',  # ✅ CHANGED: from section_name to sections
+            'section_name',  # ✅ FIXED: Changed from 'sections' to 'section_name'
             'possible_rooms',
         ]
     
@@ -557,6 +552,7 @@ class TblModalitySerializer(serializers.ModelSerializer):
         representation['user_id'] = instance.user.user_id if instance.user else None
         representation['room_id'] = instance.room.room_id if instance.room else None
         representation['program_id'] = instance.program_id
+        representation['section_name'] = instance.section_name  # ✅ Add this
         return representation
     
     def create(self, validated_data):
