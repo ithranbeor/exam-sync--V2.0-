@@ -15,8 +15,8 @@ import DeanSend from "../components/DeanSend.tsx";
 import ExportSchedule from "../components/ExportSchedule.tsx";
 
 interface ExamDetail {
-  examdetails_id?: number; course_id: string; section_name?: string; room_id?: string; exam_date?: string; exam_start_time?: string; semester?: string;
-  exam_end_time?: string; instructor_id?: number; proctor_id?: number; proctor_timein?: string; academic_year?: string; building_name?: string;
+  examdetails_id?: number; course_id: string; section_name?: string; sections?: string[]; room_id?: string; exam_date?: string; exam_start_time?: string; semester?: string;
+  exam_end_time?: string; instructor_id?: number; instructors?: number[]; proctor_id?: number; proctors?: number[]; proctor_timein?: string; academic_year?: string; building_name?: string;
   proctor_timeout?: string; program_id?: string; college_name?: string; modality_id?: number; exam_period?: string; exam_category?: string;
 }
 
@@ -318,6 +318,103 @@ const SchedulerView: React.FC<SchedulerViewProps> = ({ user }) => {
     return () => clearInterval(interval);
   }, [user, collegeName, approvalStatus, examData.length]);
 
+  const getSectionDisplay = (exam: ExamDetail): string => {
+    if (exam.sections && exam.sections.length > 0) {
+      if (exam.sections.length === 1) {
+        return exam.sections[0];
+      }
+      
+      // ✅ Smart range detection for sections like IT4R1-IT4R4, IT4R6
+      const sorted = [...exam.sections].sort();
+      
+      // Group sections by prefix
+      const groups: { [prefix: string]: { num: number, original: string }[] } = {};
+      
+      sorted.forEach(section => {
+        const match = section.match(/^(.*?)(\d+)$/);
+        if (match) {
+          const prefix = match[1];
+          const num = parseInt(match[2]);
+          if (!groups[prefix]) groups[prefix] = [];
+          groups[prefix].push({ num, original: section });
+        } else {
+          // Non-numeric sections, add as separate group
+          if (!groups[section]) groups[section] = [];
+          groups[section].push({ num: 0, original: section });
+        }
+      });
+      
+      // Build ranges for each prefix group
+      const result: string[] = [];
+      
+      Object.keys(groups).forEach(prefix => {
+        const items = groups[prefix].sort((a, b) => a.num - b.num);
+        
+        if (items.length === 1 || items[0].num === 0) {
+          // Single item or non-numeric
+          result.push(items[0].original);
+          return;
+        }
+        
+        // Detect consecutive sequences
+        let rangeStart = 0;
+        for (let i = 0; i < items.length; i++) {
+          // Check if this is the end of a sequence
+          const isEndOfSequence = 
+            i === items.length - 1 || 
+            items[i + 1].num !== items[i].num + 1;
+          
+          if (isEndOfSequence) {
+            const rangeLength = i - rangeStart + 1;
+            if (rangeLength >= 3) {
+              // Create range for 3+ consecutive items
+              result.push(`${items[rangeStart].original}-${items[i].original}`);
+            } else if (rangeLength === 2) {
+              // Show both items for 2 consecutive
+              result.push(items[rangeStart].original);
+              result.push(items[i].original);
+            } else {
+              // Single item
+              result.push(items[i].original);
+            }
+            rangeStart = i + 1;
+          }
+        }
+      });
+      
+      return result.join(', ');
+    }
+    // Fallback to legacy single section
+    return exam.section_name || 'N/A';
+  };
+
+  // ✅ NEW: Helper function to get instructor display
+  const getInstructorDisplay = (exam: ExamDetail): string => {
+    if (exam.instructors && exam.instructors.length > 0) {
+      // Multiple instructors - always show as comma-separated list
+      const names = exam.instructors.map(id => getUserName(id)).filter(n => n !== '-');
+      if (names.length === 0) return '-';
+      if (names.length === 1) return names[0];
+      return names.join(', ');
+    }
+    // Fallback to legacy single instructor
+    return getUserName(exam.instructor_id);
+  };
+
+  // ✅ UPDATED: Helper function to get proctor display with full list
+  const getProctorDisplay = (exam: ExamDetail): string => {
+    if (exam.proctors && exam.proctors.length > 0) {
+      // Multiple proctors
+      const names = exam.proctors.map(id => getUserName(id)).filter(n => n !== '-');
+      if (names.length === 0) return 'Not Assigned';
+      if (names.length === 1) return names[0];
+      // ✅ Show all proctors, not just first + count
+      return names.join(', ');
+    }
+    // Fallback to legacy single proctor
+    return exam.proctor_id ? getUserName(exam.proctor_id) : 'Not Assigned';
+  };
+
   const handleProctorChange = async (examId: number, proctorId: number) => {
     try {
       await api.put(`/tbl_examdetails/${examId}/`, {
@@ -410,18 +507,34 @@ const SchedulerView: React.FC<SchedulerViewProps> = ({ user }) => {
   const searchFilteredData = searchTerm.trim() === ""
     ? filteredExamData
     : filteredExamData.filter(exam => {
-      const searchLower = searchTerm.toLowerCase();
-      return (
-        exam.course_id?.toLowerCase().includes(searchLower) ||
-        exam.section_name?.toLowerCase().includes(searchLower) ||
-        exam.room_id?.toLowerCase().includes(searchLower) ||
-        getUserName(exam.instructor_id).toLowerCase().includes(searchLower) ||
-        getUserName(exam.proctor_id).toLowerCase().includes(searchLower) ||
-        exam.exam_date?.includes(searchTerm) ||
-        exam.exam_start_time?.includes(searchTerm) ||
-        exam.exam_end_time?.includes(searchTerm)
-      );
-    });
+        const searchLower = searchTerm.toLowerCase();
+        
+        // Check sections (both array and legacy)
+        const sectionMatch = 
+          (exam.sections && exam.sections.some(s => s.toLowerCase().includes(searchLower))) ||
+          exam.section_name?.toLowerCase().includes(searchLower);
+        
+        // Check instructors (both array and legacy)
+        const instructorMatch = 
+          (exam.instructors && exam.instructors.some(id => getUserName(id).toLowerCase().includes(searchLower))) ||
+          getUserName(exam.instructor_id).toLowerCase().includes(searchLower);
+        
+        // Check proctors (both array and legacy)
+        const proctorMatch = 
+          (exam.proctors && exam.proctors.some(id => getUserName(id).toLowerCase().includes(searchLower))) ||
+          getUserName(exam.proctor_id).toLowerCase().includes(searchLower);
+        
+        return (
+          exam.course_id?.toLowerCase().includes(searchLower) ||
+          sectionMatch ||
+          exam.room_id?.toLowerCase().includes(searchLower) ||
+          instructorMatch ||
+          proctorMatch ||
+          exam.exam_date?.includes(searchTerm) ||
+          exam.exam_start_time?.includes(searchTerm) ||
+          exam.exam_end_time?.includes(searchTerm)
+        );
+      });
 
   const getFilterOptions = () => {
     const uniqueOptions = new Set<string>();
@@ -1229,53 +1342,93 @@ const SchedulerView: React.FC<SchedulerViewProps> = ({ user }) => {
                                         ? "10px solid blue"
                                         : searchTerm && (
                                           exam.course_id?.toLowerCase().includes(searchTerm.toLowerCase()) ||
-                                          exam.section_name?.toLowerCase().includes(searchTerm.toLowerCase()) ||
+                                          getSectionDisplay(exam).toLowerCase().includes(searchTerm.toLowerCase()) ||
                                           exam.room_id?.toLowerCase().includes(searchTerm.toLowerCase()) ||
-                                          getUserName(exam.instructor_id).toLowerCase().includes(searchTerm.toLowerCase()) ||
-                                          getUserName(exam.proctor_id).toLowerCase().includes(searchTerm.toLowerCase())
+                                          getInstructorDisplay(exam).toLowerCase().includes(searchTerm.toLowerCase()) ||
+                                          getProctorDisplay(exam).toLowerCase().includes(searchTerm.toLowerCase())
                                         )
                                           ? "3px solid yellow"
                                           : "none",
                                       boxShadow: searchTerm && (
                                         exam.course_id?.toLowerCase().includes(searchTerm.toLowerCase()) ||
-                                        exam.section_name?.toLowerCase().includes(searchTerm.toLowerCase()) ||
+                                        getSectionDisplay(exam).toLowerCase().includes(searchTerm.toLowerCase()) ||
                                         exam.room_id?.toLowerCase().includes(searchTerm.toLowerCase()) ||
-                                        getUserName(exam.instructor_id).toLowerCase().includes(searchTerm.toLowerCase()) ||
-                                        getUserName(exam.proctor_id).toLowerCase().includes(searchTerm.toLowerCase())
+                                        getInstructorDisplay(exam).toLowerCase().includes(searchTerm.toLowerCase()) ||
+                                        getProctorDisplay(exam).toLowerCase().includes(searchTerm.toLowerCase())
                                       ) ? "0 0 15px 3px rgba(255, 255, 0, 0.8)" : "none"
                                     }}
                                   >
-                                    <p>{exam.course_id}</p>
-                                    <p>{exam.section_name}</p>
-                                    <p>Instructor: {getUserName(exam.instructor_id)}</p>
-                                    <p>
+                                    <p><strong>{exam.course_id}</strong></p>
+                                    
+                                    {/* ✅ UPDATED: Show all sections without tooltip limit */}
+                                    <p style={{ 
+                                      fontSize: exam.sections && exam.sections.length > 3 ? '10px' : '12px',
+                                      lineHeight: '1.2'
+                                    }}>
+                                      {getSectionDisplay(exam)}
+                                    </p>
+                                    
+                                    {/* ✅ UPDATED: Show all instructors without tooltip, adjust font for many */}
+                                    <p style={{ 
+                                      fontSize: exam.instructors && exam.instructors.length > 2 ? '10px' : '12px',
+                                      lineHeight: '1.2'
+                                    }}>
+                                      Instructor: {getInstructorDisplay(exam)}
+                                    </p>
+                                    
+                                    {/* ✅ UPDATED: Proctor section - show all without tooltip */}
+                                    <p style={{ 
+                                      fontSize: exam.proctors && exam.proctors.length > 2 ? '10px' : '12px',
+                                      lineHeight: '1.2'
+                                    }}>
                                       Proctor:
                                       {activeProctorEdit === exam.examdetails_id || activeProctorEdit === -1 ? (
-                                        <Select
-                                          value={
-                                            exam.proctor_id
-                                              ? {
-                                                value: exam.proctor_id,
-                                                label: getUserName(exam.proctor_id)
-                                              }
-                                              : null
-                                          }
-                                          onChange={(selectedOption) => {
-                                            if (selectedOption) {
-                                              handleProctorChange(exam.examdetails_id!, selectedOption.value);
+                                        exam.proctors && exam.proctors.length > 1 ? (
+                                          // ✅ Multiple proctors - show full list, not editable
+                                          <span 
+                                            style={{ 
+                                              marginLeft: '5px',
+                                              fontSize: '10px',
+                                              color: '#333',
+                                              display: 'block',
+                                              marginTop: '2px'
+                                            }}
+                                          >
+                                            {getProctorDisplay(exam)} (Multiple - View Only)
+                                          </span>
+                                        ) : (
+                                          // ✅ Single proctor - editable as before
+                                          <Select
+                                            value={
+                                              exam.proctor_id
+                                                ? {
+                                                  value: exam.proctor_id,
+                                                  label: getUserName(exam.proctor_id)
+                                                }
+                                                : null
                                             }
-                                          }}
-                                          options={getAvailableProctorsForExam(exam, examData, allCollegeUsers, users)}
-                                          placeholder="--Select Proctor--"
-                                          isSearchable
-                                          styles={{ menu: (provided) => ({ ...provided, zIndex: 9999 }) }}
-                                        />
+                                            onChange={(selectedOption) => {
+                                              if (selectedOption) {
+                                                handleProctorChange(exam.examdetails_id!, selectedOption.value);
+                                              }
+                                            }}
+                                            options={getAvailableProctorsForExam(exam, examData, allCollegeUsers, users)}
+                                            placeholder="--Select Proctor--"
+                                            isSearchable
+                                            styles={{ 
+                                              menu: (provided) => ({ ...provided, zIndex: 9999 }),
+                                              control: (provided) => ({ ...provided, fontSize: '10px' }),
+                                              option: (provided) => ({ ...provided, fontSize: '10px' })
+                                            }}
+                                          />
+                                        )
                                       ) : (
-                                        <span style={{ marginLeft: '5px' }}>
-                                          {exam.proctor_id ? getUserName(exam.proctor_id) : "Not Assigned"}
+                                        <span style={{ marginLeft: '5px', display: 'block', marginTop: '2px' }}>
+                                          {getProctorDisplay(exam)}
                                         </span>
                                       )}
                                     </p>
+                                    
                                     <p>{formatTo12Hour(examStartTimeStr)} - {formatTo12Hour(examEndTimeStr)}</p>
                                   </div>
                                 </td>
@@ -1469,53 +1622,93 @@ const SchedulerView: React.FC<SchedulerViewProps> = ({ user }) => {
                                         ? "10px solid blue"
                                         : searchTerm && (
                                           exam.course_id?.toLowerCase().includes(searchTerm.toLowerCase()) ||
-                                          exam.section_name?.toLowerCase().includes(searchTerm.toLowerCase()) ||
+                                          getSectionDisplay(exam).toLowerCase().includes(searchTerm.toLowerCase()) ||
                                           exam.room_id?.toLowerCase().includes(searchTerm.toLowerCase()) ||
-                                          getUserName(exam.instructor_id).toLowerCase().includes(searchTerm.toLowerCase()) ||
-                                          getUserName(exam.proctor_id).toLowerCase().includes(searchTerm.toLowerCase())
+                                          getInstructorDisplay(exam).toLowerCase().includes(searchTerm.toLowerCase()) ||
+                                          getProctorDisplay(exam).toLowerCase().includes(searchTerm.toLowerCase())
                                         )
                                           ? "3px solid yellow"
                                           : "none",
                                       boxShadow: searchTerm && (
                                         exam.course_id?.toLowerCase().includes(searchTerm.toLowerCase()) ||
-                                        exam.section_name?.toLowerCase().includes(searchTerm.toLowerCase()) ||
+                                        getSectionDisplay(exam).toLowerCase().includes(searchTerm.toLowerCase()) ||
                                         exam.room_id?.toLowerCase().includes(searchTerm.toLowerCase()) ||
-                                        getUserName(exam.instructor_id).toLowerCase().includes(searchTerm.toLowerCase()) ||
-                                        getUserName(exam.proctor_id).toLowerCase().includes(searchTerm.toLowerCase())
+                                        getInstructorDisplay(exam).toLowerCase().includes(searchTerm.toLowerCase()) ||
+                                        getProctorDisplay(exam).toLowerCase().includes(searchTerm.toLowerCase())
                                       ) ? "0 0 15px 3px rgba(255, 255, 0, 0.8)" : "none"
                                     }}
                                   >
-                                    <p>{exam.course_id}</p>
-                                    <p>{exam.section_name}</p>
-                                    <p>Instructor: {getUserName(exam.instructor_id)}</p>
-                                    <p>
+                                    <p><strong>{exam.course_id}</strong></p>
+                                    
+                                    {/* ✅ UPDATED: Show all sections without tooltip limit */}
+                                    <p style={{ 
+                                      fontSize: exam.sections && exam.sections.length > 3 ? '10px' : '12px',
+                                      lineHeight: '1.2'
+                                    }}>
+                                      {getSectionDisplay(exam)}
+                                    </p>
+                                    
+                                    {/* ✅ UPDATED: Show all instructors without tooltip, adjust font for many */}
+                                    <p style={{ 
+                                      fontSize: exam.instructors && exam.instructors.length > 2 ? '10px' : '12px',
+                                      lineHeight: '1.2'
+                                    }}>
+                                      Instructor: {getInstructorDisplay(exam)}
+                                    </p>
+                                    
+                                    {/* ✅ UPDATED: Proctor section - show all without tooltip */}
+                                    <p style={{ 
+                                      fontSize: exam.proctors && exam.proctors.length > 2 ? '10px' : '12px',
+                                      lineHeight: '1.2'
+                                    }}>
                                       Proctor:
                                       {activeProctorEdit === exam.examdetails_id || activeProctorEdit === -1 ? (
-                                        <Select
-                                          value={
-                                            exam.proctor_id
-                                              ? {
-                                                value: exam.proctor_id,
-                                                label: getUserName(exam.proctor_id)
-                                              }
-                                              : null
-                                          }
-                                          onChange={(selectedOption) => {
-                                            if (selectedOption) {
-                                              handleProctorChange(exam.examdetails_id!, selectedOption.value);
+                                        exam.proctors && exam.proctors.length > 1 ? (
+                                          // ✅ Multiple proctors - show full list, not editable
+                                          <span 
+                                            style={{ 
+                                              marginLeft: '5px',
+                                              fontSize: '10px',
+                                              color: '#333',
+                                              display: 'block',
+                                              marginTop: '2px'
+                                            }}
+                                          >
+                                            {getProctorDisplay(exam)} (Multiple - View Only)
+                                          </span>
+                                        ) : (
+                                          // ✅ Single proctor - editable as before
+                                          <Select
+                                            value={
+                                              exam.proctor_id
+                                                ? {
+                                                  value: exam.proctor_id,
+                                                  label: getUserName(exam.proctor_id)
+                                                }
+                                                : null
                                             }
-                                          }}
-                                          options={getAvailableProctorsForExam(exam, examData, allCollegeUsers, users)}
-                                          placeholder="--Select Proctor--"
-                                          isSearchable
-                                          styles={{ menu: (provided) => ({ ...provided, zIndex: 9999 }) }}
-                                        />
+                                            onChange={(selectedOption) => {
+                                              if (selectedOption) {
+                                                handleProctorChange(exam.examdetails_id!, selectedOption.value);
+                                              }
+                                            }}
+                                            options={getAvailableProctorsForExam(exam, examData, allCollegeUsers, users)}
+                                            placeholder="--Select Proctor--"
+                                            isSearchable
+                                            styles={{ 
+                                              menu: (provided) => ({ ...provided, zIndex: 9999 }),
+                                              control: (provided) => ({ ...provided, fontSize: '10px' }),
+                                              option: (provided) => ({ ...provided, fontSize: '10px' })
+                                            }}
+                                          />
+                                        )
                                       ) : (
-                                        <span style={{ marginLeft: '5px' }}>
-                                          {exam.proctor_id ? getUserName(exam.proctor_id) : "Not Assigned"}
+                                        <span style={{ marginLeft: '5px', display: 'block', marginTop: '2px' }}>
+                                          {getProctorDisplay(exam)}
                                         </span>
                                       )}
                                     </p>
+                                    
                                     <p>{formatTo12Hour(examStartTimeStr)} - {formatTo12Hour(examEndTimeStr)}</p>
                                   </div>
                                 </td>
