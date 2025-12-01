@@ -440,6 +440,12 @@ def tbl_examdetails_list(request):
         many = isinstance(request.data, list)
         print("📦 Incoming exam details data:", len(request.data) if many else 1, "records")
         
+        # ✅ ADD: Log the actual data being received
+        if many:
+            print("📋 First item sample:", request.data[0] if request.data else "Empty")
+        else:
+            print("📋 Single item:", request.data)
+        
         # ✅ FIXED: Build occupancy map from the CURRENT batch ONLY
         room_time_usage = {}
         
@@ -459,6 +465,7 @@ def tbl_examdetails_list(request):
                     room = TblRooms.objects.get(room_id=room_id)
                     room_capacity = room.room_capacity
                 except TblRooms.DoesNotExist:
+                    print(f"❌ Room not found: {room_id}")
                     return Response({
                         'error': f'Room {room_id} not found'
                     }, status=status.HTTP_400_BAD_REQUEST)
@@ -472,7 +479,11 @@ def tbl_examdetails_list(request):
                         section_name=modality.section_name
                     )
                     needed_capacity = section.number_of_students
-                except (TblModality.DoesNotExist, TblSectioncourse.DoesNotExist):
+                except TblModality.DoesNotExist:
+                    print(f"❌ Modality not found: {modality_id}")
+                    needed_capacity = 0
+                except TblSectioncourse.DoesNotExist:
+                    print(f"❌ Section not found for modality: {modality_id}")
                     needed_capacity = 0
                 
                 # Create unique key for room+date+time
@@ -491,6 +502,7 @@ def tbl_examdetails_list(request):
                 total_students = room_time_usage[time_key]['batch_occupancy'] + needed_capacity
                 
                 if total_students > room_time_usage[time_key]['capacity']:
+                    print(f"❌ Capacity exceeded: {total_students} > {room_time_usage[time_key]['capacity']}")
                     return Response({
                         'error': 'Room capacity exceeded in batch',
                         'detail': f'Room {room_id} (capacity: {room_capacity}) cannot accommodate {total_students} students at {exam_start_time}',
@@ -510,11 +522,14 @@ def tbl_examdetails_list(request):
         else:
             modality_ids = [request.data.get('modality_id')] if request.data.get('modality_id') else []
         
+        print(f"🔍 Checking for duplicates in modality_ids: {modality_ids}")
+        
         existing_schedules = TblExamdetails.objects.filter(
             modality_id__in=modality_ids
         ).select_related('modality', 'modality__course')
         
         if existing_schedules.exists():
+            print(f"❌ Found {existing_schedules.count()} duplicate schedules")
             duplicate_info = []
             for schedule in existing_schedules:
                 duplicate_info.append({
@@ -531,26 +546,36 @@ def tbl_examdetails_list(request):
                 'duplicates': duplicate_info
             }, status=status.HTTP_409_CONFLICT)
         
+        print("✅ No duplicates found, proceeding to serialization")
+        
         # Proceed with saving if all validations pass
         serializer = TblExamdetailsSerializer(data=request.data, many=many)
+        
+        print("🔍 Checking serializer validity...")
+        
         if serializer.is_valid():
+            print("✅ Serializer is valid, attempting to save...")
             try:
                 with transaction.atomic():
-                    serializer.save()
+                    saved_data = serializer.save()
                     print(f"✅ Successfully saved {len(request.data) if many else 1} exam schedule(s)")
                     return Response(serializer.data, status=status.HTTP_201_CREATED)
             except Exception as e:
-                print(f"❌ Error saving exam details: {str(e)}")
+                print(f"💥 ERROR DURING SAVE: {type(e).__name__}: {str(e)}")
                 import traceback
+                print("📋 Full traceback:")
                 traceback.print_exc()
-                return Response(
-                    {'error': str(e), 'detail': 'Failed to save exam details'},
-                    status=status.HTTP_400_BAD_REQUEST
-                )
-        
-        print("❌ Validation errors:", serializer.errors)
-        return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
-
+                
+                # ✅ Return detailed error to frontend
+                return Response({
+                    'error': f'{type(e).__name__}: {str(e)}',
+                    'detail': 'Failed to save exam details',
+                    'traceback': traceback.format_exc()
+                }, status=status.HTTP_400_BAD_REQUEST)
+        else:
+            print(f"❌ Serializer validation failed!")
+            print(f"📋 Validation errors: {serializer.errors}")
+            return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
 
 # ============================================================================
 # ADD THIS NEW ENDPOINT to urls.py:
