@@ -182,6 +182,7 @@ def generate_exam_otps(request):
         }, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
     
 @api_view(['POST'])
+@permission_classes([AllowAny])
 def reset_exam_otps(request):
     schedule_ids = request.data.get('schedule_ids', [])
     deleted_count = TblExamOtp.objects.filter(
@@ -200,32 +201,6 @@ def reset_exam_otps(request):
 @api_view(['POST'])
 @permission_classes([AllowAny])
 def verify_otp(request):
-    """
-    Verify OTP code and check if user is assigned proctor
-    
-    Expected payload:
-    {
-        "otp_code": "09306-IT114-X5P9K",
-        "user_id": 12345
-    }
-    
-    Response:
-    {
-        "valid": true,
-        "verification_status": "valid-assigned" | "valid-not-assigned",
-        "message": "...",
-        "exam_schedule_id": 123,
-        "course_id": "IT114",
-        "section_name": "IT4R1",
-        "exam_date": "2025-06-15",
-        "exam_start_time": "...",
-        "exam_end_time": "...",
-        "building_name": "Building 09",
-        "room_id": "306",
-        "assigned_proctor_id": 456,
-        "assigned_proctor_name": "John Doe"
-    }
-    """
     try:
         otp_code = request.data.get('otp_code', '').strip()
         user_id = request.data.get('user_id')
@@ -332,17 +307,6 @@ def verify_otp(request):
 @api_view(['POST'])
 @permission_classes([AllowAny])
 def submit_proctor_attendance(request):
-    """
-    Submit proctor attendance after OTP verification
-    
-    Expected payload:
-    {
-        "otp_code": "09306-IT114-X5P9K",
-        "user_id": 12345,
-        "remarks": "Substituting for emergency" (optional, required if role='sub'),
-        "role": "assigned" | "sub"
-    }
-    """
     try:
         otp_code = request.data.get('otp_code', '').strip()
         user_id = request.data.get('user_id')
