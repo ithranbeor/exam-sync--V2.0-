@@ -253,7 +253,6 @@ class TblExamdetails(models.Model):
             models.Index(fields=['examperiod']),
             models.Index(fields=['exam_date']),
             models.Index(fields=['course_id']),
-            models.Index(fields=['college_name']),
         ]
 
 
@@ -261,8 +260,8 @@ class TblExamperiod(models.Model):
     examperiod_id = models.AutoField(primary_key=True)
     start_date = models.DateTimeField()
     end_date = models.DateTimeField()
-    academic_year = models.TextField()
-    exam_category = models.TextField()
+    academic_year = models.TextField()  # This field type is a guess.
+    exam_category = models.TextField()  # This field type is a guess.
     term = models.ForeignKey('TblTerm', models.DO_NOTHING)
     department = models.ForeignKey(TblDepartment, models.DO_NOTHING, blank=True, null=True)
     college = models.ForeignKey(TblCollege, models.DO_NOTHING, blank=True, null=True)
@@ -287,16 +286,9 @@ class TblModality(models.Model):
     room = models.ForeignKey('TblRooms', models.DO_NOTHING, blank=True, null=True)
     user = models.ForeignKey('TblUsers', models.DO_NOTHING)
     created_at = models.DateTimeField(blank=True, null=True)
+    section_name = models.CharField(blank=True, null=True)
     
-    # ✅ CHANGED: Store multiple sections as array instead of single section
-    sections = ArrayField(
-        models.CharField(max_length=50),
-        blank=True,
-        null=True,
-        default=list
-    )
-    
-    # ✅ Keep possible_rooms as array
+    # ✅ FIXED: Proper ArrayField
     possible_rooms = ArrayField(
         models.CharField(max_length=50),
         blank=True,
