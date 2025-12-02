@@ -6,6 +6,7 @@ import * as XLSX from 'xlsx';
 import { api } from '../lib/apiClient.ts'; // <-- Axios instance
 import 'react-toastify/dist/ReactToastify.css';
 import '../styles/colleges.css';
+import { useEscapeKey } from '../hooks/useEscapeKey';
 
 interface Building {
   building_id: string;
@@ -45,6 +46,29 @@ const Buildings: React.FC = () => {
   const [canScrollLeft, setCanScrollLeft] = useState(false);
   const [canScrollRight, setCanScrollRight] = useState(false);
   const tableContainerRef = useRef<HTMLDivElement>(null);
+
+  // Handle ESC key to close modals
+  useEscapeKey(() => {
+    if (showModal) {
+      setShowModal(false);
+      setEditMode(false);
+      setNewBuilding({ building_id: '', building_name: '' });
+    }
+  }, showModal);
+
+  useEscapeKey(() => {
+    if (showImport) {
+      setShowImport(false);
+    }
+  }, showImport);
+
+  useEscapeKey(() => {
+    if (showRoomModal) {
+      setShowRoomModal(false);
+      setSelectedBuildingName('');
+      setSelectedBuildingRooms([]);
+    }
+  }, showRoomModal);
 
   useEffect(() => {
     if (showModal || showImport) return; // pause refresh while editing/importing

@@ -2,6 +2,7 @@
 import React, { useEffect, useState } from "react";
 import { createPortal } from "react-dom";
 import { FaTimes } from "react-icons/fa";
+import { useEscapeKey } from "../hooks/useEscapeKey";
 
 export interface ModalProps {
   isOpen: boolean;
@@ -30,14 +31,17 @@ const Modal: React.FC<ModalProps> = ({ isOpen, onClose, children }) => {
     }
   }, [isOpen]);
 
-  if (!isOpen && !isAnimating) return null;
-
   const handleClose = () => {
     setIsAnimating(false);
     setTimeout(() => {
       onClose();
     }, 300); // Match animation duration
   };
+
+  // Handle ESC key to close modal
+  useEscapeKey(handleClose, isOpen);
+
+  if (!isOpen && !isAnimating) return null;
 
   const modalContent = (
     <>

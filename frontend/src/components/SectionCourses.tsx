@@ -1,12 +1,13 @@
 // deno-lint-ignore-file no-explicit-any
 import React, { useState, useEffect, useMemo, useCallback, useRef } from 'react';
-import { FaTrash, FaEdit, FaSearch, FaDownload,  FaPlus, FaFileImport, FaChevronLeft, FaChevronRight, FaSort } from 'react-icons/fa';
+import { FaTrash, FaEdit, FaSearch, FaDownload,  FaPlus, FaFileImport, FaChevronLeft, FaChevronRight, FaSort, FaChevronDown } from 'react-icons/fa';
 import { api } from '../lib/apiClient.ts';
 import { ToastContainer, toast } from 'react-toastify';
 import * as XLSX from 'xlsx';
 import 'react-toastify/dist/ReactToastify.css';
 import '../styles/colleges.css';
 import Select from 'react-select';
+import { useEscapeKey } from '../hooks/useEscapeKey';
 
 interface Course {
   course_id: string;
@@ -61,7 +62,9 @@ const SectionCourses: React.FC = () => {
   const [loading, setLoading] = useState(true);
   const [currentPage, setCurrentPage] = useState(1);
   const [isImporting, setIsImporting] = useState(false);
-  const itemsPerPage = 20;
+  const [itemsPerPage, setItemsPerPage] = useState<number | 'all'>('all');
+  const [showItemsPerPageDropdown, setShowItemsPerPageDropdown] = useState(false);
+  const [customItemsPerPage, setCustomItemsPerPage] = useState<string>('');
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
   const [isBulkDeleting, setIsBulkDeleting] = useState(false);
   const [sortBy, setSortBy] = useState<string>('none');
@@ -170,6 +173,29 @@ const SectionCourses: React.FC = () => {
     }
   }, []);
 
+  // Handle ESC key to close modals
+  useEscapeKey(() => {
+    if (showModal) {
+      setShowModal(false);
+      setEditMode(false);
+      setNewSection({
+        course_id: '',
+        program_id: '',
+        term_id: 0,
+        section_name: '',
+        number_of_students: 0,
+        year_level: '',
+        is_night_class: "",
+      } as SectionCourse);
+    }
+  }, showModal);
+
+  useEscapeKey(() => {
+    if (showImport) {
+      setShowImport(false);
+    }
+  }, showImport);
+
   useEffect(() => { 
     fetchAll(); 
   }, [fetchAll]);
@@ -181,16 +207,19 @@ const SectionCourses: React.FC = () => {
       if (showSortDropdown && !target.closest('[data-sort-dropdown]')) {
         setShowSortDropdown(false);
       }
+      if (showItemsPerPageDropdown && !target.closest('[data-items-per-page-dropdown]')) {
+        setShowItemsPerPageDropdown(false);
+      }
     };
 
-    if (showSortDropdown) {
+    if (showSortDropdown || showItemsPerPageDropdown) {
       document.addEventListener('mousedown', handleClickOutside);
     }
 
     return () => {
       document.removeEventListener('mousedown', handleClickOutside);
     };
-  }, [showSortDropdown]);
+  }, [showSortDropdown, showItemsPerPageDropdown]);
 
   useEffect(() => {
     setCurrentPage(1);
@@ -633,10 +662,18 @@ const SectionCourses: React.FC = () => {
   }, [searchTerm, sectionCourses, sortBy]);
 
   const paginated = useMemo(() => {
+    if (itemsPerPage === 'all') {
+      return filtered;
+    }
     return filtered.slice((currentPage - 1) * itemsPerPage, currentPage * itemsPerPage);
   }, [filtered, currentPage, itemsPerPage]);
 
-  const totalPages = Math.ceil(filtered.length / itemsPerPage);
+  const totalPages = useMemo(() => {
+    if (itemsPerPage === 'all') {
+      return 1;
+    }
+    return Math.ceil(filtered.length / itemsPerPage);
+  }, [filtered.length, itemsPerPage]);
 
   const toggleSelect = (id: string | number | undefined) => {
     if (id === undefined) return;
@@ -663,6 +700,24 @@ const SectionCourses: React.FC = () => {
   };
 
   const clearSelection = () => setSelectedIds(new Set());
+
+  const handleItemsPerPageChange = (value: number | 'all') => {
+    setItemsPerPage(value);
+    setShowItemsPerPageDropdown(false);
+    setCurrentPage(1);
+  };
+
+  const handleCustomItemsPerPage = () => {
+    const numValue = parseInt(customItemsPerPage, 10);
+    if (!isNaN(numValue) && numValue > 0) {
+      setItemsPerPage(numValue);
+      setCustomItemsPerPage('');
+      setShowItemsPerPageDropdown(false);
+      setCurrentPage(1);
+    } else {
+      toast.error('Please enter a valid positive number.');
+    }
+  };
 
   // Handle scroll position and update button states
   useEffect(() => {
