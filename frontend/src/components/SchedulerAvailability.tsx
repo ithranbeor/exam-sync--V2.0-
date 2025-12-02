@@ -1,11 +1,12 @@
 import React, { useState, useEffect, useRef, useMemo } from 'react';
 import '../styles/proctorSetAvailability.css';
 import '../styles/colleges.css';
-import { FaChevronLeft, FaChevronRight, FaEye, FaTrash, FaPenAlt, FaPlus, FaSearch, FaSort } from 'react-icons/fa';
+import { FaChevronLeft, FaChevronRight, FaEye, FaTrash, FaPenAlt, FaPlus, FaSearch, FaSort, FaChevronDown } from 'react-icons/fa';
 import { api } from '../lib/apiClient.ts';
 import { ToastContainer, toast } from 'react-toastify';
 import Select, { components } from 'react-select';
 import 'react-toastify/dist/ReactToastify.css';
+import { useEscapeKey } from '../hooks/useEscapeKey';
 
 type ProctorSetAvailabilityProps = {
   user: {
@@ -64,7 +65,9 @@ const SchedulerAvailability: React.FC<ProctorSetAvailabilityProps> = ({ user }) 
   const [loading, setLoading] = useState(false);
   const [isBulkDeleting, setIsBulkDeleting] = useState(false);
   const [currentPage, setCurrentPage] = useState(1);
-  const itemsPerPage = 20;
+  const [itemsPerPage, setItemsPerPage] = useState<number | 'all'>('all');
+  const [showItemsPerPageDropdown, setShowItemsPerPageDropdown] = useState(false);
+  const [customItemsPerPage, setCustomItemsPerPage] = useState<string>('');
 
   const [userCache, setUserCache] = useState<Map<number, any>>(new Map());
   const [selectedAvailabilityIds, setSelectedAvailabilityIds] = useState<Set<number>>(new Set());
@@ -78,6 +81,21 @@ const SchedulerAvailability: React.FC<ProctorSetAvailabilityProps> = ({ user }) 
     if (props.data.value === 'all') return null;
     return <components.MultiValue {...props} />;
   };
+
+  // Handle ESC key to close modals
+  useEscapeKey(() => {
+    if (showModal) {
+      setShowModal(false);
+      setEditingId(null);
+    }
+  }, showModal);
+
+  useEscapeKey(() => {
+    if (showRemarksModal) {
+      setShowRemarksModal(false);
+      setSelectedRemarks('');
+    }
+  }, showRemarksModal);
 
   useEffect(() => {
     // ✅ Load all data in parallel on mount
@@ -95,16 +113,19 @@ const SchedulerAvailability: React.FC<ProctorSetAvailabilityProps> = ({ user }) 
       if (showSortDropdown && !target.closest('[data-sort-dropdown]')) {
         setShowSortDropdown(false);
       }
+      if (showItemsPerPageDropdown && !target.closest('[data-items-per-page-dropdown]')) {
+        setShowItemsPerPageDropdown(false);
+      }
     };
 
-    if (showSortDropdown) {
+    if (showSortDropdown || showItemsPerPageDropdown) {
       document.addEventListener('mousedown', handleClickOutside);
     }
 
     return () => {
       document.removeEventListener('mousedown', handleClickOutside);
     };
-  }, [showSortDropdown]);
+  }, [showSortDropdown, showItemsPerPageDropdown]);
 
   // ✅ Combined function to fetch both instructors and availability in one go
   const fetchInstructorsAndAvailability = async () => {
@@ -604,10 +625,18 @@ const SchedulerAvailability: React.FC<ProctorSetAvailabilityProps> = ({ user }) 
   }, [entries, searchTerm, sortBy]);
 
   const paginatedEntries = useMemo(() => {
+    if (itemsPerPage === 'all') {
+      return filteredEntries;
+    }
     return filteredEntries.slice((currentPage - 1) * itemsPerPage, currentPage * itemsPerPage);
   }, [filteredEntries, currentPage, itemsPerPage]);
 
-  const totalPages = Math.ceil(filteredEntries.length / itemsPerPage);
+  const totalPages = useMemo(() => {
+    if (itemsPerPage === 'all') {
+      return 1;
+    }
+    return Math.ceil(filteredEntries.length / itemsPerPage);
+  }, [filteredEntries.length, itemsPerPage]);
 
   const isAllSelected = filteredEntries.length > 0 && filteredEntries.every((entry) => selectedAvailabilityIds.has(entry.availability_id));
 
@@ -623,6 +652,24 @@ const SchedulerAvailability: React.FC<ProctorSetAvailabilityProps> = ({ user }) 
   };
 
   const clearSelection = () => setSelectedAvailabilityIds(new Set());
+
+  const handleItemsPerPageChange = (value: number | 'all') => {
+    setItemsPerPage(value);
+    setShowItemsPerPageDropdown(false);
+    setCurrentPage(1);
+  };
+
+  const handleCustomItemsPerPage = () => {
+    const numValue = parseInt(customItemsPerPage, 10);
+    if (!isNaN(numValue) && numValue > 0) {
+      setItemsPerPage(numValue);
+      setCustomItemsPerPage('');
+      setShowItemsPerPageDropdown(false);
+      setCurrentPage(1);
+    } else {
+      toast.error('Please enter a valid positive number.');
+    }
+  };
 
   // Handle scroll position and update button states
   useEffect(() => {
@@ -894,6 +941,278 @@ const SchedulerAvailability: React.FC<ProctorSetAvailabilityProps> = ({ user }) 
                 </div>
               )}
             </div>
+            <div style={{ position: 'relative' }} data-items-per-page-dropdown>
+              <button
+                type="button"
+                className="action-button"
+                onClick={() => setShowItemsPerPageDropdown(!showItemsPerPageDropdown)}
+                style={{
+                  backgroundColor: '#0A3765',
+                  color: 'white',
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  gap: '6px',
+                  padding: '8px 16px',
+                  borderRadius: '8px',
+                  border: 'none',
+                  cursor: 'pointer',
+                  fontSize: '14px',
+                  fontWeight: '500',
+                  width: 'auto',
+                  minWidth: 'fit-content',
+                  whiteSpace: 'nowrap',
+                  transition: 'background-color 0.2s ease',
+                  height: '38px',
+                  boxSizing: 'border-box'
+                }}
+                onMouseEnter={(e) => {
+                  e.currentTarget.style.backgroundColor = '#0d4a7a';
+                }}
+                onMouseLeave={(e) => {
+                  e.currentTarget.style.backgroundColor = '#0A3765';
+                }}
+              >
+                <span>Show rows: {itemsPerPage === 'all' ? 'All' : itemsPerPage}</span>
+                <FaChevronDown size={12} />
+              </button>
+              {showItemsPerPageDropdown && (
+                <div
+                  style={{
+                    position: 'absolute',
+                    top: '100%',
+                    left: 0,
+                    marginTop: '4px',
+                    backgroundColor: 'white',
+                    border: '1px solid #ddd',
+                    borderRadius: '8px',
+                    boxShadow: '0 2px 8px rgba(0,0,0,0.15)',
+                    zIndex: 1000,
+                    minWidth: '240px',
+                    padding: '8px'
+                  }}
+                >
+                  <button
+                    type="button"
+                    onClick={() => handleItemsPerPageChange(10)}
+                    style={{
+                      width: '100%',
+                      padding: '8px 12px',
+                      textAlign: 'left',
+                      border: 'none',
+                      backgroundColor: itemsPerPage === 10 ? '#f0f0f0' : 'white',
+                      color: '#000',
+                      cursor: 'pointer',
+                      fontSize: '14px',
+                      borderRadius: '4px'
+                    }}
+                    onMouseEnter={(e) => {
+                      if (itemsPerPage !== 10) e.currentTarget.style.backgroundColor = '#f5f5f5';
+                    }}
+                    onMouseLeave={(e) => {
+                      if (itemsPerPage !== 10) e.currentTarget.style.backgroundColor = 'white';
+                    }}
+                  >
+                    10
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => handleItemsPerPageChange(20)}
+                    style={{
+                      width: '100%',
+                      padding: '8px 12px',
+                      textAlign: 'left',
+                      border: 'none',
+                      backgroundColor: itemsPerPage === 20 ? '#f0f0f0' : 'white',
+                      color: '#000',
+                      cursor: 'pointer',
+                      fontSize: '14px',
+                      borderRadius: '4px',
+                      borderTop: '1px solid #eee'
+                    }}
+                    onMouseEnter={(e) => {
+                      if (itemsPerPage !== 20) e.currentTarget.style.backgroundColor = '#f5f5f5';
+                    }}
+                    onMouseLeave={(e) => {
+                      if (itemsPerPage !== 20) e.currentTarget.style.backgroundColor = 'white';
+                    }}
+                  >
+                    20
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => handleItemsPerPageChange(30)}
+                    style={{
+                      width: '100%',
+                      padding: '8px 12px',
+                      textAlign: 'left',
+                      border: 'none',
+                      backgroundColor: itemsPerPage === 30 ? '#f0f0f0' : 'white',
+                      color: '#000',
+                      cursor: 'pointer',
+                      fontSize: '14px',
+                      borderRadius: '4px',
+                      borderTop: '1px solid #eee'
+                    }}
+                    onMouseEnter={(e) => {
+                      if (itemsPerPage !== 30) e.currentTarget.style.backgroundColor = '#f5f5f5';
+                    }}
+                    onMouseLeave={(e) => {
+                      if (itemsPerPage !== 30) e.currentTarget.style.backgroundColor = 'white';
+                    }}
+                  >
+                    30
+                  </button>
+                  <div style={{ borderTop: '1px solid #eee', marginTop: '4px', paddingTop: '8px' }}>
+                    <div style={{ display: 'flex', gap: '4px', marginBottom: '4px' }}>
+                      <div style={{ position: 'relative', flex: 1, display: 'flex', alignItems: 'center' }}>
+                        <input
+                          type="number"
+                          data-custom-input
+                          className="custom-number-input"
+                          value={customItemsPerPage}
+                          onChange={(e) => setCustomItemsPerPage(e.target.value)}
+                          placeholder="Custom Number"
+                          min="1"
+                          style={{
+                            width: '100%',
+                            padding: '6px 32px 6px 8px',
+                            border: '1px solid #0A3765',
+                            borderRadius: '4px',
+                            fontSize: '14px',
+                            backgroundColor: '#ffffff',
+                            color: '#333',
+                            outline: 'none'
+                          }}
+                          onFocus={(e) => {
+                            e.target.style.borderColor = '#0d4a7a';
+                            e.target.style.boxShadow = '0 0 0 2px rgba(10, 55, 101, 0.1)';
+                          }}
+                          onBlur={(e) => {
+                            e.target.style.borderColor = '#0A3765';
+                            e.target.style.boxShadow = 'none';
+                          }}
+                          onKeyDown={(e) => {
+                            if (e.key === 'Enter') {
+                              handleCustomItemsPerPage();
+                            }
+                          }}
+                        />
+                        <div style={{ position: 'absolute', right: '2px', display: 'flex', flexDirection: 'column', height: 'calc(100% - 4px)', gap: '0px', justifyContent: 'center', alignItems: 'center' }}>
+                          <button
+                            type="button"
+                            onClick={() => {
+                              const current = parseInt(customItemsPerPage) || 1;
+                              setCustomItemsPerPage(String(current + 1));
+                            }}
+                            style={{
+                              height: 'auto',
+                              background: 'transparent',
+                              border: 'none',
+                              color: '#0A3765',
+                              cursor: 'pointer',
+                              display: 'flex',
+                              alignItems: 'center',
+                              justifyContent: 'center',
+                              fontSize: '10px',
+                              fontWeight: 'bold',
+                              padding: '0',
+                              width: '16px',
+                              lineHeight: '1',
+                              transition: 'color 0.2s',
+                              borderRadius: '0',
+                              boxSizing: 'border-box'
+                            }}
+                            onMouseEnter={(e) => {
+                              e.currentTarget.style.color = '#0d4a7a';
+                            }}
+                            onMouseLeave={(e) => {
+                              e.currentTarget.style.color = '#0A3765';
+                            }}
+                          >
+                            ^
+                          </button>
+                          <button
+                            type="button"
+                            onClick={() => {
+                              const current = parseInt(customItemsPerPage) || 1;
+                              if (current > 1) {
+                                setCustomItemsPerPage(String(current - 1));
+                              }
+                            }}
+                            style={{
+                              height: 'auto',
+                              background: 'transparent',
+                              border: 'none',
+                              color: '#0A3765',
+                              cursor: 'pointer',
+                              display: 'flex',
+                              alignItems: 'center',
+                              justifyContent: 'center',
+                              fontSize: '10px',
+                              fontWeight: 'bold',
+                              padding: '0',
+                              width: '16px',
+                              lineHeight: '1',
+                              transition: 'color 0.2s',
+                              borderRadius: '0',
+                              boxSizing: 'border-box'
+                            }}
+                            onMouseEnter={(e) => {
+                              e.currentTarget.style.color = '#0d4a7a';
+                            }}
+                            onMouseLeave={(e) => {
+                              e.currentTarget.style.color = '#0A3765';
+                            }}
+                          >
+                            v
+                          </button>
+                        </div>
+                      </div>
+                      <button
+                        type="button"
+                        onClick={handleCustomItemsPerPage}
+                        style={{
+                          padding: '6px 12px',
+                          backgroundColor: '#0A3765',
+                          color: 'white',
+                          border: 'none',
+                          borderRadius: '4px',
+                          cursor: 'pointer',
+                          fontSize: '12px'
+                        }}
+                      >
+                        Apply
+                      </button>
+                    </div>
+                    <button
+                      type="button"
+                      onClick={() => handleItemsPerPageChange('all')}
+                      style={{
+                        width: '100%',
+                        padding: '8px 12px',
+                        textAlign: 'left',
+                        border: 'none',
+                        backgroundColor: itemsPerPage === 'all' ? '#f0f0f0' : 'white',
+                        color: '#000',
+                        cursor: 'pointer',
+                        fontSize: '14px',
+                        borderRadius: '4px',
+                        marginTop: '4px'
+                      }}
+                      onMouseEnter={(e) => {
+                        if (itemsPerPage !== 'all') e.currentTarget.style.backgroundColor = '#f5f5f5';
+                      }}
+                      onMouseLeave={(e) => {
+                        if (itemsPerPage !== 'all') e.currentTarget.style.backgroundColor = 'white';
+                      }}
+                    >
+                      Show All
+                    </button>
+                  </div>
+                </div>
+              )}
+            </div>
           </div>
           <div style={{ marginLeft: 'auto', display: 'flex', alignItems: 'center', gap: 8 }}>
             <button
@@ -907,24 +1226,6 @@ const SchedulerAvailability: React.FC<ProctorSetAvailabilityProps> = ({ user }) 
             </button>
           </div>
         </div>
-      </div>
-
-      <div className="pagination-controls">
-        <button type='button'
-          onClick={() => setCurrentPage((prev) => Math.max(prev - 1, 1))}
-          disabled={currentPage === 1}
-          className="pagination-arrow-btn"
-        >
-          &lt;
-        </button>
-        <span className="pagination-page-number">{currentPage} of {totalPages}</span>
-        <button type='button'
-          onClick={() => setCurrentPage((prev) => Math.min(prev + 1, totalPages))}
-          disabled={currentPage === totalPages}
-          className="pagination-arrow-btn"
-        >
-          &gt;
-        </button>
       </div>
 
       <div className="table-scroll-wrapper">
@@ -983,9 +1284,16 @@ const SchedulerAvailability: React.FC<ProctorSetAvailabilityProps> = ({ user }) 
                   </td>
                 </tr>
               ) : (
-                paginatedEntries.map((entry, idx) => (
-                    <tr key={entry.availability_id}>
-                      <td>{(currentPage - 1) * itemsPerPage + idx + 1}</td>
+                paginatedEntries.map((entry, idx) => {
+                  const isSelected = selectedAvailabilityIds.has(entry.availability_id);
+                  return (
+                    <tr 
+                      key={entry.availability_id}
+                      style={{
+                        backgroundColor: isSelected ? '#ffcccc' : 'transparent',
+                      }}
+                    >
+                      <td>{itemsPerPage === 'all' ? idx + 1 : (currentPage - 1) * itemsPerPage + idx + 1}</td>
                       <td>{entry.user_fullname}</td>
                       <td>{entry.days?.map(d => new Date(d).toLocaleDateString()).join(', ')}</td>
                       <td>{entry.time_slots?.join(', ')}</td>
@@ -1032,7 +1340,8 @@ const SchedulerAvailability: React.FC<ProctorSetAvailabilityProps> = ({ user }) 
                         />
                       </td>
                     </tr>
-                  ))
+                  );
+                })
               )}
             </tbody>
           </table>

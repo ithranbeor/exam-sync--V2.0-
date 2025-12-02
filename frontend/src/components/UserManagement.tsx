@@ -1777,7 +1777,7 @@ export const UserManagement: React.FC<UserManagementProps> = ({}) => {
                     <tr
                         key={account.user_id}
                         style={{
-                        backgroundColor: isSelected ? '#f8d7da' : 'transparent',
+                        backgroundColor: isSelected ? '#ffcccc' : 'transparent',
                         }}
                     >
                         <td>{itemsPerPage === 'all' ? index + 1 : (currentPage - 1) * itemsPerPage + index + 1}</td>
