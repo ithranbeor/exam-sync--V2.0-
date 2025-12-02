@@ -272,16 +272,11 @@ const ProctorMonitoring: React.FC<UserProps> = ({ }) => {
       <div className="proctor-monitoring-header">
         <div className="proctor-monitoring-header-left">
           <p 
-            className="proctor-monitoring-label"
-            style={{
-              color: hasApprovedSchedules ? '#28a745' : '#666',
-              fontWeight: hasApprovedSchedules ? 'bold' : 'normal',
-              fontSize: hasApprovedSchedules ? '1.1em' : '1em'
-            }}
+            className={`proctor-monitoring-label ${hasApprovedSchedules ? 'proctor-monitoring-label-approved' : 'proctor-monitoring-label-waiting'}`}
           >
             {hasApprovedSchedules 
-              ? '✅ EXAM SCHEDULE HAS BEEN APPROVED. CLICK TO GENERATE EXAM CODES'
-              : 'EXAM SCHEDULE HAS BEEN APPROVED. CLICK TO GENERATE EXAM CODES'}
+              ? '✔ EXAM SCHEDULE HAS BEEN APPROVED. CLICK TO GENERATE EXAM CODES'
+              : '✗ EXAM SCHEDULER WAITING FOR APPROVAL'}
           </p>
           <div style={{ marginTop: '10px', position: 'relative' }} data-sort-dropdown>
             <button 
