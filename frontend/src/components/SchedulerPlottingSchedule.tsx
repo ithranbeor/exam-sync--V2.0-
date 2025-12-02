@@ -579,7 +579,7 @@ const SchedulerPlottingSchedule: React.FC<SchedulerProps> = ({ user, onScheduleC
         }
       }
 
-      // Priority 2: Find a free proctor
+      // Priority 2: Find a free proctor from available list
       if (proctorId === -1) {
         for (const pid of shuffledProctors) {
           const key = proctorKey(date, pid);
@@ -591,18 +591,36 @@ const SchedulerPlottingSchedule: React.FC<SchedulerProps> = ({ user, onScheduleC
         }
       }
 
-      // Priority 3: Attempt a non-destructive swap:
-      // find a busy proctor (in availableProctors) who has an overlapping assignment,
-      // try to reassign that existing assignment to another free proctor so we can free them.
+      // Priority 3: Use section instructor as fallback (if not already assigned)
+      if (proctorId === -1 && section.instructor_id) {
+        const instrKey = proctorKey(date, section.instructor_id);
+        if (isProctorFree(instrKey, startMinutes, endMinutes)) {
+          proctorId = section.instructor_id;
+          markProctor(instrKey, startMinutes, endMinutes);
+        }
+      }
+
+      // Priority 4: Use any instructor from sections array as fallback
+      if (proctorId === -1 && section.instructors && section.instructors.length > 0) {
+        for (const instrId of section.instructors) {
+          if (!instrId) continue;
+          const instrKey = proctorKey(date, instrId);
+          if (isProctorFree(instrKey, startMinutes, endMinutes)) {
+            proctorId = instrId;
+            markProctor(instrKey, startMinutes, endMinutes);
+            break;
+          }
+        }
+      }
+
+      // Priority 5: Attempt a non-destructive swap
       if (proctorId === -1 && shuffledProctors.length > 0) {
-        // Build a list of blocking proctors who have overlapping ranges
         const blocking = shuffledProctors.filter(pid => {
           const key = proctorKey(date, pid);
           const ranges = proctorGlobalTimeRanges.get(key) || [];
           return ranges.some(r => rangesOverlap(startMinutes, endMinutes, r.start, r.end));
         });
 
-        // Try each blocking proctor: find one of their assignments that overlaps and try to move it
         outerSwap:
         for (const blockedPid of blocking) {
           const blockedKey = proctorKey(date, blockedPid);
@@ -610,24 +628,18 @@ const SchedulerPlottingSchedule: React.FC<SchedulerProps> = ({ user, onScheduleC
 
           for (let i = 0; i < blockedRanges.length; i++) {
             const blockedRange = blockedRanges[i];
-            // try find another free proctor to take this blockedRange
             const candidateReceivers = shuffledProctors.filter(p => p !== blockedPid);
             for (const receiver of candidateReceivers) {
               const recvKey = proctorKey(date, receiver);
               if (isProctorFree(recvKey, blockedRange.start, blockedRange.end)) {
-                // perform swap: move blockedRange from blockedPid -> receiver
-                // remove blockedRange from blockedPid list
                 const newBlockedRanges = (proctorGlobalTimeRanges.get(blockedKey) || []).filter((_, idx) => idx !== i);
                 proctorGlobalTimeRanges.set(blockedKey, newBlockedRanges);
-                // add to receiver
                 markProctor(recvKey, blockedRange.start, blockedRange.end);
-                // now blockedPid is free for our current range if it doesn't overlap others
                 if (isProctorFree(blockedKey, startMinutes, endMinutes)) {
                   proctorId = blockedPid;
                   markProctor(blockedKey, startMinutes, endMinutes);
                   break outerSwap;
                 } else {
-                  // rollback: remove the receiver's assignment we just added, and restore blockedPid ranges
                   const recRanges = proctorGlobalTimeRanges.get(recvKey) || [];
                   proctorGlobalTimeRanges.set(recvKey, recRanges.filter(r => !(r.start === blockedRange.start && r.end === blockedRange.end)));
                   proctorGlobalTimeRanges.set(blockedKey, [...(proctorGlobalTimeRanges.get(blockedKey) || []), blockedRange]);
@@ -638,14 +650,12 @@ const SchedulerPlottingSchedule: React.FC<SchedulerProps> = ({ user, onScheduleC
         }
       }
 
-      // LAST RESORT: assign a fallback placeholder proctor so we don't error out.
-      // Replace -9999 with a real substitute ID pool if available.
+      // LAST RESORT: Use placeholder only if instructor also unavailable
       if (proctorId === -1) {
         const FALLBACK_PROCTOR = -9999;
         proctorId = FALLBACK_PROCTOR;
         const key = proctorKey(date, FALLBACK_PROCTOR);
         markProctor(key, startMinutes, endMinutes);
-        // (no console.error here — keep GA quiet)
       }
 
       // add to chromosome & mark scheduled
@@ -993,6 +1003,16 @@ const SchedulerPlottingSchedule: React.FC<SchedulerProps> = ({ user, onScheduleC
       "6 PM - 9 PM (Evening)": ["18:00", "18:30", "19:00", "19:30", "20:00", "20:30"]
     };
 
+    const getPeriodFromTime = (time: string): string | null => {
+      const hour = parseInt(time.split(":")[0], 10);
+
+      if (hour >= 7 && hour < 13) return "7 AM - 1 PM (Morning)";
+      if (hour >= 13 && hour < 18) return "1 PM - 6 PM (Afternoon)";
+      if (hour >= 18 && hour < 21) return "6 PM - 9 PM (Evening)";
+
+      return null;
+    };
+
     // ✅ CRITICAL: Get all available time slots from TIME_SLOT_RANGES
     const allAvailableTimeSlots = [
       ...TIME_SLOT_RANGES["7 AM - 1 PM (Morning)"],
@@ -1001,6 +1021,7 @@ const SchedulerPlottingSchedule: React.FC<SchedulerProps> = ({ user, onScheduleC
     ];
 
     const availabilityMap = new Map<string, Set<number>>();
+
     allAvailability?.forEach(a => {
       const proctorId = a.user_id;
       const daysArray = a.days || [];
@@ -1008,34 +1029,26 @@ const SchedulerPlottingSchedule: React.FC<SchedulerProps> = ({ user, onScheduleC
 
       daysArray.forEach((dateStr: string) => {
         const isoDate = dateStr.split('T')[0];
-        
+
         timeSlotsArray.forEach((timeSlotPeriod: string) => {
-          const specificTimes = TIME_SLOT_RANGES[timeSlotPeriod] || [];
-          specificTimes.forEach(slot => {
-            const key = `${isoDate}|${slot}`;
-            if (!availabilityMap.has(key)) {
-              availabilityMap.set(key, new Set());
-            }
-            availabilityMap.get(key)!.add(proctorId);
-          });
+          const key = `${isoDate}|${timeSlotPeriod}`;
+          if (!availabilityMap.has(key)) {
+            availabilityMap.set(key, new Set());
+          }
+          availabilityMap.get(key)!.add(proctorId);
         });
       });
     });
 
     const getAvailableProctors = (date: string, startTime: string): number[] => {
       const isoDate = date.split('T')[0];
+      const period = getPeriodFromTime(startTime);
       
-      const examTimeSlots = getTimeSlots(startTime, totalDurationMinutes);
-      const proctorSets = examTimeSlots.map(slot => {
-        const key = `${isoDate}|${slot}`;
-        return availabilityMap.get(key) || new Set<number>();
-      });
-      
-      if (proctorSets.length === 0) return [];
-      
-      return Array.from(proctorSets[0]).filter(proctorId =>
-        proctorSets.every(set => set.has(proctorId))
-      );
+      if (!period) return [];
+
+      const key = `${isoDate}|${period}`;
+
+      return Array.from(availabilityMap.get(key) || new Set());
     };
 
     // Build lookup structures
@@ -1512,51 +1525,70 @@ const SchedulerPlottingSchedule: React.FC<SchedulerProps> = ({ user, onScheduleC
       }
 
       const availableProctorsForAssignment = getAvailableProctors(date, timeSlot);
+      console.log(`📋 Assigning proctors for ${section.course_id} (${section.sections.length} sections) at ${date} ${timeSlot}`);
+      console.log(`   Available proctors: [${availableProctorsForAssignment.join(', ')}]`);
+      
       const proctorsArray: number[] = [];
+      const usedProctorsInThisExam = new Set<number>();
 
-      // ✅ FIX: Check each proctor for conflicts before adding
       for (let i = 0; i < section.sections.length; i++) {
-        if (availableProctorsForAssignment.length > 0) {
-          // Try to find an available proctor that's not already booked
-          let assignedProctor = -1;
+        let assignedProctor = -1;
+        
+        for (const candidateProctor of availableProctorsForAssignment) {
+          // Skip if already used for another section in this same exam
+          if (usedProctorsInThisExam.has(candidateProctor)) {
+            continue;
+          }
           
-          for (const candidateProctor of availableProctorsForAssignment) {
-            const proctorKey = `${date}|${candidateProctor}`;
-            const existingRanges = finalProctorTimeRanges.get(proctorKey) || [];
+          const proctorKey = `${date}|${candidateProctor}`;
+          const existingRanges = finalProctorTimeRanges.get(proctorKey) || [];
+          
+          const isFree = !existingRanges.some(range => 
+            rangesOverlap(startMinutes, endMinutes, range.start, range.end)
+          );
+          
+          if (isFree) {
+            assignedProctor = candidateProctor;
+            usedProctorsInThisExam.add(candidateProctor);
             
-            // Check if this proctor is free at this time
-            const isFree = !existingRanges.some(range => 
-              rangesOverlap(startMinutes, endMinutes, range.start, range.end)
-            );
-            
-            if (isFree) {
-              assignedProctor = candidateProctor;
-              
-              // Mark this proctor as occupied
-              if (!finalProctorTimeRanges.has(proctorKey)) {
-                finalProctorTimeRanges.set(proctorKey, []);
-              }
-              finalProctorTimeRanges.get(proctorKey)!.push({
-                start: startMinutes,
-                end: endMinutes,
-                course: section.course_id,
-                section: section.section_name
-              });
-              
-              break; // Found a free proctor
+            // Mark this proctor as occupied
+            if (!finalProctorTimeRanges.has(proctorKey)) {
+              finalProctorTimeRanges.set(proctorKey, []);
             }
+            finalProctorTimeRanges.get(proctorKey)!.push({
+              start: startMinutes,
+              end: endMinutes,
+              course: section.course_id,
+              section: section.sections[i] || section.section_name
+            });
+            
+            console.log(`   ✅ Section ${i} (${section.sections[i]}): Assigned proctor ${candidateProctor}`);
+            break;
           }
-          
-          if (assignedProctor !== -1) {
-            proctorsArray.push(assignedProctor);
-          } else {
-            // No available proctor for this section
-            console.warn(`⚠️ No available proctor for section ${i} of ${section.course_id}`);
-            proctorsArray.push(proctorId); // Fallback to main proctor (will create conflict)
-          }
-        } else {
-          proctorsArray.push(proctorId);
         }
+        
+        if (assignedProctor === -1) {
+          console.error(`   ❌ Section ${i} (${section.sections[i]}): NO PROCTOR AVAILABLE`);
+          unscheduledSections.push(
+            `${section.course_id} - ${section.sections[i] || section.section_name} (no available proctor)`
+          );
+          hasOverlap = true;
+          break;
+        }
+        
+        proctorsArray.push(assignedProctor);
+      }
+      
+      if (hasOverlap || proctorsArray.length !== section.sections.length) {
+        console.error(`   ❌ SKIPPING entire exam for ${section.course_id} - could not assign all proctors`);
+        continue;
+      }
+
+      console.log(`   ✅ SUCCESS: All ${section.sections.length} sections assigned proctors: [${proctorsArray.join(', ')}]`);
+      
+      // If we couldn't assign all proctors, skip this exam entirely
+      if (hasOverlap || proctorsArray.length !== section.sections.length) {
+        continue;
       }
 
       // ✅ Only add to scheduledExams if no conflicts
