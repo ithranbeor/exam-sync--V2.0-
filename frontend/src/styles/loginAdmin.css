@@ -172,11 +172,25 @@ body {
   display: flex;
   align-items: center;
   width: 100%;
+  isolation: isolate; /* Create a new stacking context */
 }
 
 .password-wrapper .login-input {
   padding-right: 45px;
   width: 100%;
+}
+
+/* Hide browser's default password reveal button */
+.password-wrapper input[type="password"]::-webkit-credentials-auto-fill-button,
+.password-wrapper input[type="password"]::-ms-reveal,
+.password-wrapper input[type="password"]::-ms-clear {
+  display: none !important;
+}
+
+.password-wrapper input[type="text"][id="password"]::-webkit-credentials-auto-fill-button,
+.password-wrapper input[type="text"][id="password"]::-ms-reveal,
+.password-wrapper input[type="text"][id="password"]::-ms-clear {
+  display: none !important;
 }
 
 .toggle-password {
@@ -186,6 +200,10 @@ body {
   color: rgba(255, 255, 255, 0.6);
   font-size: 16px;
   transition: color 0.3s ease;
+  z-index: 10;
+  display: flex;
+  align-items: center;
+  justify-content: center;
 }
 
 .toggle-password:hover {

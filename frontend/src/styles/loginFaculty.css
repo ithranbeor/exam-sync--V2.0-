@@ -128,6 +128,7 @@ body {
   position: relative;
   width: 100%;
   margin-bottom: 25px;
+  isolation: isolate; /* Create a new stacking context */
 }
 
 .input-field input {
@@ -158,6 +159,8 @@ body {
   transition: all 0.3s ease;
   transform-origin: left top;
   font-weight: 500;
+  z-index: 1;
+  max-width: calc(100% - 70px); /* Prevent label from overlapping with toggle button */
 }
 
 .input-field input:focus,
@@ -179,6 +182,19 @@ body {
   padding-right: 50px; /* Space for the eye icon */
 }
 
+/* Hide browser's default password reveal button */
+.password-field input[type="password"]::-webkit-credentials-auto-fill-button,
+.password-field input[type="password"]::-ms-reveal,
+.password-field input[type="password"]::-ms-clear {
+  display: none !important;
+}
+
+.password-field input[type="text"][id="password"]::-webkit-credentials-auto-fill-button,
+.password-field input[type="text"][id="password"]::-ms-reveal,
+.password-field input[type="text"][id="password"]::-ms-clear {
+  display: none !important;
+}
+
 .toggle-password {
   position: absolute;
   top: 50%;
@@ -186,7 +202,11 @@ body {
   transform: translateY(-50%);
   cursor: pointer;
   color: rgba(255, 255, 255, 0.7);
-  z-index: 1;
+  z-index: 10;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  pointer-events: auto;
 }
 
 .form-actions {
