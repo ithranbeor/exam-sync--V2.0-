@@ -1,4 +1,5 @@
-import React, { useState, useEffect, useCallback } from 'react';
+import React, { useState, useEffect, useCallback, useMemo } from 'react';
+import { FaSort } from 'react-icons/fa';
 import { toast, ToastContainer } from 'react-toastify';
 import 'react-toastify/dist/ReactToastify.css';
 import api from '../lib/apiClient';
@@ -40,6 +41,8 @@ const ProctorMonitoring: React.FC<UserProps> = ({ }) => {
   const [collegeFilter, _setCollegeFilter] = useState<string>('');
   const [hasApprovedSchedules, setHasApprovedSchedules] = useState(false);
   const [showResetConfirm, setShowResetConfirm] = useState(false);
+  const [sortBy, setSortBy] = useState<string>('none');
+  const [showSortDropdown, setShowSortDropdown] = useState(false);
 
   // Fetch monitoring data
   const fetchMonitoringData = useCallback(async () => {
@@ -86,6 +89,24 @@ const ProctorMonitoring: React.FC<UserProps> = ({ }) => {
   useEffect(() => {
     fetchMonitoringData();
   }, [fetchMonitoringData]);
+
+  // Close dropdown when clicking outside
+  useEffect(() => {
+    const handleClickOutside = (event: MouseEvent) => {
+      const target = event.target as HTMLElement;
+      if (showSortDropdown && !target.closest('[data-sort-dropdown]')) {
+        setShowSortDropdown(false);
+      }
+    };
+
+    if (showSortDropdown) {
+      document.addEventListener('mousedown', handleClickOutside);
+    }
+
+    return () => {
+      document.removeEventListener('mousedown', handleClickOutside);
+    };
+  }, [showSortDropdown]);
 
   // Handle generate OTP codes
   const handleGenerateOtpCodes = async () => {
@@ -155,6 +176,67 @@ const ProctorMonitoring: React.FC<UserProps> = ({ }) => {
   // Check if any schedules have OTP codes
   const hasOtpCodes = approvedSchedules.some(s => s.otp_code);
 
+  // Helper function to determine if a string is numeric
+  const isNumeric = (str: string): boolean => {
+    return !isNaN(Number(str)) && !isNaN(parseFloat(str));
+  };
+
+  // Smart sort function that handles both text and numbers
+  const smartSort = (a: string, b: string): number => {
+    const aIsNumeric = isNumeric(a);
+    const bIsNumeric = isNumeric(b);
+
+    if (aIsNumeric && bIsNumeric) {
+      // Both are numbers - sort numerically
+      return parseFloat(a) - parseFloat(b);
+    } else if (aIsNumeric && !bIsNumeric) {
+      // a is number, b is text - numbers come first
+      return -1;
+    } else if (!aIsNumeric && bIsNumeric) {
+      // a is text, b is number - numbers come first
+      return 1;
+    } else {
+      // Both are text - sort alphabetically
+      return a.localeCompare(b);
+    }
+  };
+
+  // Sort schedules based on selected sort option
+  const sortedSchedules = useMemo(() => {
+    if (sortBy === 'none') {
+      return approvedSchedules;
+    }
+
+    return [...approvedSchedules].sort((a, b) => {
+      switch (sortBy) {
+        case 'course_id':
+          return smartSort(a.course_id.toLowerCase(), b.course_id.toLowerCase());
+        case 'subject':
+          return smartSort(a.subject.toLowerCase(), b.subject.toLowerCase());
+        case 'section_name':
+          return smartSort(a.section_name.toLowerCase(), b.section_name.toLowerCase());
+        case 'exam_date':
+          // Sort dates as strings (YYYY-MM-DD format)
+          return a.exam_date.localeCompare(b.exam_date);
+        case 'exam_start_time':
+          // Sort by start time
+          return (a.exam_start_time || '').localeCompare(b.exam_start_time || '');
+        case 'building_name':
+          return smartSort(a.building_name.toLowerCase(), b.building_name.toLowerCase());
+        case 'room_id':
+          return smartSort(a.room_id.toLowerCase(), b.room_id.toLowerCase());
+        case 'proctor_name':
+          return smartSort(a.proctor_name.toLowerCase(), b.proctor_name.toLowerCase());
+        case 'instructor_name':
+          return smartSort(a.instructor_name.toLowerCase(), b.instructor_name.toLowerCase());
+        case 'status':
+          return smartSort(a.status.toLowerCase(), b.status.toLowerCase());
+        default:
+          return 0;
+      }
+    });
+  }, [approvedSchedules, sortBy]);
+
   const formatTo12Hour = (timeString: string | undefined) => {
     if (!timeString) return '-';
     
@@ -201,6 +283,340 @@ const ProctorMonitoring: React.FC<UserProps> = ({ }) => {
               ? '✅ EXAM SCHEDULE HAS BEEN APPROVED. CLICK TO GENERATE EXAM CODES'
               : 'EXAM SCHEDULE HAS BEEN APPROVED. CLICK TO GENERATE EXAM CODES'}
           </p>
+          <div style={{ marginTop: '10px', position: 'relative' }} data-sort-dropdown>
+            <button 
+              type='button' 
+              onClick={() => setShowSortDropdown(!showSortDropdown)}
+              style={{ 
+                backgroundColor: sortBy !== 'none' ? '#0A3765' : '#0A3765',
+                color: 'white',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                gap: '6px',
+                padding: '8px 16px',
+                borderRadius: '8px',
+                border: 'none',
+                cursor: 'pointer',
+                fontSize: '14px',
+                fontWeight: '500',
+                minWidth: '100px',
+                transition: 'background-color 0.2s ease'
+              }}
+              onMouseEnter={(e) => {
+                e.currentTarget.style.backgroundColor = '#0d4a7a';
+              }}
+              onMouseLeave={(e) => {
+                e.currentTarget.style.backgroundColor = '#0A3765';
+              }}
+              title="Sort by"
+            >
+              <FaSort/>
+              <span>Sort by</span>
+            </button>
+            {showSortDropdown && (
+              <div 
+                style={{
+                  position: 'absolute',
+                  top: '100%',
+                  left: 0,
+                  marginTop: '4px',
+                  backgroundColor: 'white',
+                  border: '1px solid #ddd',
+                  borderRadius: '8px',
+                  boxShadow: '0 2px 8px rgba(0,0,0,0.15)',
+                  zIndex: 1000,
+                  minWidth: '150px'
+                }}
+              >
+                <button
+                  type="button"
+                  onClick={() => {
+                    setSortBy('none');
+                    setShowSortDropdown(false);
+                  }}
+                  style={{
+                    width: '100%',
+                    padding: '8px 12px',
+                    textAlign: 'left',
+                    border: 'none',
+                    backgroundColor: sortBy === 'none' ? '#f0f0f0' : 'white',
+                    color: '#000',
+                    cursor: 'pointer',
+                    fontSize: '14px'
+                  }}
+                  onMouseEnter={(e) => {
+                    if (sortBy !== 'none') e.currentTarget.style.backgroundColor = '#f5f5f5';
+                  }}
+                  onMouseLeave={(e) => {
+                    if (sortBy !== 'none') e.currentTarget.style.backgroundColor = 'white';
+                  }}
+                >
+                  None
+                </button>
+                <button
+                  type="button"
+                  onClick={() => {
+                    setSortBy('course_id');
+                    setShowSortDropdown(false);
+                  }}
+                  style={{
+                    width: '100%',
+                    padding: '8px 12px',
+                    textAlign: 'left',
+                    border: 'none',
+                    backgroundColor: sortBy === 'course_id' ? '#f0f0f0' : 'white',
+                    color: '#000',
+                    cursor: 'pointer',
+                    fontSize: '14px',
+                    borderTop: '1px solid #eee'
+                  }}
+                  onMouseEnter={(e) => {
+                    if (sortBy !== 'course_id') e.currentTarget.style.backgroundColor = '#f5f5f5';
+                  }}
+                  onMouseLeave={(e) => {
+                    if (sortBy !== 'course_id') e.currentTarget.style.backgroundColor = 'white';
+                  }}
+                >
+                  Course Code
+                </button>
+                <button
+                  type="button"
+                  onClick={() => {
+                    setSortBy('subject');
+                    setShowSortDropdown(false);
+                  }}
+                  style={{
+                    width: '100%',
+                    padding: '8px 12px',
+                    textAlign: 'left',
+                    border: 'none',
+                    backgroundColor: sortBy === 'subject' ? '#f0f0f0' : 'white',
+                    color: '#000',
+                    cursor: 'pointer',
+                    fontSize: '14px',
+                    borderTop: '1px solid #eee'
+                  }}
+                  onMouseEnter={(e) => {
+                    if (sortBy !== 'subject') e.currentTarget.style.backgroundColor = '#f5f5f5';
+                  }}
+                  onMouseLeave={(e) => {
+                    if (sortBy !== 'subject') e.currentTarget.style.backgroundColor = 'white';
+                  }}
+                >
+                  Subject
+                </button>
+                <button
+                  type="button"
+                  onClick={() => {
+                    setSortBy('section_name');
+                    setShowSortDropdown(false);
+                  }}
+                  style={{
+                    width: '100%',
+                    padding: '8px 12px',
+                    textAlign: 'left',
+                    border: 'none',
+                    backgroundColor: sortBy === 'section_name' ? '#f0f0f0' : 'white',
+                    color: '#000',
+                    cursor: 'pointer',
+                    fontSize: '14px',
+                    borderTop: '1px solid #eee'
+                  }}
+                  onMouseEnter={(e) => {
+                    if (sortBy !== 'section_name') e.currentTarget.style.backgroundColor = '#f5f5f5';
+                  }}
+                  onMouseLeave={(e) => {
+                    if (sortBy !== 'section_name') e.currentTarget.style.backgroundColor = 'white';
+                  }}
+                >
+                  Section
+                </button>
+                <button
+                  type="button"
+                  onClick={() => {
+                    setSortBy('exam_date');
+                    setShowSortDropdown(false);
+                  }}
+                  style={{
+                    width: '100%',
+                    padding: '8px 12px',
+                    textAlign: 'left',
+                    border: 'none',
+                    backgroundColor: sortBy === 'exam_date' ? '#f0f0f0' : 'white',
+                    color: '#000',
+                    cursor: 'pointer',
+                    fontSize: '14px',
+                    borderTop: '1px solid #eee'
+                  }}
+                  onMouseEnter={(e) => {
+                    if (sortBy !== 'exam_date') e.currentTarget.style.backgroundColor = '#f5f5f5';
+                  }}
+                  onMouseLeave={(e) => {
+                    if (sortBy !== 'exam_date') e.currentTarget.style.backgroundColor = 'white';
+                  }}
+                >
+                  Date
+                </button>
+                <button
+                  type="button"
+                  onClick={() => {
+                    setSortBy('exam_start_time');
+                    setShowSortDropdown(false);
+                  }}
+                  style={{
+                    width: '100%',
+                    padding: '8px 12px',
+                    textAlign: 'left',
+                    border: 'none',
+                    backgroundColor: sortBy === 'exam_start_time' ? '#f0f0f0' : 'white',
+                    color: '#000',
+                    cursor: 'pointer',
+                    fontSize: '14px',
+                    borderTop: '1px solid #eee'
+                  }}
+                  onMouseEnter={(e) => {
+                    if (sortBy !== 'exam_start_time') e.currentTarget.style.backgroundColor = '#f5f5f5';
+                  }}
+                  onMouseLeave={(e) => {
+                    if (sortBy !== 'exam_start_time') e.currentTarget.style.backgroundColor = 'white';
+                  }}
+                >
+                  Time
+                </button>
+                <button
+                  type="button"
+                  onClick={() => {
+                    setSortBy('building_name');
+                    setShowSortDropdown(false);
+                  }}
+                  style={{
+                    width: '100%',
+                    padding: '8px 12px',
+                    textAlign: 'left',
+                    border: 'none',
+                    backgroundColor: sortBy === 'building_name' ? '#f0f0f0' : 'white',
+                    color: '#000',
+                    cursor: 'pointer',
+                    fontSize: '14px',
+                    borderTop: '1px solid #eee'
+                  }}
+                  onMouseEnter={(e) => {
+                    if (sortBy !== 'building_name') e.currentTarget.style.backgroundColor = '#f5f5f5';
+                  }}
+                  onMouseLeave={(e) => {
+                    if (sortBy !== 'building_name') e.currentTarget.style.backgroundColor = 'white';
+                  }}
+                >
+                  Building
+                </button>
+                <button
+                  type="button"
+                  onClick={() => {
+                    setSortBy('room_id');
+                    setShowSortDropdown(false);
+                  }}
+                  style={{
+                    width: '100%',
+                    padding: '8px 12px',
+                    textAlign: 'left',
+                    border: 'none',
+                    backgroundColor: sortBy === 'room_id' ? '#f0f0f0' : 'white',
+                    color: '#000',
+                    cursor: 'pointer',
+                    fontSize: '14px',
+                    borderTop: '1px solid #eee'
+                  }}
+                  onMouseEnter={(e) => {
+                    if (sortBy !== 'room_id') e.currentTarget.style.backgroundColor = '#f5f5f5';
+                  }}
+                  onMouseLeave={(e) => {
+                    if (sortBy !== 'room_id') e.currentTarget.style.backgroundColor = 'white';
+                  }}
+                >
+                  Room
+                </button>
+                <button
+                  type="button"
+                  onClick={() => {
+                    setSortBy('proctor_name');
+                    setShowSortDropdown(false);
+                  }}
+                  style={{
+                    width: '100%',
+                    padding: '8px 12px',
+                    textAlign: 'left',
+                    border: 'none',
+                    backgroundColor: sortBy === 'proctor_name' ? '#f0f0f0' : 'white',
+                    color: '#000',
+                    cursor: 'pointer',
+                    fontSize: '14px',
+                    borderTop: '1px solid #eee'
+                  }}
+                  onMouseEnter={(e) => {
+                    if (sortBy !== 'proctor_name') e.currentTarget.style.backgroundColor = '#f5f5f5';
+                  }}
+                  onMouseLeave={(e) => {
+                    if (sortBy !== 'proctor_name') e.currentTarget.style.backgroundColor = 'white';
+                  }}
+                >
+                  Proctor
+                </button>
+                <button
+                  type="button"
+                  onClick={() => {
+                    setSortBy('instructor_name');
+                    setShowSortDropdown(false);
+                  }}
+                  style={{
+                    width: '100%',
+                    padding: '8px 12px',
+                    textAlign: 'left',
+                    border: 'none',
+                    backgroundColor: sortBy === 'instructor_name' ? '#f0f0f0' : 'white',
+                    color: '#000',
+                    cursor: 'pointer',
+                    fontSize: '14px',
+                    borderTop: '1px solid #eee'
+                  }}
+                  onMouseEnter={(e) => {
+                    if (sortBy !== 'instructor_name') e.currentTarget.style.backgroundColor = '#f5f5f5';
+                  }}
+                  onMouseLeave={(e) => {
+                    if (sortBy !== 'instructor_name') e.currentTarget.style.backgroundColor = 'white';
+                  }}
+                >
+                  Instructor
+                </button>
+                <button
+                  type="button"
+                  onClick={() => {
+                    setSortBy('status');
+                    setShowSortDropdown(false);
+                  }}
+                  style={{
+                    width: '100%',
+                    padding: '8px 12px',
+                    textAlign: 'left',
+                    border: 'none',
+                    backgroundColor: sortBy === 'status' ? '#f0f0f0' : 'white',
+                    color: '#000',
+                    cursor: 'pointer',
+                    fontSize: '14px',
+                    borderTop: '1px solid #eee'
+                  }}
+                  onMouseEnter={(e) => {
+                    if (sortBy !== 'status') e.currentTarget.style.backgroundColor = '#f5f5f5';
+                  }}
+                  onMouseLeave={(e) => {
+                    if (sortBy !== 'status') e.currentTarget.style.backgroundColor = 'white';
+                  }}
+                >
+                  Status
+                </button>
+              </div>
+            )}
+          </div>
         </div>
         <div style={{ display: 'flex', gap: '10px' }}>
           <button 
@@ -261,8 +677,8 @@ const ProctorMonitoring: React.FC<UserProps> = ({ }) => {
                 </tr>
               </thead>
               <tbody>
-                {approvedSchedules.length > 0 ? (
-              approvedSchedules.map((schedule, index) => {
+                {sortedSchedules.length > 0 ? (
+              sortedSchedules.map((schedule, index) => {
                 // Determine status based on schedule data (can be updated to use actual status from backend)
                 const status = schedule.status || 'pending'; // 'confirmed', 'late', 'absent', 'substitute'
                 
