@@ -127,6 +127,7 @@ const ExamPeriodComponent: React.FC = () => {
       setNewExam(prev => ({ ...prev, start_date: '', end_date: '' }));
     }
   }, [selectedDates]);
+  
 
   const handleSubmit = async () => {
     const { academic_year, exam_category, term_id, department_id, college_id, examperiod_id } = newExam;
@@ -752,14 +753,27 @@ const ExamPeriodComponent: React.FC = () => {
             type='button'
             className="action-button delete"
             onClick={async () => {
-              if (!globalThis.confirm('Are you sure you want to delete all exam periods?')) return;
+              const idsToDelete = Array.from(selectedExamIds);
+              
+              if (idsToDelete.length === 0) {
+                toast.error('No items selected');
+                return;
+              }
+              
+              if (!globalThis.confirm(`Delete ${idsToDelete.length} selected exam periods?`)) return;
+              
               try {
-                await api.delete('/tbl_examperiod');
-                toast.success('All exam periods deleted');
+                // Delete each individually
+                await Promise.all(
+                  idsToDelete.map(id => api.delete(`/tbl_examperiod/${id}/`))
+                );
+                
+                toast.success(`Deleted ${idsToDelete.length} exam period(s)`);
+                setSelectedExamIds(new Set());
                 fetchAll();
               } catch (err) {
                 console.error(err);
-                toast.error('Failed to delete all exam periods');
+                toast.error('Failed to delete selected items');
               }
             }}
           >

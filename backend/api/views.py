@@ -2386,7 +2386,7 @@ def tbl_examperiod_bulk_update(request):
 
     return Response({"updated_count": updated_count})
 
-@api_view(['GET', 'POST'])
+@api_view(['GET', 'POST', 'DELETE'])  # ✅ Add DELETE
 @permission_classes([AllowAny])
 def tbl_examperiod_list(request):
     if request.method == 'GET':
@@ -2400,6 +2400,13 @@ def tbl_examperiod_list(request):
             serializer.save()
             return Response(serializer.data, status=201)
         return Response(serializer.errors, status=400)
+    
+    elif request.method == 'DELETE':  # ✅ ADD THIS
+        # Delete ALL exam periods
+        deleted_count, _ = TblExamperiod.objects.all().delete()
+        return Response({
+            'message': f'Deleted {deleted_count} exam period(s)'
+        }, status=204)
 
 @api_view(['GET', 'PUT', 'DELETE'])
 @permission_classes([AllowAny])
