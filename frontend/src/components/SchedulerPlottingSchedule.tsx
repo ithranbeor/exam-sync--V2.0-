@@ -1525,70 +1525,51 @@ const SchedulerPlottingSchedule: React.FC<SchedulerProps> = ({ user, onScheduleC
       }
 
       const availableProctorsForAssignment = getAvailableProctors(date, timeSlot);
-      console.log(`📋 Assigning proctors for ${section.course_id} (${section.sections.length} sections) at ${date} ${timeSlot}`);
-      console.log(`   Available proctors: [${availableProctorsForAssignment.join(', ')}]`);
-      
       const proctorsArray: number[] = [];
-      const usedProctorsInThisExam = new Set<number>();
 
+      // ✅ FIX: Check each proctor for conflicts before adding
       for (let i = 0; i < section.sections.length; i++) {
-        let assignedProctor = -1;
-        
-        for (const candidateProctor of availableProctorsForAssignment) {
-          // Skip if already used for another section in this same exam
-          if (usedProctorsInThisExam.has(candidateProctor)) {
-            continue;
-          }
+        if (availableProctorsForAssignment.length > 0) {
+          // Try to find an available proctor that's not already booked
+          let assignedProctor = -1;
           
-          const proctorKey = `${date}|${candidateProctor}`;
-          const existingRanges = finalProctorTimeRanges.get(proctorKey) || [];
-          
-          const isFree = !existingRanges.some(range => 
-            rangesOverlap(startMinutes, endMinutes, range.start, range.end)
-          );
-          
-          if (isFree) {
-            assignedProctor = candidateProctor;
-            usedProctorsInThisExam.add(candidateProctor);
+          for (const candidateProctor of availableProctorsForAssignment) {
+            const proctorKey = `${date}|${candidateProctor}`;
+            const existingRanges = finalProctorTimeRanges.get(proctorKey) || [];
             
-            // Mark this proctor as occupied
-            if (!finalProctorTimeRanges.has(proctorKey)) {
-              finalProctorTimeRanges.set(proctorKey, []);
+            // Check if this proctor is free at this time
+            const isFree = !existingRanges.some(range => 
+              rangesOverlap(startMinutes, endMinutes, range.start, range.end)
+            );
+            
+            if (isFree) {
+              assignedProctor = candidateProctor;
+              
+              // Mark this proctor as occupied
+              if (!finalProctorTimeRanges.has(proctorKey)) {
+                finalProctorTimeRanges.set(proctorKey, []);
+              }
+              finalProctorTimeRanges.get(proctorKey)!.push({
+                start: startMinutes,
+                end: endMinutes,
+                course: section.course_id,
+                section: section.section_name
+              });
+              
+              break; // Found a free proctor
             }
-            finalProctorTimeRanges.get(proctorKey)!.push({
-              start: startMinutes,
-              end: endMinutes,
-              course: section.course_id,
-              section: section.sections[i] || section.section_name
-            });
-            
-            console.log(`   ✅ Section ${i} (${section.sections[i]}): Assigned proctor ${candidateProctor}`);
-            break;
           }
+          
+          if (assignedProctor !== -1) {
+            proctorsArray.push(assignedProctor);
+          } else {
+            // No available proctor for this section
+            console.warn(`⚠️ No available proctor for section ${i} of ${section.course_id}`);
+            proctorsArray.push(proctorId); // Fallback to main proctor (will create conflict)
+          }
+        } else {
+          proctorsArray.push(proctorId);
         }
-        
-        if (assignedProctor === -1) {
-          console.error(`   ❌ Section ${i} (${section.sections[i]}): NO PROCTOR AVAILABLE`);
-          unscheduledSections.push(
-            `${section.course_id} - ${section.sections[i] || section.section_name} (no available proctor)`
-          );
-          hasOverlap = true;
-          break;
-        }
-        
-        proctorsArray.push(assignedProctor);
-      }
-      
-      if (hasOverlap || proctorsArray.length !== section.sections.length) {
-        console.error(`   ❌ SKIPPING entire exam for ${section.course_id} - could not assign all proctors`);
-        continue;
-      }
-
-      console.log(`   ✅ SUCCESS: All ${section.sections.length} sections assigned proctors: [${proctorsArray.join(', ')}]`);
-      
-      // If we couldn't assign all proctors, skip this exam entirely
-      if (hasOverlap || proctorsArray.length !== section.sections.length) {
-        continue;
       }
 
       // ✅ Only add to scheduledExams if no conflicts

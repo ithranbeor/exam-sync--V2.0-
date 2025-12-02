@@ -351,16 +351,41 @@ const SchedulerAvailability: React.FC<ProctorSetAvailabilityProps> = ({ user }) 
       const dates: string[] = [];
       periods?.forEach((period: any) => {
         if (!period.start_date || !period.end_date) return;
-        const start = new Date(period.start_date);
-        const end = new Date(period.end_date);
-        for (let d = new Date(start); d <= end; d.setDate(d.getDate() + 1)) {
-          dates.push(new Date(d).toISOString().split('T')[0]);
+        
+        // ✅ Parse date strings as local dates (not UTC)
+        const startParts = period.start_date.split('-').map(Number);
+        const endParts = period.end_date.split('-').map(Number);
+        
+        // Create dates in local timezone
+        // Note: month is 0-indexed (January = 0)
+        const start = new Date(startParts[0], startParts[1] - 1, startParts[2]);
+        const end = new Date(endParts[0], endParts[1] - 1, endParts[2]);
+        
+        // Iterate through all dates in range
+        const current = new Date(start);
+        while (current <= end) {
+          // Format as YYYY-MM-DD using local date components
+          const year = current.getFullYear();
+          const month = String(current.getMonth() + 1).padStart(2, '0');
+          const day = String(current.getDate()).padStart(2, '0');
+          dates.push(`${year}-${month}-${day}`);
+          
+          // Move to next day
+          current.setDate(current.getDate() + 1);
         }
       });
 
+      // Sort and set allowed dates
       dates.sort();
       setAllowedDates(dates);
-      const todayStr = today.toISOString().split('T')[0];
+      
+      // ✅ Format today's date in local timezone
+      const todayYear = today.getFullYear();
+      const todayMonth = String(today.getMonth() + 1).padStart(2, '0');
+      const todayDay = String(today.getDate()).padStart(2, '0');
+      const todayStr = `${todayYear}-${todayMonth}-${todayDay}`;
+      
+      // Select today if it's in allowed dates
       setSelectedDate(dates.includes(todayStr) ? [todayStr] : []);
     } catch (error) {
       console.error('Error fetching allowed dates:', error);
@@ -406,9 +431,17 @@ const SchedulerAvailability: React.FC<ProctorSetAvailabilityProps> = ({ user }) 
   const goToNextMonth = () =>
     setCurrentMonth((prev) => new Date(prev.getFullYear(), prev.getMonth() + 1, 1));
   const goToToday = () => {
-    const isoToday = today.toISOString().split('T')[0];
+    // ✅ Format today using local timezone (matches fetchAllowedDates)
+    const todayYear = today.getFullYear();
+    const todayMonth = String(today.getMonth() + 1).padStart(2, '0');
+    const todayDay = String(today.getDate()).padStart(2, '0');
+    const todayStr = `${todayYear}-${todayMonth}-${todayDay}`;
+    
+    // Set calendar to current month
     setCurrentMonth(new Date(today.getFullYear(), today.getMonth(), 1));
-    setSelectedDate(allowedDates.includes(isoToday) ? [isoToday] : []);
+    
+    // Select today if it's in allowed dates
+    setSelectedDate(allowedDates.includes(todayStr) ? [todayStr] : []);
   };
 
   const openAddModal = () => {
@@ -972,15 +1005,8 @@ const SchedulerAvailability: React.FC<ProctorSetAvailabilityProps> = ({ user }) 
                   </td>
                 </tr>
               ) : (
-                paginatedEntries.map((entry, idx) => {
-                  const isSelected = selectedAvailabilityIds.has(entry.availability_id);
-                  return (
-                    <tr 
-                      key={entry.availability_id}
-                      style={{
-                        backgroundColor: isSelected ? '#f8d7da' : 'transparent',
-                      }}
-                    >
+                paginatedEntries.map((entry, idx) => (
+                    <tr key={entry.availability_id}>
                       <td>{(currentPage - 1) * itemsPerPage + idx + 1}</td>
                       <td>{entry.user_fullname}</td>
                       <td>{entry.days?.map(d => new Date(d).toLocaleDateString()).join(', ')}</td>
@@ -1028,9 +1054,8 @@ const SchedulerAvailability: React.FC<ProctorSetAvailabilityProps> = ({ user }) 
                         />
                       </td>
                     </tr>
-                  );
-                })
-            )}
+                  ))
+              )}
             </tbody>
           </table>
         </div>
@@ -1047,9 +1072,21 @@ const SchedulerAvailability: React.FC<ProctorSetAvailabilityProps> = ({ user }) 
                 type="text"
                 readOnly
                 value={selectedDate.length > 0 ? selectedDate.map(d => new Date(d).toLocaleDateString()).join(', ') : 'Select Date(s)'}
-                onClick={() => allowedDates.length > 0 && setShowDatePicker(!showDatePicker)}
+                onClick={() => {
+                  console.log('📅 Date input clicked');
+                  console.log('Allowed dates count:', allowedDates.length);
+                  console.log('First 3 allowed dates:', allowedDates.slice(0, 3));
+                  
+                  if (allowedDates.length > 0) {
+                    setShowDatePicker(!showDatePicker);
+                  } else {
+                    console.warn('⚠️ No allowed dates found. Check if exam period is created.');
+                    alert('No exam dates available. Please create an exam period first.');
+                  }
+                }}
+                style={{ cursor: allowedDates.length > 0 ? 'pointer' : 'not-allowed' }}
               />
-              {showDatePicker && (
+              {showDatePicker && allowedDates.length > 0 && (
                 <div className="date-picker">
                   <div className="date-picker-header">
                     <button type="button" onClick={goToPreviousMonth}>
