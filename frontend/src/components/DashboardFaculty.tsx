@@ -177,9 +177,15 @@ const DashboardFaculty = () => {
     new Map(
       roles
         .flatMap(role => roleSidebarMap[role] || [])
+        .filter(item => item.key !== 'notification') // Filter out notification as it will be rendered separately
         .map(item => [item.key, item])
     ).values()
   );
+
+  // Extract notification item separately to place it at the top
+  const notificationItem = roles
+    .flatMap(role => roleSidebarMap[role] || [])
+    .find(item => item.key === 'notification');
 
   const toggleSidebar = () => {
     setIsSidebarOpen(!isSidebarOpen);
@@ -273,15 +279,24 @@ const DashboardFaculty = () => {
                   </button>
                 </li>
 
-                {mergedSidebarItems.map(({ key, label, icon }) => (
-                  <li key={key} className={activeMenu === key ? 'active' : ''}>
-                    <button type="button" onClick={() => handleMenuClick(key)}>
+                {notificationItem && (
+                  <li className={activeMenu === 'notification' ? 'active' : ''}>
+                    <button type="button" onClick={() => handleMenuClick('notification')}>
                       <div className="sidebar-icon-wrapper">
-                        {icon}
-                        {key === 'notification' && unreadNotificationCount > 0 && (
+                        {notificationItem.icon}
+                        {unreadNotificationCount > 0 && (
                           <span className="notification-badge-icon">{unreadNotificationCount}</span>
                         )}
                       </div>
+                      {isSidebarOpen && <span>{notificationItem.label}</span>}
+                    </button>
+                  </li>
+                )}
+
+                {mergedSidebarItems.map(({ key, label, icon }) => (
+                  <li key={key} className={activeMenu === key ? 'active' : ''}>
+                    <button type="button" onClick={() => handleMenuClick(key)}>
+                      {icon}
                       {isSidebarOpen && <span>{label}</span>}
                     </button>
                   </li>

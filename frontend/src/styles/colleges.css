@@ -493,55 +493,6 @@ body {
   font-weight: bold;
 }
 
-/* Room Modal Specific Styles */
-.modal.room-modal {
-  max-width: 900px;
-  width: 90%;
-  max-height: 85vh;
-  overflow-y: auto;
-  padding: 25px;
-}
-
-.room-modal-table-container {
-  overflow-x: auto;
-  overflow-y: auto;
-  max-height: calc(85vh - 180px);
-  border: 1px solid #e0e0e0;
-  border-radius: 8px;
-  margin: 10px 0;
-}
-
-.room-modal-table-container .accounts-table {
-  width: 100%;
-  border-collapse: collapse;
-  min-width: 500px;
-}
-
-.room-modal-table-container .accounts-table th {
-  background-color: #333d52;
-  color: white;
-  padding: 12px 15px;
-  text-align: left;
-  font-weight: 600;
-  position: sticky;
-  top: 0;
-  z-index: 10;
-}
-
-.room-modal-table-container .accounts-table td {
-  padding: 12px 15px;
-  border-bottom: 1px solid #eee;
-  text-align: left;
-}
-
-.room-modal-table-container .accounts-table tbody tr:nth-child(even) {
-  background-color: #f8f8f8;
-}
-
-.room-modal-table-container .accounts-table tbody tr:hover {
-  background-color: #f0f0f0;
-}
-
 .input-group {
   position: relative;
   margin-bottom: 16px;
@@ -1142,24 +1093,6 @@ body {
     margin: 0;
   }
 
-  .modal.room-modal {
-    max-width: 100%;
-    width: 100%;
-    max-height: 90vh;
-    padding: 20px 16px;
-  }
-
-  .room-modal-table-container {
-    max-height: calc(90vh - 160px);
-    margin: 8px 0;
-  }
-
-  .room-modal-table-container .accounts-table th,
-  .room-modal-table-container .accounts-table td {
-    padding: 10px 8px;
-    font-size: 13px;
-  }
-
   .modal h3 {
     font-size: 1.2em;
     margin-bottom: 15px;
@@ -1447,4 +1380,16 @@ body {
     background-color: #f5f5f5 !important;
     color: #000 !important;
   }
+}
+
+/* Custom Number Input Spinner Styling - Hide Default Spinners */
+.custom-number-input {
+  -moz-appearance: textfield;
+}
+
+/* Hide default spinner buttons for all browsers */
+.custom-number-input::-webkit-outer-spin-button,
+.custom-number-input::-webkit-inner-spin-button {
+  -webkit-appearance: none;
+  margin: 0;
 }
