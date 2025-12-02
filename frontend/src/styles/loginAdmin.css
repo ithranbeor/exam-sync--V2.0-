@@ -216,12 +216,15 @@ body {
   margin-bottom: 10px;
   display: flex;
   align-items: center;
+  min-width: 0;
+  overflow: hidden;
 }
 
 .error-text {
   color: var(--color-error);
   font-size: 13px;
   font-weight: 500;
+  white-space: nowrap;
 }
 
 .error-text.hidden {
@@ -235,6 +238,11 @@ body {
   margin-bottom: 20px;
   font-size: 13px;
   color: rgba(255, 255, 255, 0.8);
+  white-space: nowrap;
+}
+
+.remember-me-container label {
+  white-space: nowrap;
 }
 
 .remember-me-container input {

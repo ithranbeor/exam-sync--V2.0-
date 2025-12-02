@@ -215,6 +215,8 @@ body {
     justify-content: space-between;
     align-items: center;
     margin-bottom: 20px;
+    gap: 10px;
+    min-width: 0;
 }
 
 /* Modern Remember Me Checkbox */
@@ -230,6 +232,8 @@ body {
   -moz-user-select: none;
   -ms-user-select: none;
   user-select: none;
+  white-space: nowrap;
+  flex-shrink: 0;
 }
 
 .modern-checkbox-container input {
@@ -328,6 +332,9 @@ body {
   margin-top: 5px;
   text-align: left;
   flex-grow: 1;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
 }
 
 /* Admin/Settings Toggle Button (Bottom-right) */
