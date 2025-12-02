@@ -626,8 +626,15 @@ const Buildings: React.FC = () => {
                 </td>
               </tr>
             ) : (
-              paginatedBuildings.map((b, index) => (
-                <tr key={b.building_id}>
+              paginatedBuildings.map((b, index) => {
+                const isSelected = selectedBuildingIds.has(b.building_id);
+                return (
+                <tr 
+                  key={b.building_id}
+                  style={{
+                    backgroundColor: isSelected ? '#f8d7da' : 'transparent',
+                  }}
+                >
                   <td>{(currentPage - 1) * itemsPerPage + index + 1}</td>
                   <td>{b.building_id}</td>
                   <td>{b.building_name}</td>
@@ -661,7 +668,8 @@ const Buildings: React.FC = () => {
                     />
                   </td>
                 </tr>
-              ))
+                );
+              })
             )}
           </tbody>
         </table>

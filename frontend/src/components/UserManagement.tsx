@@ -1,5 +1,5 @@
 import React, { useEffect, useState, useRef, useMemo, useCallback } from 'react';
-import { FaSearch, FaPen, FaTrash, FaCalendarAlt, FaLock, FaLockOpen, FaDownload,  FaPlus, FaFileImport, FaTimes, FaChevronLeft, FaChevronRight } from 'react-icons/fa';
+import { FaSearch, FaPen, FaTrash, FaCalendarAlt, FaLock, FaLockOpen, FaDownload,  FaPlus, FaFileImport, FaTimes, FaChevronLeft, FaChevronRight, FaSort } from 'react-icons/fa';
 import { api } from '../lib/apiClient.ts';
 import { ToastContainer, toast } from 'react-toastify';
 import * as XLSX from 'xlsx';
@@ -94,6 +94,10 @@ export const UserManagement: React.FC<UserManagementProps> = ({}) => {
   const [canScrollLeft, setCanScrollLeft] = useState(false);
   const [canScrollRight, setCanScrollRight] = useState(false);
   const tableContainerRef = useRef<HTMLDivElement>(null);
+  const [sortBy, setSortBy] = useState<string>('none');
+  const [showSortDropdown, setShowSortDropdown] = useState(false);
+  const [currentPage, setCurrentPage] = useState(1);
+  const itemsPerPage = 20;
 
   const [newAccount, setNewAccount] = useState<UserAccount>({
     user_id: 0,
@@ -203,6 +207,49 @@ export const UserManagement: React.FC<UserManagementProps> = ({}) => {
   useEffect(() => {
     fetchData();
   }, []);
+
+  // Close dropdown when clicking outside
+  useEffect(() => {
+    const handleClickOutside = (event: MouseEvent) => {
+      const target = event.target as HTMLElement;
+      if (showSortDropdown && !target.closest('[data-sort-dropdown]')) {
+        setShowSortDropdown(false);
+      }
+    };
+
+    if (showSortDropdown) {
+      document.addEventListener('mousedown', handleClickOutside);
+    }
+
+    return () => {
+      document.removeEventListener('mousedown', handleClickOutside);
+    };
+  }, [showSortDropdown]);
+
+  // Helper function to determine if a string is numeric
+  const isNumeric = (str: string): boolean => {
+    return !isNaN(Number(str)) && !isNaN(parseFloat(str));
+  };
+
+  // Smart sort function that handles both text and numbers
+  const smartSort = (a: string, b: string): number => {
+    const aIsNumeric = isNumeric(a);
+    const bIsNumeric = isNumeric(b);
+
+    if (aIsNumeric && bIsNumeric) {
+      // Both are numbers - sort numerically
+      return parseFloat(a) - parseFloat(b);
+    } else if (aIsNumeric && !bIsNumeric) {
+      // a is number, b is text - numbers come first
+      return -1;
+    } else if (!aIsNumeric && bIsNumeric) {
+      // a is text, b is number - numbers come first
+      return 1;
+    } else {
+      // Both are text - sort alphabetically
+      return a.localeCompare(b);
+    }
+  };
 
   // Handle Account Save (Add/Edit)
   const handleSaveAccount = async () => {
@@ -818,7 +865,7 @@ export const UserManagement: React.FC<UserManagementProps> = ({}) => {
 
   // Enhanced filtering with college and search
   const filteredAccounts = useMemo(() => {
-    return accounts.filter(account => {
+    let filtered = accounts.filter(account => {
       const fullName = `${account.first_name} ${account.last_name} ${account.middle_name || ''}`.toLowerCase();
       const userId = account.user_id.toString();
       const email = account.email_address.toLowerCase();
@@ -841,7 +888,29 @@ export const UserManagement: React.FC<UserManagementProps> = ({}) => {
 
       return matchesSearch && matchesCollege;
     });
-  }, [accounts, searchTerm, selectedCollege, getUserRoles]);
+
+    // Apply sorting
+    if (sortBy !== 'none') {
+      filtered = [...filtered].sort((a, b) => {
+        if (sortBy === 'user_id') {
+          return a.user_id - b.user_id;
+        } else if (sortBy === 'name') {
+          const aName = `${a.last_name}, ${a.first_name} ${a.middle_name || ''}`.toLowerCase();
+          const bName = `${b.last_name}, ${b.first_name} ${b.middle_name || ''}`.toLowerCase();
+          return smartSort(aName, bName);
+        } else if (sortBy === 'email') {
+          return smartSort(a.email_address.toLowerCase(), b.email_address.toLowerCase());
+        } else if (sortBy === 'status') {
+          return smartSort(a.status.toLowerCase(), b.status.toLowerCase());
+        } else if (sortBy === 'created_at') {
+          return new Date(a.created_at).getTime() - new Date(b.created_at).getTime();
+        }
+        return 0;
+      });
+    }
+
+    return filtered;
+  }, [accounts, searchTerm, selectedCollege, getUserRoles, sortBy]);
 
   useEffect(() => {
     setSelectedAccountIds(prev => {
@@ -854,6 +923,16 @@ export const UserManagement: React.FC<UserManagementProps> = ({}) => {
       return next;
     });
   }, [filteredAccounts]);
+
+  useEffect(() => {
+    setCurrentPage(1);
+  }, [searchTerm, sortBy, selectedCollege]);
+
+  const paginatedAccounts = useMemo(() => {
+    return filteredAccounts.slice((currentPage - 1) * itemsPerPage, currentPage * itemsPerPage);
+  }, [filteredAccounts, currentPage, itemsPerPage]);
+
+  const totalPages = Math.ceil(filteredAccounts.length / itemsPerPage);
 
   const isAllSelected = (() => {
     if (filteredAccounts.length === 0) return false;
@@ -983,8 +1062,7 @@ export const UserManagement: React.FC<UserManagementProps> = ({}) => {
   return (
     <div className="colleges-container accounts-container">
       <div className="colleges-header">
-        <h2 className="colleges-title">User Management</h2>
-        <div className="search-bar">
+        <div className="search-bar" style={{ marginLeft: 'auto' }}>
           <input
             type="text"
             placeholder="Search by ID, name, email, or role..."
@@ -1033,6 +1111,211 @@ export const UserManagement: React.FC<UserManagementProps> = ({}) => {
             >
               <FaFileImport/>
             </button>
+            <div style={{ position: 'relative' }} data-sort-dropdown>
+              <button 
+                type='button' 
+                className="action-button" 
+                onClick={() => setShowSortDropdown(!showSortDropdown)}
+                style={{ 
+                  backgroundColor: sortBy !== 'none' ? '#0A3765' : '#0A3765',
+                  color: 'white',
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  gap: '6px',
+                  padding: '8px 16px',
+                  borderRadius: '8px',
+                  border: 'none',
+                  cursor: 'pointer',
+                  fontSize: '14px',
+                  fontWeight: '500',
+                  minWidth: '100px',
+                  transition: 'background-color 0.2s ease'
+                }}
+                onMouseEnter={(e) => {
+                  e.currentTarget.style.backgroundColor = '#0d4a7a';
+                }}
+                onMouseLeave={(e) => {
+                  e.currentTarget.style.backgroundColor = '#0A3765';
+                }}
+                title="Sort by"
+              >
+                <FaSort/>
+                <span>Sort by</span>
+              </button>
+              {showSortDropdown && (
+                <div 
+                  style={{
+                    position: 'absolute',
+                    top: '100%',
+                    left: 0,
+                    marginTop: '4px',
+                    backgroundColor: 'white',
+                    border: '1px solid #ddd',
+                    borderRadius: '8px',
+                    boxShadow: '0 2px 8px rgba(0,0,0,0.15)',
+                    zIndex: 1000,
+                    minWidth: '150px'
+                  }}
+                >
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setSortBy('none');
+                      setShowSortDropdown(false);
+                    }}
+                    style={{
+                      width: '100%',
+                      padding: '8px 12px',
+                      textAlign: 'left',
+                      border: 'none',
+                      backgroundColor: sortBy === 'none' ? '#f0f0f0' : 'white',
+                      color: '#000',
+                      cursor: 'pointer',
+                      fontSize: '14px'
+                    }}
+                    onMouseEnter={(e) => {
+                      if (sortBy !== 'none') e.currentTarget.style.backgroundColor = '#f5f5f5';
+                    }}
+                    onMouseLeave={(e) => {
+                      if (sortBy !== 'none') e.currentTarget.style.backgroundColor = 'white';
+                    }}
+                  >
+                    None
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setSortBy('user_id');
+                      setShowSortDropdown(false);
+                    }}
+                    style={{
+                      width: '100%',
+                      padding: '8px 12px',
+                      textAlign: 'left',
+                      border: 'none',
+                      backgroundColor: sortBy === 'user_id' ? '#f0f0f0' : 'white',
+                      color: '#000',
+                      cursor: 'pointer',
+                      fontSize: '14px',
+                      borderTop: '1px solid #eee'
+                    }}
+                    onMouseEnter={(e) => {
+                      if (sortBy !== 'user_id') e.currentTarget.style.backgroundColor = '#f5f5f5';
+                    }}
+                    onMouseLeave={(e) => {
+                      if (sortBy !== 'user_id') e.currentTarget.style.backgroundColor = 'white';
+                    }}
+                  >
+                    User ID
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setSortBy('name');
+                      setShowSortDropdown(false);
+                    }}
+                    style={{
+                      width: '100%',
+                      padding: '8px 12px',
+                      textAlign: 'left',
+                      border: 'none',
+                      backgroundColor: sortBy === 'name' ? '#f0f0f0' : 'white',
+                      color: '#000',
+                      cursor: 'pointer',
+                      fontSize: '14px',
+                      borderTop: '1px solid #eee'
+                    }}
+                    onMouseEnter={(e) => {
+                      if (sortBy !== 'name') e.currentTarget.style.backgroundColor = '#f5f5f5';
+                    }}
+                    onMouseLeave={(e) => {
+                      if (sortBy !== 'name') e.currentTarget.style.backgroundColor = 'white';
+                    }}
+                  >
+                    Name
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setSortBy('email');
+                      setShowSortDropdown(false);
+                    }}
+                    style={{
+                      width: '100%',
+                      padding: '8px 12px',
+                      textAlign: 'left',
+                      border: 'none',
+                      backgroundColor: sortBy === 'email' ? '#f0f0f0' : 'white',
+                      color: '#000',
+                      cursor: 'pointer',
+                      fontSize: '14px',
+                      borderTop: '1px solid #eee'
+                    }}
+                    onMouseEnter={(e) => {
+                      if (sortBy !== 'email') e.currentTarget.style.backgroundColor = '#f5f5f5';
+                    }}
+                    onMouseLeave={(e) => {
+                      if (sortBy !== 'email') e.currentTarget.style.backgroundColor = 'white';
+                    }}
+                  >
+                    Email
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setSortBy('status');
+                      setShowSortDropdown(false);
+                    }}
+                    style={{
+                      width: '100%',
+                      padding: '8px 12px',
+                      textAlign: 'left',
+                      border: 'none',
+                      backgroundColor: sortBy === 'status' ? '#f0f0f0' : 'white',
+                      color: '#000',
+                      cursor: 'pointer',
+                      fontSize: '14px',
+                      borderTop: '1px solid #eee'
+                    }}
+                    onMouseEnter={(e) => {
+                      if (sortBy !== 'status') e.currentTarget.style.backgroundColor = '#f5f5f5';
+                    }}
+                    onMouseLeave={(e) => {
+                      if (sortBy !== 'status') e.currentTarget.style.backgroundColor = 'white';
+                    }}
+                  >
+                    Status
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setSortBy('created_at');
+                      setShowSortDropdown(false);
+                    }}
+                    style={{
+                      width: '100%',
+                      padding: '8px 12px',
+                      textAlign: 'left',
+                      border: 'none',
+                      backgroundColor: sortBy === 'created_at' ? '#f0f0f0' : 'white',
+                      color: '#000',
+                      cursor: 'pointer',
+                      fontSize: '14px',
+                      borderTop: '1px solid #eee'
+                    }}
+                    onMouseEnter={(e) => {
+                      if (sortBy !== 'created_at') e.currentTarget.style.backgroundColor = '#f5f5f5';
+                    }}
+                    onMouseLeave={(e) => {
+                      if (sortBy !== 'created_at') e.currentTarget.style.backgroundColor = 'white';
+                    }}
+                  >
+                    Created Date
+                  </button>
+                </div>
+              )}
+            </div>
           </div>
 
           <div className="input-group" style={{ marginBottom: 0, marginLeft: '16px' }}>
@@ -1071,6 +1354,24 @@ export const UserManagement: React.FC<UserManagementProps> = ({}) => {
             </button>
           </div>
         </div>
+      </div>
+
+      <div className="pagination-controls">
+        <button type='button'
+          onClick={() => setCurrentPage((prev) => Math.max(prev - 1, 1))}
+          disabled={currentPage === 1}
+          className="pagination-arrow-btn"
+        >
+          &lt;
+        </button>
+        <span className="pagination-page-number">{currentPage} of {totalPages}</span>
+        <button type='button'
+          onClick={() => setCurrentPage((prev) => Math.min(prev + 1, totalPages))}
+          disabled={currentPage === totalPages}
+          className="pagination-arrow-btn"
+        >
+          &gt;
+        </button>
       </div>
 
       <div className="table-scroll-wrapper">
@@ -1137,7 +1438,7 @@ export const UserManagement: React.FC<UserManagementProps> = ({}) => {
                 </td>
               </tr>
             ) : (
-                filteredAccounts.map((account, index) => {
+                paginatedAccounts.map((account, index) => {
                     const accountRoles = getUserRoles(account.user_id);
                     const isSelected = selectedAccountIds.has(account.user_id);
 
@@ -1148,7 +1449,7 @@ export const UserManagement: React.FC<UserManagementProps> = ({}) => {
                         backgroundColor: isSelected ? '#f8d7da' : 'transparent',
                         }}
                     >
-                        <td>{index + 1}</td>
+                        <td>{(currentPage - 1) * itemsPerPage + index + 1}</td>
                         <td>{account.user_id}</td>
                         <td>{account.last_name}, {account.first_name} {account.middle_name ?? ''}</td>
                         <td>{account.email_address}</td>

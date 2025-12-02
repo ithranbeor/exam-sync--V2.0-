@@ -620,8 +620,15 @@ const Departments: React.FC = () => {
                 </td>
               </tr>
             ) : (
-              paginatedDepartments.map((dept, index) => (
-                <tr key={dept.department_id}>
+              paginatedDepartments.map((dept, index) => {
+                const isSelected = selectedIds.has(dept.department_id);
+                return (
+                <tr 
+                  key={dept.department_id}
+                  style={{
+                    backgroundColor: isSelected ? '#f8d7da' : 'transparent',
+                  }}
+                >
                   <td>{(currentPage - 1) * itemsPerPage + index + 1}</td>
                   <td>{dept.department_id}</td>
                   <td>{dept.department_name}</td>
@@ -646,7 +653,8 @@ const Departments: React.FC = () => {
                     />
                   </td>
                 </tr>
-              ))
+                );
+              })
             )}
           </tbody>
         </table>

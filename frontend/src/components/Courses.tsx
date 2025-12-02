@@ -754,8 +754,15 @@ const Courses: React.FC = () => {
                 </td>
               </tr>
             ) : (
-              paginatedCourses.map((c, i) => (
-                <tr key={c.course_id}>
+              paginatedCourses.map((c, i) => {
+                const isSelected = selectedIds.has(c.course_id);
+                return (
+                <tr 
+                  key={c.course_id}
+                  style={{
+                    backgroundColor: isSelected ? '#f8d7da' : 'transparent',
+                  }}
+                >
                   <td>{(currentPage - 1) * itemsPerPage + i + 1}</td>
                   <td>{c.course_id}</td>
                   <td>{c.course_name}</td>
@@ -781,7 +788,8 @@ const Courses: React.FC = () => {
                     />
                   </td>
                 </tr>
-              ))
+                );
+              })
             )}
           </tbody>
         </table>

@@ -879,8 +879,15 @@ const ExamPeriodComponent: React.FC = () => {
                 </td>
               </tr>
             ) : (
-              paginatedExamPeriods.map((e, i) => (
-                <tr key={e.examperiod_id}>
+              paginatedExamPeriods.map((e, i) => {
+                const isSelected = !!e.examperiod_id && selectedExamIds.has(e.examperiod_id);
+                return (
+                <tr 
+                  key={e.examperiod_id}
+                  style={{
+                    backgroundColor: isSelected ? '#f8d7da' : 'transparent',
+                  }}
+                >
                   <td>{(currentPage - 1) * itemsPerPage + i + 1}</td>
                   <td>{new Date(e.start_date).toLocaleDateString()}</td>
                   <td>{new Date(e.end_date).toLocaleDateString()}</td>
@@ -907,7 +914,8 @@ const ExamPeriodComponent: React.FC = () => {
                     />
                   </td>
                 </tr>
-              ))
+                );
+              })
             )}
           </tbody>
         </table>

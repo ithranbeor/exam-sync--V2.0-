@@ -651,8 +651,15 @@ const Programs: React.FC<ProgramsProps> = ({ user: _user }) => {
                 </td>
               </tr>
             ) : (
-              paginatedPrograms.map((p, idx) => (
-                <tr key={p.program_id}>
+              paginatedPrograms.map((p, idx) => {
+                const isSelected = selectedIds.has(p.program_id);
+                return (
+                <tr 
+                  key={p.program_id}
+                  style={{
+                    backgroundColor: isSelected ? '#f8d7da' : 'transparent',
+                  }}
+                >
                   <td>{(currentPage - 1) * itemsPerPage + idx + 1}</td>
                   <td>{p.program_id}</td>
                   <td>{p.program_name}</td>
@@ -681,7 +688,8 @@ const Programs: React.FC<ProgramsProps> = ({ user: _user }) => {
                     />
                   </td>
                 </tr>
-              ))
+                );
+              })
             )}
           </tbody>
         </table>

@@ -554,8 +554,15 @@ const Terms: React.FC = () => {
                 </td>
               </tr>
             ) : (
-              paginatedTerms.map((term, index) => (
-                <tr key={term.term_id}>
+              paginatedTerms.map((term, index) => {
+                const isSelected = selectedIds.has(term.term_id);
+                return (
+                <tr 
+                  key={term.term_id}
+                  style={{
+                    backgroundColor: isSelected ? '#f8d7da' : 'transparent',
+                  }}
+                >
                   <td>{(currentPage - 1) * itemsPerPage + index + 1}</td>
                   <td>{term.term_name}</td>
                   <td className="action-buttons" style={{ display: "flex", alignItems: "center", gap: 8 }}>
@@ -580,7 +587,8 @@ const Terms: React.FC = () => {
                     />
                   </td>
                 </tr>
-              ))
+                );
+              })
             )}
           </tbody>
         </table>

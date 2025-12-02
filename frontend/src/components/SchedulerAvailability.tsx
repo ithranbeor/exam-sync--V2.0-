@@ -972,8 +972,15 @@ const SchedulerAvailability: React.FC<ProctorSetAvailabilityProps> = ({ user }) 
                   </td>
                 </tr>
               ) : (
-                paginatedEntries.map((entry, idx) => (
-                    <tr key={entry.availability_id}>
+                paginatedEntries.map((entry, idx) => {
+                  const isSelected = selectedAvailabilityIds.has(entry.availability_id);
+                  return (
+                    <tr 
+                      key={entry.availability_id}
+                      style={{
+                        backgroundColor: isSelected ? '#f8d7da' : 'transparent',
+                      }}
+                    >
                       <td>{(currentPage - 1) * itemsPerPage + idx + 1}</td>
                       <td>{entry.user_fullname}</td>
                       <td>{entry.days?.map(d => new Date(d).toLocaleDateString()).join(', ')}</td>
@@ -1021,8 +1028,9 @@ const SchedulerAvailability: React.FC<ProctorSetAvailabilityProps> = ({ user }) 
                         />
                       </td>
                     </tr>
-                  ))
-              )}
+                  );
+                })
+            )}
             </tbody>
           </table>
         </div>
