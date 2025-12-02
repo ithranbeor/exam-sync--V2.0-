@@ -339,19 +339,42 @@ const SchedulerPlottingSchedule: React.FC<SchedulerProps> = ({ user, onScheduleC
     return Array.from(new Set(examPeriods.map(p => p.exam_category).filter(Boolean)));
   }, [examPeriods]);
 
+  const formatLocal = (date: Date) => {
+    const year = date.getFullYear();
+    const month = String(date.getMonth() + 1).padStart(2, '0');
+    const day = String(date.getDate()).padStart(2, '0');
+    return `${year}-${month}-${day}`;
+  };
+
+  // ============================================================================
+  // REPLACE YOUR examDateOptions useMemo WITH THIS:
+  // ============================================================================
+
   const examDateOptions = useMemo(() => {
     if (!examPeriods.length || !userCollegeIds.length) return [];
-    const allowedPeriods = examPeriods.filter((p: any) => userCollegeIds.includes(String(p.college_id)));
+    const allowedPeriods = examPeriods.filter((p: any) => 
+      userCollegeIds.includes(String(p.college_id))
+    );
     const days: { key: string; iso: string; label: string }[] = [];
 
     allowedPeriods.forEach((period: any) => {
       if (!period.start_date || !period.end_date) return;
       const start = new Date(period.start_date);
       const end = new Date(period.end_date);
+      
+      // ✅ Use formatLocal instead of toISOString
       for (let d = new Date(start); d <= end; d.setDate(d.getDate() + 1)) {
-        const iso = d.toISOString().slice(0, 10);
-        const label = d.toLocaleDateString("en-US", { year: "numeric", month: "long", day: "numeric" });
-        days.push({ key: `${period.examperiod_id}-${iso}`, iso, label });
+        const iso = formatLocal(new Date(d)); // ✅ FIXED: Use local formatting
+        const label = d.toLocaleDateString("en-US", { 
+          year: "numeric", 
+          month: "long", 
+          day: "numeric" 
+        });
+        days.push({ 
+          key: `${period.examperiod_id}-${iso}`, 
+          iso, 
+          label 
+        });
       }
     });
 
@@ -1028,7 +1051,8 @@ const SchedulerPlottingSchedule: React.FC<SchedulerProps> = ({ user, onScheduleC
       const timeSlotsArray = a.time_slots || [];
 
       daysArray.forEach((dateStr: string) => {
-        const isoDate = dateStr.split('T')[0];
+        // ✅ Normalize date format - handle both with and without time
+        const isoDate = dateStr.includes('T') ? dateStr.split('T')[0] : dateStr;
 
         timeSlotsArray.forEach((timeSlotPeriod: string) => {
           const key = `${isoDate}|${timeSlotPeriod}`;
@@ -1041,14 +1065,22 @@ const SchedulerPlottingSchedule: React.FC<SchedulerProps> = ({ user, onScheduleC
     });
 
     const getAvailableProctors = (date: string, startTime: string): number[] => {
-      const isoDate = date.split('T')[0];
+      // ✅ Ensure consistent date format (YYYY-MM-DD)
+      const isoDate = date.includes('T') ? date.split('T')[0] : date;
       const period = getPeriodFromTime(startTime);
       
-      if (!period) return [];
+      if (!period) {
+        console.warn(`⚠️ No period found for time ${startTime}`);
+        return [];
+      }
 
       const key = `${isoDate}|${period}`;
-
-      return Array.from(availabilityMap.get(key) || new Set());
+      const proctors: number[] = Array.from(availabilityMap.get(key) ?? new Set<number>());
+      
+      // ✅ Add debug logging
+      console.log(`📅 Checking proctors for ${isoDate} at ${period}: ${proctors.length} available`);
+      
+      return proctors;
     };
 
     // Build lookup structures
@@ -1177,7 +1209,8 @@ const SchedulerPlottingSchedule: React.FC<SchedulerProps> = ({ user, onScheduleC
 
     const datesWithoutProctors: string[] = [];
     sortedDates.forEach(date => {
-      const isoDate = date.split('T')[0];
+      // ✅ Normalize date format
+      const isoDate = date.includes('T') ? date.split('T')[0] : date;
       
       let hasAnyProctors = false;
       for (const timeSlot of validTimes) {
@@ -1411,7 +1444,7 @@ const SchedulerPlottingSchedule: React.FC<SchedulerProps> = ({ user, onScheduleC
       const { date, timeSlot, roomId, proctorId } = gene;
       const courseId = section.course_id;
 
-      // ✅ CRITICAL: Validate that the time slot is valid
+      // ✅ Validate that the time slot is valid
       if (!allAvailableTimeSlots.includes(timeSlot)) {
         console.error(`❌ Invalid time slot ${timeSlot} for section ${section.modality_id}`);
         unscheduledSections.push(`${section.course_id} - ${section.section_name} (invalid time slot: ${timeSlot})`);
@@ -1445,14 +1478,48 @@ const SchedulerPlottingSchedule: React.FC<SchedulerProps> = ({ user, onScheduleC
         continue;
       }
 
+      // ✅ FIXED: Better exam period matching with detailed logging
+      const examDate = new Date(date);
+      
+      console.log(`🔍 Looking for exam period for ${courseId} on ${date}`);
+      console.log(`Available exam periods:`, examPeriods.map(p => ({
+        id: p.examperiod_id,
+        start: p.start_date,
+        end: p.end_date,
+        college: p.college_id
+      })));
+
       const matchedPeriod = examPeriods.find(p => {
-        const start = new Date(p.start_date);
-        const end = new Date(p.end_date);
-        return new Date(date) >= start && new Date(date) <= end;
+        // ✅ Normalize all dates to YYYY-MM-DD format for comparison
+        const periodStart = new Date(p.start_date);
+        const periodEnd = new Date(p.end_date);
+        
+        // ✅ Set all times to midnight for date-only comparison
+        periodStart.setHours(0, 0, 0, 0);
+        periodEnd.setHours(23, 59, 59, 999);
+        examDate.setHours(12, 0, 0, 0); // Use noon to avoid timezone edge cases
+        
+        const isInRange = examDate >= periodStart && examDate <= periodEnd;
+        
+        if (isInRange) {
+          console.log(`✅ Found matching period ${p.examperiod_id} for ${date}:`, {
+            start: periodStart.toISOString(),
+            end: periodEnd.toISOString(),
+            examDate: examDate.toISOString()
+          });
+        }
+        
+        return isInRange;
       });
 
       if (!matchedPeriod) {
-        unscheduledSections.push(`${section.course_id} - ${section.section_name} (no matching exam period)`);
+        console.error(`❌ No exam period found for ${courseId} on ${date}`);
+        console.error(`Exam periods available:`, examPeriods.map(p => 
+          `${p.examperiod_id}: ${p.start_date} to ${p.end_date}`
+        ));
+        unscheduledSections.push(
+          `${section.course_id} - ${section.section_name} (no matching exam period for ${date})`
+        );
         continue;
       }
 
@@ -1473,7 +1540,7 @@ const SchedulerPlottingSchedule: React.FC<SchedulerProps> = ({ user, onScheduleC
         }
       }
 
-      // ✅ CRITICAL FIX: Check proctor conflicts BEFORE adding to schedule
+      // ✅ Check proctor conflicts
       const proctorDateKey = `${date}|${proctorId}`;
       const existingProctorRanges = finalProctorTimeRanges.get(proctorDateKey) || [];
       for (const existing of existingProctorRanges) {
@@ -1486,10 +1553,10 @@ const SchedulerPlottingSchedule: React.FC<SchedulerProps> = ({ user, onScheduleC
 
       if (hasOverlap) {
         unscheduledSections.push(`${section.course_id} - ${section.section_name} (room or proctor conflict)`);
-        continue; // ✅ Skip this exam entirely
+        continue;
       }
 
-      // ✅ Only NOW do we mark room and proctor as occupied
+      // ✅ Mark room and proctor as occupied
       if (!finalRoomTimeRanges.has(roomDateKey)) {
         finalRoomTimeRanges.set(roomDateKey, []);
       }
@@ -1527,17 +1594,15 @@ const SchedulerPlottingSchedule: React.FC<SchedulerProps> = ({ user, onScheduleC
       const availableProctorsForAssignment = getAvailableProctors(date, timeSlot);
       const proctorsArray: number[] = [];
 
-      // ✅ FIX: Check each proctor for conflicts before adding
+      // ✅ Assign proctors for each section
       for (let i = 0; i < section.sections.length; i++) {
         if (availableProctorsForAssignment.length > 0) {
-          // Try to find an available proctor that's not already booked
           let assignedProctor = -1;
           
           for (const candidateProctor of availableProctorsForAssignment) {
             const proctorKey = `${date}|${candidateProctor}`;
             const existingRanges = finalProctorTimeRanges.get(proctorKey) || [];
             
-            // Check if this proctor is free at this time
             const isFree = !existingRanges.some(range => 
               rangesOverlap(startMinutes, endMinutes, range.start, range.end)
             );
@@ -1545,7 +1610,6 @@ const SchedulerPlottingSchedule: React.FC<SchedulerProps> = ({ user, onScheduleC
             if (isFree) {
               assignedProctor = candidateProctor;
               
-              // Mark this proctor as occupied
               if (!finalProctorTimeRanges.has(proctorKey)) {
                 finalProctorTimeRanges.set(proctorKey, []);
               }
@@ -1556,23 +1620,22 @@ const SchedulerPlottingSchedule: React.FC<SchedulerProps> = ({ user, onScheduleC
                 section: section.section_name
               });
               
-              break; // Found a free proctor
+              break;
             }
           }
           
           if (assignedProctor !== -1) {
             proctorsArray.push(assignedProctor);
           } else {
-            // No available proctor for this section
             console.warn(`⚠️ No available proctor for section ${i} of ${section.course_id}`);
-            proctorsArray.push(proctorId); // Fallback to main proctor (will create conflict)
+            proctorsArray.push(proctorId);
           }
         } else {
           proctorsArray.push(proctorId);
         }
       }
 
-      // ✅ Only add to scheduledExams if no conflicts
+      // ✅ Add to scheduled exams
       scheduledExams.push({
         program_id: section.program_id,
         course_id: section.course_id,
@@ -1601,6 +1664,9 @@ const SchedulerPlottingSchedule: React.FC<SchedulerProps> = ({ user, onScheduleC
         proctor_timeout: null,
       });
     }
+
+    console.log(`✅ Successfully scheduled ${scheduledExams.length}/${allModalities.length} sections`);
+    console.log(`❌ Failed to schedule ${unscheduledSections.length} sections`);
 
     // ✅ REMOVE the finalProctorValidation code you added earlier - it's not needed now
 
