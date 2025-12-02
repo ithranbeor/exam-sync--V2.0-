@@ -24,7 +24,6 @@ import Rooms from '../components/Rooms.tsx';
 import ExamPeriod from '../components/ExamPeriod.tsx';
 import UserManagement from '../components/UserManagement.tsx';
 import Profile from '../components/Profile.tsx';
-import ProctorExamDate from "./ProctorExamDate.tsx";
 import ProctorViewExam from "./ProctorViewExam.tsx";
 import BayanihanModality from "./BayanihanModality.tsx";
 import MiniExamDateCalendar from "./MiniExamDateCalendar.tsx";
