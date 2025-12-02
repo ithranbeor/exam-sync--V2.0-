@@ -52,9 +52,9 @@ const ProctorMonitoring: React.FC<UserProps> = ({ }) => {
       if (collegeFilter) {
         params.college_name = collegeFilter;
       }
-      
+
       const { data } = await api.get('/proctor-monitoring/', { params });
-      
+
       const formattedSchedules: MonitoringSchedule[] = data.map((schedule: any) => ({
         id: schedule.id,
         course_id: schedule.course_id,
@@ -73,7 +73,7 @@ const ProctorMonitoring: React.FC<UserProps> = ({ }) => {
         code_entry_time: schedule.code_entry_time || null,
         otp_code: schedule.otp_code || null
       }));
-      
+
       setApprovedSchedules(formattedSchedules);
       setHasApprovedSchedules(formattedSchedules.length > 0);
     } catch (error: any) {
@@ -127,7 +127,7 @@ const ProctorMonitoring: React.FC<UserProps> = ({ }) => {
       });
 
       toast.success(`Generated OTP codes for ${response.data.generated_count} schedule(s)`);
-      
+
       // Refresh data
       await fetchMonitoringData();
     } catch (error: any) {
@@ -143,7 +143,7 @@ const ProctorMonitoring: React.FC<UserProps> = ({ }) => {
   const handleResetOtpCodes = async () => {
     setResettingOtp(true);
     setShowResetConfirm(false);
-    
+
     try {
       // Get all schedule IDs that have OTP codes
       const schedulesWithOtp = approvedSchedules
@@ -161,7 +161,7 @@ const ProctorMonitoring: React.FC<UserProps> = ({ }) => {
       });
 
       toast.success(`Reset ${response.data.deleted_count} OTP code(s)`);
-      
+
       // Refresh data
       await fetchMonitoringData();
     } catch (error: any) {
@@ -239,26 +239,24 @@ const ProctorMonitoring: React.FC<UserProps> = ({ }) => {
 
   const formatTo12Hour = (timeString: string | undefined) => {
     if (!timeString) return '-';
-    
+
     try {
-      // Try to extract time from ISO string format (YYYY-MM-DDTHH:MM:SS)
-      let time: string;
-      if (timeString.includes('T')) {
-        time = timeString.slice(11, 16); // Extract HH:MM from ISO string
-      } else if (timeString.includes(':')) {
-        // Already in HH:MM format
-        time = timeString.slice(0, 5);
-      } else {
+      const date = new Date(timeString);
+
+      const options: Intl.DateTimeFormatOptions = {
+        hour: 'numeric',
+        minute: '2-digit',
+        hour12: true,
+        timeZone: 'Asia/Manila'
+      };
+
+      if (isNaN(date.getTime())) {
+        console.error('Invalid Date input:', timeString);
         return '-';
       }
-      
-      const [hourStr, minute] = time.split(":");
-      if (!hourStr || !minute) return '-';
-      
-      let hour = Number(hourStr);
-      const ampm = hour >= 12 ? "PM" : "AM";
-      hour = hour % 12 || 12;
-      return `${hour}:${minute} ${ampm}`;
+
+      return date.toLocaleTimeString('en-US', options);
+
     } catch (e) {
       console.error('Error formatting time:', timeString, e);
       return '-';
@@ -268,21 +266,21 @@ const ProctorMonitoring: React.FC<UserProps> = ({ }) => {
   return (
     <div className="proctor-monitoring-container">
       <ToastContainer position="top-right" autoClose={3000} />
-      
+
       <div className="proctor-monitoring-header">
         <div className="proctor-monitoring-header-left">
-          <p 
+          <p
             className={`proctor-monitoring-label ${hasApprovedSchedules ? 'proctor-monitoring-label-approved' : 'proctor-monitoring-label-waiting'}`}
           >
-            {hasApprovedSchedules 
+            {hasApprovedSchedules
               ? '✔ EXAM SCHEDULE HAS BEEN APPROVED. CLICK TO GENERATE EXAM CODES'
               : '✗ EXAM SCHEDULER WAITING FOR APPROVAL'}
           </p>
           <div style={{ marginTop: '10px', position: 'relative' }} data-sort-dropdown>
-            <button 
-              type='button' 
+            <button
+              type='button'
               onClick={() => setShowSortDropdown(!showSortDropdown)}
-              style={{ 
+              style={{
                 backgroundColor: sortBy !== 'none' ? '#0A3765' : '#0A3765',
                 color: 'white',
                 display: 'flex',
@@ -306,11 +304,11 @@ const ProctorMonitoring: React.FC<UserProps> = ({ }) => {
               }}
               title="Sort by"
             >
-              <FaSort/>
+              <FaSort />
               <span>Sort by</span>
             </button>
             {showSortDropdown && (
-              <div 
+              <div
                 style={{
                   position: 'absolute',
                   top: '100%',
@@ -614,7 +612,7 @@ const ProctorMonitoring: React.FC<UserProps> = ({ }) => {
           </div>
         </div>
         <div style={{ display: 'flex', gap: '10px' }}>
-          <button 
+          <button
             className="proctor-monitoring-create-button"
             onClick={handleGenerateOtpCodes}
             disabled={generatingOtp || loading || !hasApprovedSchedules}
@@ -625,8 +623,8 @@ const ProctorMonitoring: React.FC<UserProps> = ({ }) => {
           >
             {generatingOtp ? 'GENERATING...' : 'GENERATE EXAM CODES'}
           </button>
-          
-          <button 
+
+          <button
             className="proctor-monitoring-reset-button"
             onClick={() => setShowResetConfirm(true)}
             disabled={resettingOtp || loading || !hasOtpCodes}
@@ -646,7 +644,7 @@ const ProctorMonitoring: React.FC<UserProps> = ({ }) => {
           </button>
         </div>
       </div>
-      
+
       {loading ? (
         <div className="no-data-message">Loading monitoring data...</div>
       ) : (
@@ -673,101 +671,101 @@ const ProctorMonitoring: React.FC<UserProps> = ({ }) => {
               </thead>
               <tbody>
                 {sortedSchedules.length > 0 ? (
-              sortedSchedules.map((schedule, index) => {
-                // Determine status based on schedule data (can be updated to use actual status from backend)
-                const status = schedule.status || 'pending'; // 'confirmed', 'late', 'absent', 'substitute'
-                
-                const getStatusDisplay = (status: string) => {
-                  switch(status.toLowerCase()) {
-                    case 'confirmed':
-                    case 'confirm':
-                      return { text: 'Confirmed', className: 'status-confirmed' };
-                    case 'late':
-                    case 'absent':
-                      return { text: status === 'late' ? 'Late' : 'Absent', className: 'status-late-absent' };
-                    case 'substitute':
-                    case 'sub':
-                      return { text: 'Substitute', className: 'status-substitute' };
-                    default:
-                      return { text: 'Pending', className: 'status-pending' };
-                  }
-                };
+                  sortedSchedules.map((schedule, index) => {
+                    // Determine status based on schedule data (can be updated to use actual status from backend)
+                    const status = schedule.status || 'pending'; // 'confirmed', 'late', 'absent', 'substitute'
 
-                const statusDisplay = getStatusDisplay(status);
+                    const getStatusDisplay = (status: string) => {
+                      switch (status.toLowerCase()) {
+                        case 'confirmed':
+                        case 'confirm':
+                          return { text: 'Confirmed', className: 'status-confirmed' };
+                        case 'late':
+                        case 'absent':
+                          return { text: status === 'late' ? 'Late' : 'Absent', className: 'status-late-absent' };
+                        case 'substitute':
+                        case 'sub':
+                          return { text: 'Substitute', className: 'status-substitute' };
+                        default:
+                          return { text: 'Pending', className: 'status-pending' };
+                      }
+                    };
 
-                // Format time entry
-                const formatTimeIn = (timeString: string | null | undefined) => {
-                  if (!timeString) return '-';
-                  try {
-                    const date = new Date(timeString);
-                    // Format as HH:MM (hours and minutes only)
-                    const hours = date.getHours().toString().padStart(2, '0');
-                    const minutes = date.getMinutes().toString().padStart(2, '0');
-                    return `${hours}:${minutes}`;
-                  } catch (e) {
-                    return '-';
-                  }
-                };
+                    const statusDisplay = getStatusDisplay(status);
 
-                const codeEntryTime = schedule.code_entry_time || (schedule as any).proctor_timein;
+                    // Format time entry
+                    const formatTimeIn = (timeString: string | null | undefined) => {
+                      if (!timeString) return '-';
+                      try {
+                        const date = new Date(timeString);
+                        // Format as HH:MM (hours and minutes only)
+                        const hours = date.getHours().toString().padStart(2, '0');
+                        const minutes = date.getMinutes().toString().padStart(2, '0');
+                        return `${hours}:${minutes}`;
+                      } catch (e) {
+                        return '-';
+                      }
+                    };
 
-                return (
-                  <tr key={schedule.id}>
-                    <td>{index + 1}</td>
-                    <td>{schedule.course_id}</td>
-                    <td>{schedule.subject}</td>
-                    <td>{schedule.section_name}</td>
-                    <td>{schedule.exam_date}</td>
-                    <td>{formatTo12Hour(schedule.exam_start_time)} - {formatTo12Hour(schedule.exam_end_time)}</td>
-                    <td>{schedule.building_name}</td>
-                    <td>{schedule.room_id}</td>
-                    <td>{schedule.proctor_name}</td>
-                    <td>{schedule.instructor_name}</td>
-                    <td>
-                      <div className="proctor-monitoring-otp-field">
-                        {schedule.otp_code ? (
-                          <span style={{ 
-                            fontFamily: 'monospace', 
-                            fontWeight: 'bold',
-                            color: '#2c3e50',
-                            fontSize: '0.9em'
-                          }}>
-                            {schedule.otp_code}
+                    const codeEntryTime = schedule.code_entry_time || (schedule as any).proctor_timein;
+
+                    return (
+                      <tr key={schedule.id}>
+                        <td>{index + 1}</td>
+                        <td>{schedule.course_id}</td>
+                        <td>{schedule.subject}</td>
+                        <td>{schedule.section_name}</td>
+                        <td>{schedule.exam_date}</td>
+                        <td>{formatTo12Hour(schedule.exam_start_time)} - {formatTo12Hour(schedule.exam_end_time)}</td>
+                        <td>{schedule.building_name}</td>
+                        <td>{schedule.room_id}</td>
+                        <td>{schedule.proctor_name}</td>
+                        <td>{schedule.instructor_name}</td>
+                        <td>
+                          <div className="proctor-monitoring-otp-field">
+                            {schedule.otp_code ? (
+                              <span style={{
+                                fontFamily: 'monospace',
+                                fontWeight: 'bold',
+                                color: '#2c3e50',
+                                fontSize: '0.9em'
+                              }}>
+                                {schedule.otp_code}
+                              </span>
+                            ) : (
+                              <span style={{ color: '#999', fontStyle: 'italic' }}>
+                                Not generated
+                              </span>
+                            )}
+                          </div>
+                        </td>
+                        <td className="proctor-monitoring-time-in">
+                          {formatTimeIn(codeEntryTime)}
+                        </td>
+                        <td>
+                          <span className={`status-badge ${statusDisplay.className}`}>
+                            {statusDisplay.text}
                           </span>
-                        ) : (
-                          <span style={{ color: '#999', fontStyle: 'italic' }}>
-                            Not generated
-                          </span>
-                        )}
-                      </div>
-                    </td>
-                    <td className="proctor-monitoring-time-in">
-                      {formatTimeIn(codeEntryTime)}
-                    </td>
-                    <td>
-                      <span className={`status-badge ${statusDisplay.className}`}>
-                        {statusDisplay.text}
-                      </span>
+                        </td>
+                      </tr>
+                    );
+                  })
+                ) : (
+                  <tr>
+                    <td colSpan={13} className="no-data-message">
+                      No approved schedules found
                     </td>
                   </tr>
-                );
-              })
-            ) : (
-              <tr>
-                <td colSpan={13} className="no-data-message">
-                  No approved schedules found
-                </td>
-              </tr>
-            )}
-          </tbody>
-        </table>
-      </div>
+                )}
+              </tbody>
+            </table>
+          </div>
         </>
       )}
 
       {/* Reset Confirmation Modal */}
       {showResetConfirm && (
-        <div 
+        <div
           style={{
             position: 'fixed',
             top: 0,
@@ -782,7 +780,7 @@ const ProctorMonitoring: React.FC<UserProps> = ({ }) => {
           }}
           onClick={() => setShowResetConfirm(false)}
         >
-          <div 
+          <div
             style={{
               backgroundColor: 'white',
               padding: '30px',

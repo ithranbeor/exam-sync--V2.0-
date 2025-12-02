@@ -35,7 +35,7 @@ const ProctorExamDate = () => {
   const [termMap, setTermMap] = useState<Record<string, string>>({});
   const [isScheduler, setIsScheduler] = useState(false);
   const [schedulerCollege, setSchedulerCollege] = useState<string | null>(null);
-  const [isEditMode, setIsEditMode] = useState(false);
+  const [isEditMode, _setIsEditMode] = useState(false);
 
   const [filters, setFilters] = useState({
     academicYear: '',
@@ -199,9 +199,9 @@ const ProctorExamDate = () => {
     }
   };
 
-  const handleEditToggle = () => {
-    setIsEditMode(!isEditMode);
-  };
+  //const handleEditToggle = () => {
+    //setIsEditMode(!isEditMode);
+  //};
 
   const handleMonthChange = (e: React.ChangeEvent<HTMLSelectElement>) => {
     const newMonth = parseInt(e.target.value);
@@ -365,7 +365,6 @@ const ProctorExamDate = () => {
 
           {isScheduler ? (
             <span className="scheduler-college-label">
-              College: <strong>{schedulerCollege}</strong>
             </span>
           ) : (
             <select
@@ -380,18 +379,6 @@ const ProctorExamDate = () => {
                 </option>
               ))}
             </select>
-          )}
-          
-          {isScheduler && (
-            <div className="save-section">
-              <button 
-                type="button" 
-                className={`now-button ${isEditMode ? 'active' : ''}`}
-                onClick={handleEditToggle}
-              >
-                {isEditMode ? 'Done Editing' : 'Edit'}
-              </button>
-            </div>
           )}
 
           <button type="button" className="now-button" onClick={goToToday}>

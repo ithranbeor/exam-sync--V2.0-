@@ -25,7 +25,7 @@ interface Department { department_id: string; department_name: string; }
 interface College { college_id: string; college_name: string; }
 
 const academicYears = ['2024-2025', '2025-2026', '2026-2027', '2027-2028', '2028-2029'];
-const examCategories = ['Preliminary', 'Midterm', 'Pre-Final', 'Final'];
+const examCategories = [ 'Midterm', 'Final'];
 
 const ExamPeriodComponent: React.FC = () => {
   const [examPeriods, setExamPeriods] = useState<ExamPeriod[]>([]);
@@ -168,6 +168,7 @@ const ExamPeriodComponent: React.FC = () => {
 
         for (const date of sortedDates) {
           const formatted = toLocalDateString(date);
+
           const payload = {
             start_date: `${formatted}T00:00:00`,
             end_date: `${formatted}T00:00:00`,
@@ -178,16 +179,8 @@ const ExamPeriodComponent: React.FC = () => {
             college: college_id || null,
           };
 
-          // Create 2 copies for each date
-          for (let copy = 0; copy < 2; copy++) {
-            try {
-              const res = await api.post('/tbl_examperiod', payload);
-              newRecords.push(res.data);
-            } catch (innerErr: any) {
-              console.error('❌ Failed payload:', payload);
-              console.error('📩 Error response:', innerErr.response?.data);
-            }
-          }
+          const res = await api.post('/tbl_examperiod', payload);
+          newRecords.push(res.data);
         }
 
         // Update state once with all new records
@@ -1115,25 +1108,6 @@ const ExamPeriodComponent: React.FC = () => {
                       setNewExam({ ...newExam, term_id: opt?.value ?? 0 })
                     }
                     placeholder="Select Semester"
-                    isClearable
-                  />
-                </div>
-
-                <div className="examperiod-input-group">
-                  <label className="examperiod-label">Department</label>
-                  <Select
-                    className="examperiod-select"
-                    classNamePrefix="examperiod"
-                    options={departments
-                      .sort((a, b) => a.department_name.localeCompare(b.department_name))
-                      .map(d => ({ value: d.department_id, label: d.department_name }))}
-                    value={newExam.department_id
-                      ? { value: newExam.department_id, label: departments.find(d => d.department_id === newExam.department_id)?.department_name || '' }
-                      : null}
-                    onChange={opt =>
-                      setNewExam({ ...newExam, department_id: opt?.value || null })
-                    }
-                    placeholder="Optional"
                     isClearable
                   />
                 </div>

@@ -312,7 +312,7 @@ const ProctorCourseDetails = ({ user }: ProctorCourseDetailsProps) => {
                   <div className="course-card-left">
                     <div className="course-code-badge">{assign.course_id}</div>
                     <div className="course-card-main">
-                      <p className="course-title">{assign.course_id} - {assign.section}</p>
+                      <p className="course-title">{assign.section}</p>
                       <p className="course-instructor">{assign.instructor}</p>
 
                       <div className="course-preview-info">

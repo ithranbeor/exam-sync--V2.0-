@@ -45,7 +45,7 @@ const ProctorAttendance: React.FC<UserProps> = ({ user }) => {
   // Fetch proctor's assigned exams
   const fetchAssignedExams = useCallback(async () => {
     if (!user?.user_id) return;
-    
+
     try {
       const { data } = await api.get(`/proctor-assigned-exams/${user.user_id}/`);
       const formattedExams: ExamDetails[] = data.map((exam: any) => ({
@@ -162,29 +162,28 @@ const ProctorAttendance: React.FC<UserProps> = ({ user }) => {
       setVerifyingOtp(false);
     }
   };
-  
+
+  // Place this revised function in your component:
   const formatTo12Hour = (timeString: string | undefined) => {
     if (!timeString) return '-';
-    
+
     try {
-      // Try to extract time from ISO string format (YYYY-MM-DDTHH:MM:SS)
-      let time: string;
-      if (timeString.includes('T')) {
-        time = timeString.slice(11, 16); // Extract HH:MM from ISO string
-      } else if (timeString.includes(':')) {
-        // Already in HH:MM format
-        time = timeString.slice(0, 5);
-      } else {
+      const date = new Date(timeString);
+
+      const options: Intl.DateTimeFormatOptions = {
+        hour: 'numeric',
+        minute: '2-digit',
+        hour12: true,
+        timeZone: 'Asia/Manila'
+      };
+
+      if (isNaN(date.getTime())) {
+        console.error('Invalid Date input:', timeString);
         return '-';
       }
-      
-      const [hourStr, minute] = time.split(":");
-      if (!hourStr || !minute) return '-';
-      
-      let hour = Number(hourStr);
-      const ampm = hour >= 12 ? "PM" : "AM";
-      hour = hour % 12 || 12;
-      return `${hour}:${minute} ${ampm}`;
+
+      return date.toLocaleTimeString('en-US', options);
+
     } catch (e) {
       console.error('Error formatting time:', timeString, e);
       return '-';
@@ -198,7 +197,7 @@ const ProctorAttendance: React.FC<UserProps> = ({ user }) => {
     }
 
     const role = (isSubstitutionMode || otpValidationStatus === 'valid-not-assigned') ? 'sub' : 'assigned';
-    
+
     // Validate remarks for substitute
     if (role === 'sub' && !remarks.trim()) {
       toast.error('Remarks are required for substitute proctors');
@@ -215,10 +214,10 @@ const ProctorAttendance: React.FC<UserProps> = ({ user }) => {
       });
 
       toast.success(response.data.message || 'Attendance recorded successfully');
-      
+
       // Refresh data
       await Promise.all([fetchAssignedExams(), fetchAllExams()]);
-      
+
       // Close modal after submission
       handleCloseModal();
     } catch (error: any) {
@@ -233,13 +232,13 @@ const ProctorAttendance: React.FC<UserProps> = ({ user }) => {
   return (
     <div className="proctor-attendance-container">
       <ToastContainer position="top-right" autoClose={3000} />
-         
+
       <div className="proctor-attendance-instruction">
         <p className="proctor-attendance-instruction-text">
           Click assigned schedule to confirm your proctorship
         </p>
       </div>
-      
+
       {loading ? (
         <div className="no-data-message">Loading exams...</div>
       ) : (
@@ -250,127 +249,127 @@ const ProctorAttendance: React.FC<UserProps> = ({ user }) => {
             <div className="proctor-attendance-canvas">
               <div className="proctor-attendance-schedules-grid">
                 {proctorAssignedExams.length > 0 ? (
-              proctorAssignedExams.map((exam) => (
-                <div 
-                  key={exam.id} 
-                  className="proctor-attendance-schedule-card proctor-attendance-schedule-card-clickable proctor-attendance-schedule-card-assigned"
-                  onClick={() => handleCardClick(exam, false)}
-                >
-                  <div className="proctor-attendance-schedule-header">
-                    <h3 className="proctor-attendance-schedule-subject">
-                      {exam.course_id} - {exam.subject}
-                    </h3>
-                    <span className="proctor-attendance-schedule-code">{exam.course_id}</span>
-                  </div>
-                  
-                  <div className="proctor-attendance-schedule-details">
-                    <div className="proctor-attendance-detail-row">
-                      <span className="proctor-attendance-detail-label">Section:</span>
-                      <span className="proctor-attendance-detail-value">{exam.section_name}</span>
-                    </div>
-                    <div className="proctor-attendance-detail-row">
-                      <span className="proctor-attendance-detail-label">Date:</span>
-                      <span className="proctor-attendance-detail-value">{exam.exam_date}</span>
-                    </div>
-                    <div className="proctor-attendance-detail-row">
-                      <span className="proctor-attendance-detail-label">Time:</span>
-                      <span className="proctor-attendance-detail-value">
-                        {formatTo12Hour(exam.exam_start_time)} - {formatTo12Hour(exam.exam_end_time)}
-                      </span>
-                    </div>
-                    <div className="proctor-attendance-detail-row">
-                      <span className="proctor-attendance-detail-label">Building:</span>
-                      <span className="proctor-attendance-detail-value">{exam.building_name}</span>
-                    </div>
-                    <div className="proctor-attendance-detail-row">
-                      <span className="proctor-attendance-detail-label">Room:</span>
-                      <span className="proctor-attendance-detail-value">{exam.room_id}</span>
-                    </div>
-                    <div className="proctor-attendance-detail-row">
-                      <span className="proctor-attendance-detail-label">Instructor:</span>
-                      <span className="proctor-attendance-detail-value">{exam.instructor_name}</span>
-                    </div>
-                  </div>
-                  <div className="proctor-attendance-click-hint">
-                    Click to confirm proctorship
-                  </div>
-                </div>
-              ))
-            ) : (
-              <div className="no-data-message">No assigned exams found</div>
-            )}
-          </div>
-        </div>
-      </div>
+                  proctorAssignedExams.map((exam) => (
+                    <div
+                      key={exam.id}
+                      className="proctor-attendance-schedule-card proctor-attendance-schedule-card-clickable proctor-attendance-schedule-card-assigned"
+                      onClick={() => handleCardClick(exam, false)}
+                    >
+                      <div className="proctor-attendance-schedule-header">
+                        <h3 className="proctor-attendance-schedule-subject">
+                          {exam.course_id} - {exam.subject}
+                        </h3>
+                        <span className="proctor-attendance-schedule-code">{exam.course_id}</span>
+                      </div>
 
-      {/* Second Section: All Exams (for substitution) */}
-      <div className="proctor-attendance-section">
-        <h3 className="proctor-attendance-section-title">All Exams (Available for Substitution)</h3>
-        <div className="proctor-attendance-canvas">
-          <div className="proctor-attendance-schedules-grid">
-            {allExams.length > 0 ? (
-              allExams.map((exam) => (
-                <div 
-                  key={exam.id} 
-                  className="proctor-attendance-schedule-card proctor-attendance-schedule-card-clickable proctor-attendance-schedule-card-substitution"
-                  onClick={() => handleCardClick(exam, true)}
-                >
-                  <div className="proctor-attendance-schedule-header">
-                    <h3 className="proctor-attendance-schedule-subject">
-                      {exam.course_id} - {exam.subject}
-                    </h3>
-                    <span className="proctor-attendance-schedule-code">{exam.course_id}</span>
-                  </div>
-                  
-                  <div className="proctor-attendance-schedule-details">
-                    <div className="proctor-attendance-detail-row">
-                      <span className="proctor-attendance-detail-label">Section:</span>
-                      <span className="proctor-attendance-detail-value">{exam.section_name}</span>
+                      <div className="proctor-attendance-schedule-details">
+                        <div className="proctor-attendance-detail-row">
+                          <span className="proctor-attendance-detail-label">Section:</span>
+                          <span className="proctor-attendance-detail-value">{exam.section_name}</span>
+                        </div>
+                        <div className="proctor-attendance-detail-row">
+                          <span className="proctor-attendance-detail-label">Date:</span>
+                          <span className="proctor-attendance-detail-value">{exam.exam_date}</span>
+                        </div>
+                        <div className="proctor-attendance-detail-row">
+                          <span className="proctor-attendance-detail-label">Time:</span>
+                          <span className="proctor-attendance-detail-value">
+                            {formatTo12Hour(exam.exam_start_time)} - {formatTo12Hour(exam.exam_end_time)}
+                          </span>
+                        </div>
+                        <div className="proctor-attendance-detail-row">
+                          <span className="proctor-attendance-detail-label">Building:</span>
+                          <span className="proctor-attendance-detail-value">{exam.building_name}</span>
+                        </div>
+                        <div className="proctor-attendance-detail-row">
+                          <span className="proctor-attendance-detail-label">Room:</span>
+                          <span className="proctor-attendance-detail-value">{exam.room_id}</span>
+                        </div>
+                        <div className="proctor-attendance-detail-row">
+                          <span className="proctor-attendance-detail-label">Instructor:</span>
+                          <span className="proctor-attendance-detail-value">{exam.instructor_name}</span>
+                        </div>
+                      </div>
+                      <div className="proctor-attendance-click-hint">
+                        Click to confirm proctorship
+                      </div>
                     </div>
-                    <div className="proctor-attendance-detail-row">
-                      <span className="proctor-attendance-detail-label">Date:</span>
-                      <span className="proctor-attendance-detail-value">{exam.exam_date}</span>
-                    </div>
-                    <div className="proctor-attendance-detail-row">
-                      <span className="proctor-attendance-detail-label">Time:</span>
-                      <span className="proctor-attendance-detail-value">
-                        {formatTo12Hour(exam.exam_start_time)} - {formatTo12Hour(exam.exam_end_time)}
-                      </span>
-                    </div>
-                    <div className="proctor-attendance-detail-row">
-                      <span className="proctor-attendance-detail-label">Building:</span>
-                      <span className="proctor-attendance-detail-value">{exam.building_name}</span>
-                    </div>
-                    <div className="proctor-attendance-detail-row">
-                      <span className="proctor-attendance-detail-label">Room:</span>
-                      <span className="proctor-attendance-detail-value">{exam.room_id}</span>
-                    </div>
-                    <div className="proctor-attendance-detail-row">
-                      <span className="proctor-attendance-detail-label">Assigned Proctor:</span>
-                      <span className="proctor-attendance-detail-value">{exam.assigned_proctor}</span>
-                    </div>
-                    <div className="proctor-attendance-detail-row">
-                      <span className="proctor-attendance-detail-label">Instructor:</span>
-                      <span className="proctor-attendance-detail-value">{exam.instructor_name}</span>
-                    </div>
-                    <div className="proctor-attendance-detail-row">
-                      <span className="proctor-attendance-detail-label">Status:</span>
-                      <span className={`status-badge status-${exam.status}`}>
-                        {exam.status}
-                      </span>
-                    </div>
-                  </div>
-                  <div className="proctor-attendance-click-hint proctor-attendance-substitution-hint">
-                    Click to substitute as proctor
-                  </div>
-                </div>
-              ))
-            ) : (
-              <div className="no-data-message">No exams found</div>
-            )}
+                  ))
+                ) : (
+                  <div className="no-data-message">No assigned exams found</div>
+                )}
+              </div>
+            </div>
           </div>
-        </div>
-      </div>
+
+          {/* Second Section: All Exams (for substitution) */}
+          <div className="proctor-attendance-section">
+            <h3 className="proctor-attendance-section-title">All Exams (Available for Substitution)</h3>
+            <div className="proctor-attendance-canvas">
+              <div className="proctor-attendance-schedules-grid">
+                {allExams.length > 0 ? (
+                  allExams.map((exam) => (
+                    <div
+                      key={exam.id}
+                      className="proctor-attendance-schedule-card proctor-attendance-schedule-card-clickable proctor-attendance-schedule-card-substitution"
+                      onClick={() => handleCardClick(exam, true)}
+                    >
+                      <div className="proctor-attendance-schedule-header">
+                        <h3 className="proctor-attendance-schedule-subject">
+                          {exam.course_id} - {exam.subject}
+                        </h3>
+                        <span className="proctor-attendance-schedule-code">{exam.course_id}</span>
+                      </div>
+
+                      <div className="proctor-attendance-schedule-details">
+                        <div className="proctor-attendance-detail-row">
+                          <span className="proctor-attendance-detail-label">Section:</span>
+                          <span className="proctor-attendance-detail-value">{exam.section_name}</span>
+                        </div>
+                        <div className="proctor-attendance-detail-row">
+                          <span className="proctor-attendance-detail-label">Date:</span>
+                          <span className="proctor-attendance-detail-value">{exam.exam_date}</span>
+                        </div>
+                        <div className="proctor-attendance-detail-row">
+                          <span className="proctor-attendance-detail-label">Time:</span>
+                          <span className="proctor-attendance-detail-value">
+                            {formatTo12Hour(exam.exam_start_time)} - {formatTo12Hour(exam.exam_end_time)}
+                          </span>
+                        </div>
+                        <div className="proctor-attendance-detail-row">
+                          <span className="proctor-attendance-detail-label">Building:</span>
+                          <span className="proctor-attendance-detail-value">{exam.building_name}</span>
+                        </div>
+                        <div className="proctor-attendance-detail-row">
+                          <span className="proctor-attendance-detail-label">Room:</span>
+                          <span className="proctor-attendance-detail-value">{exam.room_id}</span>
+                        </div>
+                        <div className="proctor-attendance-detail-row">
+                          <span className="proctor-attendance-detail-label">Assigned Proctor:</span>
+                          <span className="proctor-attendance-detail-value">{exam.assigned_proctor}</span>
+                        </div>
+                        <div className="proctor-attendance-detail-row">
+                          <span className="proctor-attendance-detail-label">Instructor:</span>
+                          <span className="proctor-attendance-detail-value">{exam.instructor_name}</span>
+                        </div>
+                        <div className="proctor-attendance-detail-row">
+                          <span className="proctor-attendance-detail-label">Status:</span>
+                          <span className={`status-badge status-${exam.status}`}>
+                            {exam.status}
+                          </span>
+                        </div>
+                      </div>
+                      <div className="proctor-attendance-click-hint proctor-attendance-substitution-hint">
+                        Click to substitute as proctor
+                      </div>
+                    </div>
+                  ))
+                ) : (
+                  <div className="no-data-message">No exams found</div>
+                )}
+              </div>
+            </div>
+          </div>
         </>
       )}
 
@@ -386,7 +385,7 @@ const ProctorAttendance: React.FC<UserProps> = ({ user }) => {
                 ×
               </button>
             </div>
-            
+
             <div className="proctor-attendance-modal-content">
               {/* Substitution Mode Indicator */}
               {isSubstitutionMode && (
@@ -469,7 +468,7 @@ const ProctorAttendance: React.FC<UserProps> = ({ user }) => {
                       {verifyingOtp ? 'Verifying...' : 'Verify'}
                     </button>
                   </div>
-                  
+
                   {/* OTP Validation Status */}
                   {otpValidationStatus === 'valid-assigned' && (
                     <div className="proctor-attendance-validation-message proctor-attendance-validation-success">
@@ -495,8 +494,8 @@ const ProctorAttendance: React.FC<UserProps> = ({ user }) => {
                   <textarea
                     id="remarks-input"
                     className={`proctor-attendance-modal-textarea ${(isSubstitutionMode || otpValidationStatus === 'valid-not-assigned') && !remarks.trim() ? 'proctor-attendance-required-field' : ''}`}
-                    placeholder={isSubstitutionMode || otpValidationStatus === 'valid-not-assigned' 
-                      ? "Please provide a reason for substitution (e.g., emergency leave, illness, etc.)" 
+                    placeholder={isSubstitutionMode || otpValidationStatus === 'valid-not-assigned'
+                      ? "Please provide a reason for substitution (e.g., emergency leave, illness, etc.)"
                       : "Enter any remarks or notes..."}
                     rows={3}
                     value={remarks}
@@ -510,28 +509,28 @@ const ProctorAttendance: React.FC<UserProps> = ({ user }) => {
             </div>
 
             <div className="proctor-attendance-modal-footer">
-              <button 
-                className="proctor-attendance-modal-cancel" 
+              <button
+                className="proctor-attendance-modal-cancel"
                 onClick={handleCloseModal}
               >
                 Cancel
               </button>
-              <button 
-                className="proctor-attendance-modal-submit" 
+              <button
+                className="proctor-attendance-modal-submit"
                 onClick={handleSubmit}
                 disabled={
-                  !otpCode.trim() || 
+                  !otpCode.trim() ||
                   otpValidationStatus === 'idle' ||
                   otpValidationStatus === 'invalid' ||
                   ((isSubstitutionMode || otpValidationStatus === 'valid-not-assigned') && !remarks.trim()) ||
                   submittingAttendance
                 }
               >
-                {submittingAttendance 
-                  ? 'Submitting...' 
-                  : (isSubstitutionMode || otpValidationStatus === 'valid-not-assigned' 
-                      ? 'Confirm as Substitute' 
-                      : 'Confirm Proctorship')}
+                {submittingAttendance
+                  ? 'Submitting...'
+                  : (isSubstitutionMode || otpValidationStatus === 'valid-not-assigned'
+                    ? 'Confirm as Substitute'
+                    : 'Confirm Proctorship')}
               </button>
             </div>
           </div>

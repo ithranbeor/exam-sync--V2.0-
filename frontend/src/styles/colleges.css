@@ -809,7 +809,8 @@ body {
 .examperiod-selected-day {
   background-color: #ffb800 !important;
   color: white !important;
-  border-radius: 50% !important;
+  border-radius: 50px !important;
+  padding: 10px 20px !important;
 }
 
 /* React Calendar White Theme Styles */
