@@ -60,57 +60,89 @@ const Modal: React.FC<ModalProps> = ({ isOpen, onClose, children }) => {
         className="modal-scroll"
         style={{
           position: "fixed",
-          top: "70px", // Position below the icons card
-          left: "52%",
-          transform: `translateX(-50%) translateY(${isAnimating ? "0" : "-20px"})`,
+          top: "50%",
+          left: "50%",
+          transform: `translate(-50%, -50%) translateY(${isAnimating ? "0" : "-20px"})`,
           zIndex: 1000,
           pointerEvents: "auto",
-          maxWidth: "90vw",
-          maxHeight: "calc(100vh - 100px)",
-          overflowY: "auto",
+          maxWidth: "95vw",
+          maxHeight: "95vh",
+          width: "90%",
+          height: "90%",
+          display: "flex",
+          flexDirection: "column",
           backgroundColor: "white",
           borderRadius: "20px",
           boxShadow: "0 8px 24px rgba(0,0,0,0.3)",
-          padding: "30px",
           opacity: isAnimating ? 1 : 0,
           transition: "all 0.3s cubic-bezier(0.4, 0, 0.2, 1)",
-          height: "50%",
-          width: "50%",
         }}
       >
-        {/* Close button */}
-        <button
-          type="button"
-          onClick={handleClose}
+        {/* Sticky Header */}
+        <div
           style={{
-            position: "absolute",
-            top: "15px",
-            right: "15px",
-            background: "transparent",
-            border: "none",
-            cursor: "pointer",
-            fontSize: "20px",
-            color: "#092C4C",
-            zIndex: 1100,
-            padding: "5px",
+            position: "sticky",
+            top: 0,
+            backgroundColor: "white",
+            padding: "20px 30px",
+            borderBottom: "2px solid #e2e8f0",
+            borderRadius: "20px 20px 0 0",
+            zIndex: 10,
             display: "flex",
             alignItems: "center",
-            justifyContent: "center",
-            borderRadius: "50%",
-            transition: "background 0.2s ease",
-          }}
-          onMouseEnter={(e) => {
-            e.currentTarget.style.backgroundColor = "rgba(9, 44, 76, 0.1)";
-          }}
-          onMouseLeave={(e) => {
-            e.currentTarget.style.backgroundColor = "transparent";
+            justifyContent: "space-between",
           }}
         >
-          <FaTimes />
-        </button>
+          {/* Header Title */}
+          <h2
+            style={{
+              margin: 0,
+              fontSize: "24px",
+              fontWeight: 700,
+              color: "#0d3b66",
+              letterSpacing: "-0.2px",
+            }}
+          >
+            Plot Scheduler
+          </h2>
 
-        {/* Modal content */}
-        <div style={{ marginTop: "10px" }}>
+          {/* Close button */}
+          <button
+            type="button"
+            onClick={handleClose}
+            style={{
+              position: "relative",
+              background: "transparent",
+              border: "none",
+              cursor: "pointer",
+              fontSize: "20px",
+              color: "#092C4C",
+              padding: "5px",
+              display: "flex",
+              alignItems: "center",
+              justifyContent: "center",
+              borderRadius: "50%",
+              transition: "background 0.2s ease",
+            }}
+            onMouseEnter={(e) => {
+              e.currentTarget.style.backgroundColor = "rgba(9, 44, 76, 0.1)";
+            }}
+            onMouseLeave={(e) => {
+              e.currentTarget.style.backgroundColor = "transparent";
+            }}
+          >
+            <FaTimes />
+          </button>
+        </div>
+
+        {/* Scrollable Modal content */}
+        <div
+          style={{
+            flex: 1,
+            overflowY: "auto",
+            padding: "30px",
+          }}
+        >
           {children}
         </div>
       </div>
