@@ -27,6 +27,7 @@ import Profile from '../components/Profile.tsx';
 import ProctorExamDate from "./ProctorExamDate.tsx";
 import ProctorViewExam from "./ProctorViewExam.tsx";
 import BayanihanModality from "./BayanihanModality.tsx";
+import MiniExamDateCalendar from "./MiniExamDateCalendar.tsx";
 
 const iconStyle = { className: 'icon', size: 25 };
 
@@ -192,7 +193,7 @@ const DashboardAdmin: React.FC = () => {
               <div className="full-width-section">
                 <h2>Shortcut</h2>
                 <div className="try-things-grid">
-                  <div className="try-thing-card"><ProctorExamDate /></div>
+                  <div className="try-thing-card"><MiniExamDateCalendar user={user} /></div>
                   <div className="try-thing-card"><ProctorViewExam /></div>
                 </div>
               </div>

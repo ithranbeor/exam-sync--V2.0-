@@ -38,7 +38,7 @@ const collegeColors: Record<string, string> = {
 const MiniExamDateCalendar = ({ }: MiniExamDateCalendarProps) => {
   const [currentMonth, setCurrentMonth] = useState(new Date());
   const [examPeriods, setExamPeriods] = useState<ExamPeriod[]>([]);
-  const [_termMap, setTermMap] = useState<Record<string, string>>({});
+  const [termMap, setTermMap] = useState<Record<string, string>>({});
 
   const currentYear = currentMonth.getFullYear();
   const currentMonthIndex = currentMonth.getMonth();
@@ -137,6 +137,9 @@ const MiniExamDateCalendar = ({ }: MiniExamDateCalendarProps) => {
                   {college}
                 </div>
               ))}
+            <div className="mini-semester">{termMap[String(events[0].term_id)] || "Unknown Term"}</div>
+            <div className="mini-semester">{events[0].academic_year}</div>
+            <div className="mini-exam">{events[0].exam_category}</div>
           </div>
         )}
       </div>
