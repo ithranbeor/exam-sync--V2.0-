@@ -324,6 +324,13 @@ const SchedulerAvailability: React.FC<ProctorSetAvailabilityProps> = ({ user }) 
     }
   };
 
+  const formatLocal = (date: Date) => {
+    const year = date.getFullYear();
+    const month = String(date.getMonth() + 1).padStart(2, '0');
+    const day = String(date.getDate()).padStart(2, '0');
+    return `${year}-${month}-${day}`;
+  };
+
   const fetchAllowedDates = async () => {
     try {
       const { data: roles } = await api.get(`/tbl_user_role`, {
@@ -349,44 +356,23 @@ const SchedulerAvailability: React.FC<ProctorSetAvailabilityProps> = ({ user }) 
       );
 
       const dates: string[] = [];
-      periods?.forEach((period: any) => {
+      periods.forEach((period: any) => {
         if (!period.start_date || !period.end_date) return;
         
-        // ✅ Parse date strings as local dates (not UTC)
-        const startParts = period.start_date.split('-').map(Number);
-        const endParts = period.end_date.split('-').map(Number);
-        
-        // Create dates in local timezone
-        // Note: month is 0-indexed (January = 0)
-        const start = new Date(startParts[0], startParts[1] - 1, startParts[2]);
-        const end = new Date(endParts[0], endParts[1] - 1, endParts[2]);
-        
-        // Iterate through all dates in range
-        const current = new Date(start);
-        while (current <= end) {
-          // Format as YYYY-MM-DD using local date components
-          const year = current.getFullYear();
-          const month = String(current.getMonth() + 1).padStart(2, '0');
-          const day = String(current.getDate()).padStart(2, '0');
-          dates.push(`${year}-${month}-${day}`);
-          
-          // Move to next day
-          current.setDate(current.getDate() + 1);
+        const start = new Date(period.start_date);
+        const end = new Date(period.end_date);
+
+        for (let d = new Date(start); d <= end; d.setDate(d.getDate() + 1)) {
+          dates.push(formatLocal(new Date(d)));  // 👈 FIXED: local date, no UTC shift
         }
       });
 
-      // Sort and set allowed dates
       dates.sort();
       setAllowedDates(dates);
-      
-      // ✅ Format today's date in local timezone
-      const todayYear = today.getFullYear();
-      const todayMonth = String(today.getMonth() + 1).padStart(2, '0');
-      const todayDay = String(today.getDate()).padStart(2, '0');
-      const todayStr = `${todayYear}-${todayMonth}-${todayDay}`;
-      
-      // Select today if it's in allowed dates
+
+      const todayStr = formatLocal(new Date());
       setSelectedDate(dates.includes(todayStr) ? [todayStr] : []);
+
     } catch (error) {
       console.error('Error fetching allowed dates:', error);
       setAllowedDates([]);
@@ -431,17 +417,9 @@ const SchedulerAvailability: React.FC<ProctorSetAvailabilityProps> = ({ user }) 
   const goToNextMonth = () =>
     setCurrentMonth((prev) => new Date(prev.getFullYear(), prev.getMonth() + 1, 1));
   const goToToday = () => {
-    // ✅ Format today using local timezone (matches fetchAllowedDates)
-    const todayYear = today.getFullYear();
-    const todayMonth = String(today.getMonth() + 1).padStart(2, '0');
-    const todayDay = String(today.getDate()).padStart(2, '0');
-    const todayStr = `${todayYear}-${todayMonth}-${todayDay}`;
-    
-    // Set calendar to current month
+    const isoToday = today.toISOString().split('T')[0];
     setCurrentMonth(new Date(today.getFullYear(), today.getMonth(), 1));
-    
-    // Select today if it's in allowed dates
-    setSelectedDate(allowedDates.includes(todayStr) ? [todayStr] : []);
+    setSelectedDate(allowedDates.includes(isoToday) ? [isoToday] : []);
   };
 
   const openAddModal = () => {
@@ -1072,21 +1050,9 @@ const SchedulerAvailability: React.FC<ProctorSetAvailabilityProps> = ({ user }) 
                 type="text"
                 readOnly
                 value={selectedDate.length > 0 ? selectedDate.map(d => new Date(d).toLocaleDateString()).join(', ') : 'Select Date(s)'}
-                onClick={() => {
-                  console.log('📅 Date input clicked');
-                  console.log('Allowed dates count:', allowedDates.length);
-                  console.log('First 3 allowed dates:', allowedDates.slice(0, 3));
-                  
-                  if (allowedDates.length > 0) {
-                    setShowDatePicker(!showDatePicker);
-                  } else {
-                    console.warn('⚠️ No allowed dates found. Check if exam period is created.');
-                    alert('No exam dates available. Please create an exam period first.');
-                  }
-                }}
-                style={{ cursor: allowedDates.length > 0 ? 'pointer' : 'not-allowed' }}
+                onClick={() => allowedDates.length > 0 && setShowDatePicker(!showDatePicker)}
               />
-              {showDatePicker && allowedDates.length > 0 && (
+              {showDatePicker && (
                 <div className="date-picker">
                   <div className="date-picker-header">
                     <button type="button" onClick={goToPreviousMonth}>
