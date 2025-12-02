@@ -103,7 +103,7 @@ const Modal: React.FC<ModalProps> = ({ isOpen, onClose, children }) => {
               letterSpacing: "-0.2px",
             }}
           >
-            Plot Scheduler
+            Plot Exam Schedule
           </h2>
 
           {/* Close button */}
