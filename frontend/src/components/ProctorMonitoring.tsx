@@ -155,6 +155,34 @@ const ProctorMonitoring: React.FC<UserProps> = ({ }) => {
   // Check if any schedules have OTP codes
   const hasOtpCodes = approvedSchedules.some(s => s.otp_code);
 
+  const formatTo12Hour = (timeString: string | undefined) => {
+    if (!timeString) return '-';
+    
+    try {
+      // Try to extract time from ISO string format (YYYY-MM-DDTHH:MM:SS)
+      let time: string;
+      if (timeString.includes('T')) {
+        time = timeString.slice(11, 16); // Extract HH:MM from ISO string
+      } else if (timeString.includes(':')) {
+        // Already in HH:MM format
+        time = timeString.slice(0, 5);
+      } else {
+        return '-';
+      }
+      
+      const [hourStr, minute] = time.split(":");
+      if (!hourStr || !minute) return '-';
+      
+      let hour = Number(hourStr);
+      const ampm = hour >= 12 ? "PM" : "AM";
+      hour = hour % 12 || 12;
+      return `${hour}:${minute} ${ampm}`;
+    } catch (e) {
+      console.error('Error formatting time:', timeString, e);
+      return '-';
+    }
+  };
+
   return (
     <div className="proctor-monitoring-container">
       <ToastContainer position="top-right" autoClose={3000} />
@@ -279,7 +307,7 @@ const ProctorMonitoring: React.FC<UserProps> = ({ }) => {
                     <td>{schedule.subject}</td>
                     <td>{schedule.section_name}</td>
                     <td>{schedule.exam_date}</td>
-                    <td>{schedule.exam_start_time?.slice(11, 16)} - {schedule.exam_end_time?.slice(11, 16)}</td>
+                    <td>{formatTo12Hour(schedule.exam_start_time)} - {formatTo12Hour(schedule.exam_end_time)}</td>
                     <td>{schedule.building_name}</td>
                     <td>{schedule.room_id}</td>
                     <td>{schedule.proctor_name}</td>

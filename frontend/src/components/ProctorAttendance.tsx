@@ -162,6 +162,34 @@ const ProctorAttendance: React.FC<UserProps> = ({ user }) => {
       setVerifyingOtp(false);
     }
   };
+  
+  const formatTo12Hour = (timeString: string | undefined) => {
+    if (!timeString) return '-';
+    
+    try {
+      // Try to extract time from ISO string format (YYYY-MM-DDTHH:MM:SS)
+      let time: string;
+      if (timeString.includes('T')) {
+        time = timeString.slice(11, 16); // Extract HH:MM from ISO string
+      } else if (timeString.includes(':')) {
+        // Already in HH:MM format
+        time = timeString.slice(0, 5);
+      } else {
+        return '-';
+      }
+      
+      const [hourStr, minute] = time.split(":");
+      if (!hourStr || !minute) return '-';
+      
+      let hour = Number(hourStr);
+      const ampm = hour >= 12 ? "PM" : "AM";
+      hour = hour % 12 || 12;
+      return `${hour}:${minute} ${ampm}`;
+    } catch (e) {
+      console.error('Error formatting time:', timeString, e);
+      return '-';
+    }
+  };
 
   const handleSubmit = async () => {
     if (!user?.user_id || !otpCode.trim()) {
@@ -247,7 +275,7 @@ const ProctorAttendance: React.FC<UserProps> = ({ user }) => {
                     <div className="proctor-attendance-detail-row">
                       <span className="proctor-attendance-detail-label">Time:</span>
                       <span className="proctor-attendance-detail-value">
-                        {exam.exam_start_time?.slice(11, 16)} - {exam.exam_end_time?.slice(11, 16)}
+                        {formatTo12Hour(exam.exam_start_time)} - {formatTo12Hour(exam.exam_end_time)}
                       </span>
                     </div>
                     <div className="proctor-attendance-detail-row">
@@ -305,7 +333,9 @@ const ProctorAttendance: React.FC<UserProps> = ({ user }) => {
                     </div>
                     <div className="proctor-attendance-detail-row">
                       <span className="proctor-attendance-detail-label">Time:</span>
-                      <span className="proctor-attendance-detail-value">{exam.exam_start_time} - {exam.exam_end_time}</span>
+                      <span className="proctor-attendance-detail-value">
+                        {formatTo12Hour(exam.exam_start_time)} - {formatTo12Hour(exam.exam_end_time)}
+                      </span>
                     </div>
                     <div className="proctor-attendance-detail-row">
                       <span className="proctor-attendance-detail-label">Building:</span>
@@ -386,7 +416,7 @@ const ProctorAttendance: React.FC<UserProps> = ({ user }) => {
                   <div className="proctor-attendance-modal-detail-item">
                     <span className="modal-detail-label">Time:</span>
                     <span className="modal-detail-value">
-                      {selectedExam.exam_start_time?.slice(11, 16)} - {selectedExam.exam_end_time?.slice(11, 16)}
+                      {formatTo12Hour(selectedExam.exam_start_time)} - {formatTo12Hour(selectedExam.exam_end_time)}
                     </span>
                   </div>
                   <div className="proctor-attendance-modal-detail-item">
