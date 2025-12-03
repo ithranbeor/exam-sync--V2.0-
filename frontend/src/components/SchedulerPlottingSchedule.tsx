@@ -1169,19 +1169,35 @@ const SchedulerPlottingSchedule: React.FC<SchedulerProps> = ({ user, onScheduleC
           : [selectedModality.section_name];
         
         // Get instructor IDs for all sections
-        const instructorIds = Array.from(new Set(
-          sections.map((sectionName: string) => {
-            const sectionCourseData = sectionCourses.find(
-              sc => sc.program_id === selectedModality.program_id &&
-                    sc.course_id === selectedModality.course_id &&
-                    sc.section_name === sectionName
-            );
-            return sectionCourseData?.user_id ?? null;
-          }).filter(Boolean)
-        ));
+        // ✅ FIX: Get instructor IDs for all sections (match ANY section in the sections array)
+        const instructorIds = sections.map((sectionName: string) => {
+          const sectionCourseData = sectionCourses.find(
+            sc => sc.program_id === selectedModality.program_id &&
+                  sc.course_id === selectedModality.course_id &&
+                  sc.section_name === sectionName
+          );
+          
+          const instructorId = sectionCourseData?.user_id ?? null;
+          
+          if (!instructorId) {
+            console.warn(`⚠️ No instructor found for ${selectedModality.course_id} - ${sectionName}`);
+            console.log('Available sectionCourses:', sectionCourses.filter(
+              sc => sc.course_id === selectedModality.course_id
+            ));
+          }
+          
+          return instructorId;
+        }).filter(Boolean);
+
+        // Keep order but remove duplicates
+        const uniqueInstructorIds: number[] = instructorIds.filter((id: number, index: number) => 
+          instructorIds.indexOf(id) === index
+        );
+
+        console.log(`📚 Course ${selectedModality.course_id}: ${sections.length} sections, ${uniqueInstructorIds.length} unique instructors`);
 
         
-        // Check if ANY section is night class
+        // Check if ANY section is night class`
         const isNightClass = sections.some((sectionName: string) => {
           const sectionCourseData = sectionCourses.find(
             sc => sc.program_id === selectedModality.program_id &&
@@ -1194,7 +1210,7 @@ const SchedulerPlottingSchedule: React.FC<SchedulerProps> = ({ user, onScheduleC
         const enrichedModality = {
           ...selectedModality,
           sections: sections, // ✅ Keep as array
-          instructors: instructorIds, // ✅ Array of instructors
+          instructors: uniqueInstructorIds, // ✅ Array of instructors
           is_night_class: isNightClass ? "YES" : "NO",
           enrolled_students: selectedModality.total_students ?? 0
         };
@@ -1744,9 +1760,36 @@ const SchedulerPlottingSchedule: React.FC<SchedulerProps> = ({ user, onScheduleC
       }
 
       // Build proctors array for all grouped sections
-      const proctorsArray: number[] = Array(section.sections.length).fill(sharedProctor);
+      const proctorsArray: number[] = [];
 
-      console.log(`✅ Assigned proctor ${sharedProctor} to ${section.sections.length} section(s)`);
+      for (let i = 0; i < section.sections.length; i++) {
+        let sectionProctor = -1;
+        
+        // Try to get a unique proctor for this section
+        const availableForSection = getAvailableProctors(date, timeSlot).filter(pid => 
+          isProctorAvailable(pid, date, timeSlot) && !proctorsArray.includes(pid)
+        );
+        
+        if (availableForSection.length > 0) {
+          sectionProctor = availableForSection[Math.floor(Math.random() * availableForSection.length)];
+          assignProctorGlobally(sectionProctor, date, timeSlot);
+        } else {
+          // Fallback: try section's own instructor
+          const sectionInstructor = section.instructors[i];
+          if (sectionInstructor && isProctorAvailable(sectionInstructor, date, timeSlot)) {
+            sectionProctor = sectionInstructor;
+            assignProctorGlobally(sectionProctor, date, timeSlot);
+          } else {
+            // Last resort: use a placeholder
+            sectionProctor = -9999;
+            assignProctorGlobally(sectionProctor, date, timeSlot);
+          }
+        }
+        
+        proctorsArray.push(sectionProctor);
+      }
+
+      console.log(`✅ Assigned ${proctorsArray.length} different proctors for ${section.sections.length} section(s)`);
 
       // ✅ Add to scheduled exams
       scheduledExams.push({
@@ -1756,8 +1799,18 @@ const SchedulerPlottingSchedule: React.FC<SchedulerProps> = ({ user, onScheduleC
         room_id: roomId,
         
         sections: section.sections,
-        instructors: section.instructors,
+        instructors: section.instructors, // Keep raw array for backend
         proctors: proctorsArray,
+        instructors_display: (() => {
+          // ✅ FIX: Deduplicate instructors while preserving order
+          const uniqueInstructors: number[] = [];
+          section.instructors.forEach((instrId: number) => {
+            if (instrId && !uniqueInstructors.includes(instrId)) {
+              uniqueInstructors.push(instrId);
+            }
+          });
+          return uniqueInstructors;
+        })(),
         
         section_name: section.sections[0],
         instructor_id: section.instructors[0] ?? null,

@@ -120,28 +120,72 @@ const SectionCourses: React.FC = () => {
       }));
   }, [courseInstructorsMap, newSection.course_id]);
 
+  // Replace the fetchAll function in SectionCourses.tsx with this fixed version:
+
   const fetchAll = useCallback(async () => {
     setLoading(true);
     try {
-      const [secRes, courseRes, progRes, termRes, courseUserRes] = await Promise.all([
+      const [secRes, courseRes, progRes, termRes, courseUserRes, userRes] = await Promise.all([
         api.get('/tbl_sectioncourse/'),
         api.get('/courses/'),
         api.get('/programs/'),
         api.get('/tbl_term'),
-        api.get('/tbl_course_users/')
+        api.get('/tbl_course_users/'),
+        api.get('/users/me/')
       ]);
 
-      // ✅ FIX: Extract data from the new response structure
-      const secData = secRes.data?.data || secRes.data || [];  // Handle both formats
+      // Extract data from response
+      const secData = secRes.data?.data || secRes.data || [];
       const courseData = courseRes.data || [];
       const progData = progRes.data || [];
       const termData = termRes.data || [];
       const courseUserData = courseUserRes.data || [];
 
-      setSectionCourses(secData);  // ✅ Use extracted array
-      setCourses(courseData);
+      // Extract current user
+      const user: User | null = userRes?.data?.data || userRes?.data || null;
+
+      if (!user?.user_id) {
+        toast.error('User not found');
+        setLoading(false);
+        return;
+      }
+
+      setSectionCourses(secData);
+
+      // ✅ FIX: Filter courses where user is a Bayanihan Leader
+      const bayanihanCourseIds = new Set(
+        courseUserData
+          .filter((row: any) => {
+            // Handle different possible response structures
+            const rowUserId = row.user_id || row.tbl_users?.user_id || row.user?.user_id;
+            const isBayanihanLeader = row.is_bayanihan_leader === true || row.is_bayanihan_leader === 'true';
+            
+            return rowUserId === user.user_id && isBayanihanLeader;
+          })
+          .map((row: any) => row.course?.course_id || row.course_id)
+          .filter(Boolean) // Remove null/undefined values
+      );
+
+      console.log('User ID:', user.user_id);
+      console.log('Bayanihan Leader Course IDs:', Array.from(bayanihanCourseIds));
+
+      // Filter courses to only show those where user is Bayanihan Leader
+      const filteredCourses = courseData.filter(
+        (c: any) => bayanihanCourseIds.has(c.course_id)
+      );
+
+      console.log('Filtered Courses Count:', filteredCourses.length);
+      // Add types to the console log for filteredCourses
+      interface FilteredCourse extends Course {
+        // You can extend with additional properties if needed
+      }
+      const filteredCoursesTyped: FilteredCourse[] = filteredCourses;
+      console.log('Filtered Courses:', filteredCoursesTyped.map((c: FilteredCourse) => c.course_id));
+
+      setCourses(filteredCourses);
       setPrograms(progData);
 
+      // Map terms
       const mappedTerms = termData.map((t: any) => ({
         ...t,
         tbl_examperiod: {
@@ -152,21 +196,29 @@ const SectionCourses: React.FC = () => {
       }));
       setTerms(mappedTerms);
 
+      // Build instructor map for ALL courses (not just filtered)
       const instructorMap: Record<string, User[]> = {};
       courseUserData.forEach((row: any) => {
-        if (!row.tbl_users) return;
-        const user: User = {
-          user_id: row.tbl_users.user_id,
-          full_name: row.tbl_users.full_name || `${row.tbl_users.first_name} ${row.tbl_users.last_name}`
-        };
         const courseId = row.course?.course_id || row.course_id;
         if (!courseId) return;
+
+        // Extract user information
+        const userEntry: User = {
+          user_id: row.user_id || row.tbl_users?.user_id || row.user?.user_id,
+          full_name: row.tbl_users?.full_name || 
+                    row.user?.full_name || 
+                    `${row.tbl_users?.first_name || row.user?.first_name || ''} ${row.tbl_users?.last_name || row.user?.last_name || ''}`.trim()
+        };
+
+        if (!userEntry.user_id) return;
+
         if (!instructorMap[courseId]) instructorMap[courseId] = [];
-        instructorMap[courseId].push(user);
+        instructorMap[courseId].push(userEntry);
       });
       setCourseInstructorsMap(instructorMap);
 
-    } catch (_error) {
+    } catch (error) {
+      console.error('Error fetching data:', error);
       toast.error('Error fetching data.');
     } finally {
       setLoading(false);
