@@ -199,13 +199,6 @@ const Colleges: React.FC = () => {
     return filteredColleges.slice((currentPage - 1) * itemsPerPage, currentPage * itemsPerPage);
   }, [filteredColleges, currentPage, itemsPerPage]);
 
-  const totalPages = useMemo(() => {
-    if (itemsPerPage === 'all') {
-      return 1;
-    }
-    return Math.ceil(filteredColleges.length / itemsPerPage);
-  }, [filteredColleges.length, itemsPerPage]);
-
   const toggleSelect = (id: string) => {
     setSelectedIds((prev) => {
       const next = new Set(prev);

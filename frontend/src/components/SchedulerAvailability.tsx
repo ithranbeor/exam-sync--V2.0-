@@ -631,13 +631,6 @@ const SchedulerAvailability: React.FC<ProctorSetAvailabilityProps> = ({ user }) 
     return filteredEntries.slice((currentPage - 1) * itemsPerPage, currentPage * itemsPerPage);
   }, [filteredEntries, currentPage, itemsPerPage]);
 
-  const totalPages = useMemo(() => {
-    if (itemsPerPage === 'all') {
-      return 1;
-    }
-    return Math.ceil(filteredEntries.length / itemsPerPage);
-  }, [filteredEntries.length, itemsPerPage]);
-
   const isAllSelected = filteredEntries.length > 0 && filteredEntries.every((entry) => selectedAvailabilityIds.has(entry.availability_id));
 
   const toggleSelectAll = () => {

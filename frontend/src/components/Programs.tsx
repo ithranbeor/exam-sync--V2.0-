@@ -256,13 +256,6 @@ const Programs: React.FC<ProgramsProps> = ({ user: _user }) => {
     return filteredPrograms.slice((currentPage - 1) * itemsPerPage, currentPage * itemsPerPage);
   }, [filteredPrograms, currentPage, itemsPerPage]);
 
-  const totalPages = useMemo(() => {
-    if (itemsPerPage === 'all') {
-      return 1;
-    }
-    return Math.ceil(filteredPrograms.length / itemsPerPage);
-  }, [filteredPrograms.length, itemsPerPage]);
-
   const toggleSelect = (id: string) => {
     setSelectedIds((prev) => {
       const next = new Set(prev);

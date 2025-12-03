@@ -668,13 +668,6 @@ const SectionCourses: React.FC = () => {
     return filtered.slice((currentPage - 1) * itemsPerPage, currentPage * itemsPerPage);
   }, [filtered, currentPage, itemsPerPage]);
 
-  const totalPages = useMemo(() => {
-    if (itemsPerPage === 'all') {
-      return 1;
-    }
-    return Math.ceil(filtered.length / itemsPerPage);
-  }, [filtered.length, itemsPerPage]);
-
   const toggleSelect = (id: string | number | undefined) => {
     if (id === undefined) return;
     const key = String(id);

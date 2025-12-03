@@ -227,13 +227,6 @@ const Departments: React.FC = () => {
     return filteredDepartments.slice((currentPage - 1) * itemsPerPage, currentPage * itemsPerPage);
   }, [filteredDepartments, currentPage, itemsPerPage]);
 
-  const totalPages = useMemo(() => {
-    if (itemsPerPage === 'all') {
-      return 1;
-    }
-    return Math.ceil(filteredDepartments.length / itemsPerPage);
-  }, [filteredDepartments.length, itemsPerPage]);
-
   const toggleSelect = (id: string) => {
     setSelectedIds((prev) => {
       const next = new Set(prev);

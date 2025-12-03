@@ -192,13 +192,6 @@ const Terms: React.FC = () => {
     return filteredTerms.slice((currentPage - 1) * itemsPerPage, currentPage * itemsPerPage);
   }, [filteredTerms, currentPage, itemsPerPage]);
 
-  const totalPages = useMemo(() => {
-    if (itemsPerPage === 'all') {
-      return 1;
-    }
-    return Math.ceil(filteredTerms.length / itemsPerPage);
-  }, [filteredTerms.length, itemsPerPage]);
-
   // ✅ Add or edit term
   const handleModalSubmit = async () => {
     if (!newTermName.trim()) {

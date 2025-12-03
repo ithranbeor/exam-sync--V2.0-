@@ -986,13 +986,6 @@ export const UserManagement: React.FC<UserManagementProps> = ({}) => {
     return filteredAccounts.slice((currentPage - 1) * itemsPerPage, currentPage * itemsPerPage);
   }, [filteredAccounts, currentPage, itemsPerPage]);
 
-  const totalPages = useMemo(() => {
-    if (itemsPerPage === 'all') {
-      return 1;
-    }
-    return Math.ceil(filteredAccounts.length / itemsPerPage);
-  }, [filteredAccounts.length, itemsPerPage]);
-
   const isAllSelected = (() => {
     if (filteredAccounts.length === 0) return false;
     return filteredAccounts.every(acc => selectedAccountIds.has(acc.user_id));
