@@ -193,7 +193,7 @@ const DashboardAdmin: React.FC = () => {
                 <h2>Shortcut</h2>
                 <div className="try-things-grid">
                   <div className="try-thing-card"><MiniExamDateCalendar user={user} /></div>
-                  <div className="try-thing-card"><ProctorViewExam /></div>
+                  <div className="try-thing-card"><ProctorViewExam user={user}  /></div>
                 </div>
               </div>
             </div>
