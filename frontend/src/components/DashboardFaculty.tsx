@@ -76,6 +76,7 @@ const DashboardFaculty = () => {
   const [showLogoutModal, setShowLogoutModal] = useState(false);
   const [isMobile, setIsMobile] = useState(window.innerWidth <= 1024);
   const [unreadNotificationCount, setUnreadNotificationCount] = useState(0);
+  const [pendingRequestCount, setPendingRequestCount] = useState(0);
   const navigate = useNavigate();
 
   useEffect(() => {
@@ -143,6 +144,25 @@ const DashboardFaculty = () => {
 
     fetchUnreadCount();
     const interval = setInterval(fetchUnreadCount, 10000);
+    return () => clearInterval(interval);
+  }, [user]);
+
+  useEffect(() => {
+    const fetchPendingRequests = async () => {
+      if (!user?.user_id) return;
+      try {
+        const res = await api.get(`/tbl_scheduleapproval/`, {
+          params: { status: 'pending', reviewer_id: user.user_id }
+        });
+        const pendingCount = Array.isArray(res.data) ? res.data.length : 0;
+        setPendingRequestCount(pendingCount);
+      } catch (err) {
+        console.error('Error fetching pending request count:', err);
+      }
+    };
+
+    fetchPendingRequests();
+    const interval = setInterval(fetchPendingRequests, 10000);
     return () => clearInterval(interval);
   }, [user]);
 
@@ -296,7 +316,16 @@ const DashboardFaculty = () => {
                 {mergedSidebarItems.map(({ key, label, icon }) => (
                   <li key={key} className={activeMenu === key ? 'active' : ''}>
                     <button type="button" onClick={() => handleMenuClick(key)}>
-                      {icon}
+                      {key === 'Request' ? (
+                        <div className="sidebar-icon-wrapper">
+                          {icon}
+                          {pendingRequestCount > 0 && (
+                            <span className="notification-badge-icon">{pendingRequestCount}</span>
+                          )}
+                        </div>
+                      ) : (
+                        icon
+                      )}
                       {isSidebarOpen && <span>{label}</span>}
                     </button>
                   </li>

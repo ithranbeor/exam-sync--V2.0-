@@ -383,11 +383,11 @@ const Colleges: React.FC = () => {
       <div className="colleges-actions">
         <div style={{ display: 'flex', alignItems: 'center', gap: 8, width: '100%' }}>
           <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-            <button type='button' className="action-button add-new" onClick={handleAddCollege}>
-              <FaPlus/>
+            <button type='button' className="action-button add-new with-label" onClick={handleAddCollege}>
+              <FaPlus/><span className="btn-label">Add</span>
             </button>
-            <button type='button' className="action-button import" onClick={() => setShowImport(true)}>
-              <FaFileImport/>
+            <button type='button' className="action-button import with-label" onClick={() => setShowImport(true)}>
+              <FaFileImport/><span className="btn-label">Import</span>
             </button>
             <div style={{ position: 'relative' }} data-sort-dropdown>
               <button 

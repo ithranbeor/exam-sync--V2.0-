@@ -531,7 +531,7 @@ const Courses: React.FC = () => {
           <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
             <button
               type="button"
-              className="action-button add-new"
+              className="action-button add-new with-label"
               onClick={() => {
                 setNewCourse({
                   course_id: "",
@@ -544,14 +544,14 @@ const Courses: React.FC = () => {
                 setShowModal(true);
               }}
             >
-              <FaPlus/>
+              <FaPlus/><span className="btn-label">Add</span>
             </button>
             <button
               type="button"
-              className="action-button import"
+              className="action-button import with-label"
               onClick={() => setShowImport(true)}
             >
-              <FaFileImport/>
+              <FaFileImport/><span className="btn-label">Import</span>
             </button>
             <div style={{ position: 'relative' }} data-sort-dropdown>
               <button 

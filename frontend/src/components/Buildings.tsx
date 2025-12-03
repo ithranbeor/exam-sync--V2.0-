@@ -412,21 +412,21 @@ const Buildings: React.FC = () => {
           <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
             <button
               type="button"
-              className="action-button add-new"
+              className="action-button add-new with-label"
               onClick={() => {
                 setEditMode(false);
                 setNewBuilding({ building_id: '', building_name: '' });
                 setShowModal(true);
               }}
             >
-              <FaPlus/>
+              <FaPlus/><span className="btn-label">Add</span>
             </button>
             <button
               type="button"
-              className="action-button import"
+              className="action-button import with-label"
               onClick={() => setShowImport(true)}
             >
-              <FaFileImport/>
+              <FaFileImport/><span className="btn-label">Import</span>
             </button>
             <div style={{ position: 'relative' }} data-sort-dropdown>
               <button 

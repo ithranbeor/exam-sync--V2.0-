@@ -386,7 +386,7 @@ const Terms: React.FC = () => {
           <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
             <button
               type="button"
-              className="action-button add-new"
+              className="action-button add-new with-label"
               onClick={() => {
                 setNewTermName("");
                 setEditMode(false);
@@ -394,14 +394,14 @@ const Terms: React.FC = () => {
                 setShowModal(true);
               }}
             >
-              <FaPlus/>
+              <FaPlus/><span className="btn-label">Add</span>
             </button>
             <button
               type="button"
-              className="action-button import"
+              className="action-button import with-label"
               onClick={() => setShowImport(true)}
             >
-              <FaFileImport/>
+              <FaFileImport/><span className="btn-label">Import</span>
             </button>
             <div style={{ position: 'relative' }} data-sort-dropdown>
               <button 
@@ -518,6 +518,7 @@ const Terms: React.FC = () => {
                   gap: '6px',
                   padding: '8px 16px',
                   borderRadius: '8px',
+                    borderRadius: '8px',
                   border: 'none',
                   cursor: 'pointer',
                   fontSize: '14px',
@@ -591,6 +592,7 @@ const Terms: React.FC = () => {
                       cursor: 'pointer',
                       fontSize: '14px',
                       borderRadius: '4px',
+                        borderRadius: '8px',
                       borderTop: '1px solid #eee'
                     }}
                     onMouseEnter={(e) => {
@@ -615,6 +617,7 @@ const Terms: React.FC = () => {
                       cursor: 'pointer',
                       fontSize: '14px',
                       borderRadius: '4px',
+                        borderRadius: '8px',
                       borderTop: '1px solid #eee'
                     }}
                     onMouseEnter={(e) => {

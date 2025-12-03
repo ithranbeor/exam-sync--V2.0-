@@ -492,7 +492,7 @@ const ExamPeriodComponent: React.FC = () => {
 
       <div className="colleges-actions" style={{ display: 'flex', width: '100%', alignItems: 'center', flexWrap: 'wrap', gap: 8 }}>
         <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-          <button type='button' className="action-button add-new" onClick={() => {
+          <button type='button' className="action-button add-new with-label" onClick={() => {
             setEditMode(false);
             setNewExam({
               start_date: '',
@@ -506,7 +506,7 @@ const ExamPeriodComponent: React.FC = () => {
             setSelectedDates([]);
             setActiveDate(new Date());
             setShowModal(true);
-          }}><FaPlus/></button>
+          }}><FaPlus/><span className="btn-label">Add</span></button>
           <div style={{ position: 'relative' }} data-sort-dropdown>
             <button 
               type='button' 
