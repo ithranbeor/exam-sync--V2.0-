@@ -346,7 +346,7 @@ const ProctorAttendance: React.FC<UserProps> = ({ user }) => {
                         <h3 className="proctor-attendance-schedule-subject">
                           {exam.course_id} - {exam.subject}
                         </h3>
-                        <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                        <div className="proctor-attendance-badge-wrapper">
                           <span className="proctor-attendance-schedule-code">{exam.course_id}</span>
                           <span className="ongoing-badge">ONGOING</span>
                         </div>

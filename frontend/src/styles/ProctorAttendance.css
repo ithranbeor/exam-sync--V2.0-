@@ -7,6 +7,11 @@
   min-height: calc(100vh - 60px);
   display: flex;
   flex-direction: column;
+  width: 100%;
+  box-sizing: border-box;
+  overflow-x: hidden;
+  overflow-y: visible;
+  position: relative;
 }
 
 .proctor-attendance-header {
@@ -14,6 +19,8 @@
   justify-content: flex-start;
   align-items: center;
   margin-bottom: 20px;
+  width: 100%;
+  visibility: visible;
 }
 
 .proctor-attendance-section {
@@ -26,6 +33,11 @@
   background-color: #e3f2fd;
   border-left: 4px solid #2196f3;
   border-radius: 4px;
+  width: 100%;
+  box-sizing: border-box;
+  visibility: visible;
+  opacity: 1;
+  display: block;
 }
 
 .proctor-attendance-instruction-text {
@@ -33,6 +45,9 @@
   font-size: 14px;
   color: #1976d2;
   font-weight: 500;
+  visibility: visible;
+  opacity: 1;
+  display: block;
 }
 
 .proctor-attendance-section-title {
@@ -42,12 +57,19 @@
   font-weight: 600;
   padding-bottom: 8px;
   border-bottom: 2px solid #333d52;
+  width: 100%;
+  visibility: visible;
+  opacity: 1;
+  display: block;
 }
 
 .proctor-attendance-title {
   font-size: 24px;
   color: #333;
   margin: 0;
+  visibility: visible;
+  opacity: 1;
+  display: block;
 }
 
 /* Canvas Area - Similar to Proctor Monitoring */
@@ -74,9 +96,17 @@
   transition: box-shadow 0.3s ease, transform 0.2s ease;
 }
 
-.proctor-attendance-schedule-card:hover {
-  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.12);
-  transform: translateY(-2px);
+@media (hover: hover) {
+  .proctor-attendance-schedule-card:hover {
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.12);
+    transform: translateY(-2px);
+  }
+
+  .proctor-attendance-schedule-card-clickable:hover {
+    border-color: #FAB417;
+    box-shadow: 0 4px 12px rgba(250, 180, 23, 0.3);
+    transform: translateY(-3px);
+  }
 }
 
 .proctor-attendance-schedule-card-clickable {
@@ -84,12 +114,7 @@
   position: relative;
   border: 2px solid #e0e0e0;
   transition: all 0.3s ease;
-}
-
-.proctor-attendance-schedule-card-clickable:hover {
-  border-color: #FAB417;
-  box-shadow: 0 4px 12px rgba(250, 180, 23, 0.3);
-  transform: translateY(-3px);
+  -webkit-tap-highlight-color: transparent;
 }
 
 .proctor-attendance-schedule-card-assigned {
@@ -145,6 +170,15 @@
   margin: 0;
   flex: 1;
   line-height: 1.3;
+  word-wrap: break-word;
+  overflow-wrap: break-word;
+}
+
+.proctor-attendance-badge-wrapper {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
 }
 
 .proctor-attendance-schedule-code {
@@ -165,8 +199,10 @@
 .proctor-attendance-detail-row {
   display: flex;
   justify-content: space-between;
+  align-items: center;
   padding: 3px 0;
   border-bottom: 1px solid #f0f0f0;
+  gap: 8px;
 }
 
 .proctor-attendance-detail-row:last-child {
@@ -177,12 +213,18 @@
   font-weight: 600;
   color: #555;
   font-size: 11px;
+  flex-shrink: 0;
+  white-space: nowrap;
 }
 
 .proctor-attendance-detail-value {
   color: #333;
   font-size: 11px;
   text-align: right;
+  word-break: break-word;
+  overflow-wrap: break-word;
+  flex: 1;
+  min-width: 0;
 }
 
 .no-data-message {
@@ -230,6 +272,8 @@
   align-items: center;
   z-index: 1000;
   padding: 20px;
+  overflow-y: auto;
+  -webkit-overflow-scrolling: touch;
 }
 
 .proctor-attendance-modal {
@@ -545,83 +589,833 @@
 /* Tablet (768px - 1024px) */
 @media screen and (max-width: 1024px) {
   .proctor-attendance-container {
-    padding: 15px;
+    padding: 16px;
   }
 
-  .proctor-attendance-title {
-    font-size: 20px;
+  .proctor-attendance-section {
+    margin-bottom: 24px;
   }
 
-  .proctor-attendance-table th,
-  .proctor-attendance-table td {
-    padding: 10px 12px;
-    font-size: 14px;
+  .proctor-attendance-section-title {
+    font-size: 16px;
+  }
+
+  .proctor-attendance-canvas {
+    padding: 12px;
+  }
+
+  .proctor-attendance-schedules-grid {
+    grid-template-columns: repeat(auto-fill, minmax(260px, 1fr));
+    gap: 10px;
+  }
+
+  .proctor-attendance-schedule-card {
+    padding: 10px;
+  }
+
+  .proctor-attendance-modal {
+    max-width: 90%;
+  }
+
+  .proctor-attendance-modal-details-grid {
+    grid-template-columns: repeat(2, 1fr);
+    gap: 10px;
+    padding: 12px;
   }
 }
 
 /* Mobile (< 768px) */
 @media screen and (max-width: 768px) {
   .proctor-attendance-container {
-    padding: 12px;
-    min-height: calc(100vh - 50px);
+    padding: 8px !important;
+    padding-top: 8px !important;
+    min-height: auto !important;
+    width: 100% !important;
+    max-width: 100vw !important;
+    overflow-x: hidden !important;
+    overflow-y: visible !important;
+    box-sizing: border-box !important;
+    position: relative !important;
+    display: flex !important;
+    flex-direction: column !important;
+    margin: 0 !important;
+    background-color: #f5f5f5 !important;
   }
 
   .proctor-attendance-header {
-    flex-direction: column;
-    align-items: stretch;
-    margin-bottom: 15px;
-    gap: 12px;
+    margin-bottom: 12px !important;
+    display: block !important;
+    width: 100% !important;
+    visibility: visible !important;
+    opacity: 1 !important;
+    position: relative !important;
+    z-index: 10 !important;
+    min-height: 30px !important;
+    padding: 0 !important;
+    margin-top: 0 !important;
   }
 
   .proctor-attendance-title {
-    font-size: 18px;
-    text-align: center;
+    font-size: 18px !important;
+    color: #333 !important;
+    margin: 0 !important;
+    padding: 4px 0 !important;
+    font-weight: 600 !important;
+    width: 100% !important;
+    display: block !important;
+    visibility: visible !important;
+    opacity: 1 !important;
+    line-height: 1.2 !important;
+    text-align: left !important;
   }
 
-  .proctor-attendance-table-container {
-    border-radius: 6px;
-    box-shadow: 0 1px 4px rgba(0, 0, 0, 0.1);
+  .proctor-attendance-instruction {
+    padding: 8px 10px !important;
+    margin-bottom: 12px !important;
+    width: 100% !important;
+    box-sizing: border-box !important;
+    display: block !important;
+    visibility: visible !important;
+    opacity: 1 !important;
+    position: relative !important;
+    z-index: 10 !important;
+    min-height: 30px !important;
+    margin-top: 0 !important;
+    background-color: #e3f2fd !important;
+    border-left: 4px solid #2196f3 !important;
+    border-radius: 4px !important;
   }
 
-  .proctor-attendance-table {
-    min-width: 500px;
-    font-size: 14px;
+  .proctor-attendance-instruction-text {
+    font-size: 11px !important;
+    line-height: 1.3 !important;
+    margin: 0 !important;
+    display: block !important;
+    visibility: visible !important;
+    opacity: 1 !important;
+    color: #1976d2 !important;
+    font-weight: 500 !important;
   }
 
-  .proctor-attendance-table th {
-    padding: 10px 8px;
+  .proctor-attendance-section {
+    margin-bottom: 14px !important;
+    width: 100% !important;
+    display: block !important;
+    visibility: visible !important;
+    margin-top: 0 !important;
+  }
+
+  .proctor-attendance-section-title {
+    font-size: 13px !important;
+    margin-bottom: 8px !important;
+    padding-bottom: 4px !important;
+    width: 100% !important;
+    display: block !important;
+    visibility: visible !important;
+    opacity: 1 !important;
+    color: #333 !important;
+    min-height: 25px !important;
+    line-height: 1.3 !important;
+    font-weight: 600 !important;
+    border-bottom: 2px solid #333d52 !important;
+    margin-top: 0 !important;
+  }
+
+  .proctor-attendance-canvas {
+    padding: 6px;
+    border-radius: 4px;
+    min-height: 150px;
+    width: 100%;
+    box-sizing: border-box;
+    overflow-x: hidden;
+  }
+
+  .proctor-attendance-schedules-grid {
+    grid-template-columns: 1fr;
+    gap: 8px;
+  }
+
+  .proctor-attendance-schedule-card {
+    padding: 8px;
+    border-radius: 4px;
+  }
+
+  .proctor-attendance-schedule-header {
+    flex-direction: row;
+    align-items: flex-start;
+    gap: 6px;
+    padding-bottom: 5px;
+    margin-bottom: 6px;
+    border-bottom-width: 1px;
+  }
+
+  .proctor-attendance-schedule-subject {
+    font-size: 10px;
+    flex: 1;
+    min-width: 0;
+    line-height: 1.2;
+  }
+
+  .proctor-attendance-badge-wrapper {
+    gap: 4px;
+    flex-shrink: 0;
+    flex-wrap: nowrap;
+  }
+
+  .proctor-attendance-schedule-code {
+    font-size: 8px;
+    padding: 2px 5px;
+    margin-left: 0;
+  }
+
+  .ongoing-badge {
+    font-size: 7px;
+    padding: 2px 6px;
+    letter-spacing: 0.3px;
+  }
+
+  .proctor-attendance-schedule-details {
+    margin-bottom: 6px;
+  }
+
+  .proctor-attendance-detail-row {
+    padding: 2px 0;
+    border-bottom: 1px solid #f0f0f0;
+    display: flex;
+    justify-content: space-between;
+    align-items: flex-start;
+    gap: 4px;
+  }
+
+  .proctor-attendance-detail-label {
+    font-size: 9px;
+    font-weight: 600;
+    color: #555;
+    flex-shrink: 0;
+    min-width: fit-content;
+  }
+
+  .proctor-attendance-detail-value {
+    font-size: 9px;
+    text-align: right;
+    color: #333;
+    word-break: break-word;
+    flex: 1;
+    text-align: right;
+  }
+
+  .proctor-attendance-click-hint {
+    font-size: 8px;
+    margin-top: 4px;
+    padding-top: 4px;
+    letter-spacing: 0.3px;
+  }
+
+  .status-badge {
+    padding: 3px 8px;
+    font-size: 9px;
+  }
+
+  /* Modal Responsive */
+  .proctor-attendance-modal-overlay {
+    padding: 0;
+    align-items: flex-end;
+  }
+
+  .proctor-attendance-modal {
+    max-width: 100%;
+    max-height: 95vh;
+    border-radius: 12px 12px 0 0;
+    margin: 0;
+  }
+
+  .proctor-attendance-modal-header {
+    padding: 12px;
+    border-bottom-width: 1px;
+  }
+
+  .proctor-attendance-modal-title {
+    font-size: 15px;
+  }
+
+  .proctor-attendance-modal-close {
+    font-size: 22px;
+    width: 26px;
+    height: 26px;
+  }
+
+  .proctor-attendance-modal-content {
+    padding: 12px;
+    overflow-y: auto;
+    -webkit-overflow-scrolling: touch;
+  }
+
+  .proctor-attendance-modal-exam-details {
+    margin-bottom: 16px;
+  }
+
+  .proctor-attendance-modal-exam-details h4 {
+    font-size: 13px;
+    margin-bottom: 8px;
+  }
+
+  .proctor-attendance-modal-details-grid {
+    grid-template-columns: 1fr;
+    gap: 6px;
+    padding: 8px;
+  }
+
+  .proctor-attendance-modal-detail-item {
+    gap: 2px;
+  }
+
+  .modal-detail-label {
+    font-size: 9px;
+    letter-spacing: 0.3px;
+  }
+
+  .modal-detail-value {
+    font-size: 11px;
+    word-break: break-word;
+  }
+
+  .proctor-attendance-substitution-banner {
+    padding: 8px 10px;
+    margin-bottom: 12px;
+    flex-direction: row;
+    align-items: center;
+    gap: 6px;
+    border-width: 1px;
+  }
+
+  .substitution-icon {
+    font-size: 16px;
+    flex-shrink: 0;
+  }
+
+  .substitution-text {
+    font-size: 11px;
+    line-height: 1.3;
+  }
+
+  .proctor-attendance-modal-form {
+    gap: 12px;
+  }
+
+  .proctor-attendance-modal-input-group {
+    gap: 6px;
+  }
+
+  .proctor-attendance-modal-label {
+    font-size: 11px;
+  }
+
+  .proctor-attendance-modal-input {
+    padding: 8px 10px;
+    font-size: 12px;
+    letter-spacing: 1px;
+  }
+
+  .proctor-attendance-modal-textarea {
+    padding: 8px 10px;
+    font-size: 11px;
+    min-height: 60px;
+  }
+
+  .proctor-attendance-otp-input-wrapper {
+    flex-direction: column;
+    gap: 6px;
+  }
+
+  .proctor-attendance-verify-button {
+    width: 100%;
+    padding: 10px;
     font-size: 12px;
   }
 
-  .proctor-attendance-table td {
-    padding: 10px 8px;
+  .proctor-attendance-validation-message {
+    padding: 8px 10px;
+    font-size: 11px;
+    margin-top: 6px;
+  }
+
+  .proctor-attendance-modal-footer {
+    flex-direction: column-reverse;
+    gap: 8px;
+    padding: 12px;
+    border-top-width: 1px;
+  }
+
+  .proctor-attendance-modal-cancel,
+  .proctor-attendance-modal-submit {
+    width: 100%;
+    padding: 10px;
     font-size: 13px;
+  }
+
+  .proctor-attendance-field-error {
+    font-size: 10px;
+    margin-top: 4px;
   }
 }
 
 /* Small Mobile (< 480px) */
 @media screen and (max-width: 480px) {
   .proctor-attendance-container {
-    padding: 10px;
+    padding: 6px;
+    width: 100%;
+    max-width: 100vw;
+    overflow-x: hidden;
+    overflow-y: visible;
+    box-sizing: border-box;
+    position: relative;
+  }
+
+  .proctor-attendance-header {
+    margin-bottom: 10px;
+    width: 100%;
+    display: block !important;
+    visibility: visible !important;
+    opacity: 1 !important;
+    position: relative;
+    z-index: 1;
   }
 
   .proctor-attendance-title {
     font-size: 16px;
+    width: 100%;
+    display: block !important;
+    visibility: visible !important;
+    opacity: 1 !important;
+    color: #333 !important;
   }
 
-  .proctor-attendance-table {
-    min-width: 450px;
-    font-size: 13px;
+  .proctor-attendance-instruction {
+    padding: 6px 8px;
+    margin-bottom: 10px;
+    border-left-width: 3px;
+    width: 100%;
+    box-sizing: border-box;
+    display: block !important;
+    visibility: visible !important;
+    opacity: 1 !important;
+    position: relative;
+    z-index: 1;
   }
 
-  .proctor-attendance-table th {
-    padding: 8px 6px;
+  .proctor-attendance-instruction-text {
+    font-size: 10px;
+    line-height: 1.3;
+    margin: 0;
+    display: block !important;
+    visibility: visible !important;
+    opacity: 1 !important;
+    color: #1976d2 !important;
+  }
+
+  .proctor-attendance-section {
+    margin-bottom: 12px;
+    width: 100%;
+    display: block !important;
+    visibility: visible !important;
+  }
+
+  .proctor-attendance-section-title {
+    font-size: 12px;
+    margin-bottom: 6px;
+    padding-bottom: 3px;
+    width: 100%;
+    display: block !important;
+    visibility: visible !important;
+    opacity: 1 !important;
+    color: #333 !important;
+  }
+
+  .proctor-attendance-canvas {
+    padding: 5px;
+    border-radius: 3px;
+    width: 100%;
+    box-sizing: border-box;
+    overflow-x: hidden;
+  }
+
+  .proctor-attendance-schedules-grid {
+    gap: 6px;
+  }
+
+  .proctor-attendance-schedule-card {
+    padding: 6px;
+    border-radius: 3px;
+  }
+
+  .proctor-attendance-schedule-header {
+    gap: 4px;
+    padding-bottom: 4px;
+    margin-bottom: 4px;
+  }
+
+  .proctor-attendance-schedule-subject {
+    font-size: 9px;
+    line-height: 1.2;
+  }
+
+  .proctor-attendance-badge-wrapper {
+    gap: 3px;
+  }
+
+  .proctor-attendance-schedule-code {
+    font-size: 7px;
+    padding: 2px 4px;
+  }
+
+  .ongoing-badge {
+    font-size: 6px;
+    padding: 2px 5px;
+    letter-spacing: 0.2px;
+  }
+
+  .proctor-attendance-schedule-details {
+    margin-bottom: 4px;
+  }
+
+  .proctor-attendance-detail-row {
+    padding: 1px 0;
+    gap: 3px;
+  }
+
+  .proctor-attendance-detail-label {
+    font-size: 8px;
+    min-width: 55px;
+  }
+
+  .proctor-attendance-detail-value {
+    font-size: 8px;
+    text-align: right;
+    word-break: break-word;
+    overflow-wrap: break-word;
+  }
+
+  .proctor-attendance-click-hint {
+    font-size: 7px;
+    padding-top: 3px;
+    margin-top: 3px;
+    letter-spacing: 0.2px;
+  }
+
+  .status-badge {
+    padding: 2px 6px;
+    font-size: 8px;
+  }
+
+  /* Modal Small Mobile */
+  .proctor-attendance-modal-overlay {
+    padding: 0;
+  }
+
+  .proctor-attendance-modal {
+    max-height: 100vh;
+    border-radius: 0;
+    margin: 0;
+  }
+
+  .proctor-attendance-modal-header {
+    padding: 10px;
+    position: sticky;
+    top: 0;
+    background-color: #fff;
+    z-index: 10;
+    box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
+  }
+
+  .proctor-attendance-modal-title {
+    font-size: 14px;
+  }
+
+  .proctor-attendance-modal-close {
+    font-size: 20px;
+    width: 24px;
+    height: 24px;
+  }
+
+  .proctor-attendance-modal-content {
+    padding: 10px;
+    max-height: calc(100vh - 140px);
+    overflow-y: auto;
+  }
+
+  .proctor-attendance-modal-exam-details {
+    margin-bottom: 12px;
+  }
+
+  .proctor-attendance-modal-exam-details h4 {
+    font-size: 12px;
+    margin-bottom: 6px;
+  }
+
+  .proctor-attendance-modal-details-grid {
+    padding: 6px;
+    gap: 5px;
+  }
+
+  .proctor-attendance-modal-detail-item {
+    gap: 1px;
+  }
+
+  .modal-detail-label {
+    font-size: 8px;
+    letter-spacing: 0.2px;
+  }
+
+  .modal-detail-value {
+    font-size: 10px;
+  }
+
+  .proctor-attendance-substitution-banner {
+    padding: 6px 8px;
+    margin-bottom: 10px;
+    gap: 4px;
+  }
+
+  .substitution-icon {
+    font-size: 14px;
+  }
+
+  .substitution-text {
+    font-size: 10px;
+  }
+
+  .proctor-attendance-modal-form {
+    gap: 10px;
+  }
+
+  .proctor-attendance-modal-input-group {
+    gap: 4px;
+  }
+
+  .proctor-attendance-modal-label {
+    font-size: 10px;
+  }
+
+  .proctor-attendance-modal-input {
+    padding: 7px 8px;
+    font-size: 11px;
+    letter-spacing: 0.5px;
+  }
+
+  .proctor-attendance-modal-textarea {
+    padding: 7px 8px;
+    font-size: 10px;
+    min-height: 50px;
+  }
+
+  .proctor-attendance-otp-input-wrapper {
+    gap: 5px;
+  }
+
+  .proctor-attendance-verify-button {
+    padding: 8px;
     font-size: 11px;
   }
 
-  .proctor-attendance-table td {
-    padding: 8px 6px;
+  .proctor-attendance-validation-message {
+    padding: 6px 8px;
+    font-size: 10px;
+    margin-top: 4px;
+  }
+
+  .proctor-attendance-modal-footer {
+    padding: 10px;
+    position: sticky;
+    bottom: 0;
+    background-color: #fff;
+    z-index: 10;
+    box-shadow: 0 -1px 3px rgba(0, 0, 0, 0.1);
+    gap: 6px;
+  }
+
+  .proctor-attendance-modal-cancel,
+  .proctor-attendance-modal-submit {
+    padding: 9px;
     font-size: 12px;
+  }
+
+  .proctor-attendance-field-error {
+    font-size: 9px;
+    margin-top: 3px;
+  }
+
+  .no-data-message {
+    padding: 25px 12px;
+    font-size: 11px;
+  }
+
+  .status-badge {
+    padding: 3px 8px;
+    font-size: 8px;
+  }
+}
+
+/* iPhone 14 Pro Max and similar devices (430px) */
+@media screen and (max-width: 430px) and (min-width: 361px) {
+  .proctor-attendance-container {
+    padding: 8px !important;
+    padding-top: 8px !important;
+    width: 100% !important;
+    max-width: 100vw !important;
+    overflow-x: hidden !important;
+    overflow-y: visible !important;
+    box-sizing: border-box !important;
+    position: relative !important;
+    margin: 0 !important;
+  }
+
+  .proctor-attendance-header {
+    margin-bottom: 10px !important;
+    margin-top: 0 !important;
+    width: 100% !important;
+    display: block !important;
+    visibility: visible !important;
+    opacity: 1 !important;
+    position: relative !important;
+    z-index: 10 !important;
+    min-height: 28px !important;
+    padding: 0 !important;
+  }
+
+  .proctor-attendance-title {
+    font-size: 17px !important;
+    width: 100% !important;
+    display: block !important;
+    visibility: visible !important;
+    opacity: 1 !important;
+    color: #333 !important;
+    margin: 0 !important;
+    padding: 4px 0 !important;
+    font-weight: 600 !important;
+  }
+
+  .proctor-attendance-instruction {
+    padding: 8px 10px !important;
+    margin-bottom: 12px !important;
+    margin-top: 0 !important;
+    width: 100% !important;
+    box-sizing: border-box !important;
+    display: block !important;
+    visibility: visible !important;
+    opacity: 1 !important;
+    background-color: #e3f2fd !important;
+    border-left: 4px solid #2196f3 !important;
+    border-radius: 4px !important;
+    position: relative !important;
+    z-index: 10 !important;
+    min-height: 30px !important;
+  }
+
+  .proctor-attendance-instruction-text {
+    font-size: 11px !important;
+    line-height: 1.3 !important;
+    margin: 0 !important;
+    display: block !important;
+    visibility: visible !important;
+    opacity: 1 !important;
+    color: #1976d2 !important;
+    font-weight: 500 !important;
+  }
+
+  .proctor-attendance-section {
+    margin-bottom: 14px !important;
+    margin-top: 0 !important;
+    width: 100% !important;
+    display: block !important;
+    visibility: visible !important;
+  }
+
+  .proctor-attendance-section-title {
+    font-size: 13px !important;
+    margin-bottom: 8px !important;
+    margin-top: 0 !important;
+    padding-bottom: 4px !important;
+    width: 100% !important;
+    display: block !important;
+    visibility: visible !important;
+    opacity: 1 !important;
+    color: #333 !important;
+    font-weight: 600 !important;
+    border-bottom: 2px solid #333d52 !important;
+    min-height: 22px !important;
+  }
+
+  .proctor-attendance-canvas {
+    padding: 6px;
+    width: 100%;
+    box-sizing: border-box;
+    overflow-x: hidden;
+  }
+}
+
+/* Very Small Mobile (< 360px) */
+@media screen and (max-width: 360px) {
+  .proctor-attendance-container {
+    padding: 4px;
+  }
+
+  .proctor-attendance-instruction {
+    padding: 5px 6px;
+    margin-bottom: 8px;
+  }
+
+  .proctor-attendance-instruction-text {
+    font-size: 9px;
+  }
+
+  .proctor-attendance-section {
+    margin-bottom: 10px;
+  }
+
+  .proctor-attendance-section-title {
+    font-size: 11px;
+    margin-bottom: 5px;
+  }
+
+  .proctor-attendance-canvas {
+    padding: 4px;
+  }
+
+  .proctor-attendance-schedules-grid {
+    gap: 5px;
+  }
+
+  .proctor-attendance-schedule-card {
+    padding: 5px;
+  }
+
+  .proctor-attendance-schedule-subject {
+    font-size: 8px;
+  }
+
+  .proctor-attendance-schedule-code {
+    font-size: 6px;
+    padding: 1px 3px;
+  }
+
+  .ongoing-badge {
+    font-size: 6px;
+    padding: 1px 4px;
+  }
+
+  .proctor-attendance-detail-label {
+    font-size: 7px;
+    min-width: 50px;
+  }
+
+  .proctor-attendance-detail-value {
+    font-size: 7px;
+  }
+
+  .proctor-attendance-click-hint {
+    font-size: 6px;
+    padding-top: 2px;
+    margin-top: 2px;
   }
 }
 .ongoing-badge {
@@ -644,5 +1438,35 @@
   50% {
     opacity: 0.8;
     transform: scale(1.05);
+  }
+}
+
+/* ============================================
+   GLOBAL OVERRIDE - ENSURE VISIBILITY ON ALL DEVICES
+   ============================================ */
+
+/* Force visibility of critical elements on all screen sizes */
+.proctor-attendance-header,
+.proctor-attendance-title,
+.proctor-attendance-instruction,
+.proctor-attendance-instruction-text,
+.proctor-attendance-section-title {
+  visibility: visible !important;
+  opacity: 1 !important;
+  display: block !important;
+}
+
+/* Mobile-specific global overrides */
+@media screen and (max-width: 768px) {
+  .proctor-attendance-header,
+  .proctor-attendance-title,
+  .proctor-attendance-instruction,
+  .proctor-attendance-instruction-text,
+  .proctor-attendance-section-title {
+    visibility: visible !important;
+    opacity: 1 !important;
+    display: block !important;
+    position: relative !important;
+    z-index: 10 !important;
   }
 }
