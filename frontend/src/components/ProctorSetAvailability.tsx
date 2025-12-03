@@ -46,6 +46,10 @@ const ProctorSetAvailability: React.FC<ProctorSetAvailabilityProps> = ({ user })
   const [loadingAvailability, setLoadingAvailability] = useState(false);
   const [loadingAllowedDates, setLoadingAllowedDates] = useState(false);
 
+  const [showConfirmAvailability, setShowConfirmAvailability] = useState(false);
+  const [showConfirmChangeRequest, setShowConfirmChangeRequest] = useState(false);
+  const [confirmPendingSubmit, setConfirmPendingSubmit] = useState<'availability' | 'change' | null>(null);
+
   const today = new Date();
 
   // Fetch availability list for current user
@@ -282,18 +286,9 @@ const ProctorSetAvailability: React.FC<ProctorSetAvailabilityProps> = ({ user })
     e.preventDefault();
 
     if (isSubmitting) return;
-    setIsSubmitting(true);
-
-    const userId = user?.user_id;
-    if (!userId) {
-      toast.info('User is not logged in.');
-      setIsSubmitting(false);
-      return;
-    }
 
     if (selectedDates.length === 0 || selectedTimeSlots.length === 0) {
       toast.info('Please select at least one date and one time slot.');
-      setIsSubmitting(false);
       return;
     }
 
@@ -316,12 +311,26 @@ const ProctorSetAvailability: React.FC<ProctorSetAvailabilityProps> = ({ user })
 
     if (isRedundant) {
       toast.error('Some selected date and time slot combinations already exist.');
-      setIsSubmitting(false);
       return;
     }
 
     if (totalSlots > 6) {
       toast.error('You can only add a maximum of 6 availability slots.');
+      return;
+    }
+
+    // Show confirmation modal instead of submitting directly
+    setConfirmPendingSubmit('availability');
+    setShowConfirmAvailability(true);
+  };
+
+  const handleConfirmAvailabilitySubmit = async () => {
+    if (isSubmitting) return;
+    setIsSubmitting(true);
+
+    const userId = user?.user_id;
+    if (!userId) {
+      toast.info('User is not logged in.');
       setIsSubmitting(false);
       return;
     }
@@ -365,6 +374,7 @@ const ProctorSetAvailability: React.FC<ProctorSetAvailabilityProps> = ({ user })
         setSelectedTimeSlots([]);
         setAvailabilityStatus('available');
         setRemarks('');
+        setShowConfirmAvailability(false);
       } else {
         toast.error(`Failed to submit availability: ${response.data?.message || 'Unknown error'}`);
       }
@@ -380,23 +390,33 @@ const ProctorSetAvailability: React.FC<ProctorSetAvailabilityProps> = ({ user })
     e.preventDefault();
 
     if (isSubmitting) return;
-    setIsSubmitting(true);
 
     const selectedDays = selectedOriginalDay.split(',').filter(Boolean);
     const selectedSlots = selectedOriginalTimeSlot.split(',').filter(Boolean);
 
     if (selectedDays.length === 0 || selectedSlots.length === 0) {
       toast.info('Please select at least one day and one time slot.');
-      setIsSubmitting(false);
       return;
     }
 
     const userId = user?.user_id;
     if (!userId) {
       toast.info('User is not logged in.');
-      setIsSubmitting(false);
       return;
     }
+
+    // Show confirmation modal
+    setConfirmPendingSubmit('change');
+    setShowConfirmChangeRequest(true);
+  };
+
+  const handleConfirmChangeRequestSubmit = async () => {
+    if (isSubmitting) return;
+    setIsSubmitting(true);
+
+    const selectedDays = selectedOriginalDay.split(',').filter(Boolean);
+    const selectedSlots = selectedOriginalTimeSlot.split(',').filter(Boolean);
+    const userId = user?.user_id;
 
     try {
       const data = {
@@ -415,6 +435,7 @@ const ProctorSetAvailability: React.FC<ProctorSetAvailabilityProps> = ({ user })
         setChangeStatus('unavailable');
         setSelectedOriginalDay('');
         setSelectedOriginalTimeSlot('');
+        setShowConfirmChangeRequest(false);
       } else {
         toast.error(`Failed to submit change request: ${response.data?.message || 'Unknown error'}`);
       }
@@ -432,8 +453,10 @@ const ProctorSetAvailability: React.FC<ProctorSetAvailabilityProps> = ({ user })
     <div className="set-availability-container">
       <div className="availability-sections">
         <div className="availability-card">
-          <div className="card-header-set">Set Availability</div>
-          <div className="subtitle">(Choose your availability for the exam schedule)</div>
+          <div className="card-header-request">Set Availability</div>
+          <div className="subtitle">
+            (Choose your availability for the exam schedule)
+          </div>
           <form onSubmit={handleSubmitAvailability} className="availability-form">
             
             {/* Day Picker */}
@@ -504,7 +527,7 @@ const ProctorSetAvailability: React.FC<ProctorSetAvailabilityProps> = ({ user })
                       })}
                     </div>
                     <div className="date-picker-footer">
-                      <button type="button" onClick={() => setShowDatePicker(false)}>Close</button>
+                      <button type="button" onClick={() => setShowDatePicker(false)}>Done</button>
                     </div>
                   </div>
                 )}
@@ -542,14 +565,33 @@ const ProctorSetAvailability: React.FC<ProctorSetAvailabilityProps> = ({ user })
             </div>
 
             <div style={{ textAlign: 'center', marginTop: '20px' }}>
-              <button type="submit" className="submit-button" disabled={isSubmitting}>
+              <button type="button" className="submit-button" onClick={handleSubmitAvailability} disabled={isSubmitting}>
                 {isSubmitting ? 'Submitting...' : 'Submit'}
               </button>
             </div>
 
             <div style={{ textAlign: 'center', marginTop: '10px' }}>
               <span
-                style={{ color: '#092C4C', cursor: 'pointer', textDecoration: 'underline' }}
+                style={{
+                  display: 'inline-block',
+                  color: '#092C4C',
+                  cursor: 'pointer',
+                  textDecoration: 'none',
+                  border: '2px solid #092C4C',
+                  padding: '8px 16px',
+                  borderRadius: '6px',
+                  fontSize: '0.95em',
+                  fontWeight: '500',
+                  transition: 'all 0.2s ease'
+                }}
+                onMouseEnter={(e) => {
+                  e.currentTarget.style.backgroundColor = '#092C4C';
+                  e.currentTarget.style.color = 'white';
+                }}
+                onMouseLeave={(e) => {
+                  e.currentTarget.style.backgroundColor = 'transparent';
+                  e.currentTarget.style.color = '#092C4C';
+                }}
                 onClick={() => setShowModal(true)}
               >
                 Click here to view all submitted availabilities
@@ -599,6 +641,78 @@ const ProctorSetAvailability: React.FC<ProctorSetAvailabilityProps> = ({ user })
               >
                 Close
               </button>
+            </div>
+          </div>
+        )}
+
+        {/* Confirmation Modal for Set Availability */}
+        {showConfirmAvailability && (
+          <div className="availability-modal-overlay">
+            <div className="availability-modal-box">
+              <h2 className="availability-modal-title">Confirm Availability Submission</h2>
+              <div className="availability-modal-body">
+                <div className="availability-entry">
+                  <p><strong>Days:</strong> {selectedDates.map(d => new Date(d).toLocaleDateString('en-US')).join(', ')}</p>
+                  <p><strong>Time Slots:</strong> {selectedTimeSlots.join(', ')}</p>
+                  <p><strong>Status:</strong> {availabilityStatus}</p>
+                  {remarks && <p><strong>Remarks:</strong> {remarks}</p>}
+                </div>
+              </div>
+              <div style={{ display: 'flex', gap: '10px', justifyContent: 'center', marginTop: '20px' }}>
+                <button
+                  type="button"
+                  onClick={() => setShowConfirmAvailability(false)}
+                  className="availability-modal-close-btn"
+                  style={{ backgroundColor: '#6c757d', width: 'auto', margin: '0' }}
+                >
+                  Back
+                </button>
+                <button
+                  type="button"
+                  onClick={handleConfirmAvailabilitySubmit}
+                  disabled={isSubmitting}
+                  className="availability-modal-close-btn"
+                  style={{ backgroundColor: '#092C4C', width: 'auto', margin: '0' }}
+                >
+                  {isSubmitting ? 'Submitting...' : 'Submit'}
+                </button>
+              </div>
+            </div>
+          </div>
+        )}
+
+        {/* Confirmation Modal for Request Change */}
+        {showConfirmChangeRequest && (
+          <div className="availability-modal-overlay">
+            <div className="availability-modal-box">
+              <h2 className="availability-modal-title">Confirm Change Request Submission</h2>
+              <div className="availability-modal-body">
+                <div className="availability-entry">
+                  <p><strong>Days:</strong> {selectedOriginalDay.split(',').filter(Boolean).map(d => new Date(d).toLocaleDateString('en-US')).join(', ')}</p>
+                  <p><strong>Time Slots:</strong> {selectedOriginalTimeSlot.split(',').filter(Boolean).join(', ')}</p>
+                  <p><strong>New Status:</strong> {changeStatus}</p>
+                  {reason && <p><strong>Reason:</strong> {reason}</p>}
+                </div>
+              </div>
+              <div style={{ display: 'flex', gap: '10px', justifyContent: 'center', marginTop: '20px' }}>
+                <button
+                  type="button"
+                  onClick={() => setShowConfirmChangeRequest(false)}
+                  className="availability-modal-close-btn"
+                  style={{ backgroundColor: '#6c757d', width: 'auto', margin: '0' }}
+                >
+                  Back
+                </button>
+                <button
+                  type="button"
+                  onClick={handleConfirmChangeRequestSubmit}
+                  disabled={isSubmitting}
+                  className="availability-modal-close-btn"
+                  style={{ backgroundColor: '#092C4C', width: 'auto', margin: '0' }}
+                >
+                  {isSubmitting ? 'Submitting...' : 'Submit'}
+                </button>
+              </div>
             </div>
           </div>
         )}
@@ -738,7 +852,7 @@ const ProctorSetAvailability: React.FC<ProctorSetAvailabilityProps> = ({ user })
               </div>
 
               {/* Submit */}
-              <button type="submit" className="submit-button" disabled={isSubmitting}>
+              <button type="button" className="submit-button" onClick={handleSubmitChangeRequest} disabled={isSubmitting}>
                 {isSubmitting ? 'Submitting...' : 'Submit'}
               </button>
             </form>
