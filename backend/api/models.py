@@ -232,6 +232,20 @@ class TblExamdetails(models.Model):
     exam_end_time = models.DateTimeField(blank=True, null=True)
     proctor_timein = models.DateTimeField(blank=True, null=True)
     proctor_timeout = models.DateTimeField(blank=True, null=True)
+
+    status = models.CharField(
+        max_length=20,
+        blank=True,
+        null=True,
+        default='pending',
+        choices=[
+            ('pending', 'Pending'),
+            ('confirmed', 'Confirmed'),
+            ('late', 'Late'),
+            ('absent', 'Absent'),
+            ('substitute', 'Substitute'),
+        ]
+    )
     
     # ✅ NEW: Changed to ArrayField for multiple sections
     sections = ArrayField(
