@@ -54,10 +54,6 @@ const ProctorMonitoring: React.FC<UserProps> = ({ }) => {
       const examEnd = new Date(`${s.exam_date}T${s.exam_end_time}`);
       const hasTimeIn = Boolean(s.code_entry_time);
 
-      // Conditions for ABSENT:
-      // 1. Exam already ended
-      // 2. No OTP verified (no code_entry_time)
-      // 3. Status still pending
       if (now > examEnd && !hasTimeIn && s.status.toLowerCase() === "pending") {
         try {
           setTimeout(() => fetchMonitoringData(), 500);

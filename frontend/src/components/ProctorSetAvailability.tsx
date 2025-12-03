@@ -529,24 +529,6 @@ const ProctorSetAvailability: React.FC<ProctorSetAvailabilityProps> = ({ user })
               />
             </div>
 
-            {/* Status */}
-            <div className="form-group">
-              <label htmlFor="status">Status</label>
-              <Select
-                id="status"
-                value={{ value: availabilityStatus, label: availabilityStatus.charAt(0).toUpperCase() + availabilityStatus.slice(1) }}
-                onChange={(selected) => setAvailabilityStatus(selected?.value || 'available')}
-                options={availabilityOptions.map(opt => ({
-                  value: opt,
-                  label: opt.charAt(0).toUpperCase() + opt.slice(1),
-                }))}
-                isDisabled={isSubmitting}
-                classNamePrefix="react-select"
-                placeholder="Select Status"
-                isSearchable={false}
-              />
-            </div>
-
             {/* Remarks */}
             <div className="form-group">
               <label htmlFor="remarks">Remarks</label>

@@ -385,7 +385,6 @@ const SchedulerPlottingSchedule: React.FC<SchedulerProps> = ({ user, onScheduleC
   const filteredCoursesByPrograms = useMemo(() => {
     if (formData.selectedPrograms.length === 0) return [];
     
-    // Courses are already filtered by lazy loading
     return courses;
   }, [formData.selectedPrograms, courses]);
 
@@ -495,6 +494,8 @@ const SchedulerPlottingSchedule: React.FC<SchedulerProps> = ({ user, onScheduleC
           })
         : validTimes.filter(t => !eveningTimeSlots.includes(t));
 
+      const shuffledTimeList = [...validTimesForCourse].sort(() => Math.random() - 0.5);
+
       const courseId = firstSection.course_id;
       let date = courseDateAssignment.get(courseId);
       if (!date || !sortedDates.includes(date)) {
@@ -505,7 +506,7 @@ const SchedulerPlottingSchedule: React.FC<SchedulerProps> = ({ user, onScheduleC
       let foundTimeSlot = false;
       const maxAttempts = Math.max(1, validTimesForCourse.length * 3);
       for (let attempt = 0; attempt < maxAttempts && !foundTimeSlot; attempt++) {
-        const candidateTime = validTimesForCourse[Math.floor(Math.random() * validTimesForCourse.length)];
+        const candidateTime = shuffledTimeList[Math.floor(Math.random() * shuffledTimeList.length)]
         const startMinutes = timeToMinutes(candidateTime);
         const endMinutes = startMinutes + totalDurationMinutes;
 
@@ -529,7 +530,7 @@ const SchedulerPlottingSchedule: React.FC<SchedulerProps> = ({ user, onScheduleC
       }
 
       if (!foundTimeSlot && validTimesForCourse.length > 0) {
-        const timeSlot = validTimesForCourse[Math.floor(Math.random() * validTimesForCourse.length)];
+        const timeSlot = shuffledTimeList[Math.floor(Math.random() * shuffledTimeList.length)]
         courseTypeTimeSlots.set(courseKey, { date, timeSlot });
       }
     });
@@ -562,7 +563,7 @@ const SchedulerPlottingSchedule: React.FC<SchedulerProps> = ({ user, onScheduleC
       // Find room
       let roomId = "";
       const suitableRooms = modalityRoomsMap.get(section.modality_id) || [];
-      for (const room of suitableRooms) {
+      for (const room of [...suitableRooms].sort(() => Math.random() - 0.5)) {
         const roomDateKey = `${date}|${room}`;
         const existingRanges = roomTimeRanges.get(roomDateKey) || [];
         if (!existingRanges.some(range => rangesOverlap(startMinutes, endMinutes, range.start, range.end))) {
@@ -904,7 +905,8 @@ const SchedulerPlottingSchedule: React.FC<SchedulerProps> = ({ user, onScheduleC
       getAvailableProctors: (date: string, time: string) => number[],
       mutationRate: number
     ): Chromosome => {
-    // ✅ NEW: Build course-to-timeslot map to preserve course consistency
+    
+    // Build course-to-timeslot map to preserve course consistency
     const courseTypeTimeSlots = new Map<string, { date: string; timeSlot: string }>();
     
     chromosome.forEach(gene => {
@@ -919,74 +921,110 @@ const SchedulerPlottingSchedule: React.FC<SchedulerProps> = ({ user, onScheduleC
       }
     });
 
+    // ✅ FIX: Track which courses have been mutated to apply changes to all sections
+    const mutatedCourses = new Map<string, { date?: string; timeSlot?: string }>();
+
+    // First pass: decide which courses to mutate
+    chromosome.forEach(gene => {
+      if (Math.random() >= mutationRate) return;
+      
+      const section = sectionMap.get(gene.sectionId);
+      if (!section) return;
+
+      const isNightClass = section.is_night_class === "YES";
+      const courseKey = isNightClass ? `${section.course_id}_NIGHT` : section.course_id;
+      
+      // Skip if we already decided to mutate this course
+      if (mutatedCourses.has(courseKey)) return;
+
+      const mutationType = Math.floor(Math.random() * 4);
+      const validTimesForSection = isNightClass 
+        ? eveningTimeSlots.filter(t => {
+            const [h, m] = t.split(":").map(Number);
+            const totalDurationMinutes = duration.hours * 60 + duration.minutes;
+            const end = (h * 60 + m) + totalDurationMinutes;
+            return end <= 21 * 60;
+          })
+        : validTimes;
+
+      if (mutationType === 0 && Math.random() < 0.3) {
+        // Mutate date for entire course
+        const newDate = sortedDates[Math.floor(Math.random() * sortedDates.length)];
+        mutatedCourses.set(courseKey, { date: newDate });
+        courseTypeTimeSlots.set(courseKey, { date: newDate, timeSlot: gene.timeSlot });
+        
+      } else if (mutationType === 1) {
+        // Mutate time slot for entire course
+        const newTimeSlot = validTimesForSection[Math.floor(Math.random() * validTimesForSection.length)];
+        mutatedCourses.set(courseKey, { timeSlot: newTimeSlot });
+        courseTypeTimeSlots.set(courseKey, { date: gene.date, timeSlot: newTimeSlot });
+        
+      } else if (mutationType === 2) {
+        // Room mutations are section-specific (not course-wide)
+        // Will be handled in second pass
+        
+      } else {
+        // Proctor mutations are section-specific
+        // Will be handled in second pass
+      }
+    });
+
+    // Second pass: apply mutations to all sections
     return chromosome.map(gene => {
+      const section = sectionMap.get(gene.sectionId);
+      if (!section) return { ...gene };
+
+      const isNightClass = section.is_night_class === "YES";
+      const courseKey = isNightClass ? `${section.course_id}_NIGHT` : section.course_id;
+      const suitableRooms = modalityRoomsMap.get(gene.sectionId) || [];
+
+      // ✅ Apply course-wide mutations
+      const courseMutation = mutatedCourses.get(courseKey);
+      if (courseMutation) {
+        let newGene = { ...gene };
+        
+        if (courseMutation.date) {
+          newGene.date = courseMutation.date;
+        }
+        
+        if (courseMutation.timeSlot) {
+          newGene.timeSlot = courseMutation.timeSlot;
+        }
+        
+        // Reassign proctor for the new date/time
+        const availableProctors = getAvailableProctors(newGene.date, newGene.timeSlot);
+        let newProctorId = -1;
+        
+        if (isNightClass && section.instructor_id && availableProctors.includes(section.instructor_id)) {
+          newProctorId = section.instructor_id;
+        } else {
+          const shuffled = [...availableProctors].sort(() => Math.random() - 0.5);
+          newProctorId = shuffled.length > 0 ? shuffled[0] : -1;
+        }
+        
+        newGene.proctorId = newProctorId;
+        return newGene;
+      }
+
+      // Apply section-specific mutations only if course wasn't mutated
       if (Math.random() < mutationRate) {
-        const section = sectionMap.get(gene.sectionId);
-        if (!section) return { ...gene };
-
-        const isNightClass = section.is_night_class === "YES";
-        const courseKey = isNightClass ? `${section.course_id}_NIGHT` : section.course_id;
         const mutationType = Math.floor(Math.random() * 4);
-        const suitableRooms = modalityRoomsMap.get(gene.sectionId) || [];
-
-        const validTimesForSection = isNightClass 
-          ? eveningTimeSlots.filter(t => {
-              const [h, m] = t.split(":").map(Number);
-              const totalDurationMinutes = duration.hours * 60 + duration.minutes;
-              const end = (h * 60 + m) + totalDurationMinutes;
-              return end <= 21 * 60;
-            })
-          : validTimes;
-
-        if (mutationType === 0 && Math.random() < 0.3) {
-          // ✅ Mutate date - update for entire course
-          const newDate = sortedDates[Math.floor(Math.random() * sortedDates.length)];
-          courseTypeTimeSlots.set(courseKey, { date: newDate, timeSlot: gene.timeSlot });
-          
-          const availableProctors = getAvailableProctors(newDate, gene.timeSlot);
-          let newProctorId = -1;
-          
-          if (isNightClass && section.instructor_id && availableProctors.includes(section.instructor_id)) {
-            newProctorId = section.instructor_id;
-          } else {
-            newProctorId = availableProctors.length > 0
-              ? availableProctors[Math.floor(Math.random() * availableProctors.length)]
-              : -1;
-          }
-          
-          return { ...gene, date: newDate, proctorId: newProctorId };
-        } else if (mutationType === 1) {
-          // ✅ Mutate time slot - update for entire course
-          const newTimeSlot = validTimesForSection[Math.floor(Math.random() * validTimesForSection.length)];
-          courseTypeTimeSlots.set(courseKey, { date: gene.date, timeSlot: newTimeSlot });
-          
-          const availableProctors = getAvailableProctors(gene.date, newTimeSlot);
-          let newProctorId = -1;
-          
-          if (isNightClass && section.instructor_id && availableProctors.includes(section.instructor_id)) {
-            newProctorId = section.instructor_id;
-          } else {
-            newProctorId = availableProctors.length > 0
-              ? availableProctors[Math.floor(Math.random() * availableProctors.length)]
-              : -1;
-          }
-          
-          return { ...gene, timeSlot: newTimeSlot, proctorId: newProctorId };
-        } else if (mutationType === 2) {
-          // Mutate room only (doesn't affect other sections)
+        
+        if (mutationType === 2) {
+          // Mutate room only
           const newRoomId = suitableRooms.length > 0
             ? suitableRooms[Math.floor(Math.random() * suitableRooms.length)]
             : "";
           return { ...gene, roomId: newRoomId };
-        } else {
-          // Mutate proctor only (doesn't affect other sections)
+          
+        } else if (mutationType === 3) {
+          // Mutate proctor only
           const availableProctors = getAvailableProctors(gene.date, gene.timeSlot);
           let newProctorId = -1;
           
           if (isNightClass && section.instructor_id && availableProctors.includes(section.instructor_id)) {
             newProctorId = section.instructor_id;
           } else {
-            // Randomize proctor selection
             const shuffled = [...availableProctors].sort(() => Math.random() - 0.5);
             newProctorId = shuffled.length > 0 ? shuffled[0] : -1;
           }
@@ -994,6 +1032,7 @@ const SchedulerPlottingSchedule: React.FC<SchedulerProps> = ({ user, onScheduleC
           return { ...gene, proctorId: newProctorId };
         }
       }
+
       return { ...gene };
     });
   };
@@ -1406,8 +1445,6 @@ const SchedulerPlottingSchedule: React.FC<SchedulerProps> = ({ user, onScheduleC
       courseDateAssignment.set(courseId, randomDate);
     });
     
-    toast.info("Generating schedule... This may take a moment.", { autoClose: 2000 });
-
     let population: Chromosome[] = [];
     for (let i = 0; i < POPULATION_SIZE; i++) {
       population.push(generateRandomChromosome(
@@ -1470,14 +1507,29 @@ const SchedulerPlottingSchedule: React.FC<SchedulerProps> = ({ user, onScheduleC
       return;
     }
 
-    console.log(`✅ Evolution complete! Final best fitness: ${bestFitness}`);
-
     // Convert to schedule with validation
     const scheduledExams: any[] = [];
     const unscheduledSections: string[] = [];
     const finalRoomTimeRanges = new Map<string, Array<{ start: number; end: number; course: string; section: string }>>();
     const finalProctorTimeRanges = new Map<string, Array<{ start: number; end: number; course: string; section: string }>>();
     const finalCourseDates = new Map<string, Set<string>>();
+
+    const globalProctorAssignments = new Map<string, Set<string>>();
+    const proctorKey = (proctorId: number) => {
+      return globalProctorAssignments.get(String(proctorId)) || new Set();
+    };
+
+    const isProctorAvailable = (proctorId: number, date: string, timeSlot: string) => {
+      const assignments = proctorKey(proctorId);
+      return !assignments.has(`${date}|${timeSlot}`);
+    };
+
+    const assignProctorGlobally = (proctorId: number, date: string, timeSlot: string) => {
+      if (!globalProctorAssignments.has(String(proctorId))) {
+        globalProctorAssignments.set(String(proctorId), new Set());
+      }
+      globalProctorAssignments.get(String(proctorId))!.add(`${date}|${timeSlot}`);
+    };
 
     for (const gene of bestChromosome) {
       const section = modalityMap.get(gene.sectionId);
@@ -1636,93 +1688,63 @@ const SchedulerPlottingSchedule: React.FC<SchedulerProps> = ({ user, onScheduleC
         continue;
       }
 
-      // ===== PROCTOR ASSIGNMENT - FIXED TO PREVENT CONFLICTS =====
+      // ===== PROCTOR ASSIGNMENT (GLOBAL, NO DOUBLE BOOKING) =====
+      let sharedProctor = -1;
+
+      // Step A: Get available proctors for this time
       const availableProctorsForAssignment = getAvailableProctors(date, timeSlot);
 
-      // ✅ CRITICAL: Filter out proctors already assigned at this exact time
-      const freeProctors = availableProctorsForAssignment.filter(candidateProctor => {
-        const proctorKey = `${date}|${candidateProctor}`;
-        const existingRanges = finalProctorTimeRanges.get(proctorKey) || [];
-        
-        // Check if this proctor is free during the exam time
-        return !existingRanges.some(range => 
-          rangesOverlap(startMinutes, endMinutes, range.start, range.end)
-        );
-      });
+      // Step B: Filter those actually free (no overlap in ranges)
+      const freeProctors = availableProctorsForAssignment.filter(pid => 
+        isProctorAvailable(pid, date, timeSlot)
+      );
 
       console.log(`📅 Date: ${date}, Time: ${timeSlot}`);
       console.log(`   Available: ${availableProctorsForAssignment.length}, Free: ${freeProctors.length}`);
 
-      let sharedProctor = -1;
-
-      // Priority 1: Night class instructor (if free)
+      // Priority 1: Night class instructor
       if (section.is_night_class === "YES" && section.instructors && section.instructors.length > 0) {
         const nightInstructor = section.instructors[0];
         if (freeProctors.includes(nightInstructor)) {
           sharedProctor = nightInstructor;
+          assignProctorGlobally(sharedProctor, date, timeSlot);
           console.log(`✅ Night class instructor ${nightInstructor} assigned`);
         }
       }
 
-      // Priority 2: Any free proctor from available list
-      if (sharedProctor === -1 && freeProctors.length > 0) {
-        // Shuffle for randomization
-        const shuffled = [...freeProctors].sort(() => Math.random() - 0.5);
-        sharedProctor = shuffled[0];
-        console.log(`✅ Random free proctor ${sharedProctor} assigned`);
+      // Priority 2: Any free proctor
+      if (sharedProctor === -1) {
+        for (const pid of freeProctors.sort(() => Math.random() - 0.5)) {
+          sharedProctor = pid;
+          assignProctorGlobally(sharedProctor, date, timeSlot);
+          console.log(`✅ Proctor ${pid} assigned`);
+          break;
+        }
       }
 
-      // Priority 3: Section instructor as fallback (if somehow free but not in availability)
-      if (sharedProctor === -1 && section.instructors && section.instructors.length > 0) {
+      // Priority 3: Use section instructor
+      if (sharedProctor === -1 && section.instructors) {
         for (const instrId of section.instructors) {
-          if (!instrId) continue;
-          const instrKey = `${date}|${instrId}`;
-          const instrRanges = finalProctorTimeRanges.get(instrKey) || [];
-          const instrFree = !instrRanges.some(range => 
-            rangesOverlap(startMinutes, endMinutes, range.start, range.end)
-          );
-          
-          if (instrFree) {
+          if (instrId && isProctorAvailable(instrId, date, timeSlot)) {
             sharedProctor = instrId;
-            console.log(`✅ Fallback instructor ${instrId} assigned`);
+            assignProctorGlobally(sharedProctor, date, timeSlot);
+            console.log(`✅ Section instructor ${instrId} assigned`);
             break;
           }
         }
       }
 
-      // ❌ If NO proctor found, skip this section entirely
+      // If still no proctor → cannot schedule
       if (sharedProctor === -1) {
-        console.error(`❌ NO FREE PROCTOR for ${section.course_id} - ${section.sections.join(', ')}`);
-        console.error(`   Available: ${availableProctorsForAssignment.length}`);
-        console.error(`   Free: ${freeProctors.length}`);
-        console.error(`   Occupied proctors:`, Array.from(finalProctorTimeRanges.keys())
-          .filter(k => k.startsWith(`${date}|`))
-          .map(k => k.split('|')[1])
-        );
-        
+        console.error(`❌ NO AVAILABLE PROCTOR for ${section.course_id} - ${section.sections.join(', ')}`);
         unscheduledSections.push(
           `${section.course_id} - ${section.section_name} (no available proctor at ${timeSlot})`
         );
-        continue; // ✅ Skip this section - don't add to scheduledExams
+        continue;
       }
 
-      // ✅ IMMEDIATELY mark proctor as used BEFORE processing next section
-      const proctorKey = `${date}|${sharedProctor}`;
-      if (!finalProctorTimeRanges.has(proctorKey)) {
-        finalProctorTimeRanges.set(proctorKey, []);
-      }
-      finalProctorTimeRanges.get(proctorKey)!.push({
-        start: startMinutes,
-        end: endMinutes,
-        course: section.course_id,
-        section: section.sections.join(', ')
-      });
-
-      // Build proctors array for all sections in this group
-      const proctorsArray: number[] = [];
-      for (let i = 0; i < section.sections.length; i++) {
-        proctorsArray.push(sharedProctor);
-      }
+      // Build proctors array for all grouped sections
+      const proctorsArray: number[] = Array(section.sections.length).fill(sharedProctor);
 
       console.log(`✅ Assigned proctor ${sharedProctor} to ${section.sections.length} section(s)`);
 
@@ -1785,8 +1807,6 @@ const SchedulerPlottingSchedule: React.FC<SchedulerProps> = ({ user, onScheduleC
 
     try {
       await api.post('/tbl_examdetails', scheduledExams);
-      toast.success(`Successfully scheduled ${scheduledExams.length}/${allModalities.length} sections!`);
-      console.log(`✅ Successfully saved ${scheduledExams.length} exam schedules`);
       
       if (onScheduleCreated) {
         setTimeout(() => {
@@ -1837,6 +1857,14 @@ const SchedulerPlottingSchedule: React.FC<SchedulerProps> = ({ user, onScheduleC
     { value: "__all__", label },
     ...options,
   ];
+
+  const sortedPrograms = [...programs].sort((a, b) =>
+    a.program_id.toString().localeCompare(b.program_id.toString(), undefined, { numeric: true })
+  );
+
+  const sortedCourses = [...filteredCoursesByPrograms].sort((a, b) =>
+    a.course_id.toString().localeCompare(b.course_id.toString(), undefined, { numeric: true })
+  );
 
   return (
     <div className="scheduler-container">
@@ -1926,10 +1954,12 @@ const SchedulerPlottingSchedule: React.FC<SchedulerProps> = ({ user, onScheduleC
           <div className="field">
             <label className="label">Program</label>
             <Select
-              options={addSelectAllOption(programs.map(p => ({ 
-                value: p.program_id, 
-                label: `${p.program_id} | ${p.program_name}` 
-              })))}
+              options={addSelectAllOption(
+                sortedPrograms.map(p => ({
+                  value: p.program_id,
+                  label: `${p.program_id} | ${p.program_name}`
+                }))
+              )}
               isMulti
               closeMenuOnSelect={false}
               hideSelectedOptions={false}
@@ -1937,9 +1967,8 @@ const SchedulerPlottingSchedule: React.FC<SchedulerProps> = ({ user, onScheduleC
               onChange={(selected) => {
                 let selectedValues = (selected as any[]).map(s => s.value);
                 if (selectedValues.includes("__all__")) {
-                  selectedValues = [...programs.map(p => p.program_id)];
+                  selectedValues = [...sortedPrograms.map(p => p.program_id)];
                 }
-
                 setFormData(prev => ({
                   ...prev,
                   selectedPrograms: selectedValues.filter(v => v !== "__all__"),
@@ -1948,7 +1977,7 @@ const SchedulerPlottingSchedule: React.FC<SchedulerProps> = ({ user, onScheduleC
                 }));
               }}
               value={formData.selectedPrograms.map(p => {
-                const prog = programs.find(f => f.program_id === p);
+                const prog = sortedPrograms.find(f => f.program_id === p);
                 return { value: p, label: prog ? `${prog.program_id} | ${prog.program_name}` : p };
               })}
             />
@@ -1957,7 +1986,12 @@ const SchedulerPlottingSchedule: React.FC<SchedulerProps> = ({ user, onScheduleC
           <div className="field">
             <label className="label">Course</label>
             <Select
-              options={addSelectAllOption(filteredCoursesByPrograms.map(c => ({ value: c.course_id, label: `${c.course_id} | ${c.course_name}` })))}
+              options={addSelectAllOption(
+                sortedCourses.map(c => ({
+                  value: c.course_id,
+                  label: `${c.course_id} | ${c.course_name}`
+                }))
+              )}
               isMulti
               closeMenuOnSelect={false}
               hideSelectedOptions={false}
@@ -1965,15 +1999,25 @@ const SchedulerPlottingSchedule: React.FC<SchedulerProps> = ({ user, onScheduleC
               onChange={(selected) => {
                 let selectedValues = (selected as any[]).map(s => s.value);
                 if (selectedValues.includes("__all__")) {
-                  selectedValues = [...filteredCoursesByPrograms.map(c => c.course_id)];
+                  selectedValues = [...sortedCourses.map(c => c.course_id)];
                 }
-                setFormData(prev => ({ ...prev, selectedCourses: selectedValues.filter(v => v !== "__all__"), selectedModalities: [] }));
+                setFormData(prev => ({
+                  ...prev,
+                  selectedCourses: selectedValues.filter(v => v !== "__all__"),
+                  selectedModalities: [],
+                }));
               }}
               value={formData.selectedCourses.map(c => {
-                const course = filteredCoursesByPrograms.find(f => f.course_id === c);
-                return { value: c, label: course ? course.course_id : c };
+                const course = sortedCourses.find(f => f.course_id === c);
+                return { value: c, label: course ? `${course.course_id} | ${course.course_name}` : c };
               })}
-              styles={{ valueContainer: (provided) => ({ ...provided, maxHeight: "120px", overflowY: "auto" }) }}
+              styles={{
+                valueContainer: (provided) => ({
+                  ...provided,
+                  maxHeight: "120px",
+                  overflowY: "auto"
+                })
+              }}
             />
           </div>
 

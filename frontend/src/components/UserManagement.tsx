@@ -1277,7 +1277,7 @@ export const UserManagement: React.FC<UserManagementProps> = ({}) => {
                       if (sortBy !== 'user_id') e.currentTarget.style.backgroundColor = 'white';
                     }}
                   >
-                    User ID
+                    User ID 
                   </button>
                   <button
                     type="button"
@@ -1945,7 +1945,7 @@ export const UserManagement: React.FC<UserManagementProps> = ({}) => {
             {['user_id', 'first_name', 'last_name', 'middle_name', 'email_address', 'contact_number'].map((field) => (
               <div key={field} className="input-group">
                 <label htmlFor={field}>
-                  {field === 'user_id' ? 'USER ID' : field.replace('_', ' ').toUpperCase()}
+                  {field === 'user_id' ? 'USER ID (Employee ID)' : field.replace('_', ' ').toUpperCase()}
                 </label>
                 <input
                   id={field}
@@ -1971,18 +1971,6 @@ export const UserManagement: React.FC<UserManagementProps> = ({}) => {
                 />
               </div>
             ))}
-
-            <div className="input-group">
-              <label htmlFor="status">STATUS</label>
-              <select
-                id="status"
-                value={newAccount.status}
-                onChange={(e) => setNewAccount(prev => ({ ...prev, status: e.target.value }))}
-              >
-                <option value="Active">Active</option>
-                <option value="Suspended">Suspended</option>
-              </select>
-            </div>
 
             {!isEditMode && (
               <>

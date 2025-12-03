@@ -58,36 +58,24 @@ User = get_user_model()
 # ============================================================
 
 def generate_otp_code(exam_schedule):
-    # Extract building number from building name
-    building_str = exam_schedule.building_name or "00"
+    import random
+    import string
     
-    building_match = re.search(r'\d+', building_str)
-    room_id = exam_schedule.room.room_id if exam_schedule.room else "000"
-    course_code = exam_schedule.course_id or "XXXXX"
-    random_code = ''.join(random.choices(string.ascii_uppercase + string.digits, k=5))
-    
-    # ✅ Format: Building-Room-Course-Random
-    # Example output: 09-207-IT215-X5P9K (NOT 09)-09-207-IT215-X5P9K)
-    otp_code = f"{room_id}-{course_code}-{random_code}"
+    otp_code = ''.join(random.choices(string.ascii_uppercase + string.digits, k=6))
     
     return otp_code
 
 @api_view(['POST'])
 @permission_classes([AllowAny])
 def generate_exam_otps(request):
-    """
-    Generate OTP codes for approved exam schedules
-    """
     try:
         schedule_ids = request.data.get('schedule_ids', [])
         
-        # Query for approved schedules that need OTPs
         if schedule_ids:
             schedules = TblExamdetails.objects.filter(
                 examdetails_id__in=schedule_ids
             ).select_related('room', 'room__building', 'proctor', 'modality')
         else:
-            # Get all approved schedules without OTP
             existing_otp_schedule_ids = TblExamOtp.objects.values_list('examdetails_id', flat=True)
             schedules = TblExamdetails.objects.exclude(
                 examdetails_id__in=existing_otp_schedule_ids
@@ -99,52 +87,37 @@ def generate_exam_otps(request):
                 'generated_count': 0
             }, status=status.HTTP_200_OK)
         
-        # Generate OTPs
         otp_records = []
         generated_count = 0
         
         with transaction.atomic():
             for schedule in schedules:
-                # Check if OTP already exists
                 if TblExamOtp.objects.filter(examdetails=schedule).exists():
                     continue
                 
-                # Generate unique OTP code
                 otp_code = generate_otp_code(schedule)
                 
-                # Ensure uniqueness
                 while TblExamOtp.objects.filter(otp_code=otp_code).exists():
                     otp_code = generate_otp_code(schedule)
                 
-                # ✅ CRITICAL FIX: Calculate expiry properly
                 if schedule.exam_end_time:
-                    # Check if it's already a datetime object
                     if isinstance(schedule.exam_end_time, datetime):
                         expires_at = schedule.exam_end_time
                     else:
-                        # It's a time object, need to combine with date
                         from datetime import datetime as dt
-                        
-                        # Parse exam_date (string format: "2025-06-15" or "2025-11-24")
                         if schedule.exam_date:
                             try:
                                 exam_date_obj = dt.strptime(schedule.exam_date, '%Y-%m-%d').date()
-                                # Combine date and time into full datetime
                                 expires_at = timezone.make_aware(
                                     dt.combine(exam_date_obj, schedule.exam_end_time)
                                 )
                             except Exception as e:
-                                print(f"⚠️ Error parsing date {schedule.exam_date}: {str(e)}")
-                                # Fallback: 3 hours from now
                                 expires_at = timezone.now() + timedelta(hours=3)
                         else:
-                            # Fallback: 3 hours from now
                             expires_at = timezone.now() + timedelta(hours=3)
                 else:
-                    # Fallback: 3 hours from now
                     expires_at = timezone.now() + timedelta(hours=3)
                 
-                # Create OTP record
                 otp_record = TblExamOtp.objects.create(
                     examdetails=schedule,
                     otp_code=otp_code,
@@ -162,8 +135,6 @@ def generate_exam_otps(request):
                 })
                 
                 generated_count += 1
-                print(f"✅ Generated OTP: {otp_code} for schedule {schedule.examdetails_id}")
-                print(f"   Expires at: {expires_at}")
         
         return Response({
             'message': f'Successfully generated {generated_count} OTP codes',
@@ -172,7 +143,6 @@ def generate_exam_otps(request):
         }, status=status.HTTP_201_CREATED)
         
     except Exception as e:
-        print(f"❌ Error generating OTPs: {str(e)}")
         import traceback
         traceback.print_exc()
         return Response({
@@ -198,9 +168,7 @@ def reset_exam_otps(request):
             else:
                 # Delete all OTP codes if no schedule_ids provided
                 deleted_count = TblExamOtp.objects.all().delete()[0]
-        
-        print(f"✅ Reset {deleted_count} OTP code(s)")
-        
+                
         return Response({
             'success': True,
             'deleted_count': deleted_count,
@@ -208,7 +176,6 @@ def reset_exam_otps(request):
         }, status=status.HTTP_200_OK)
         
     except Exception as e:
-        print(f"❌ Error resetting OTP codes: {str(e)}")
         return Response({
             'success': False,
             'error': str(e)
@@ -229,9 +196,7 @@ def verify_otp(request):
     try:
         otp_code = request.data.get('otp_code', '').strip()
         user_id = request.data.get('user_id')
-        
-        print(f"🔍 Verifying OTP: '{otp_code}' for user {user_id}")
-        
+                
         if not otp_code or not user_id:
             return Response({
                 'valid': False,
@@ -246,15 +211,7 @@ def verify_otp(request):
                 'examdetails__proctor',
                 'examdetails__modality'
             ).get(otp_code=otp_code)
-            print(f"✅ Found OTP record: {otp_record.otp_id}")
         except TblExamOtp.DoesNotExist:
-            print(f"❌ OTP not found in database: '{otp_code}'")
-            # ✅ Debug: Show what's in the database
-            all_otps = TblExamOtp.objects.all()[:5]
-            print(f"📊 Database has {TblExamOtp.objects.count()} total OTPs")
-            print(f"📊 First 5 OTPs in database:")
-            for otp in all_otps:
-                print(f"   - '{otp.otp_code}'")
             return Response({
                 'valid': False,
                 'message': 'Invalid OTP code'
@@ -262,8 +219,6 @@ def verify_otp(request):
         
         # Check if expired
         now = timezone.now()
-        print(f"⏰ Current time: {now}")
-        print(f"⏰ Expires at: {otp_record.expires_at}")
         
         if now > otp_record.expires_at:
             print(f"❌ OTP expired")
@@ -273,11 +228,7 @@ def verify_otp(request):
             }, status=status.HTTP_200_OK)
         
         exam_schedule = otp_record.examdetails
-        print(f"📅 Exam schedule: {exam_schedule.examdetails_id}")
-        print(f"📅 Exam date: {exam_schedule.exam_date}")
-        print(f"📅 Exam time: {exam_schedule.exam_start_time} - {exam_schedule.exam_end_time}")
-        
-        # ✅ Check if within exam time window (allow entry 30 mins before start)
+  
         if exam_schedule.exam_start_time and exam_schedule.exam_end_time:
             from datetime import datetime as dt
             
@@ -297,19 +248,13 @@ def verify_otp(request):
                     # Allow entry 30 minutes before start
                     early_entry_window = exam_start_datetime - timedelta(minutes=30)
                     
-                    print(f"⏰ Early entry: {early_entry_window}")
-                    print(f"⏰ Exam start: {exam_start_datetime}")
-                    print(f"⏰ Exam end: {exam_end_datetime}")
-                    
                     if now < early_entry_window:
-                        print(f"❌ Too early - before 30-minute window")
                         return Response({
                             'valid': False,
                             'message': 'Too early to verify. You can verify 30 minutes before the exam starts.'
                         }, status=status.HTTP_200_OK)
                     
                     if now > exam_end_datetime:
-                        print(f"❌ Too late - exam has ended")
                         return Response({
                             'valid': False,
                             'message': 'Exam has already ended. Attendance recording is closed.'
