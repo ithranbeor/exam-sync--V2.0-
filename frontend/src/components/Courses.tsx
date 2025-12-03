@@ -61,6 +61,7 @@ const Courses: React.FC = () => {
   const [canScrollLeft, setCanScrollLeft] = useState(false);
   const [canScrollRight, setCanScrollRight] = useState(false);
   const tableContainerRef = useRef<HTMLDivElement>(null);
+  const [originalCourseId, setOriginalCourseId] = useState<string>("");
 
   // Handle ESC key to close modals
   useEscapeKey(() => {
@@ -234,11 +235,18 @@ const Courses: React.FC = () => {
 
   // 🧠 Memoize filtered results
   const filteredCourses = useMemo(() => {
-    let filtered = courses.filter(
-      (c) =>
-        c.course_name.toLowerCase().includes(searchTerm.toLowerCase()) ||
-        c.course_id.toLowerCase().includes(searchTerm.toLowerCase())
-    );
+    const search = searchTerm.toLowerCase();
+    let filtered = courses.filter((c) => {
+      // Search in course_id, course_name, term_name, and instructor names
+      const matchesCourseId = c.course_id.toLowerCase().includes(search);
+      const matchesCourseName = c.course_name.toLowerCase().includes(search);
+      const matchesTerm = (c.term_name || '').toLowerCase().includes(search);
+      const matchesInstructors = c.instructor_names?.some(name => 
+        name.toLowerCase().includes(search)
+      ) || false;
+      
+      return matchesCourseId || matchesCourseName || matchesTerm || matchesInstructors;
+    });
 
     // Apply sorting
     if (sortBy !== 'none') {
@@ -329,7 +337,7 @@ const Courses: React.FC = () => {
     }
   };
   // Add or update course
-   const handleSubmit = useCallback(async () => {
+  const handleSubmit = useCallback(async () => {
     const { course_id, course_name, term_id, user_ids, leaders } = newCourse;
     if (!course_id || !course_name || !term_id || user_ids.length === 0) {
       toast.error("All fields are required.");
@@ -339,14 +347,14 @@ const Courses: React.FC = () => {
     setIsSubmitting(true);
     try {
       if (editMode) {
-        await api.put(`/courses/${course_id}/`, {
-          course_id, // include this for backend consistency
+        await api.put(`/courses/${originalCourseId}/`, {
+          course_id,
           course_name,
           term_id,
           user_ids,
           leaders,
         });
-        toast.success("successfully updated");
+        toast.success("Successfully updated");
       } else {
         await api.post("/courses/", {
           course_id,
@@ -364,10 +372,11 @@ const Courses: React.FC = () => {
     } finally {
       setIsSubmitting(false);
     }
-  }, [newCourse, editMode, fetchCourses]);
+  }, [newCourse, editMode, fetchCourses, originalCourseId]);
 
   // ✅ Fix Edit button handler (correctly loads full editable data)
   const handleEdit = (course: Course) => {
+    setOriginalCourseId(course.course_id); // Store original ID
     setNewCourse({
       course_id: course.course_id,
       course_name: course.course_name,
@@ -1103,6 +1112,18 @@ const Courses: React.FC = () => {
             <h3 style={{ textAlign: "center" }}>
               {editMode ? "Edit Course" : "Add Course"}
             </h3>
+
+            <div className="input-group">
+              <label>Course Code</label>
+              <input
+                type="text"
+                value={newCourse.course_id}
+                disabled={false}  // Changed from {editMode} to {false}
+                onChange={(e) =>
+                  setNewCourse({ ...newCourse, course_id: e.target.value })
+                }
+              />
+            </div>
 
             <div className="input-group">
               <label>Course Code</label>

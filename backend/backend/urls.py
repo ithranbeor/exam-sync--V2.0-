@@ -18,6 +18,7 @@ urlpatterns = [
     path('api/send-proctor-emails/', views.send_proctor_emails, name='send_proctor_emails'),
     path('api/users/<int:user_id>/avatar/', views.user_avatar_upload, name='user_avatar_upload'),
     path('api/users/<int:user_id>/avatar/delete/', views.user_avatar_delete, name='user_avatar_delete'),
+    path('api/users/me/', views.get_current_user, name='get_current_user'),
 
     # Tables
     path('api/tbl_examperiod', views.tbl_examperiod_list, name='tbl_examperiod_list'),

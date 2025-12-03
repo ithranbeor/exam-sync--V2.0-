@@ -125,13 +125,24 @@ const SectionCourses: React.FC = () => {
   const fetchAll = useCallback(async () => {
     setLoading(true);
     try {
+      // ✅ Get user_id from localStorage or your auth context
+      const userDataString = localStorage.getItem('user');
+      const userData = userDataString ? JSON.parse(userDataString) : null;
+      const userId = userData?.user_id;
+
+      if (!userId) {
+        toast.error('User not logged in');
+        setLoading(false);
+        return;
+      }
+
       const [secRes, courseRes, progRes, termRes, courseUserRes, userRes] = await Promise.all([
         api.get('/tbl_sectioncourse/'),
         api.get('/courses/'),
         api.get('/programs/'),
         api.get('/tbl_term'),
         api.get('/tbl_course_users/'),
-        api.get('/users/me/')
+        api.get(`/users/me/?user_id=${userId}`)  // ✅ FIXED: Pass user_id
       ]);
 
       // Extract data from response
@@ -152,40 +163,31 @@ const SectionCourses: React.FC = () => {
 
       setSectionCourses(secData);
 
-      // ✅ FIX: Filter courses where user is a Bayanihan Leader
+      // Filter courses where user is a Bayanihan Leader
       const bayanihanCourseIds = new Set(
         courseUserData
           .filter((row: any) => {
-            // Handle different possible response structures
             const rowUserId = row.user_id || row.tbl_users?.user_id || row.user?.user_id;
             const isBayanihanLeader = row.is_bayanihan_leader === true || row.is_bayanihan_leader === 'true';
             
             return rowUserId === user.user_id && isBayanihanLeader;
           })
           .map((row: any) => row.course?.course_id || row.course_id)
-          .filter(Boolean) // Remove null/undefined values
+          .filter(Boolean)
       );
 
       console.log('User ID:', user.user_id);
       console.log('Bayanihan Leader Course IDs:', Array.from(bayanihanCourseIds));
 
-      // Filter courses to only show those where user is Bayanihan Leader
       const filteredCourses = courseData.filter(
         (c: any) => bayanihanCourseIds.has(c.course_id)
       );
 
       console.log('Filtered Courses Count:', filteredCourses.length);
-      // Add types to the console log for filteredCourses
-      interface FilteredCourse extends Course {
-        // You can extend with additional properties if needed
-      }
-      const filteredCoursesTyped: FilteredCourse[] = filteredCourses;
-      console.log('Filtered Courses:', filteredCoursesTyped.map((c: FilteredCourse) => c.course_id));
 
       setCourses(filteredCourses);
       setPrograms(progData);
 
-      // Map terms
       const mappedTerms = termData.map((t: any) => ({
         ...t,
         tbl_examperiod: {
@@ -196,13 +198,12 @@ const SectionCourses: React.FC = () => {
       }));
       setTerms(mappedTerms);
 
-      // Build instructor map for ALL courses (not just filtered)
+      // Build instructor map
       const instructorMap: Record<string, User[]> = {};
       courseUserData.forEach((row: any) => {
         const courseId = row.course?.course_id || row.course_id;
         if (!courseId) return;
 
-        // Extract user information
         const userEntry: User = {
           user_id: row.user_id || row.tbl_users?.user_id || row.user?.user_id,
           full_name: row.tbl_users?.full_name || 

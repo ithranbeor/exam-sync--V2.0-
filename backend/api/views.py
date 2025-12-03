@@ -53,6 +53,51 @@ import re
 
 User = get_user_model()
 
+@api_view(['GET'])
+@permission_classes([AllowAny])
+def get_current_user(request):
+    """
+    Get current user information from token or user_id
+    """
+    try:
+        # Try to get user_id from query params
+        user_id = request.GET.get('user_id')
+        
+        if not user_id:
+            return Response({
+                'error': 'user_id parameter is required'
+            }, status=status.HTTP_400_BAD_REQUEST)
+        
+        user = TblUsers.objects.get(user_id=user_id)
+        
+        # Return user data with full_name
+        return Response({
+            'data': {
+                'user_id': user.user_id,
+                'first_name': user.first_name,
+                'middle_name': user.middle_name,
+                'last_name': user.last_name,
+                'full_name': f"{user.first_name} {user.middle_name or ''} {user.last_name}".strip(),
+                'email_address': user.email_address,
+                'contact_number': user.contact_number,
+                'status': user.status,
+                'avatar_url': user.avatar_url,
+            }
+        }, status=status.HTTP_200_OK)
+        
+    except TblUsers.DoesNotExist:
+        return Response({
+            'error': 'User not found'
+        }, status=status.HTTP_404_NOT_FOUND)
+    except Exception as e:
+        print(f"❌ Error fetching current user: {str(e)}")
+        import traceback
+        traceback.print_exc()
+        return Response({
+            'error': str(e),
+            'detail': 'Failed to fetch user'
+        }, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+
 # ============================================================
 # OTP GENERATION
 # ============================================================
