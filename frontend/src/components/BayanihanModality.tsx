@@ -246,24 +246,22 @@ const BayanihanModality: React.FC<UserProps> = ({ user }) => {
         const isAdmin = roles.some((r: any) => r.role === 2 || r.role_id === 2);
 
         if (isAdmin) {
-          // ADMIN: Show all programs, courses, sections, and ALL rooms (not filtered by scheduler)
+          // ADMIN: Show all programs, courses, sections, and ALL rooms
           setProgramOptions(allPrograms);
           setCourseOptions(allCourses);
 
           const allSections = sectionCourses.map((sc: any) => ({
-            course_id: sc.course_id || sc.course?.course_id,
-            program_id: sc.program_id || sc.program?.program_id,
-            section_name: sc.section_name,
-            number_of_students: sc.number_of_students || 0
+            course_id: String(sc.course_id ?? sc.course?.course_id ?? ''),
+            program_id: String(sc.program_id ?? sc.program?.program_id ?? ''),
+            section_name: String(sc.section_name ?? ''),
+            number_of_students: Number(sc.number_of_students ?? 0)
           }));
           setSectionOptions(allSections);
 
-          // Fetch ALL rooms for admin (not filtered by available_rooms)
           const { data: allRooms } = await api.get('/tbl_rooms');
           setRoomOptions(allRooms);
           setAvailableRoomIds(allRooms.map((r: any) => r.room_id));
 
-          // Set buildings
           setBuildingOptions(
             buildings?.map((b: any) => ({
               id: b.building_id,
@@ -271,7 +269,7 @@ const BayanihanModality: React.FC<UserProps> = ({ user }) => {
             })) ?? []
           );
 
-          console.log('Admin access: All rooms available (not filtered by scheduler)');
+          console.log('Admin access: All rooms available');
           setLoadingRooms(false);
           return;
         }
@@ -287,6 +285,69 @@ const BayanihanModality: React.FC<UserProps> = ({ user }) => {
           return;
         }
 
+        console.log('=== BAYANIHAN LEADER DEBUG ===');
+        console.log('User ID:', user.user_id);
+
+        // ✅ FIXED: Fetch user courses as Bayanihan Leader
+        const { data: userCourses } = await api.get('/tbl_course_users/', {
+          params: {
+            user_id: user.user_id,
+            is_bayanihan_leader: 'true'  // ✅ ADD THIS PARAMETER
+          }
+        });
+
+        console.log('🔍 Raw API response:', userCourses);
+
+        // ✅ FIXED: Extract course IDs where user is Bayanihan Leader
+        const courseIds = userCourses
+          .filter((c: any) => c.is_bayanihan_leader === true)  // ✅ Double-check the flag
+          .map((c: any) => c.course?.course_id || c.course_id)
+          .filter((id: any) => id !== null && id !== undefined);
+
+        console.log('✅ Bayanihan Leader Course IDs:', courseIds);
+
+        if (courseIds.length === 0) {
+          toast.warn('No courses assigned to you as Bayanihan Leader.');
+          setLoadingRooms(false);
+          return;
+        }
+
+        // ✅ Filter courses - only show courses where user is Bayanihan Leader
+        const coursesWithNames = allCourses.filter((c: any) =>
+          courseIds.includes(c.course_id)
+        );
+        setCourseOptions(coursesWithNames);
+
+        console.log('Filtered Courses:', coursesWithNames.length);
+
+        // Filter sections
+        const sectionsData = Array.isArray(sectionCourses) ? sectionCourses : [];
+
+        const normalizedSections = sectionsData.map((sc: any) => {
+          const courseId = sc.course_id ?? sc.course?.course_id;
+          const programId = sc.program_id ?? sc.program?.program_id;
+
+          return {
+            course_id: String(courseId ?? ''),
+            program_id: String(programId ?? ''),
+            section_name: String(sc.section_name ?? ''),
+            number_of_students: Number(sc.number_of_students ?? 0),
+          };
+        });
+
+        const filteredSections = normalizedSections.filter((sec: any) =>
+          courseIds.map(String).includes(String(sec.course_id))
+        );
+
+        setSectionOptions(filteredSections);
+
+        console.log("Filtered Sections:", filteredSections.length);
+
+        const programIdsFromSections = Array.from(
+          new Set(filteredSections.map((s: any) => s.program_id))
+        );
+
+        // Handle departments and colleges for room fetching
         const leaderDepartmentIds = leaderRoles
           .map((r: any) => r.department_id || r.department)
           .filter(Boolean);
@@ -297,7 +358,6 @@ const BayanihanModality: React.FC<UserProps> = ({ user }) => {
           return;
         }
 
-        // Get colleges from departments
         const departments = allDepartments.filter((d: any) =>
           leaderDepartmentIds.includes(d.department_id)
         );
@@ -312,109 +372,61 @@ const BayanihanModality: React.FC<UserProps> = ({ user }) => {
           return;
         }
 
-        // FIX: Extract college IDs properly (they might be objects)
         const collegeIdStrings = collegeIds
           .map((c: any) => String(c.college_id || c))
           .filter(Boolean);
 
-        // FIX: Get department names to match against program.department field
         const deptNames = departments.map((d: any) => d.department_name).filter(Boolean);
 
-        console.log('=== BAYANIHAN LEADER DEBUG ===');
         console.log('Leader Department IDs:', leaderDepartmentIds);
-        console.log('Department Names:', deptNames);
-        console.log('College IDs (objects):', collegeIds);
         console.log('College ID Strings:', collegeIdStrings);
 
-        // Filter programs by matching department name OR college ID
+        // Filter programs
         const programs = allPrograms.filter((p: any) => {
+          if (!programIdsFromSections.includes(p.program_id)) {
+            return false;
+          }
+
           const progDeptName = String(p.department || p.department_name || '');
           const progDeptId = String(p.department_id || '');
           const progCollege = String(p.college_id || p.college || '');
 
-          // Match by department ID or name
           const deptMatch =
             leaderDepartmentIds.includes(progDeptId) ||
             deptNames.some((name: string) => progDeptName.includes(name));
 
-          // Match by college ID
           const collegeMatch = collegeIdStrings.includes(progCollege);
 
           return deptMatch || collegeMatch;
         });
 
-        console.log('Total Programs:', allPrograms.length);
         console.log('Filtered Programs:', programs.length);
-        console.log('Sample Program:', allPrograms[0]);
-        console.log('==============================');
-
         setProgramOptions(programs);
 
-        // Fetch user courses - this still needs to be separate
-        const { data: userCourses } = await api.get('/tbl_course_users/', {
-          params: { user_id: user.user_id, is_bayanihan_leader: true }
-        });
-
-        const courseIds = userCourses?.map((c: any) => c.course_id) ?? [];
-
-        // Filter courses
-        const coursesWithNames = allCourses.filter((c: any) =>
-          courseIds.includes(c.course_id)
-        );
-        setCourseOptions(coursesWithNames);
-        // Filter sections
-        const filteredSections = sectionCourses
-          ?.filter((sc: any) => courseIds.includes(sc.course_id || sc.course?.course_id))
-          .map((sc: any) => ({
-            course_id: sc.course_id || sc.course?.course_id,
-            program_id: sc.program_id || sc.program?.program_id,
-            section_name: sc.section_name,
-            number_of_students: sc.number_of_students || 0
-          })) ?? [];
-        setSectionOptions(filteredSections);
-        setSectionOptions(filteredSections);
-
-        // BAYANIHAN LEADER: Fetch available rooms for their college(s)
-        console.log('Fetching available rooms for colleges:', collegeIdStrings);
-
-        // Fetch available rooms for each college using the string IDs
+        // Fetch available rooms
         const availableRoomsPromises = collegeIdStrings.map((collegeId: string) =>
           api.get('/tbl_available_rooms/', { params: { college_id: collegeId } })
         );
 
         const availableRoomsResponses = await Promise.all(availableRoomsPromises);
-
-        // Combine all available rooms from all colleges
         const allAvailableRooms = availableRoomsResponses.flatMap(response => response.data);
 
-        console.log('Available rooms data:', allAvailableRooms);
-
-        // Extract room IDs - handle both nested room object and direct room_id
         const availableIds = allAvailableRooms
-          .map((ar: any) => {
-            // Try to get room_id from nested room object first, then from direct room_id property
-            return ar.room?.room_id || ar.room_id || ar.room;
-          })
-          .filter((id: string) => id); // Filter out undefined/null values
-
-        console.log('Extracted room IDs:', availableIds);
+          .map((ar: any) => ar.room?.room_id || ar.room_id || ar.room)
+          .filter((id: string) => id);
 
         setAvailableRoomIds(availableIds.map(String));
 
-        // Fetch all rooms and filter by available IDs
         if (availableIds.length > 0) {
           const { data: allRooms } = await api.get('/tbl_rooms');
           const filteredRooms = allRooms.filter((r: any) =>
             availableIds.includes(r.room_id)
           );
           setRoomOptions(filteredRooms);
-          console.log('Filtered rooms for Bayanihan Leader:', filteredRooms);
         } else {
           setRoomOptions([]);
-          console.log('No available rooms found for Bayanihan Leader');
         }
 
-        // Set buildings
         setBuildingOptions(
           buildings?.map((b: any) => ({
             id: b.building_id,
@@ -422,7 +434,7 @@ const BayanihanModality: React.FC<UserProps> = ({ user }) => {
           })) ?? []
         );
 
-        console.log('Bayanihan Leader - Available Room IDs (set by scheduler):', availableIds);
+        console.log('==============================');
       } catch (error: any) {
         console.error('Unexpected error fetching data:', error);
         toast.error('An unexpected error occurred while loading data');

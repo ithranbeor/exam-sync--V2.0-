@@ -44,14 +44,38 @@ const ProctorAttendance: React.FC<UserProps> = ({ user }) => {
   const [_verificationData, setVerificationData] = useState<any>(null);
   const [showVerificationSuccess, setShowVerificationSuccess] = useState(false);
 
+  const isTimeConflict = (
+    startA: string,
+    endA: string,
+    startB: string,
+    endB: string
+  ) => {
+    const aStart = new Date(startA).getTime();
+    const aEnd = new Date(endA).getTime();
+    const bStart = new Date(startB).getTime();
+    const bEnd = new Date(endB).getTime();
+
+    return aStart < bEnd && bStart < aEnd;
+  };
+
+  // Check full schedule conflict
+  //const hasConflictWithAssigned = (exam: ExamDetails) => {
+    //return proctorAssignedExams.some((assigned) =>
+      //isTimeConflict(
+        //assigned.exam_start_time,
+        //assigned.exam_end_time,
+        //exam.exam_start_time,
+        //exam.exam_end_time
+      //)
+    //);
+  //};
+
   const isExamOngoing = (examDate: string, startTime: string, endTime: string) => {
     try {
       const now = new Date();
       
-      // Parse the exam date (assuming format like "2024-12-03" or similar)
       const examDateObj = new Date(examDate);
       
-      // Check if it's the same day
       const isSameDay = 
         now.getFullYear() === examDateObj.getFullYear() &&
         now.getMonth() === examDateObj.getMonth() &&
@@ -145,45 +169,71 @@ const ProctorAttendance: React.FC<UserProps> = ({ user }) => {
       console.error('Error fetching assigned exams:', error);
       toast.error('Failed to load assigned exams');
     }
-  }, [user]);
-  
+  }, [user]); // Only depend on user
 
-  // Fetch all exams for substitution
+  // Fetch all exams for substitution - REMOVE proctorAssignedExams dependency
   const fetchAllExams = useCallback(async () => {
     try {
       const { data } = await api.get('/all-exams-for-substitution/');
       const formattedExams: ExamDetails[] = data
         .map((exam: any) => ({
-        id: exam.id,
-        course_id: exam.course_id,
-        subject: exam.subject || exam.course_id,
-        section_name: exam.section_name || '',
-        exam_date: exam.exam_date || '',
-        exam_start_time: exam.exam_start_time || '',
-        exam_end_time: exam.exam_end_time || '',
-        building_name: exam.building_name || '',
-        room_id: exam.room_id || '',
-        instructor_name: exam.instructor_name || '',
-        assigned_proctor: exam.assigned_proctor || '',
-        status: exam.status || 'pending'
-      }));
-      setAllExams(formattedExams);
+          id: exam.id,
+          course_id: exam.course_id,
+          subject: exam.subject || exam.course_id,
+          section_name: exam.section_name || '',
+          exam_date: exam.exam_date || '',
+          exam_start_time: exam.exam_start_time || '',
+          exam_end_time: exam.exam_end_time || '',
+          building_name: exam.building_name || '',
+          room_id: exam.room_id || '',
+          instructor_name: exam.instructor_name || '',
+          assigned_proctor: exam.assigned_proctor || '',
+          status: exam.status || 'pending'
+        }));
+
+        const filteredForSubstitution = formattedExams.filter((exam) => {
+          // 1. Remove user's own assigned schedule (assigned_proctor name match)
+          if (
+            String(exam.assigned_proctor).toLowerCase().includes(
+              `${user?.first_name} ${user?.last_name}`.toLowerCase()
+            )
+          ) {
+            return false;
+          }
+
+          // 2. Remove exams that match EXACT SAME DATE + TIME as any user's assigned exam
+          const isSameDateAndTime = proctorAssignedExams.some((assigned) =>
+            assigned.exam_date === exam.exam_date &&
+            assigned.exam_start_time === exam.exam_start_time &&
+            assigned.exam_end_time === exam.exam_end_time
+          );
+          if (isSameDateAndTime) return false;
+
+          // 3. Remove exams with same schedule even if course differs
+          // (this rule was requested, this is the fix)
+
+          // 4. Remove time conflicts
+          const hasTimeConflict = proctorAssignedExams.some((assigned) =>
+            isTimeConflict(
+              assigned.exam_start_time,
+              assigned.exam_end_time,
+              exam.exam_start_time,
+              exam.exam_end_time
+            )
+          );
+          if (hasTimeConflict) return false;
+
+          return true;
+        });
+
+      setAllExams(filteredForSubstitution);
     } catch (error: any) {
       console.error('Error fetching all exams:', error);
       toast.error('Failed to load exams');
     }
-  }, []);
+  }, []); // No dependencies
 
-  useEffect(() => {
-    const interval = setInterval(() => {
-      fetchAssignedExams();
-      fetchAllExams();
-    }, 30000); // Refresh every 30 seconds
-
-    return () => clearInterval(interval);
-  }, [fetchAssignedExams, fetchAllExams]);
-
-  // Load data on mount
+  // REPLACE ALL useEffects with these simplified ones:
   useEffect(() => {
     const loadData = async () => {
       setLoading(true);
@@ -193,6 +243,14 @@ const ProctorAttendance: React.FC<UserProps> = ({ user }) => {
     loadData();
   }, [fetchAssignedExams, fetchAllExams]);
 
+  useEffect(() => {
+    const interval = setInterval(() => {
+      fetchAssignedExams();
+      fetchAllExams();
+    }, 30000); // Refresh every 30 seconds
+
+    return () => clearInterval(interval);
+  }, [fetchAssignedExams, fetchAllExams]);
 
   const handleCardClick = (exam: ExamDetails, isSubstitution: boolean = false) => {
     setSelectedExam(exam);
@@ -417,59 +475,60 @@ const ProctorAttendance: React.FC<UserProps> = ({ user }) => {
                       key={exam.id}
                       className="proctor-attendance-schedule-card proctor-attendance-schedule-card-clickable proctor-attendance-schedule-card-substitution"
                       onClick={() => handleCardClick(exam, true)}
-                    >
-                      <div className="proctor-attendance-schedule-header">
-                        <h3 className="proctor-attendance-schedule-subject">
-                          {exam.course_id} - {exam.subject}
-                        </h3>
-                        <span className="proctor-attendance-schedule-code">{exam.course_id}</span>
-                      </div>
+                      >
+                        <div className="proctor-attendance-schedule-header">
+                          <h3 className="proctor-attendance-schedule-subject">
+                            {exam.course_id} - {exam.subject}
+                          </h3>
+                          <span className="proctor-attendance-schedule-code">{exam.course_id}</span>
+                        </div>
 
-                      <div className="proctor-attendance-schedule-details">
-                        <div className="proctor-attendance-detail-row">
-                          <span className="proctor-attendance-detail-label">Section:</span>
-                          <span className="proctor-attendance-detail-value">{exam.section_name}</span>
+                        <div className="proctor-attendance-schedule-details">
+                          <div className="proctor-attendance-detail-row">
+                            <span className="proctor-attendance-detail-label">Section:</span>
+                            <span className="proctor-attendance-detail-value">{exam.section_name}</span>
+                          </div>
+                          <div className="proctor-attendance-detail-row">
+                            <span className="proctor-attendance-detail-label">Date:</span>
+                            <span className="proctor-attendance-detail-value">{exam.exam_date}</span>
+                          </div>
+                          <div className="proctor-attendance-detail-row">
+                            <span className="modal-detail-label">Time:</span>
+                            <span className="modal-detail-value">
+                              {formatTo12Hour(exam.exam_start_time)} - {formatTo12Hour(exam.exam_end_time)}
+                            </span>
+                          </div>
+                          <div className="proctor-attendance-detail-row">
+                            <span className="proctor-attendance-detail-label">Building:</span>
+                            <span className="proctor-attendance-detail-value">{exam.building_name}</span>
+                          </div>
+                          <div className="proctor-attendance-detail-row">
+                            <span className="proctor-attendance-detail-label">Room:</span>
+                            <span className="proctor-attendance-detail-value">{exam.room_id}</span>
+                          </div>
+                          <div className="proctor-attendance-detail-row">
+                            <span className="proctor-attendance-detail-label">Assigned Proctor:</span>
+                            <span className="proctor-attendance-detail-value">{exam.assigned_proctor}</span>
+                          </div>
+                          <div className="proctor-attendance-detail-row">
+                            <span className="proctor-attendance-detail-label">Instructor:</span>
+                            <span className="proctor-attendance-detail-value">{exam.instructor_name}</span>
+                          </div>
+                          <div className="proctor-attendance-detail-row">
+                            <span className="proctor-attendance-detail-label">Status:</span>
+                            <span className={`status-badge status-${exam.status}`}>
+                              {exam.status}
+                            </span>
+                          </div>
                         </div>
-                        <div className="proctor-attendance-detail-row">
-                          <span className="proctor-attendance-detail-label">Date:</span>
-                          <span className="proctor-attendance-detail-value">{exam.exam_date}</span>
-                        </div>
-                        <div className="proctor-attendance-detail-row">
-                          <span className="proctor-attendance-detail-label">Time:</span>
-                          <span className="proctor-attendance-detail-value">
-                            {formatTo12Hour(exam.exam_start_time)} - {formatTo12Hour(exam.exam_end_time)}
-                          </span>
-                        </div>
-                        <div className="proctor-attendance-detail-row">
-                          <span className="proctor-attendance-detail-label">Building:</span>
-                          <span className="proctor-attendance-detail-value">{exam.building_name}</span>
-                        </div>
-                        <div className="proctor-attendance-detail-row">
-                          <span className="proctor-attendance-detail-label">Room:</span>
-                          <span className="proctor-attendance-detail-value">{exam.room_id}</span>
-                        </div>
-                        <div className="proctor-attendance-detail-row">
-                          <span className="proctor-attendance-detail-label">Assigned Proctor:</span>
-                          <span className="proctor-attendance-detail-value">{exam.assigned_proctor}</span>
-                        </div>
-                        <div className="proctor-attendance-detail-row">
-                          <span className="proctor-attendance-detail-label">Instructor:</span>
-                          <span className="proctor-attendance-detail-value">{exam.instructor_name}</span>
-                        </div>
-                        <div className="proctor-attendance-detail-row">
-                          <span className="proctor-attendance-detail-label">Status:</span>
-                          <span className={`status-badge status-${exam.status}`}>
-                            {exam.status}
-                          </span>
+
+                        <div className="proctor-attendance-click-hint proctor-attendance-substitution-hint">
+                          Click to substitute as proctor
                         </div>
                       </div>
-                      <div className="proctor-attendance-click-hint proctor-attendance-substitution-hint">
-                        Click to substitute as proctor
-                      </div>
-                    </div>
-                  ))
+                    ))
                 ) : (
-                  <div className="no-data-message">No exams found</div>
+                  <div className="no-data-message">No exams available (no conflict-free schedules)</div>
                 )}
               </div>
             </div>

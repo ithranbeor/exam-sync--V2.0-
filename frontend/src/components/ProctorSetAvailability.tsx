@@ -48,7 +48,7 @@ const ProctorSetAvailability: React.FC<ProctorSetAvailabilityProps> = ({ user })
 
   const [showConfirmAvailability, setShowConfirmAvailability] = useState(false);
   const [showConfirmChangeRequest, setShowConfirmChangeRequest] = useState(false);
-  const [confirmPendingSubmit, setConfirmPendingSubmit] = useState<'availability' | 'change' | null>(null);
+  const [_confirmPendingSubmit, setConfirmPendingSubmit] = useState<'availability' | 'change' | null>(null);
 
   const today = new Date();
 

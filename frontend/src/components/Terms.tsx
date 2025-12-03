@@ -518,7 +518,6 @@ const Terms: React.FC = () => {
                   gap: '6px',
                   padding: '8px 16px',
                   borderRadius: '8px',
-                    borderRadius: '8px',
                   border: 'none',
                   cursor: 'pointer',
                   fontSize: '14px',
@@ -592,7 +591,6 @@ const Terms: React.FC = () => {
                       cursor: 'pointer',
                       fontSize: '14px',
                       borderRadius: '4px',
-                        borderRadius: '8px',
                       borderTop: '1px solid #eee'
                     }}
                     onMouseEnter={(e) => {
@@ -617,7 +615,6 @@ const Terms: React.FC = () => {
                       cursor: 'pointer',
                       fontSize: '14px',
                       borderRadius: '4px',
-                        borderRadius: '8px',
                       borderTop: '1px solid #eee'
                     }}
                     onMouseEnter={(e) => {

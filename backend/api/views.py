@@ -1456,16 +1456,21 @@ def tbl_availability_detail(request, availability_id):
 @permission_classes([AllowAny])
 def tbl_course_users_list(request):
     if request.method == 'GET':
+        user_id = request.GET.get('user_id')
+        is_bayanihan_leader = request.GET.get('is_bayanihan_leader')
+        
         course_users = TblCourseUsers.objects.select_related('course', 'user').all()
+        
+        if user_id:
+            course_users = course_users.filter(user__user_id=user_id)
+        
+        # ✅ ADD THIS
+        if is_bayanihan_leader:
+            if is_bayanihan_leader.lower() == 'true':
+                course_users = course_users.filter(is_bayanihan_leader=True)
+        
         serializer = TblCourseUsersSerializer(course_users, many=True)
         return Response(serializer.data)
-
-    elif request.method == 'POST':
-        serializer = TblCourseUsersSerializer(data=request.data)
-        if serializer.is_valid():
-            serializer.save()
-            return Response(serializer.data, status=status.HTTP_201_CREATED)
-        return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
 
 @api_view(['GET', 'PUT', 'DELETE'])
 @permission_classes([AllowAny])
