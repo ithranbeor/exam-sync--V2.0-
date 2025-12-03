@@ -615,14 +615,26 @@ const SectionCourses: React.FC = () => {
       filtered = sectionCourses.filter(sc => {
         const termName = sc.term?.term_name || '';
         const courseName = sc.course?.course_name || '';
+        const courseId = sc.course_id || '';  // ✅ NEW: Search course_id
         const programName = sc.program?.program_name || '';
+        const programId = sc.program_id || '';  // ✅ NEW: Search program_id
         const instructor = sc.user?.full_name || '';
+        const sectionName = sc.section_name || '';
+        const yearLevel = sc.year_level || '';
+        const students = String(sc.number_of_students || '');
+        const nightClass = sc.is_night_class === "YES" ? "yes" : "";
+        
         return (
-          sc.section_name.toLowerCase().includes(lowerSearch) ||
+          sectionName.toLowerCase().includes(lowerSearch) ||
+          courseId.toLowerCase().includes(lowerSearch) ||  // ✅ NEW
           courseName.toLowerCase().includes(lowerSearch) ||
+          programId.toLowerCase().includes(lowerSearch) ||  // ✅ NEW
           programName.toLowerCase().includes(lowerSearch) ||
           instructor.toLowerCase().includes(lowerSearch) ||
-          termName.toLowerCase().includes(lowerSearch)
+          termName.toLowerCase().includes(lowerSearch) ||
+          yearLevel.toLowerCase().includes(lowerSearch) ||
+          students.includes(lowerSearch) ||
+          nightClass.includes(lowerSearch)
         );
       });
     }
@@ -656,7 +668,6 @@ const SectionCourses: React.FC = () => {
         return 0;
       });
     }
-    // Note: Removed default sort to improve performance - only sort when explicitly requested
 
     return filtered;
   }, [searchTerm, sectionCourses, sortBy]);
@@ -787,7 +798,7 @@ const SectionCourses: React.FC = () => {
         <div className="search-bar" style={{ marginLeft: 'auto' }}>
           <input
             type="text"
-            placeholder="Search Section Name"
+            placeholder="Search anything..."
             value={searchTerm}
             onChange={(e) => setSearchTerm(e.target.value)}
           />
@@ -1384,6 +1395,7 @@ const SectionCourses: React.FC = () => {
           <thead>
             <tr>
               <th>#</th>
+              <th>Course Code</th>
               <th>Course</th>
               <th>Program</th>
               <th>Section</th>
@@ -1411,13 +1423,13 @@ const SectionCourses: React.FC = () => {
           <tbody>
             {loading ? (
               <tr>
-                <td colSpan={10} style={{ textAlign: 'center', padding: '20px' }}>
+                <td colSpan={11} style={{ textAlign: 'center', padding: '20px' }}>
                   Loading sections with courses...
                 </td>
               </tr>
             ) : paginated.length === 0 ? (
               <tr>
-                <td colSpan={10} style={{ textAlign: 'center', padding: '20px' }}>
+                <td colSpan={11} style={{ textAlign: 'center', padding: '20px' }}>
                   No sections with courses.
                 </td>
               </tr>
@@ -1432,6 +1444,7 @@ const SectionCourses: React.FC = () => {
                   }}
                 >
                   <td>{itemsPerPage === 'all' ? i + 1 : (currentPage - 1) * itemsPerPage + i + 1}</td>
+                  <td>{sc.course_id}</td> 
                   <td>{sc.course?.course_name || sc.course_id}</td>
                   <td>{sc.program?.program_name || sc.program_id}</td>
                   <td>{sc.section_name}</td>

@@ -180,6 +180,7 @@ const DeanScheduleViewer: React.FC<DeanScheduleViewerProps> = ({ scheduleData })
                 });
 
                 if (!exam) return <td key={room}></td>;
+                const sectionDisplay = exam.section_name;
 
                 const examStartTimeStr = exam.exam_start_time.slice(11, 16);
                 const examEndTimeStr = exam.exam_end_time.slice(11, 16);
@@ -211,12 +212,33 @@ const DeanScheduleViewer: React.FC<DeanScheduleViewerProps> = ({ scheduleData })
                       style={{
                         backgroundColor: courseColorMap[exam.course_id] || "#ccc",
                         color: "black",
+                        padding: "4px",
+                        borderRadius: "4px",
+                        fontSize: "12px",
                       }}
                     >
                       <p><strong>{exam.course_id}</strong></p>
-                      <p>{exam.section_name}</p>
-                      <p>Instructor: {exam.instructor}</p>
-                      <p>Proctor: {exam.proctor}</p>
+                      {/* ✅ Adjust font size if section_name is long */}
+                      <p style={{ 
+                        fontSize: sectionDisplay && sectionDisplay.length > 30 ? '10px' : '12px',
+                        lineHeight: '1.2'
+                      }}>
+                        {sectionDisplay}
+                      </p>
+                      {/* ✅ Adjust font size if instructor is long */}
+                      <p style={{ 
+                        fontSize: exam.instructor && exam.instructor.length > 30 ? '10px' : '12px',
+                        lineHeight: '1.2'
+                      }}>
+                        Instructor: {exam.instructor}
+                      </p>
+                      {/* ✅ Adjust font size if proctor is long */}
+                      <p style={{ 
+                        fontSize: exam.proctor && exam.proctor.length > 30 ? '10px' : '12px',
+                        lineHeight: '1.2'
+                      }}>
+                        Proctor: {exam.proctor}
+                      </p>
                       <p>{formatTo12Hour(examStartTimeStr)} - {formatTo12Hour(examEndTimeStr)}</p>
                     </div>
                   </td>

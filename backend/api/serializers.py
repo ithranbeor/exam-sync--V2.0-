@@ -908,7 +908,6 @@ class TblAvailableRoomsSerializer(serializers.ModelSerializer):
 class TblExamOtpSerializer(serializers.ModelSerializer):
     """Serializer for Exam OTP records"""
     
-    # Include related exam details
     course_id = serializers.CharField(source='examdetails.course_id', read_only=True)
     section_name = serializers.CharField(source='examdetails.section_name', read_only=True)
     exam_date = serializers.CharField(source='examdetails.exam_date', read_only=True)
@@ -916,7 +915,6 @@ class TblExamOtpSerializer(serializers.ModelSerializer):
     building_name = serializers.CharField(source='examdetails.building_name', read_only=True)
     room_id = serializers.CharField(source='examdetails.room.room_id', read_only=True)
     
-    # Write-only field for creating OTP
     examdetails_id = serializers.IntegerField(write_only=True, required=False)
     
     class Meta:
@@ -928,7 +926,6 @@ class TblExamOtpSerializer(serializers.ModelSerializer):
             'otp_code',
             'created_at',
             'expires_at',
-            # Related fields
             'course_id',
             'section_name',
             'exam_date',
@@ -949,14 +946,12 @@ class TblExamOtpSerializer(serializers.ModelSerializer):
 class TblProctorAttendanceSerializer(serializers.ModelSerializer):
     """Serializer for Proctor Attendance records"""
     
-    # Include related information
     proctor_name = serializers.SerializerMethodField()
     course_id = serializers.CharField(source='examdetails.course_id', read_only=True)
     section_name = serializers.CharField(source='examdetails.section_name', read_only=True)
     exam_date = serializers.CharField(source='examdetails.exam_date', read_only=True)
     room_id = serializers.CharField(source='examdetails.room.room_id', read_only=True)
     
-    # Write-only fields for creating attendance
     examdetails_id = serializers.IntegerField(write_only=True, required=False)
     proctor_id = serializers.IntegerField(write_only=True, required=False)
     
@@ -974,7 +969,6 @@ class TblProctorAttendanceSerializer(serializers.ModelSerializer):
             'time_in',
             'time_out',
             'otp_used',
-            # Related fields
             'course_id',
             'section_name',
             'exam_date',

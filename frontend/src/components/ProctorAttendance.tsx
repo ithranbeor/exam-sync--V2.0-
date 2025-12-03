@@ -58,18 +58,6 @@ const ProctorAttendance: React.FC<UserProps> = ({ user }) => {
     return aStart < bEnd && bStart < aEnd;
   };
 
-  // Check full schedule conflict
-  //const hasConflictWithAssigned = (exam: ExamDetails) => {
-    //return proctorAssignedExams.some((assigned) =>
-      //isTimeConflict(
-        //assigned.exam_start_time,
-        //assigned.exam_end_time,
-        //exam.exam_start_time,
-        //exam.exam_end_time
-      //)
-    //);
-  //};
-
   const isExamOngoing = (examDate: string, startTime: string, endTime: string) => {
     try {
       const now = new Date();
@@ -169,10 +157,12 @@ const ProctorAttendance: React.FC<UserProps> = ({ user }) => {
       console.error('Error fetching assigned exams:', error);
       toast.error('Failed to load assigned exams');
     }
-  }, [user]); // Only depend on user
+  }, [user]);
 
-  // Fetch all exams for substitution - REMOVE proctorAssignedExams dependency
+  // ✅ FIXED: Fetch all exams for substitution with proper filtering
   const fetchAllExams = useCallback(async () => {
+    if (!user?.user_id || !user?.first_name || !user?.last_name) return;
+
     try {
       const { data } = await api.get('/all-exams-for-substitution/');
       const formattedExams: ExamDetails[] = data
@@ -191,66 +181,107 @@ const ProctorAttendance: React.FC<UserProps> = ({ user }) => {
           status: exam.status || 'pending'
         }));
 
+        const loggedInUserFullName = `${user.first_name} ${user.last_name}`.toLowerCase().trim();
+
         const filteredForSubstitution = formattedExams.filter((exam) => {
-          // 1. Remove user's own assigned schedule (assigned_proctor name match)
-          if (
-            String(exam.assigned_proctor).toLowerCase().includes(
-              `${user?.first_name} ${user?.last_name}`.toLowerCase()
-            )
-          ) {
+          // 1. ✅ FIXED: Remove user's own assigned schedules (exact name match)
+          const examProctorName = String(exam.assigned_proctor).toLowerCase().trim();
+          if (examProctorName === loggedInUserFullName) {
+            console.log(`❌ Excluded own schedule: ${exam.course_id} (assigned to user)`);
             return false;
           }
 
-          // 2. Remove exams that match EXACT SAME DATE + TIME as any user's assigned exam
-          const isSameDateAndTime = proctorAssignedExams.some((assigned) =>
-            assigned.exam_date === exam.exam_date &&
-            assigned.exam_start_time === exam.exam_start_time &&
-            assigned.exam_end_time === exam.exam_end_time
-          );
-          if (isSameDateAndTime) return false;
+          // 2. ✅ FIXED: Remove ALL schedules where user is in the exam (not just assigned_proctor)
+          // This handles cases where user might be listed in other fields
+          const examString = JSON.stringify(exam).toLowerCase();
+          if (
+            user.first_name &&
+            user.last_name &&
+            examString.includes(user.first_name.toLowerCase()) &&
+            examString.includes(user.last_name.toLowerCase())
+          ) {
+            console.log(`❌ Excluded user's schedule: ${exam.course_id}`);
+            return false;
+          }
 
-          // 3. Remove exams with same schedule even if course differs
-          // (this rule was requested, this is the fix)
+          // 3. ✅ FIXED: Remove time conflicts with user's assigned exams
+          const hasTimeConflict = proctorAssignedExams.some((assigned) => {
+            // Check if same date first
+            if (assigned.exam_date !== exam.exam_date) {
+              return false;
+            }
 
-          // 4. Remove time conflicts
-          const hasTimeConflict = proctorAssignedExams.some((assigned) =>
-            isTimeConflict(
+            console.log(`🔍 Checking conflict between:`);
+            console.log(`   Your schedule: ${assigned.course_id} ${assigned.section_name} on ${assigned.exam_date}`);
+            console.log(`   Other exam: ${exam.course_id} ${exam.section_name} on ${exam.exam_date}`);
+            console.log(`   Your time: ${assigned.exam_start_time} - ${assigned.exam_end_time}`);
+            console.log(`   Other time: ${exam.exam_start_time} - ${exam.exam_end_time}`);
+
+            // Check for time overlap
+            const conflict = isTimeConflict(
               assigned.exam_start_time,
               assigned.exam_end_time,
               exam.exam_start_time,
               exam.exam_end_time
-            )
-          );
-          if (hasTimeConflict) return false;
+            );
+
+            if (conflict) {
+              console.log(`❌ TIME CONFLICT DETECTED - EXCLUDING THIS EXAM`);
+            } else {
+              console.log(`✅ No conflict - times don't overlap`);
+            }
+
+            return conflict;
+          });
+
+          if (hasTimeConflict) {
+            console.log(`⛔ Filtered out: ${exam.course_id} ${exam.section_name} (time conflict)`);
+            return false;
+          }
+
+          // 4. ✅ Keep only ongoing exams for substitution
+          // TEMPORARILY DISABLED FOR TESTING - Shows all available substitution exams
+          // const ongoing = isExamOngoing(exam.exam_date, exam.exam_start_time, exam.exam_end_time);
+          // if (!ongoing) {
+          //   return false;
+          // }
 
           return true;
         });
 
+      console.log(`✅ Filtered substitution exams: ${filteredForSubstitution.length} available`);
       setAllExams(filteredForSubstitution);
     } catch (error: any) {
       console.error('Error fetching all exams:', error);
       toast.error('Failed to load exams');
     }
-  }, []); // No dependencies
+  }, [user, proctorAssignedExams]); // ✅ Add dependencies
 
-  // REPLACE ALL useEffects with these simplified ones:
+  // ✅ FIXED: Load data properly with dependencies
   useEffect(() => {
     const loadData = async () => {
       setLoading(true);
-      await Promise.all([fetchAssignedExams(), fetchAllExams()]);
+      await fetchAssignedExams();
       setLoading(false);
     };
     loadData();
-  }, [fetchAssignedExams, fetchAllExams]);
+  }, [fetchAssignedExams]);
 
+  // ✅ FIXED: Fetch all exams AFTER assigned exams are loaded
+  useEffect(() => {
+    if (proctorAssignedExams.length >= 0) {
+      fetchAllExams();
+    }
+  }, [proctorAssignedExams, fetchAllExams]);
+
+  // ✅ Refresh every 30 seconds
   useEffect(() => {
     const interval = setInterval(() => {
       fetchAssignedExams();
-      fetchAllExams();
-    }, 30000); // Refresh every 30 seconds
+    }, 30000);
 
     return () => clearInterval(interval);
-  }, [fetchAssignedExams, fetchAllExams]);
+  }, [fetchAssignedExams]);
 
   const handleCardClick = (exam: ExamDetails, isSubstitution: boolean = false) => {
     setSelectedExam(exam);
@@ -374,7 +405,7 @@ const ProctorAttendance: React.FC<UserProps> = ({ user }) => {
       }
 
       // Refresh data
-      await Promise.all([fetchAssignedExams(), fetchAllExams()]);
+      await fetchAssignedExams();
 
       // Close modals
       setShowVerificationSuccess(false);
@@ -528,7 +559,7 @@ const ProctorAttendance: React.FC<UserProps> = ({ user }) => {
                       </div>
                     ))
                 ) : (
-                  <div className="no-data-message">No exams available (no conflict-free schedules)</div>
+                  <div className="no-data-message">No exams available for substitution</div>
                 )}
               </div>
             </div>

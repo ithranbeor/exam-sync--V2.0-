@@ -148,14 +148,30 @@ const DeanSender: React.FC<DeanSenderProps> = ({
         remarks: remarks || "No remarks",
         schedules: validSchedules.map((exam) => ({
           course_id: exam.course_id,
-          section_name: exam.section_name || "N/A",
+          // ✅ Send BOTH array and legacy format
+          sections: exam.sections && exam.sections.length > 0 ? exam.sections : [exam.section_name || "N/A"],
+          section_name: exam.sections && exam.sections.length > 0 
+            ? exam.sections.join(', ') 
+            : exam.section_name || "N/A",
           exam_date: exam.exam_date,
           exam_start_time: exam.exam_start_time,
           exam_end_time: exam.exam_end_time,
           room_id: exam.room_id,
           building_name: exam.building_name || buildingName,
-          instructor: getUserName(exam.instructor_id),
-          proctor: getUserName(exam.proctor_id),
+          // ✅ Send BOTH array and string format for instructors
+          instructors: exam.instructors && exam.instructors.length > 0 
+            ? exam.instructors 
+            : (exam.instructor_id ? [exam.instructor_id] : []),
+          instructor: exam.instructors && exam.instructors.length > 0
+            ? exam.instructors.map((id: number) => getUserName(id)).filter((n: string) => n !== '-').join(', ')
+            : getUserName(exam.instructor_id),
+          // ✅ Send BOTH array and string format for proctors
+          proctors: exam.proctors && exam.proctors.length > 0 
+            ? exam.proctors 
+            : (exam.proctor_id ? [exam.proctor_id] : []),
+          proctor: exam.proctors && exam.proctors.length > 0
+            ? exam.proctors.map((id: number) => getUserName(id)).filter((n: string) => n !== '-').join(', ')
+            : getUserName(exam.proctor_id),
         })),
       };
 
