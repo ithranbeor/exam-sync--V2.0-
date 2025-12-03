@@ -1142,8 +1142,9 @@ const BayanihanModality: React.FC<UserProps> = ({ user }) => {
               </div>
             )}
             <div style={{ textAlign: "center", marginTop: "10px" }}>
-              <button type="submit" disabled={isSubmitting || calculateRoomAssignments.length === 0} style={{ backgroundColor: '#144f1fff', color: 'white', padding: '10px', border: 'none', borderRadius: '8px', cursor: isSubmitting || calculateRoomAssignments.length === 0 ? 'not-allowed' : 'pointer' }}>
+              <button type="submit" disabled={isSubmitting || calculateRoomAssignments.length === 0} className="action-button with-label" style={{ backgroundColor: '#144f1fff', color: 'white', padding: '10px', border: 'none', borderRadius: '8px', cursor: isSubmitting || calculateRoomAssignments.length === 0 ? 'not-allowed' : 'pointer' }}>
                 <FaPlus style={{ color: 'white', fontSize: '20px' }} />
+                <span className="btn-label">Submit</span>
               </button>
             </div>
 
