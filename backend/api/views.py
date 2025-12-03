@@ -421,6 +421,35 @@ def submit_proctor_attendance(request):
                 otp_used=otp_code,
                 time_in=timezone.now()
             )
+
+            # Determine late or on-time
+            now = timezone.now()
+
+            from datetime import datetime as dt
+
+            exam_date_obj = None
+            if exam_schedule.exam_date:
+                try:
+                    exam_date_obj = dt.strptime(exam_schedule.exam_date, '%Y-%m-%d').date()
+                except:
+                    pass
+
+            if exam_date_obj:
+                exam_start = timezone.make_aware(
+                    dt.combine(exam_date_obj, exam_schedule.exam_start_time)
+                )
+
+                # Mark LATE if after scheduled time
+                if now > exam_start:
+                    exam_schedule.status = "late"
+                else:
+                    exam_schedule.status = "confirmed"
+            else:
+                exam_schedule.status = "confirmed"
+
+            exam_schedule.save(update_fields=["status"])
+            print(f"✅ Updated proctor status to: {exam_schedule.status}")
+
             
             print(f"✅ Created attendance record:")
             print(f"   - Attendance ID: {attendance.attendance_id}")

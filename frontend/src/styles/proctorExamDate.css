@@ -524,3 +524,8 @@ body {
     font-size: 9px;
   }
 }
+
+.ongoing-badge {
+  background-color: #ff9800;
+  color: white;
+}

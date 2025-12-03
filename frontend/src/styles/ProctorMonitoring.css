@@ -301,9 +301,22 @@
   color: white;
 }
 
-/* Pending status (optional) */
-.status-badge.status-pending {
-  background-color: #6c757d;
+.status-confirmed {
+  background-color: #28a745;
   color: white;
 }
 
+.status-late {
+  background-color: #ffc107;
+  color: black;
+}
+
+.status-absent {
+  background-color: #dc3545;
+  color: white;
+}
+
+.status-pending {
+  background-color: #6c757d;
+  color: white;
+}

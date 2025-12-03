@@ -168,17 +168,22 @@ const ExamPeriodComponent: React.FC = () => {
 
     setIsSubmitting(true);
 
+    // ✅ Fixed function to create date at noon local time to avoid timezone shifts
     const toLocalDateString = (d: Date) => {
       const pad = (n: number) => n.toString().padStart(2, '0');
-      return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`;
+      const year = d.getFullYear();
+      const month = pad(d.getMonth() + 1);
+      const day = pad(d.getDate());
+      // Use noon (12:00:00) instead of midnight to avoid timezone issues
+      return `${year}-${month}-${day}T12:00:00`;
     };
 
     try {
       if (editMode && examperiod_id) {
         // Update mode (single record)
         const payload = {
-          start_date: newExam.start_date,
-          end_date: newExam.end_date,
+          start_date: newExam.start_date + 'T12:00:00', // Add time at noon
+          end_date: newExam.end_date + 'T12:00:00',     // Add time at noon
           academic_year,
           exam_category,
           term: term_id,
@@ -191,16 +196,16 @@ const ExamPeriodComponent: React.FC = () => {
           prev.map(ep => (ep.examperiod_id === examperiod_id ? res.data : ep))
         );
       } else {
-        // Create multiple — 2 copies per selected day
+        // Create multiple — records per selected day
         const sortedDates = [...selectedDates].sort((a, b) => a.getTime() - b.getTime());
         const newRecords: any[] = [];
 
         for (const date of sortedDates) {
-          const formatted = toLocalDateString(date);
+          const formatted = toLocalDateString(date); // This now includes T12:00:00
 
           const payload = {
-            start_date: `${formatted}T00:00:00`,
-            end_date: `${formatted}T00:00:00`,
+            start_date: formatted,  // Already has T12:00:00
+            end_date: formatted,    // Already has T12:00:00
             academic_year,
             exam_category,
             term: term_id,

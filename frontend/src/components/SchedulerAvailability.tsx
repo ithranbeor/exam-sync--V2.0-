@@ -1417,18 +1417,6 @@ const SchedulerAvailability: React.FC<ProctorSetAvailabilityProps> = ({ user }) 
             </div>
 
             <div className="input-group">
-              <label>Status</label>
-              <select
-                value={availabilityStatus}
-                onChange={(e) => setAvailabilityStatus(e.target.value as AvailabilityStatus)}
-              >
-                {Object.values(AvailabilityStatus).map((status) => (
-                  <option key={status} value={status}>{status}</option>
-                ))}
-              </select>
-            </div>
-
-            <div className="input-group">
               <label>Remarks</label>
               <textarea value={remarks} onChange={(e) => setRemarks(e.target.value)} />
             </div>

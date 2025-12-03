@@ -481,20 +481,29 @@ const ProctorMonitoring: React.FC<UserProps> = ({ }) => {
                   sortedSchedules.map((schedule, index) => {
                     const status = schedule.status || 'pending';
 
+                    // FIXED STATUS HANDLER — ensures "late" displays properly
                     const getStatusDisplay = (status: string) => {
-                      switch (status.toLowerCase()) {
-                        case 'confirmed':
-                        case 'confirm':
-                          return { text: 'Present', className: 'status-confirmed' };
-                        case 'late':
-                        case 'absent':
-                          return { text: status === 'late' ? 'Late' : 'Absent', className: 'status-late-absent' };
-                        case 'substitute':
-                        case 'sub':
-                          return { text: 'Substitute', className: 'status-substitute' };
-                        default:
-                          return { text: 'Pending', className: 'status-pending' };
+                      if (!status) return { text: 'Pending', className: 'status-pending' };
+
+                      const normalized = status.trim().toLowerCase();
+
+                      if (normalized === 'confirmed' || normalized === 'confirm') {
+                        return { text: 'Present', className: 'status-confirmed' };
                       }
+
+                      if (normalized === 'late') {
+                        return { text: 'Late', className: 'status-late' }; // <-- FIXED
+                      }
+
+                      if (normalized === 'absent') {
+                        return { text: 'Absent', className: 'status-absent' }; // <-- FIXED
+                      }
+
+                      if (normalized === 'substitute' || normalized === 'sub') {
+                        return { text: 'Substitute', className: 'status-substitute' };
+                      }
+
+                      return { text: 'Pending', className: 'status-pending' };
                     };
 
                     const statusDisplay = getStatusDisplay(status);
@@ -503,9 +512,14 @@ const ProctorMonitoring: React.FC<UserProps> = ({ }) => {
                       if (!timeString) return '-';
                       try {
                         const date = new Date(timeString);
-                        const hours = date.getHours().toString().padStart(2, '0');
+                        let hours = date.getHours();
                         const minutes = date.getMinutes().toString().padStart(2, '0');
-                        return `${hours}:${minutes}`;
+
+                        const ampm = hours >= 12 ? 'PM' : 'AM';
+                        hours = hours % 12;
+                        hours = hours === 0 ? 12 : hours; // convert 0 to 12
+
+                        return `${hours}:${minutes} ${ampm}`;
                       } catch (e) {
                         return '-';
                       }
