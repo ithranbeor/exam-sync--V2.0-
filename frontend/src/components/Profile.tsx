@@ -179,7 +179,7 @@ const Profile: React.FC<ProfileProps> = ({ user }) => {
   };
 
   if (loading || !profile) {
-    return <div className="profile-container"><p>Loading profile...</p></div>;
+    return <div className="profile-container"><p style={{ color: '#333' }}>Loading profile...</p></div>;
   }
 
   return (
