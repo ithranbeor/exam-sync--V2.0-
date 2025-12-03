@@ -441,11 +441,11 @@ const Programs: React.FC<ProgramsProps> = ({ user: _user }) => {
       <div className="colleges-actions">
         <div style={{ display: 'flex', alignItems: 'center', gap: 8, width: '100%' }}>
           <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-            <button type="button" onClick={handleAddProgram} className="action-button add-new">
-              <FaPlus/>
+            <button type="button" onClick={handleAddProgram} className="action-button add-new with-label">
+              <FaPlus/><span className="btn-label">Add</span>
             </button>
-            <button type="button" onClick={() => setShowImport(true)} className="action-button import">
-              <FaFileImport/>
+            <button type="button" onClick={() => setShowImport(true)} className="action-button import with-label">
+              <FaFileImport/><span className="btn-label">Import</span>
             </button>
             <div style={{ position: 'relative' }} data-sort-dropdown>
               <button 

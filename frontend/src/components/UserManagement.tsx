@@ -1148,7 +1148,7 @@ export const UserManagement: React.FC<UserManagementProps> = ({}) => {
           <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
             <button
               type="button"
-              className="action-button add-new"
+              className="action-button add-new with-label"
               onClick={() => {
                 setIsEditMode(false);
                 setShowAccountModal(true);
@@ -1171,15 +1171,15 @@ export const UserManagement: React.FC<UserManagementProps> = ({}) => {
                 }]);
               }}
             >
-              <FaPlus/>
+              <FaPlus/><span className="btn-label">Add</span>
             </button>
 
             <button
               type="button"
-              className="action-button import"
+              className="action-button import with-label"
               onClick={() => setShowImportAccountsModal(true)}
             >
-              <FaFileImport/>
+              <FaFileImport/><span className="btn-label">Import</span>
             </button>
             <div style={{ position: 'relative' }} data-sort-dropdown>
               <button 
@@ -1669,7 +1669,7 @@ export const UserManagement: React.FC<UserManagementProps> = ({}) => {
                 color: '#333',
                 padding: '8px 15px',
                 fontSize: '0.9rem',
-                borderRadius: '50px',
+                borderRadius: '8px',
                 border: '1px solid #ccc',
                 width: '400px',
                 maxWidth: '400px'
@@ -1977,9 +1977,9 @@ export const UserManagement: React.FC<UserManagementProps> = ({}) => {
                 <div style={{ borderTop: '2px solid #ddd', marginTop: '20px', paddingTop: '20px' }}>
                   <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '15px' }}>
                     <h4 style={{ margin: 0 }}>Roles (Required)</h4>
-                    <button
-                      type="button"
-                      className="action-button add-new"
+                            <button
+                              type="button"
+                              className="action-button add-new with-label"
                       style={{ fontSize: '0.85em', padding: '5px 10px' }}
                       onClick={addNewAccountRole}
                     >
@@ -1999,7 +1999,7 @@ export const UserManagement: React.FC<UserManagementProps> = ({}) => {
                           background: '#d9534f',
                           color: 'white',
                           border: 'none',
-                          borderRadius: '50px',
+                          borderRadius: '8px',
                           width: '50px',
                           height: '25px',
                           cursor: 'pointer',

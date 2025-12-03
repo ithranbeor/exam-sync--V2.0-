@@ -726,8 +726,8 @@ const SchedulerAvailability: React.FC<ProctorSetAvailabilityProps> = ({ user }) 
       <div className="colleges-actions">
         <div style={{ display: 'flex', alignItems: 'center', gap: 8, width: '100%' }}>
           <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-            <button type="button" className="action-button add-new" onClick={openAddModal}>
-              <FaPlus />
+            <button type="button" className="action-button add-new with-label" onClick={openAddModal}>
+              <FaPlus /><span className="btn-label">Add</span>
             </button>
             <div style={{ position: 'relative' }} data-sort-dropdown>
               <button 

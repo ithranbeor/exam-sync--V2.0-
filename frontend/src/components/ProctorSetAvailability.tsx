@@ -579,7 +579,7 @@ const ProctorSetAvailability: React.FC<ProctorSetAvailabilityProps> = ({ user })
                   textDecoration: 'none',
                   border: '2px solid #092C4C',
                   padding: '8px 16px',
-                  borderRadius: '6px',
+                         borderRadius: '8px',
                   fontSize: '0.95em',
                   fontWeight: '500',
                   transition: 'all 0.2s ease'

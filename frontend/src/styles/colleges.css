@@ -171,6 +171,24 @@ body {
   background-color: #ffb800;
 }
 
+/* Buttons that include both icon and text label */
+.action-button.with-label {
+  width: auto !important;
+  height: auto !important;
+  border-radius: 8px !important;
+  padding: 8px 14px !important;
+  display: inline-flex !important;
+  gap: 8px;
+  align-items: center;
+  justify-content: center;
+}
+
+.action-button.with-label .btn-label {
+  margin-left: 4px;
+  font-weight: 700;
+  color: inherit;
+}
+
 .action-button.import:hover {
   background-color: #e6a700;
 }
