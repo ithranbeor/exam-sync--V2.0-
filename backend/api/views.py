@@ -1196,7 +1196,20 @@ def tbl_examdetails_list(request):
                 'examperiod'
             ).all()
 
-            # ✅ ADD: Filter by college_name
+            # ✅ ADD: Filter by proctor_id (supports both single proctor and proctors array)
+            proctor_id = request.GET.get('proctor_id')
+            if proctor_id:
+                try:
+                    proctor_id_int = int(proctor_id)
+                    # Filter by either proctor_id field OR proctor_id in proctors array
+                    queryset = queryset.filter(
+                        Q(proctor_id=proctor_id_int) | Q(proctors__contains=[proctor_id_int])
+                    )
+                    print(f"🔍 Filtering by proctor_id: {proctor_id_int}")
+                except ValueError:
+                    print(f"⚠️ Invalid proctor_id: {proctor_id}")
+
+            # ✅ Existing filters
             college_name = request.GET.get('college_name')
             room_id = request.GET.get('room_id')
             exam_date = request.GET.get('exam_date')
@@ -1212,6 +1225,8 @@ def tbl_examdetails_list(request):
                 modality_ids = [mid.strip() for mid in modality_id.split(',') if mid.strip()]
                 queryset = queryset.filter(modality_id__in=modality_ids)
 
+            print(f"✅ Found {queryset.count()} exam schedules")
+            
             serializer = TblExamdetailsSerializer(queryset, many=True)
             return Response(serializer.data)
         
