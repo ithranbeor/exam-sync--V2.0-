@@ -117,14 +117,14 @@ const ProctorViewExam: React.FC<ProctorViewExamProps> = ({ user }) => {
         let schedulesData: ExamSchedule[] = [];
 
         if (scheduleFilter === 'my-schedule') {
-          const { data } = await api.get('/tbl_examdetails/', {
+          const { data } = await api.get('/tbl_examdetails', {
             params: {
               proctor_id: user.user_id
             }
           });
           schedulesData = data || [];
         } else if (scheduleFilter === 'all-college' && approvalStatus === 'approved') {
-          const { data } = await api.get('/tbl_examdetails/', {
+          const { data } = await api.get('/tbl_examdetails', {
             params: {
               college_name: proctorCollege
             }
