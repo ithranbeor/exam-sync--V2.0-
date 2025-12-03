@@ -255,7 +255,7 @@ const DeanScheduleViewer: React.FC<DeanScheduleViewerProps> = ({ scheduleData })
     <div className="dean-schedule-viewer">
       <div className="dean-schedule-header">
         <img
-          src="../../static/logo/USTPlogo.png"
+          src="/logo/USTPlogo.png"
           alt="School Logo"
           className="dean-schedule-logo"
         />

@@ -31,14 +31,14 @@ const roleSidebarMap: Record<string, { key: string, label: string, icon: JSX.Ele
   proctor: [
     { key: 'exam-Date', label: 'Exam Date', icon: <FaCalendar {...iconStyle} /> },
     { key: 'set-Availability', label: 'Set Availability', icon: <FaClock {...iconStyle} /> },
-    { key: 'exam-Schedule', label: 'View Exam Schedule', icon: <FaClipboardList {...iconStyle} /> },
+    { key: 'exam-Schedule', label: 'Exam Schedule', icon: <FaClipboardList {...iconStyle} /> },
     { key: 'proctor-Attendance', label: 'Proctor Attendance', icon: <FaClipboardCheck {...iconStyle} /> },
     { key: 'notification', label: 'Notification', icon: <FaBell {...iconStyle} /> },
   ],
   scheduler: [
     { key: 'exam-Date', label: 'Exam Date', icon: <FaCalendar {...iconStyle} /> },
     { key: 'plot-Schedule', label: 'Plot Schedule', icon: <FaCalendarPlus {...iconStyle} /> },
-    { key: 'exam-Schedule', label: 'View Exam Schedule', icon: <FaClipboardList {...iconStyle} /> },
+    { key: 'exam-Schedule', label: 'Exam Schedule', icon: <FaClipboardList {...iconStyle} /> },
     { key: 'proctors-Availability', label: 'Available Proctor', icon: <FaUsers {...iconStyle} /> },
     { key: 'proctor-Monitoring', label: 'Proctor Monitoring', icon: <FaEye {...iconStyle} /> },
     { key: 'notification', label: 'Notification', icon: <FaBell {...iconStyle} /> },
@@ -52,13 +52,13 @@ const roleSidebarMap: Record<string, { key: string, label: string, icon: JSX.Ele
   'bayanihan leader': [
     { key: 'exam-Date', label: 'Exam Date', icon: <FaCalendar {...iconStyle} /> },
     { key: 'set-Modality', label: 'Set Modality', icon: <FaPenAlt {...iconStyle} /> },
-    { key: 'exam-Schedule', label: 'View Exam Schedule', icon: <FaClipboardList {...iconStyle} /> },
+    { key: 'exam-Schedule', label: 'Exam Schedule', icon: <FaClipboardList {...iconStyle} /> },
     { key: 'notification', label: 'Notification', icon: <FaBell {...iconStyle} /> },
   ],
   admin: [
     { key: 'exam-Date', label: 'Exam Date', icon: <FaCalendar {...iconStyle} /> },
     { key: 'plot-Schedule', label: 'Plot Schedule', icon: <FaCalendarPlus {...iconStyle} /> },
-    { key: 'exam-Schedule', label: 'View Exam Schedule', icon: <FaClipboardList {...iconStyle} /> },
+    { key: 'exam-Schedule', label: 'Exam Schedule', icon: <FaClipboardList {...iconStyle} /> },
     { key: 'proctors-Availability', label: 'Available Proctor', icon: <FaUsers {...iconStyle} /> },
     { key: 'set-Modality', label: 'Set Modality', icon: <FaPenAlt {...iconStyle} /> },
     { key: 'Request', label: 'Requests', icon: <BsFillSendPlusFill {...iconStyle} /> },

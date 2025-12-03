@@ -1047,7 +1047,7 @@ def send_schedule_to_dean(request):
             "building": serializer.validated_data["building"],
             "total_schedules": len(serializer.validated_data["schedules"]),
             "schedules": serializer.validated_data["schedules"],
-            "submitted_by_id": user_id,
+            "submitted_by_id": user_id,  # ✅ ADD THIS - Store scheduler's ID
         }
 
         print(f"📦 Creating schedule approval record...")
@@ -1155,7 +1155,7 @@ def tbl_scheduleapproval_list(request):
 def tbl_scheduleapproval_detail(request, pk):
     """
     GET → Retrieve  
-    PUT → Update (and create exam schedules when approved)
+    PUT → Update  
     DELETE → Delete  
     """
     try:
@@ -1168,127 +1168,9 @@ def tbl_scheduleapproval_detail(request, pk):
         return Response(serializer.data)
 
     elif request.method == 'PUT':
-        old_status = approval.status
-        new_status = request.data.get('status')
-        
         serializer = TblScheduleapprovalSerializer(approval, data=request.data, partial=True)
         if serializer.is_valid():
-            with transaction.atomic():
-                serializer.save()
-                
-                # ✅ If status changed from 'pending' to 'approved', create exam schedules
-                if old_status == 'pending' and new_status == 'approved':
-                    print(f"✅ Creating exam schedules from approved request {pk}")
-                    
-                    schedule_data = approval.schedule_data
-                    if not schedule_data or not schedule_data.get('schedules'):
-                        return Response({
-                            'error': 'No schedule data found in approval request'
-                        }, status=status.HTTP_400_BAD_REQUEST)
-                    
-                    schedules = schedule_data.get('schedules', [])
-                    college_name = schedule_data.get('college_name')
-                    
-                    # ✅ CRITICAL: Delete existing schedules for this college first
-                    # This prevents duplicates when re-approving
-                    existing_count = TblExamdetails.objects.filter(
-                        college_name=college_name
-                    ).count()
-                    
-                    if existing_count > 0:
-                        print(f"⚠️ Found {existing_count} existing schedules for {college_name}")
-                        # Optionally delete them or skip creation
-                        # TblExamdetails.objects.filter(college_name=college_name).delete()
-                    
-                    created_count = 0
-                    for sched in schedules:
-                        try:
-                            # ✅ Extract arrays from schedule data
-                            sections = sched.get('sections', [])
-                            instructors = sched.get('instructors', [])
-                            proctors = sched.get('proctors', [])
-                            
-                            # ✅ Fallback to legacy single values if arrays are empty
-                            if not sections:
-                                section_str = sched.get('section_name', '')
-                                if section_str:
-                                    # Split comma-separated sections
-                                    sections = [s.strip() for s in section_str.split(',') if s.strip()]
-                            
-                            if not instructors:
-                                # Try to extract instructor IDs from the string
-                                instructor_str = sched.get('instructor', '')
-                                # This is tricky - we need to map names back to IDs
-                                # For now, use instructor_id if available
-                                if sched.get('instructor_id'):
-                                    instructors = [sched['instructor_id']]
-                            
-                            if not proctors:
-                                # Try to extract proctor IDs from the string
-                                proctor_str = sched.get('proctor', '')
-                                # This is tricky - we need to map names back to IDs
-                                # For now, use proctor_id if available
-                                if sched.get('proctor_id'):
-                                    proctors = [sched['proctor_id']]
-                            
-                            # ✅ Get room object
-                            room = None
-                            room_id = sched.get('room_id')
-                            if room_id:
-                                try:
-                                    room = TblRooms.objects.get(room_id=room_id)
-                                except TblRooms.DoesNotExist:
-                                    print(f"⚠️ Room {room_id} not found")
-                            
-                            # ✅ Get first proctor for proctor field (backward compatibility)
-                            proctor_obj = None
-                            if proctors and len(proctors) > 0:
-                                try:
-                                    proctor_obj = TblUsers.objects.get(user_id=proctors[0])
-                                except TblUsers.DoesNotExist:
-                                    print(f"⚠️ Proctor {proctors[0]} not found")
-                            
-                            # ✅ Create exam detail with BOTH array and legacy fields
-                            exam_detail = TblExamdetails.objects.create(
-                                course_id=sched.get('course_id', ''),
-                                program_id=sched.get('program_id', ''),
-                                room=room,
-                                exam_date=sched.get('exam_date'),
-                                exam_start_time=sched.get('exam_start_time'),
-                                exam_end_time=sched.get('exam_end_time'),
-                                building_name=sched.get('building_name', schedule_data.get('building', '')),
-                                college_name=college_name,
-                                academic_year=schedule_data.get('academic_year', ''),
-                                semester=schedule_data.get('semester', ''),
-                                exam_period=schedule_data.get('exam_period', ''),
-                                exam_category=schedule_data.get('term', ''),
-                                # ✅ CRITICAL: Set array fields
-                                sections=sections if sections else [],
-                                instructors=instructors if instructors else [],
-                                proctors=proctors if proctors else [],
-                                # ✅ Set legacy fields for backward compatibility
-                                section_name=sections[0] if sections else sched.get('section_name', ''),
-                                instructor_id=instructors[0] if instructors else sched.get('instructor_id'),
-                                proctor=proctor_obj,
-                                proctor_id=proctors[0] if proctors else sched.get('proctor_id'),
-                            )
-                            created_count += 1
-                            print(f"✅ Created exam detail {exam_detail.examdetails_id} - Sections: {sections}, Proctors: {proctors}")
-                            
-                        except Exception as e:
-                            print(f"❌ Error creating schedule: {str(e)}")
-                            import traceback
-                            traceback.print_exc()
-                            # Continue with next schedule instead of failing completely
-                            continue
-                    
-                    print(f"✅ Successfully created {created_count} exam schedules")
-                    
-                    # ✅ Add count to response
-                    response_data = serializer.data
-                    response_data['created_schedules_count'] = created_count
-                    return Response(response_data)
-            
+            serializer.save()
             return Response(serializer.data)
         return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
 
