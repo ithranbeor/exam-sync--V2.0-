@@ -325,6 +325,8 @@ def verify_otp(request):
 # ATTENDANCE SUBMISSION
 # ============================================================
 
+# Replace the submit_proctor_attendance function in views.py with this fixed version:
+
 @api_view(['POST'])
 @permission_classes([AllowAny])
 def submit_proctor_attendance(request):
@@ -377,6 +379,7 @@ def submit_proctor_attendance(request):
         print(f"   - Exam ID: {exam_schedule.examdetails_id}")
         print(f"   - Course: {exam_schedule.course_id}")
         print(f"   - Scheduled Start: {exam_schedule.exam_start_time}")
+        print(f"   - Start Time Type: {type(exam_schedule.exam_start_time)}")
         
         # Check if attendance already exists
         existing_attendance = TblProctorAttendance.objects.filter(
@@ -423,21 +426,33 @@ def submit_proctor_attendance(request):
             print(f"   - Is substitute: {attendance.is_substitute}")
             print(f"   - Time in: {attendance.time_in}")
             
-            # ✅ DETERMINE STATUS: Late or On-time (only for assigned, not substitutes)
+            # ✅ FIXED: Determine status - Late or On-time (only for assigned, not substitutes)
             if role == 'assigned':
-                from datetime import datetime as dt
+                from datetime import datetime as dt, time as dt_time
                 
                 exam_date_obj = None
                 if exam_schedule.exam_date:
                     try:
                         exam_date_obj = dt.strptime(exam_schedule.exam_date, '%Y-%m-%d').date()
-                    except:
-                        pass
+                    except Exception as e:
+                        print(f"⚠️ Error parsing exam_date: {e}")
                 
                 if exam_date_obj and exam_schedule.exam_start_time:
+                    # ✅ FIX: Extract time component if exam_start_time is datetime
+                    if isinstance(exam_schedule.exam_start_time, dt):
+                        exam_start_time = exam_schedule.exam_start_time.time()
+                    elif isinstance(exam_schedule.exam_start_time, dt_time):
+                        exam_start_time = exam_schedule.exam_start_time
+                    else:
+                        print(f"⚠️ Unexpected exam_start_time type: {type(exam_schedule.exam_start_time)}")
+                        exam_schedule.status = "confirmed"
+                        exam_schedule.proctor_timein = current_time
+                        exam_schedule.save(update_fields=["status", "proctor_timein"])
+                        print(f"✅ Updated exam schedule - Status: confirmed (fallback)")
+                    
                     # Create datetime for scheduled start
                     exam_start_datetime = timezone.make_aware(
-                        dt.combine(exam_date_obj, exam_schedule.exam_start_time)
+                        dt.combine(exam_date_obj, exam_start_time)
                     )
                     
                     # Calculate difference in minutes

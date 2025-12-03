@@ -3,6 +3,7 @@ import { toast, ToastContainer } from 'react-toastify';
 import 'react-toastify/dist/ReactToastify.css';
 import api from '../lib/apiClient';
 import '../styles/ProctorAttendance.css';
+import { FaCheckCircle } from 'react-icons/fa';
 
 interface UserProps {
   user: {
@@ -598,37 +599,23 @@ const ProctorAttendance: React.FC<UserProps> = ({ user }) => {
                           boxShadow: '0 8px 16px rgba(0, 0, 0, 0.3)',
                           textAlign: 'center'
                         }}
-                        onClick={(e) => e.stopPropagation()}
-                      >
-                        <div style={{ fontSize: '60px', marginBottom: '20px' }}>✅</div>
-                        <h2 style={{ color: '#28a745', marginBottom: '15px' }}>Code Verified!</h2>
-                        <p style={{ color: '#666', marginBottom: '25px', fontSize: '16px' }}>
-                          {otpValidationStatus === 'valid-assigned' 
-                            ? 'You are assigned to this exam. Click submit to confirm your attendance.'
-                            : 'Valid code, but you are not assigned. You will be marked as a substitute proctor.'}
-                        </p>
-                        
+                        onClick={(e) => e.stopPropagation()}>                 
                         {showVerificationSuccess && (
                           <div 
                             style={{
-                              backgroundColor: '#fff3cd',
-                              border: '1px solid #ffc107',
                               borderRadius: '8px',
                               padding: '12px',
-                              marginBottom: '20px',
+                              marginBottom: '2px',
                               color: '#856404'}}
                             onClick={() => setShowVerificationSuccess(false)}
                           >
                             <div style={{
-                              backgroundColor: '#fff3cd',
-                              border: '1px solid #ffc107',
                               borderRadius: '8px',
                               padding: '12px',
-                              marginBottom: '20px',
-                              color: '#856404'}} 
+                              marginBottom: '2px'}} 
                               onClick={(e) => e.stopPropagation()}>
-                              <div style={{ fontSize: '60px', marginBottom: '20px' }}>✅</div>
-                              <h2 style={{ color: '#28a745', marginBottom: '15px' }}>Code Verified!</h2>
+                              <div style={{ fontSize: '60px', marginBottom: '2px', color: '#28a745' }}><FaCheckCircle/></div>
+                              <h2 style={{ color: '#28a745', marginBottom: '5px' }}>Code Verified!</h2>
                               <p style={{ color: '#666', marginBottom: '25px', fontSize: '16px' }}>
                                 {otpValidationStatus === 'valid-assigned' 
                                   ? 'You are assigned to this exam. Click submit to confirm your attendance.'
