@@ -219,17 +219,6 @@ const ProctorAttendance: React.FC<UserProps> = ({ user }) => {
     }
   };
 
-  const isProctorLate = (startTime: string, currentTime: Date) => {
-    try {
-      const examStart = new Date(startTime);
-      const diffMinutes = (currentTime.getTime() - examStart.getTime()) / (1000 * 60);
-      return diffMinutes > 7; // Late if more than 7 minutes after start
-    } catch (e) {
-      console.error('Error checking late status:', e);
-      return false;
-    }
-  };
-
   // Update handleVerifyOtp to show success modal instead of just status
   const handleVerifyOtp = async () => {
     if (!otpCode.trim() || !user?.user_id) {
@@ -306,22 +295,23 @@ const ProctorAttendance: React.FC<UserProps> = ({ user }) => {
       return;
     }
 
-    // Check if late (only for assigned proctors, not substitutes)
-    const isLate = role === 'assigned' && selectedExam && isProctorLate(selectedExam.exam_start_time, new Date());
-
     setSubmittingAttendance(true);
     try {
       const response = await api.post('/submit-proctor-attendance/', {
         otp_code: otpCode.trim(),
         user_id: user.user_id,
         remarks: remarks.trim() || undefined,
-        role: role,
-        is_late: isLate // Send late status to backend
+        role: role
+        // ✅ REMOVED is_late - backend will determine this
       });
 
       toast.success(response.data.message || 'Attendance recorded successfully');
-      if (isLate) {
-        toast.warning('Marked as LATE - You arrived more than 7 minutes after start time');
+      
+      // ✅ Check status from response
+      if (response.data.status === 'late') {
+        toast.warning('Marked as LATE - You arrived more than 7 minutes after start time', {
+          autoClose: 5000
+        });
       }
 
       // Refresh data
@@ -618,16 +608,38 @@ const ProctorAttendance: React.FC<UserProps> = ({ user }) => {
                             : 'Valid code, but you are not assigned. You will be marked as a substitute proctor.'}
                         </p>
                         
-                        {selectedExam && isProctorLate(selectedExam.exam_start_time, new Date()) && (
-                          <div style={{
-                            backgroundColor: '#fff3cd',
-                            border: '1px solid #ffc107',
-                            borderRadius: '8px',
-                            padding: '12px',
-                            marginBottom: '20px',
-                            color: '#856404'
-                          }}>
-                            ⚠️ <strong>Note:</strong> You are arriving late (7+ minutes after start time)
+                        {showVerificationSuccess && (
+                          <div 
+                            style={{
+                              backgroundColor: '#fff3cd',
+                              border: '1px solid #ffc107',
+                              borderRadius: '8px',
+                              padding: '12px',
+                              marginBottom: '20px',
+                              color: '#856404'}}
+                            onClick={() => setShowVerificationSuccess(false)}
+                          >
+                            <div style={{
+                              backgroundColor: '#fff3cd',
+                              border: '1px solid #ffc107',
+                              borderRadius: '8px',
+                              padding: '12px',
+                              marginBottom: '20px',
+                              color: '#856404'}} 
+                              onClick={(e) => e.stopPropagation()}>
+                              <div style={{ fontSize: '60px', marginBottom: '20px' }}>✅</div>
+                              <h2 style={{ color: '#28a745', marginBottom: '15px' }}>Code Verified!</h2>
+                              <p style={{ color: '#666', marginBottom: '25px', fontSize: '16px' }}>
+                                {otpValidationStatus === 'valid-assigned' 
+                                  ? 'You are assigned to this exam. Click submit to confirm your attendance.'
+                                  : 'Valid code, but you are not assigned. You will be marked as a substitute proctor.'}
+                              </p>
+                              
+
+                              <div style={{ display: 'flex', gap: '10px', justifyContent: 'center' }}>
+                                {/* buttons */}
+                              </div>
+                            </div>
                           </div>
                         )}
 

@@ -368,12 +368,6 @@ def submit_proctor_attendance(request):
             print(f"   - Course: {otp_record.examdetails.course_id}")
         except TblExamOtp.DoesNotExist:
             print(f"❌ OTP not found in database: '{otp_code}'")
-            # Show what OTPs exist
-            all_otps = TblExamOtp.objects.all()[:5]
-            print(f"📊 Database has {TblExamOtp.objects.count()} OTPs total")
-            print(f"📊 Sample OTPs:")
-            for otp in all_otps:
-                print(f"   - {otp.otp_code}")
             return Response({
                 'error': 'Invalid OTP code'
             }, status=status.HTTP_400_BAD_REQUEST)
@@ -382,7 +376,7 @@ def submit_proctor_attendance(request):
         print(f"\n📅 Exam Schedule Details:")
         print(f"   - Exam ID: {exam_schedule.examdetails_id}")
         print(f"   - Course: {exam_schedule.course_id}")
-        print(f"   - Room: {exam_schedule.room.room_id if exam_schedule.room else 'N/A'}")
+        print(f"   - Scheduled Start: {exam_schedule.exam_start_time}")
         
         # Check if attendance already exists
         existing_attendance = TblProctorAttendance.objects.filter(
@@ -412,57 +406,67 @@ def submit_proctor_attendance(request):
                     'error': f'User {user_id} not found'
                 }, status=status.HTTP_400_BAD_REQUEST)
             
-            # Create attendance record
+            # Create attendance record with current time
+            current_time = timezone.now()
             attendance = TblProctorAttendance.objects.create(
                 examdetails=exam_schedule,
-                proctor=proctor_user,  # Use the user object, not ID
+                proctor=proctor_user,
                 is_substitute=(role == 'sub'),
                 remarks=remarks if remarks else None,
                 otp_used=otp_code,
-                time_in=timezone.now()
+                time_in=current_time
             )
-
-            # Determine late or on-time
-            now = timezone.now()
-
-            from datetime import datetime as dt
-
-            exam_date_obj = None
-            if exam_schedule.exam_date:
-                try:
-                    exam_date_obj = dt.strptime(exam_schedule.exam_date, '%Y-%m-%d').date()
-                except:
-                    pass
-
-            if exam_date_obj:
-                exam_start = timezone.make_aware(
-                    dt.combine(exam_date_obj, exam_schedule.exam_start_time)
-                )
-
-                # Mark LATE if after scheduled time
-                if now > exam_start:
-                    exam_schedule.status = "late"
-                else:
-                    exam_schedule.status = "confirmed"
-            else:
-                exam_schedule.status = "confirmed"
-
-            exam_schedule.save(update_fields=["status"])
-            print(f"✅ Updated proctor status to: {exam_schedule.status}")
-
             
             print(f"✅ Created attendance record:")
             print(f"   - Attendance ID: {attendance.attendance_id}")
             print(f"   - Proctor ID: {attendance.proctor_id}")
             print(f"   - Is substitute: {attendance.is_substitute}")
             print(f"   - Time in: {attendance.time_in}")
-            print(f"   - OTP used: {attendance.otp_used}")
             
-            # Verify it was saved
-            verify = TblProctorAttendance.objects.filter(
-                attendance_id=attendance.attendance_id
-            ).exists()
-            print(f"   - Verified in DB: {verify}")
+            # ✅ DETERMINE STATUS: Late or On-time (only for assigned, not substitutes)
+            if role == 'assigned':
+                from datetime import datetime as dt
+                
+                exam_date_obj = None
+                if exam_schedule.exam_date:
+                    try:
+                        exam_date_obj = dt.strptime(exam_schedule.exam_date, '%Y-%m-%d').date()
+                    except:
+                        pass
+                
+                if exam_date_obj and exam_schedule.exam_start_time:
+                    # Create datetime for scheduled start
+                    exam_start_datetime = timezone.make_aware(
+                        dt.combine(exam_date_obj, exam_schedule.exam_start_time)
+                    )
+                    
+                    # Calculate difference in minutes
+                    time_diff_minutes = (current_time - exam_start_datetime).total_seconds() / 60
+                    
+                    print(f"\n⏱️ Time Check:")
+                    print(f"   - Scheduled Start: {exam_start_datetime}")
+                    print(f"   - Actual Time In: {current_time}")
+                    print(f"   - Difference: {time_diff_minutes:.1f} minutes")
+                    
+                    # Mark as LATE if more than 7 minutes after start
+                    if time_diff_minutes > 7:
+                        exam_schedule.status = "late"
+                        print(f"   - Status: LATE (arrived {time_diff_minutes:.1f} minutes after start)")
+                    else:
+                        exam_schedule.status = "confirmed"
+                        print(f"   - Status: ON TIME")
+                else:
+                    exam_schedule.status = "confirmed"
+                    print(f"   - Status: CONFIRMED (no scheduled time to compare)")
+            else:
+                # Substitutes are always marked as 'substitute'
+                exam_schedule.status = "substitute"
+                print(f"   - Status: SUBSTITUTE")
+            
+            # Update the exam schedule
+            exam_schedule.proctor_timein = current_time
+            exam_schedule.save(update_fields=["status", "proctor_timein"])
+            print(f"✅ Updated exam schedule - Status: {exam_schedule.status}")
             
             # If substitute, create substitution record
             if role == 'sub':
@@ -473,12 +477,6 @@ def submit_proctor_attendance(request):
                     justification=remarks
                 )
                 print(f"✅ Created substitution record: {substitution.substitution_id}")
-            
-            # Update exam schedule status
-            if not exam_schedule.proctor_timein:
-                exam_schedule.proctor_timein = timezone.now()
-                exam_schedule.save(update_fields=['proctor_timein'])
-                print(f"✅ Updated exam schedule proctor_timein")
         
         print(f"\n{'='*60}")
         print(f"✅ ATTENDANCE SUBMISSION COMPLETE")
@@ -488,6 +486,7 @@ def submit_proctor_attendance(request):
             'message': 'Attendance recorded successfully',
             'attendance_id': attendance.attendance_id,
             'time_in': attendance.time_in.isoformat(),
+            'status': exam_schedule.status,  # Return the actual status
             'role': 'substitute' if attendance.is_substitute else 'assigned',
             'proctor_name': f"{proctor_user.first_name} {proctor_user.last_name}"
         }, status=status.HTTP_201_CREATED)
