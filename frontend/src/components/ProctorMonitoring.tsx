@@ -110,12 +110,13 @@ const ProctorMonitoring: React.FC<UserProps> = ({ }) => {
               instructor_name: schedule.instructor_name || '',
               department: schedule.department || '',
               college: schedule.college || '',
-              status: schedule.status || 'pending',
+              status: schedule.examdetails_status || schedule.status || 'pending',
               code_entry_time: schedule.code_entry_time || null,
               otp_code: schedule.otp_code || null,
               approval_status: isApproved ? 'approved' : 'pending'
             };
           } catch (error) {
+            console.log("STATUS RECEIVED:", schedule.id, schedule.status, schedule.examdetails_status);
             console.error(`Error checking approval for schedule ${schedule.id}:`, error);
             return {
               ...schedule,
