@@ -117,12 +117,21 @@ const ProctorViewExam: React.FC<ProctorViewExamProps> = ({ user }) => {
         let schedulesData: ExamSchedule[] = [];
 
         if (scheduleFilter === 'my-schedule') {
+          // ✅ FIXED: Fetch only schedules where user is proctor
           const { data } = await api.get('/tbl_examdetails', {
             params: {
               proctor_id: user.user_id
             }
           });
           schedulesData = data || [];
+          
+          // ✅ FIXED: Additional client-side filter for safety
+          schedulesData = schedulesData.filter(exam => 
+            exam.proctor_id === user.user_id || 
+            (exam.proctors && exam.proctors.includes(user.user_id))
+          );
+          
+          console.log(`✅ Filtered to ${schedulesData.length} schedules for proctor ${user.user_id}`);
         } else if (scheduleFilter === 'all-college' && approvalStatus === 'approved') {
           const { data } = await api.get('/tbl_examdetails', {
             params: {
@@ -130,8 +139,10 @@ const ProctorViewExam: React.FC<ProctorViewExamProps> = ({ user }) => {
             }
           });
           schedulesData = data || [];
+          console.log(`✅ Loaded ${schedulesData.length} college schedules`);
         }
 
+        // Filter by history
         if (!showHistory) {
           const today = new Date().toISOString().split('T')[0];
           schedulesData = schedulesData.filter(s => s.exam_date >= today);
@@ -258,6 +269,7 @@ const ProctorViewExam: React.FC<ProctorViewExamProps> = ({ user }) => {
   const semesterName = schedules.find(e => e.semester)?.semester ?? "-";
   const yearName = schedules.find(e => e.academic_year)?.academic_year ?? "-";
 
+  // ✅ FIXED: Calculate total pages correctly for all dates
   let totalPages = 1;
   if (hasData) {
     totalPages = uniqueDates.reduce((total, date) => {
@@ -498,6 +510,7 @@ const ProctorViewExam: React.FC<ProctorViewExamProps> = ({ user }) => {
                                 }
                               }
 
+                              // ✅ FIXED: Check if current user is actually assigned as proctor
                               const isMySchedule = exam.proctor_id === user?.user_id || 
                                 (exam.proctors && exam.proctors.includes(user?.user_id || 0));
 

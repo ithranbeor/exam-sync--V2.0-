@@ -1201,13 +1201,13 @@ def tbl_examdetails_list(request):
             if proctor_id:
                 try:
                     proctor_id_int = int(proctor_id)
-                    # Filter by either proctor_id field OR proctor_id in proctors array
                     queryset = queryset.filter(
-                        Q(proctor_id=proctor_id_int) | Q(proctors__contains=[proctor_id_int])
+                        Q(proctor_id=proctor_id_int) |
+                        Q(proctors__overlap=[proctor_id_int])
                     )
-                    print(f"🔍 Filtering by proctor_id: {proctor_id_int}")
+                    print(f"Filtering by proctor_id={proctor_id_int}")
                 except ValueError:
-                    print(f"⚠️ Invalid proctor_id: {proctor_id}")
+                    print(f"Invalid proctor_id received: {proctor_id}")
 
             # ✅ Existing filters
             college_name = request.GET.get('college_name')

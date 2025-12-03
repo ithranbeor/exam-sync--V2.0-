@@ -294,7 +294,6 @@ class TblExamdetails(models.Model):
             models.Index(fields=['course_id']),
         ]
 
-
 class TblExamperiod(models.Model):
     examperiod_id = models.AutoField(primary_key=True)
     start_date = models.DateTimeField()
