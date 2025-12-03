@@ -120,72 +120,26 @@ const SectionCourses: React.FC = () => {
       }));
   }, [courseInstructorsMap, newSection.course_id]);
 
-  // Replace the fetchAll function in SectionCourses.tsx with this fixed version:
-
   const fetchAll = useCallback(async () => {
     setLoading(true);
     try {
-      // ✅ Get user_id from localStorage or your auth context
-      const userDataString = localStorage.getItem('user');
-      const userData = userDataString ? JSON.parse(userDataString) : null;
-      const userId = userData?.user_id;
-
-      if (!userId) {
-        toast.error('User not logged in');
-        setLoading(false);
-        return;
-      }
-
-      const [secRes, courseRes, progRes, termRes, courseUserRes, userRes] = await Promise.all([
+      const [secRes, courseRes, progRes, termRes, courseUserRes] = await Promise.all([
         api.get('/tbl_sectioncourse/'),
         api.get('/courses/'),
         api.get('/programs/'),
         api.get('/tbl_term'),
-        api.get('/tbl_course_users/'),
-        api.get(`/users/me/?user_id=${userId}`)  // ✅ FIXED: Pass user_id
+        api.get('/tbl_course_users/')
       ]);
 
-      // Extract data from response
-      const secData = secRes.data?.data || secRes.data || [];
+      // ✅ FIX: Extract data from the new response structure
+      const secData = secRes.data?.data || secRes.data || [];  // Handle both formats
       const courseData = courseRes.data || [];
       const progData = progRes.data || [];
       const termData = termRes.data || [];
       const courseUserData = courseUserRes.data || [];
 
-      // Extract current user
-      const user: User | null = userRes?.data?.data || userRes?.data || null;
-
-      if (!user?.user_id) {
-        toast.error('User not found');
-        setLoading(false);
-        return;
-      }
-
-      setSectionCourses(secData);
-
-      // Filter courses where user is a Bayanihan Leader
-      const bayanihanCourseIds = new Set(
-        courseUserData
-          .filter((row: any) => {
-            const rowUserId = row.user_id || row.tbl_users?.user_id || row.user?.user_id;
-            const isBayanihanLeader = row.is_bayanihan_leader === true || row.is_bayanihan_leader === 'true';
-            
-            return rowUserId === user.user_id && isBayanihanLeader;
-          })
-          .map((row: any) => row.course?.course_id || row.course_id)
-          .filter(Boolean)
-      );
-
-      console.log('User ID:', user.user_id);
-      console.log('Bayanihan Leader Course IDs:', Array.from(bayanihanCourseIds));
-
-      const filteredCourses = courseData.filter(
-        (c: any) => bayanihanCourseIds.has(c.course_id)
-      );
-
-      console.log('Filtered Courses Count:', filteredCourses.length);
-
-      setCourses(filteredCourses);
+      setSectionCourses(secData);  // ✅ Use extracted array
+      setCourses(courseData);
       setPrograms(progData);
 
       const mappedTerms = termData.map((t: any) => ({
@@ -198,28 +152,21 @@ const SectionCourses: React.FC = () => {
       }));
       setTerms(mappedTerms);
 
-      // Build instructor map
       const instructorMap: Record<string, User[]> = {};
       courseUserData.forEach((row: any) => {
+        if (!row.tbl_users) return;
+        const user: User = {
+          user_id: row.tbl_users.user_id,
+          full_name: row.tbl_users.full_name || `${row.tbl_users.first_name} ${row.tbl_users.last_name}`
+        };
         const courseId = row.course?.course_id || row.course_id;
         if (!courseId) return;
-
-        const userEntry: User = {
-          user_id: row.user_id || row.tbl_users?.user_id || row.user?.user_id,
-          full_name: row.tbl_users?.full_name || 
-                    row.user?.full_name || 
-                    `${row.tbl_users?.first_name || row.user?.first_name || ''} ${row.tbl_users?.last_name || row.user?.last_name || ''}`.trim()
-        };
-
-        if (!userEntry.user_id) return;
-
         if (!instructorMap[courseId]) instructorMap[courseId] = [];
-        instructorMap[courseId].push(userEntry);
+        instructorMap[courseId].push(user);
       });
       setCourseInstructorsMap(instructorMap);
 
-    } catch (error) {
-      console.error('Error fetching data:', error);
+    } catch (_error) {
       toast.error('Error fetching data.');
     } finally {
       setLoading(false);
@@ -851,7 +798,7 @@ const SectionCourses: React.FC = () => {
       <div className="colleges-actions">
         <div style={{ display: 'flex', alignItems: 'center', gap: 8, width: '100%' }}>
           <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-            <button type='button' className="action-button add-new with-label" onClick={() => {
+            <button type='button' className="action-button add-new" onClick={() => {
           setEditMode(false);
           setNewSection({
             course_id: '',
@@ -863,9 +810,9 @@ const SectionCourses: React.FC = () => {
           } as SectionCourse);
           setShowModal(true);
         }}>
-          <FaPlus/><span className="btn-label">Add</span>
+          <FaPlus/>
         </button>
-            <button type='button' className="action-button import with-label" onClick={() => setShowImport(true)}><FaFileImport/><span className="btn-label">Import</span></button>
+            <button type='button' className="action-button import" onClick={() => setShowImport(true)}><FaFileImport/></button>
             <div style={{ position: 'relative' }} data-sort-dropdown>
               <button 
                 type='button' 
