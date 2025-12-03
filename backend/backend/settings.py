@@ -18,6 +18,7 @@ ALLOWED_HOSTS = [
     "exam-sync-v2-0-mwnp.onrender.com", 
     "localhost",
     "127.0.0.1",
+    "www.examsyncv2.com",
 ]
 
 # ──────────────────────────────────────────────

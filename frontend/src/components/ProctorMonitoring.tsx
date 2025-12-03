@@ -45,6 +45,34 @@ const ProctorMonitoring: React.FC<UserProps> = ({ }) => {
   const [sortBy, setSortBy] = useState<string>('none');
   const [showSortDropdown, setShowSortDropdown] = useState(false);
 
+  useEffect(() => {
+    if (approvedSchedules.length === 0) return;
+
+    const now = new Date();
+
+    approvedSchedules.forEach(async (s) => {
+      const examEnd = new Date(`${s.exam_date}T${s.exam_end_time}`);
+      const hasTimeIn = Boolean(s.code_entry_time);
+
+      // Conditions for ABSENT:
+      // 1. Exam already ended
+      // 2. No OTP verified (no code_entry_time)
+      // 3. Status still pending
+      if (now > examEnd && !hasTimeIn && s.status.toLowerCase() === "pending") {
+        try {
+          setTimeout(() => fetchMonitoringData(), 500);
+          await api.patch(`/update-proctor-status/${s.id}/`, {
+            status: "absent",
+          });
+
+          console.log(`Auto-marked absent for schedule ${s.id}`);
+        } catch (err) {
+          console.error("Failed to auto-mark absent:", err);
+        }
+      }
+    });
+  }, [approvedSchedules]);
+
   // Fetch monitoring data - ONLY APPROVED SCHEDULES
   const fetchMonitoringData = useCallback(async () => {
     setLoading(true);
@@ -461,7 +489,7 @@ const ProctorMonitoring: React.FC<UserProps> = ({ }) => {
                       switch (status.toLowerCase()) {
                         case 'confirmed':
                         case 'confirm':
-                          return { text: 'Confirmed', className: 'status-confirmed' };
+                          return { text: 'Present', className: 'status-confirmed' };
                         case 'late':
                         case 'absent':
                           return { text: status === 'late' ? 'Late' : 'Absent', className: 'status-late-absent' };
