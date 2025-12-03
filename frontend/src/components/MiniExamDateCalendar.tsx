@@ -129,7 +129,6 @@ const MiniExamDateCalendar = ({ }: MiniExamDateCalendarProps) => {
                     backgroundColor: collegeColors[college] || '#999',
                     color: 'white',
                     fontSize: '9px',
-                    padding: '2px 4px',
                     borderRadius: '3px',
                     marginBottom: '2px',
                   }}

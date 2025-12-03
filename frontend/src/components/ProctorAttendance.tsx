@@ -42,12 +42,71 @@ const ProctorAttendance: React.FC<UserProps> = ({ user }) => {
   const [submittingAttendance, setSubmittingAttendance] = useState(false);
   const [_verificationData, setVerificationData] = useState<any>(null);
 
+  const isExamOngoing = (examDate: string, startTime: string, endTime: string) => {
+    try {
+      const now = new Date();
+      
+      // Parse the exam date (assuming format like "2024-12-03" or similar)
+      const examDateObj = new Date(examDate);
+      
+      // Check if it's the same day
+      const isSameDay = 
+        now.getFullYear() === examDateObj.getFullYear() &&
+        now.getMonth() === examDateObj.getMonth() &&
+        now.getDate() === examDateObj.getDate();
+      
+      if (!isSameDay) {
+        console.log('Not same day');
+        return false;
+      }
+      
+      // Create Date objects for start and end times on the exam date
+      const examStart = new Date(startTime);
+      const examEnd = new Date(endTime);
+      
+      // Get current time in Philippines timezone
+      const currentTime = now.getTime();
+      const startTimeMs = examStart.getTime();
+      const endTimeMs = examEnd.getTime();
+      
+      const isWithinTimeRange = currentTime >= startTimeMs && currentTime <= endTimeMs;
+      
+      // Debug logging
+      console.log('=== Exam Ongoing Check ===');
+      console.log('Current Time:', now.toLocaleString('en-US', { timeZone: 'Asia/Manila' }));
+      console.log('Exam Date:', examDate);
+      console.log('Start Time:', examStart.toLocaleString('en-US', { timeZone: 'Asia/Manila' }));
+      console.log('End Time:', examEnd.toLocaleString('en-US', { timeZone: 'Asia/Manila' }));
+      console.log('Is Same Day:', isSameDay);
+      console.log('Is Within Time Range:', isWithinTimeRange);
+      console.log('========================');
+      
+      return isWithinTimeRange;
+    } catch (e) {
+      console.error('Error checking if exam is ongoing:', e);
+      return false;
+    }
+  };
+
   // Fetch proctor's assigned exams
   const fetchAssignedExams = useCallback(async () => {
     if (!user?.user_id) return;
 
     try {
       const { data } = await api.get(`/proctor-assigned-exams/${user.user_id}/`);
+      
+      console.log('=== ALL FETCHED EXAMS (Before Filter) ===');
+      console.log('Total exams:', data.length);
+      data.forEach((exam: any) => {
+        console.log({
+          course: exam.course_id,
+          date: exam.exam_date,
+          start: exam.exam_start_time,
+          end: exam.exam_end_time,
+          status: exam.status
+        });
+      });
+      
       const formattedExams: ExamDetails[] = data.map((exam: any) => ({
         id: exam.id,
         course_id: exam.course_id,
@@ -62,18 +121,37 @@ const ProctorAttendance: React.FC<UserProps> = ({ user }) => {
         assigned_proctor: exam.assigned_proctor || '',
         status: exam.status || 'pending'
       }));
-      setProctorAssignedExams(formattedExams);
+      
+      console.log('=== CHECKING EACH EXAM ===');
+      formattedExams.forEach(exam => {
+        const ongoing = isExamOngoing(exam.exam_date, exam.exam_start_time, exam.exam_end_time);
+        const notConfirmed = exam.status !== 'confirmed' && exam.status !== 'confirm';
+        console.log(`${exam.course_id}: ongoing=${ongoing}, notConfirmed=${notConfirmed}`);
+      });
+      
+      const filteredExams = formattedExams.filter((exam: ExamDetails) => {
+        const ongoing = isExamOngoing(exam.exam_date, exam.exam_start_time, exam.exam_end_time);
+        const notConfirmed = exam.status !== 'confirmed' && exam.status !== 'confirm';
+        return ongoing && notConfirmed;
+      });
+      
+      console.log('=== FILTERED EXAMS ===');
+      console.log('Ongoing exams count:', filteredExams.length);
+      
+      setProctorAssignedExams(filteredExams);
     } catch (error: any) {
       console.error('Error fetching assigned exams:', error);
       toast.error('Failed to load assigned exams');
     }
   }, [user]);
+  
 
   // Fetch all exams for substitution
   const fetchAllExams = useCallback(async () => {
     try {
       const { data } = await api.get('/all-exams-for-substitution/');
-      const formattedExams: ExamDetails[] = data.map((exam: any) => ({
+      const formattedExams: ExamDetails[] = data
+        .map((exam: any) => ({
         id: exam.id,
         course_id: exam.course_id,
         subject: exam.subject || exam.course_id,
@@ -93,6 +171,15 @@ const ProctorAttendance: React.FC<UserProps> = ({ user }) => {
       toast.error('Failed to load exams');
     }
   }, []);
+
+  useEffect(() => {
+    const interval = setInterval(() => {
+      fetchAssignedExams();
+      fetchAllExams();
+    }, 30000); // Refresh every 30 seconds
+
+    return () => clearInterval(interval);
+  }, [fetchAssignedExams, fetchAllExams]);
 
   // Load data on mount
   useEffect(() => {
@@ -259,7 +346,10 @@ const ProctorAttendance: React.FC<UserProps> = ({ user }) => {
                         <h3 className="proctor-attendance-schedule-subject">
                           {exam.course_id} - {exam.subject}
                         </h3>
-                        <span className="proctor-attendance-schedule-code">{exam.course_id}</span>
+                        <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                          <span className="proctor-attendance-schedule-code">{exam.course_id}</span>
+                          <span className="ongoing-badge">ONGOING</span>
+                        </div>
                       </div>
 
                       <div className="proctor-attendance-schedule-details">

@@ -624,4 +624,25 @@
     font-size: 12px;
   }
 }
+.ongoing-badge {
+  background: linear-gradient(135deg, #4CAF50, #45a049);
+  color: white;
+  padding: 4px 10px;
+  border-radius: 12px;
+  font-size: 10px;
+  font-weight: bold;
+  letter-spacing: 0.5px;
+  animation: pulse 2s ease-in-out infinite;
+  box-shadow: 0 2px 4px rgba(76, 175, 80, 0.3);
+}
 
+@keyframes pulse {
+  0%, 100% {
+    opacity: 1;
+    transform: scale(1);
+  }
+  50% {
+    opacity: 0.8;
+    transform: scale(1.05);
+  }
+}

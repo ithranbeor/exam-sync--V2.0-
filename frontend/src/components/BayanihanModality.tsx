@@ -3,8 +3,8 @@ import { api } from '../lib/apiClient.ts';
 import '../styles/bayanihanModality.css';
 import { ToastContainer, toast } from 'react-toastify';
 import 'react-toastify/dist/ReactToastify.css';
-import Select, { components } from 'react-select';
-import { FaTrash, FaLightbulb, FaPlus } from "react-icons/fa";
+import Select from 'react-select';
+import { FaTrash, FaPlus } from 'react-icons/fa';
 
 interface UserProps {
   user: {
@@ -19,9 +19,7 @@ interface UserProps {
 const modalityRoomTypeMap: { [key: string]: string } = {
   'Written (Lecture)': 'Lecture',
   'Written (Laboratory)': 'Laboratory',
-  'PIT or Projects': 'No Room',
-  'Pitching': 'No Room',
-  'Hands-on': 'Laboratory',
+  'Hands-on (Laboratory)': 'Laboratory',
 };
 
 const BayanihanModality: React.FC<UserProps> = ({ user }) => {
@@ -163,18 +161,6 @@ const BayanihanModality: React.FC<UserProps> = ({ user }) => {
     [key: string]: { occupiedTimes: { start: string; end: string }[] }
   }>({});
 
-  const CheckboxOption = (props: any) => (
-    <components.Option {...props}>
-      <input
-        type="checkbox"
-        checked={props.isSelected}
-        readOnly
-        style={{ marginRight: 8 }}
-      />
-      <label>{props.label}</label>
-    </components.Option>
-  );
-
   /** FETCH ROOM STATUS BASED ON EXAMDETAILS (lazy loaded when viewing occupancy) */
   const fetchRoomOccupancy = useCallback(async (roomId: string) => {
     if (roomStatus[roomId]) return; // Already loaded
@@ -201,9 +187,21 @@ const BayanihanModality: React.FC<UserProps> = ({ user }) => {
   // Memoize filtered courses based on program
   const filteredCourseOptions = useMemo(() => {
     if (!form.program) return [];
-    return courseOptions.filter(c =>
+    
+    // 1. Filter the courses based on the selected program
+    const filtered = courseOptions.filter(c =>
       sectionOptions.some(s => s.program_id === form.program && s.course_id === c.course_id)
     );
+
+    // 2. Sort the filtered courses by course_id (A-Z or 1-10)
+    filtered.sort((a, b) => 
+        a.course_id.localeCompare(b.course_id, undefined, { 
+            numeric: true, 
+            sensitivity: 'base' 
+        })
+    );
+
+    return filtered;
   }, [courseOptions, sectionOptions, form.program]);
 
   // Memoize filtered sections based on course
@@ -214,7 +212,6 @@ const BayanihanModality: React.FC<UserProps> = ({ user }) => {
       .map(s => ({ value: s.section_name, label: s.section_name }));
   }, [sectionOptions, form.course]);
 
-  /** FETCH PROGRAMS, COURSES, SECTIONS, ROOMS, BUILDINGS, AND AVAILABLE ROOMS */
   /** FETCH PROGRAMS, COURSES, SECTIONS, ROOMS, BUILDINGS, AND AVAILABLE ROOMS */
   useEffect(() => {
     const fetchData = async () => {
@@ -716,9 +713,9 @@ const BayanihanModality: React.FC<UserProps> = ({ user }) => {
           modality_remarks: form.remarks,
           course_id: form.course,
           program_id: form.program,
-          sections: assignment.sections,
+          sections: assignment.sections, // ✅ Array of sections sharing room
           total_students: assignment.totalStudents,
-          possible_rooms: [assignment.roomId],
+          possible_rooms: [assignment.roomId], // ✅ Only the assigned room
           user_id: user.user_id,
           created_at: new Date().toISOString(),
         });
@@ -852,9 +849,12 @@ const BayanihanModality: React.FC<UserProps> = ({ user }) => {
     return filteredRoomOptions
       .filter(r => !selectedBuilding || r.building_id === selectedBuilding)
       .sort((a, b) => {
+        // First sort by room_type matching form.roomType
         if (a.room_type === form.roomType && b.room_type !== form.roomType) return -1;
         if (a.room_type !== form.roomType && b.room_type === form.roomType) return 1;
-        return a.room_name.localeCompare(b.room_name);
+
+        // Then sort alphabetically/numerically by room_id
+        return a.room_id.localeCompare(b.room_id, undefined, { numeric: true });
       });
   }, [filteredRoomOptions, selectedBuilding, form.roomType]);
 
@@ -891,45 +891,21 @@ const BayanihanModality: React.FC<UserProps> = ({ user }) => {
           ) : null}
 
           <form className="availability-form" onSubmit={handleSubmit}>
-            <div className="availability-grid">
-
-              {/* MODALITY */}
-              <div className="form-group">
-                <label>Modality Type</label>
-                <Select
-                  options={[
-                    { value: 'Hands-on', label: 'Hands-on' },
-                    { value: 'Written (Lecture)', label: 'Written (Lecture)' },
-                    { value: 'Written (Laboratory)', label: 'Written (Laboratory)' },
-                    { value: 'PIT or Projects', label: 'PIT or Projects' },
-                    { value: 'Pitching', label: 'Pitching' }
-                  ]}
-                  value={form.modality ? { value: form.modality, label: form.modality } : null}
-                  onChange={selected => setForm(prev => ({ ...prev, modality: selected?.value || '' }))}
-                  placeholder="Select modality..."
-                  isClearable
-                />
-              </div>
-
-              {/* ROOM TYPE */}
-              <div className="form-group">
-                <label>Room Type</label>
-                <input
-                  type="text"
-                  name="roomType"
-                  value={form.roomType}
-                  readOnly
-                  className="custom-select"
-                  placeholder="Auto-filled"
-                />
-              </div>
+            <div className="availability-grid">    
 
               {/* PROGRAM */}
               <div className="form-group">
                 <label>Program</label>
                 <Select
-                  options={programOptions.map(p => ({ value: p.program_id, label: `${p.program_id} - ${p.program_name}` }))}
-                  value={programOptions.filter(p => p.program_id === form.program).map(p => ({ value: p.program_id, label: `${p.program_id} - ${p.program_name}` }))}
+                  options={programOptions
+                    .slice() // create a copy to avoid mutating original array
+                    .sort((a, b) => a.program_id.localeCompare(b.program_id, undefined, { numeric: true }))
+                    .map(p => ({ value: p.program_id, label: `${p.program_id} - ${p.program_name}` }))
+                  }
+                  value={programOptions
+                    .filter(p => p.program_id === form.program)
+                    .map(p => ({ value: p.program_id, label: `${p.program_id} - ${p.program_name}` }))
+                  }
                   onChange={selected => setForm(prev => ({ ...prev, program: selected?.value || '', course: '', sections: [] }))}
                   placeholder="Select program..."
                   isClearable
@@ -949,7 +925,22 @@ const BayanihanModality: React.FC<UserProps> = ({ user }) => {
                     value: form.course,
                     label: `${filteredCourseOptions.find(c => c.course_id === form.course)?.course_id} (${filteredCourseOptions.find(c => c.course_id === form.course)?.course_name})`
                   } : null}
-                  onChange={selected => setForm(prev => ({ ...prev, course: selected?.value || '', sections: [] }))}
+                  onChange={selected => {
+                    const courseId = selected?.value || "";
+
+                    // Filter sections for this course
+                    const autoSections = sectionOptions
+                      .filter(s => s.course_id === courseId)
+                      .map(s => s.section_name)
+                      .sort((a, b) => a.localeCompare(b));  // A–Z or 1–10
+
+                    setForm(prev => ({
+                      ...prev,
+                      course: courseId,
+                      sections: autoSections,  
+                      rooms: []             
+                    }));
+                  }}
                   placeholder="Select course..."
                   isClearable
                 />
@@ -962,53 +953,75 @@ const BayanihanModality: React.FC<UserProps> = ({ user }) => {
                 {form.course ? (
                   <Select
                     isMulti
+                    isDisabled={true}   // 🔒 READ-ONLY
                     closeMenuOnSelect={false}
-                    hideSelectedOptions={false}
-                    components={{ Option: CheckboxOption }}
-                    options={[
-                      { value: 'select_all', label: 'Select All Sections' },
-                      ...filteredSectionOptions
-                    ]}
-                    value={form.sections.map(sec => ({ value: sec, label: sec }))}
-                    onChange={(selected) => {
-                      if (!selected) {
-                        setForm(prev => ({ ...prev, sections: [], rooms: [] }));
-                        return;
-                      }
+                    hideSelectedOptions={true}
 
-                      const allSections = filteredSectionOptions.map(s => s.value);
-                      const isSelectAll = selected.some(s => s.value === 'select_all');
+                    options={filteredSectionOptions
+                      .map(s => ({ value: s.value, label: s.label }))
+                      .sort((a, b) => a.label.localeCompare(b.label))
+                    }
 
-                      if (isSelectAll) {
-                        setForm(prev => ({ ...prev, sections: allSections, rooms: [] }));
-                        toast.info('All sections selected. Now select rooms with sufficient capacity.');
-                        return;
-                      }
+                    value={form.sections
+                      .sort((a, b) => a.localeCompare(b))
+                      .map(sec => ({ value: sec, label: sec }))
+                    }
 
-                      const selectedValues = selected.map(s => s.value);
-
-                      // Clear rooms when sections change
-                      setForm(prev => ({ ...prev, sections: selectedValues, rooms: [] }));
+                    styles={{
+                      multiValue: (base) => ({
+                        ...base,
+                        backgroundColor: "#e0f2fe",
+                        borderRadius: "6px",
+                        padding: "2px 4px"
+                      }),
+                      multiValueRemove: () => ({
+                        display: "none" 
+                      }),
+                      control: (base) => ({
+                        ...base,
+                        cursor: "not-allowed",
+                        backgroundColor: "#f8fafc"
+                      }),
+                      valueContainer: (base) => ({
+                        ...base,
+                        maxHeight: "120px",
+                        overflowY: "auto"
+                      })
                     }}
-                    placeholder="Select sections..."
                   />
                 ) : (
                   <p style={{ color: "#888" }}>Select a course first</p>
                 )}
 
-                {form.course && (
-                  <small style={{ marginTop: "4px", display: "block", color: "#666" }}>
-                    <FaLightbulb style={{ color: 'gold' }} /> Select sections first, then choose rooms with sufficient capacity
-                  </small>
-                )}
               </div>
 
               <div className="form-group">
-                <label>Building-Room</label>
+                <label>Modality Type</label>
+                <Select
+                  options={[
+                    { value: 'Hands-on (Laboratory)', label: 'Hands-on (Laboratory)' },
+                    { value: 'Written (Lecture)', label: 'Written (Lecture)' },
+                    { value: 'Written (Laboratory)', label: 'Written (Laboratory)' },
+                  ]}
+                  value={form.modality ? { value: form.modality, label: form.modality } : null}
+                  onChange={selected => setForm(prev => ({ ...prev, modality: selected?.value || '' }))}
+                  placeholder="Select modality..."
+                  isClearable
+                />
+              </div>
+
+              <div className="form-group">
+                <label>Room Location</label>
                 <button
                   type="button"
                   className="open-modal-btn"
-                  disabled={!form.roomType || form.roomType === "No Room" || availableRoomIds.length === 0 || loadingRooms || form.sections.length === 0}
+                  disabled={
+                    !form.roomType ||
+                    form.roomType === "No Room" ||
+                    availableRoomIds.length === 0 ||
+                    loadingRooms ||
+                    form.sections.length === 0
+                  }
                   onClick={() => setShowRoomModal(true)}
                 >
                   {loadingRooms ? 'Loading...' : 'Select Room'}
@@ -1022,14 +1035,18 @@ const BayanihanModality: React.FC<UserProps> = ({ user }) => {
 
                 {form.rooms.length > 0 && (
                   <div className="selected-rooms">
-                    {form.rooms.map((roomId) => {
-                      const r = roomOptions.find(r => r.room_id === roomId);
-                      return (
-                        <div key={roomId} className="room-card">
-                          {r?.room_id}
-                        </div>
-                      );
-                    })}
+                    {form.rooms
+                      .slice()
+                      .sort((a, b) => a.localeCompare(b, undefined, { numeric: true }))
+                      .map((roomId) => {
+                        const r = roomOptions.find(r => r.room_id === roomId);
+                        return (
+                          <div key={roomId} className="room-card">
+                            {r?.room_id}
+                          </div>
+                        );
+                      })
+                    }
                   </div>
                 )}
               </div>

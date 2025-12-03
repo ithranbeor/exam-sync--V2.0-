@@ -131,11 +131,14 @@
 }
 
 .mini-college-badge {
-  display: block;
+  display: inline-block;
+  padding: 3px 6px;
+  margin: 2px 2px 4px 0;
+  border-radius: 4px;
+  font-size: 0.75em;
+  font-weight: 600;
+  color: white;
   text-align: center;
-  white-space: nowrap;
-  overflow: hidden;
-  text-overflow: ellipsis;
 }
 
 .mini-semester,

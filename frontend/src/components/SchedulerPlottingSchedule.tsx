@@ -346,10 +346,6 @@ const SchedulerPlottingSchedule: React.FC<SchedulerProps> = ({ user, onScheduleC
     return `${year}-${month}-${day}`;
   };
 
-  // ============================================================================
-  // REPLACE YOUR examDateOptions useMemo WITH THIS:
-  // ============================================================================
-
   const examDateOptions = useMemo(() => {
     if (!examPeriods.length || !userCollegeIds.length) return [];
     const allowedPeriods = examPeriods.filter((p: any) => 
@@ -399,6 +395,20 @@ const SchedulerPlottingSchedule: React.FC<SchedulerProps> = ({ user, onScheduleC
       formData.selectedPrograms.includes(m.program_id) && formData.selectedCourses.includes(m.course_id)
     );
   }, [formData.selectedPrograms, formData.selectedCourses, modalities]);
+
+  useEffect(() => {
+    if (filteredModalitiesBySelection.length > 0) {
+      setFormData(prev => ({
+        ...prev,
+        selectedModalities: filteredModalitiesBySelection.map(m => m.modality_id)
+      }));
+    } else {
+      setFormData(prev => ({
+        ...prev,
+        selectedModalities: []
+      }));
+    }
+    }, [filteredModalitiesBySelection]);
 
   // Auto-select first options
   useEffect(() => {
@@ -714,7 +724,8 @@ const SchedulerPlottingSchedule: React.FC<SchedulerProps> = ({ user, onScheduleC
       const section = sectionMap.get(gene.sectionId);
       if (!section) return;
 
-      const { date, timeSlot, roomId, proctorId } = gene;
+      const { date, timeSlot, roomId } = gene;
+      let proctorId = gene.proctorId;
       const startMinutes = timeToMinutes(timeSlot);
       const endMinutes = startMinutes + totalDurationMinutes;
       const yearLevel = extractYearLevel(section.section_name);
@@ -803,7 +814,17 @@ const SchedulerPlottingSchedule: React.FC<SchedulerProps> = ({ user, onScheduleC
 
       // Proctor assignment
       if (proctorId === -1) {
-        fitness -= 6000;
+        proctorId = -9999;
+        const proctorDateKey = `${date}|${proctorId}`;
+        if (!proctorTimeRanges.has(proctorDateKey)) {
+          proctorTimeRanges.set(proctorDateKey, []);
+        }
+        proctorTimeRanges.get(proctorDateKey)!.push({ 
+          start: startMinutes, 
+          end: endMinutes, 
+          sectionId: Number(gene.sectionId),
+          deptId: departmentId
+        });
       } else {
         const proctorDateKey = `${date}|${proctorId}`;
         if (!proctorTimeRanges.has(proctorDateKey)) {
@@ -818,7 +839,7 @@ const SchedulerPlottingSchedule: React.FC<SchedulerProps> = ({ user, onScheduleC
           else {
             if (existing.end === startMinutes) {
               if (existing.deptId === departmentId) {
-                fitness -= 12000;
+                fitness -= 100000;
               }
             }
             else if (startMinutes > existing.end && startMinutes < existing.end + totalDurationMinutes) {
@@ -1192,6 +1213,7 @@ const SchedulerPlottingSchedule: React.FC<SchedulerProps> = ({ user, onScheduleC
     });
 
     // Pre-validation
+    // Pre-validation
     const violations: string[] = [];
 
     allModalities.forEach(section => {
@@ -1204,6 +1226,26 @@ const SchedulerPlottingSchedule: React.FC<SchedulerProps> = ({ user, onScheduleC
           `Required capacity: ${enrolledCount} students\n` +
           `Possible rooms from modality: ${section.possible_rooms?.join(', ') || 'None'}`
         );
+      }
+      
+      // ✅ NEW: Check if grouped sections exceed room capacity
+      if (Array.isArray(section.sections) && section.sections.length > 1) {
+        const totalStudents = section.total_students || enrolledCount;
+        
+        for (const roomId of suitableRooms) {
+          const room = roomsCache.find(r => r.room_id === roomId);
+          const roomCapacity = room?.room_capacity || 0;
+          
+          if (totalStudents > roomCapacity) {
+            violations.push(
+              `Grouped sections for ${section.course_id} exceed room capacity:\n` +
+              `Sections: ${section.sections.join(', ')}\n` +
+              `Total Students: ${totalStudents}\n` +
+              `Room ${roomId} Capacity: ${roomCapacity}\n` +
+              `Please select a larger room or split the sections.`
+            );
+          }
+        }
       }
     });
 
@@ -1444,14 +1486,12 @@ const SchedulerPlottingSchedule: React.FC<SchedulerProps> = ({ user, onScheduleC
       const { date, timeSlot, roomId, proctorId } = gene;
       const courseId = section.course_id;
 
-      // ✅ Validate that the time slot is valid
       if (!allAvailableTimeSlots.includes(timeSlot)) {
         console.error(`❌ Invalid time slot ${timeSlot} for section ${section.modality_id}`);
         unscheduledSections.push(`${section.course_id} - ${section.section_name} (invalid time slot: ${timeSlot})`);
         continue;
       }
 
-      // ✅ Validate that exam ends by 21:00
       const [startHour, startMinute] = timeSlot.split(":").map(Number);
       const startMinutes = timeToMinutes(timeSlot);
       const endMinutes = startMinutes + totalDurationMinutes;
@@ -1463,6 +1503,14 @@ const SchedulerPlottingSchedule: React.FC<SchedulerProps> = ({ user, onScheduleC
       }
 
       if (!roomId || proctorId === -1) {
+        // ✅ ADD DETAILED LOGGING
+        console.error(`❌ FAILED: ${section.course_id} - ${section.sections.join(', ')}`);
+        console.error(`   Room ID: ${roomId || 'NO ROOM'}`);
+        console.error(`   Proctor ID: ${proctorId}`);
+        console.error(`   Suitable Rooms: ${modalityRoomsMap.get(section.modality_id)?.join(', ')}`);
+        console.error(`   Available Proctors: ${getAvailableProctors(date, timeSlot).length}`);
+        console.error(`   Date: ${date}, Time: ${timeSlot}`);
+        
         unscheduledSections.push(`${section.course_id} - ${section.section_name} (missing room or proctor)`);
         continue;
       }
@@ -1478,7 +1526,6 @@ const SchedulerPlottingSchedule: React.FC<SchedulerProps> = ({ user, onScheduleC
         continue;
       }
 
-      // ✅ FIXED: Better exam period matching with detailed logging
       const examDate = new Date(date);
       
       console.log(`🔍 Looking for exam period for ${courseId} on ${date}`);
@@ -1490,11 +1537,9 @@ const SchedulerPlottingSchedule: React.FC<SchedulerProps> = ({ user, onScheduleC
       })));
 
       const matchedPeriod = examPeriods.find(p => {
-        // ✅ Normalize all dates to YYYY-MM-DD format for comparison
         const periodStart = new Date(p.start_date);
         const periodEnd = new Date(p.end_date);
         
-        // ✅ Set all times to midnight for date-only comparison
         periodStart.setHours(0, 0, 0, 0);
         periodEnd.setHours(23, 59, 59, 999);
         examDate.setHours(12, 0, 0, 0); // Use noon to avoid timezone edge cases
@@ -1591,49 +1636,95 @@ const SchedulerPlottingSchedule: React.FC<SchedulerProps> = ({ user, onScheduleC
         continue;
       }
 
+      // ===== PROCTOR ASSIGNMENT - FIXED TO PREVENT CONFLICTS =====
       const availableProctorsForAssignment = getAvailableProctors(date, timeSlot);
-      const proctorsArray: number[] = [];
 
-      // ✅ Assign proctors for each section
-      for (let i = 0; i < section.sections.length; i++) {
-        if (availableProctorsForAssignment.length > 0) {
-          let assignedProctor = -1;
-          
-          for (const candidateProctor of availableProctorsForAssignment) {
-            const proctorKey = `${date}|${candidateProctor}`;
-            const existingRanges = finalProctorTimeRanges.get(proctorKey) || [];
-            
-            const isFree = !existingRanges.some(range => 
-              rangesOverlap(startMinutes, endMinutes, range.start, range.end)
-            );
-            
-            if (isFree) {
-              assignedProctor = candidateProctor;
-              
-              if (!finalProctorTimeRanges.has(proctorKey)) {
-                finalProctorTimeRanges.set(proctorKey, []);
-              }
-              finalProctorTimeRanges.get(proctorKey)!.push({
-                start: startMinutes,
-                end: endMinutes,
-                course: section.course_id,
-                section: section.section_name
-              });
-              
-              break;
-            }
-          }
-          
-          if (assignedProctor !== -1) {
-            proctorsArray.push(assignedProctor);
-          } else {
-            console.warn(`⚠️ No available proctor for section ${i} of ${section.course_id}`);
-            proctorsArray.push(proctorId);
-          }
-        } else {
-          proctorsArray.push(proctorId);
+      // ✅ CRITICAL: Filter out proctors already assigned at this exact time
+      const freeProctors = availableProctorsForAssignment.filter(candidateProctor => {
+        const proctorKey = `${date}|${candidateProctor}`;
+        const existingRanges = finalProctorTimeRanges.get(proctorKey) || [];
+        
+        // Check if this proctor is free during the exam time
+        return !existingRanges.some(range => 
+          rangesOverlap(startMinutes, endMinutes, range.start, range.end)
+        );
+      });
+
+      console.log(`📅 Date: ${date}, Time: ${timeSlot}`);
+      console.log(`   Available: ${availableProctorsForAssignment.length}, Free: ${freeProctors.length}`);
+
+      let sharedProctor = -1;
+
+      // Priority 1: Night class instructor (if free)
+      if (section.is_night_class === "YES" && section.instructors && section.instructors.length > 0) {
+        const nightInstructor = section.instructors[0];
+        if (freeProctors.includes(nightInstructor)) {
+          sharedProctor = nightInstructor;
+          console.log(`✅ Night class instructor ${nightInstructor} assigned`);
         }
       }
+
+      // Priority 2: Any free proctor from available list
+      if (sharedProctor === -1 && freeProctors.length > 0) {
+        // Shuffle for randomization
+        const shuffled = [...freeProctors].sort(() => Math.random() - 0.5);
+        sharedProctor = shuffled[0];
+        console.log(`✅ Random free proctor ${sharedProctor} assigned`);
+      }
+
+      // Priority 3: Section instructor as fallback (if somehow free but not in availability)
+      if (sharedProctor === -1 && section.instructors && section.instructors.length > 0) {
+        for (const instrId of section.instructors) {
+          if (!instrId) continue;
+          const instrKey = `${date}|${instrId}`;
+          const instrRanges = finalProctorTimeRanges.get(instrKey) || [];
+          const instrFree = !instrRanges.some(range => 
+            rangesOverlap(startMinutes, endMinutes, range.start, range.end)
+          );
+          
+          if (instrFree) {
+            sharedProctor = instrId;
+            console.log(`✅ Fallback instructor ${instrId} assigned`);
+            break;
+          }
+        }
+      }
+
+      // ❌ If NO proctor found, skip this section entirely
+      if (sharedProctor === -1) {
+        console.error(`❌ NO FREE PROCTOR for ${section.course_id} - ${section.sections.join(', ')}`);
+        console.error(`   Available: ${availableProctorsForAssignment.length}`);
+        console.error(`   Free: ${freeProctors.length}`);
+        console.error(`   Occupied proctors:`, Array.from(finalProctorTimeRanges.keys())
+          .filter(k => k.startsWith(`${date}|`))
+          .map(k => k.split('|')[1])
+        );
+        
+        unscheduledSections.push(
+          `${section.course_id} - ${section.section_name} (no available proctor at ${timeSlot})`
+        );
+        continue; // ✅ Skip this section - don't add to scheduledExams
+      }
+
+      // ✅ IMMEDIATELY mark proctor as used BEFORE processing next section
+      const proctorKey = `${date}|${sharedProctor}`;
+      if (!finalProctorTimeRanges.has(proctorKey)) {
+        finalProctorTimeRanges.set(proctorKey, []);
+      }
+      finalProctorTimeRanges.get(proctorKey)!.push({
+        start: startMinutes,
+        end: endMinutes,
+        course: section.course_id,
+        section: section.sections.join(', ')
+      });
+
+      // Build proctors array for all sections in this group
+      const proctorsArray: number[] = [];
+      for (let i = 0; i < section.sections.length; i++) {
+        proctorsArray.push(sharedProctor);
+      }
+
+      console.log(`✅ Assigned proctor ${sharedProctor} to ${section.sections.length} section(s)`);
 
       // ✅ Add to scheduled exams
       scheduledExams.push({
@@ -1887,37 +1978,68 @@ const SchedulerPlottingSchedule: React.FC<SchedulerProps> = ({ user, onScheduleC
           </div>
 
           <div className="field">
-            <label className="label">Modality</label>
+            <label className="label">Modality (Auto-selects all available)</label>
+
             <Select
-              options={addSelectAllOption(filteredModalitiesBySelection.map(m => ({
-                value: m.modality_id,
-                label: `${m.modality_type}${m.section_name ? ` – ${m.section_name}` : ""}`,
-              })))}
               isMulti
+              isDisabled={true}
               closeMenuOnSelect={false}
-              hideSelectedOptions={false}
-              components={{ Option: CheckboxOption }}
-              onChange={(selected) => {
-                let selectedValues = (selected as any[]).map(s => s.value);
-                if (selectedValues.includes("__all__")) {
-                  selectedValues = [...filteredModalitiesBySelection.map(m => m.modality_id)];
-                } else {
-                  // Auto-select all modalities once any are clicked
-                  selectedValues = [...filteredModalitiesBySelection.map(m => m.modality_id)];
-                }
-                setFormData(prev => ({
-                  ...prev,
-                  selectedModalities: selectedValues.filter(v => v !== "__all__"),
+              hideSelectedOptions={true}
+
+              options={(() => {
+                const labelMap = new Map<string, number[]>();
+
+                filteredModalitiesBySelection.forEach((m) => {
+                  const baseLabel = `${m.modality_type}${m.section_name ? ` – ${m.section_name}` : ""}`;
+                  if (!labelMap.has(baseLabel)) labelMap.set(baseLabel, []);
+                  labelMap.get(baseLabel)!.push(m.modality_id);
+                });
+
+                return Array.from(labelMap.entries()).map(([baseLabel, ids]) => ({
+                  value: ids,
+                  label: `${baseLabel} (${ids.length})`, 
                 }));
+              })()}
+
+              value={(() => {
+                const labelMap = new Map<string, number[]>();
+
+                formData.selectedModalities.forEach((id) => {
+                  const m = filteredModalitiesBySelection.find(f => f.modality_id === id);
+                  if (!m) return;
+
+                  const baseLabel = `${m.modality_type}${m.section_name ? ` – ${m.section_name}` : ""}`;
+                  if (!labelMap.has(baseLabel)) labelMap.set(baseLabel, []);
+                  labelMap.get(baseLabel)!.push(id);
+                });
+
+                return Array.from(labelMap.entries()).map(([baseLabel, ids]) => ({
+                  value: ids,
+                  label: `${baseLabel} (${ids.length})`,   
+                }));
+              })()}
+
+              styles={{
+                multiValue: (base) => ({
+                  ...base,
+                  backgroundColor: "#e0f2fe",
+                  borderRadius: "6px",
+                  padding: "2px 4px"
+                }),
+                multiValueRemove: () => ({
+                  display: "none"
+                }),
+                control: (base) => ({
+                  ...base,
+                  cursor: "not-allowed",
+                  backgroundColor: "#f8fafc"
+                }),
+                valueContainer: (base) => ({
+                  ...base,
+                  maxHeight: "120px",
+                  overflowY: "auto"
+                })
               }}
-              value={formData.selectedModalities.map(m => {
-                const mod = filteredModalitiesBySelection.find(f => f.modality_id === m);
-                return {
-                  value: m,
-                  label: mod ? `${mod.modality_type}${mod.section_name ? ` – ${mod.section_name}` : ""}` : String(m),
-                };
-              })}
-              styles={{ valueContainer: (provided) => ({ ...provided, maxHeight: "120px", overflowY: "auto" }) }}
             />
           </div>
 

@@ -403,16 +403,24 @@ const SchedulerView: React.FC<SchedulerViewProps> = ({ user }) => {
 
   // ✅ UPDATED: Helper function to get proctor display with full list
   const getProctorDisplay = (exam: ExamDetail): string => {
-    if (exam.proctors && exam.proctors.length > 0) {
-      // Multiple proctors
+    // ✅ Check if there are multiple proctors (length > 1)
+    if (exam.proctors && exam.proctors.length > 1) {
       const names = exam.proctors.map(id => getUserName(id)).filter(n => n !== '-');
       if (names.length === 0) return 'Not Assigned';
-      if (names.length === 1) return names[0];
-      // ✅ Show all proctors, not just first + count
       return names.join(', ');
     }
-    // Fallback to legacy single proctor
-    return exam.proctor_id ? getUserName(exam.proctor_id) : 'Not Assigned';
+    
+    // ✅ For single proctor, prioritize proctor_id over proctors[0]
+    if (exam.proctor_id) {
+      return getUserName(exam.proctor_id);
+    }
+    
+    // ✅ Fallback to proctors array if proctor_id is missing
+    if (exam.proctors && exam.proctors.length === 1) {
+      return getUserName(exam.proctors[0]);
+    }
+    
+    return 'Not Assigned';
   };
 
   const handleProctorChange = async (examId: number, proctorId: number) => {
@@ -422,13 +430,13 @@ const SchedulerView: React.FC<SchedulerViewProps> = ({ user }) => {
         proctors: [proctorId]
       });
 
-      // ✅ FIX: Update both proctor_id AND proctors array in local state
+      // ✅ FIX: Update BOTH proctor_id AND proctors array in local state
       setExamData(prev =>
         prev.map(e => e.examdetails_id === examId 
           ? { 
               ...e, 
               proctor_id: proctorId,
-              proctors: [proctorId]  // ✅ Update proctors array to match
+              proctors: [proctorId]  // ✅ Ensure proctors array matches proctor_id
             } 
           : e
         )
@@ -691,20 +699,23 @@ const SchedulerView: React.FC<SchedulerViewProps> = ({ user }) => {
     allCollegeUsers: { user_id: number; first_name: string; last_name: string }[],
     users: { user_id: number; first_name: string; last_name: string }[]
   ) => {
-
-    // Rule: Show proctors only from scheduler’s college if available
+    // Rule: Show proctors only from scheduler's college if available
     const availableUserPool = allCollegeUsers.length > 0 ? allCollegeUsers : users;
 
     // Step 1: Filter users by schedule conflict ONLY
     const availableUsers = availableUserPool.filter((p) => {
+      // ✅ Find all exams assigned to this proctor on the SAME DATE
       const assignedExamsSameDay = examData.filter(
         (ex) =>
-          ex.proctor_id === p.user_id &&
-          ex.examdetails_id !== exam.examdetails_id &&
-          ex.exam_date === exam.exam_date
+          // Check both proctor_id and proctors array
+          (ex.proctor_id === p.user_id || (ex.proctors && ex.proctors.includes(p.user_id))) &&
+          ex.examdetails_id !== exam.examdetails_id && // Exclude current exam
+          ex.exam_date === exam.exam_date // Same date only
       );
 
+      // ✅ Check if ANY of the proctor's assignments conflict with this exam's time
       return !assignedExamsSameDay.some((ex) => {
+        // Skip if time data is missing
         if (
           !exam.exam_start_time ||
           !exam.exam_end_time ||
@@ -714,17 +725,32 @@ const SchedulerView: React.FC<SchedulerViewProps> = ({ user }) => {
           return false;
         }
 
-        const startA = new Date(exam.exam_start_time).getTime();
-        const endA = new Date(exam.exam_end_time).getTime();
-        const startB = new Date(ex.exam_start_time).getTime();
-        const endB = new Date(ex.exam_end_time).getTime();
+        // ✅ Extract time from ISO string (HH:MM format)
+        const examStartStr = exam.exam_start_time.slice(11, 16); // "13:30"
+        const examEndStr = exam.exam_end_time.slice(11, 16);     // "14:30"
+        const exStartStr = ex.exam_start_time.slice(11, 16);
+        const exEndStr = ex.exam_end_time.slice(11, 16);
 
-        // Prevent time overlap (1–2pm can't also do 1:30–2:30pm)
-        return startA < endB && endA > startB;
+        // Convert to minutes for easier comparison
+        const [examStartHour, examStartMin] = examStartStr.split(':').map(Number);
+        const [examEndHour, examEndMin] = examEndStr.split(':').map(Number);
+        const [exStartHour, exStartMin] = exStartStr.split(':').map(Number);
+        const [exEndHour, exEndMin] = exEndStr.split(':').map(Number);
+
+        const startA = examStartHour * 60 + examStartMin; // Current exam start in minutes
+        const endA = examEndHour * 60 + examEndMin;       // Current exam end in minutes
+        const startB = exStartHour * 60 + exStartMin;     // Proctor's assigned exam start
+        const endB = exEndHour * 60 + exEndMin;           // Proctor's assigned exam end
+
+        // ✅ Check for time overlap
+        // Two time ranges overlap if: startA < endB AND endA > startB
+        const hasOverlap = startA < endB && endA > startB;
+
+        return hasOverlap; // If true, this proctor is NOT available
       });
     });
 
-    // Step 2: Format output
+    // Step 2: Format output for react-select
     return availableUsers.map((p) => ({
       value: p.user_id,
       label: `${p.first_name} ${p.last_name}`,

@@ -389,13 +389,24 @@ def submit_proctor_attendance(request):
         remarks = request.data.get('remarks', '').strip()
         role = request.data.get('role', 'assigned')
         
+        print(f"\n{'='*60}")
+        print(f"📥 SUBMITTING ATTENDANCE")
+        print(f"{'='*60}")
+        print(f"OTP Code: {otp_code}")
+        print(f"User ID: {user_id}")
+        print(f"Role: {role}")
+        print(f"Remarks: {remarks}")
+        print(f"{'='*60}\n")
+        
         if not otp_code or not user_id:
+            print("❌ Missing OTP code or user_id")
             return Response({
                 'error': 'OTP code and user_id are required'
             }, status=status.HTTP_400_BAD_REQUEST)
         
         # Validate remarks for substitute
         if role == 'sub' and not remarks:
+            print("❌ Remarks required for substitute")
             return Response({
                 'error': 'Remarks are required for substitute proctors'
             }, status=status.HTTP_400_BAD_REQUEST)
@@ -406,12 +417,27 @@ def submit_proctor_attendance(request):
                 'examdetails',
                 'examdetails__proctor'
             ).get(otp_code=otp_code)
+            print(f"✅ Found OTP record:")
+            print(f"   - OTP ID: {otp_record.otp_id}")
+            print(f"   - Exam ID: {otp_record.examdetails.examdetails_id}")
+            print(f"   - Course: {otp_record.examdetails.course_id}")
         except TblExamOtp.DoesNotExist:
+            print(f"❌ OTP not found in database: '{otp_code}'")
+            # Show what OTPs exist
+            all_otps = TblExamOtp.objects.all()[:5]
+            print(f"📊 Database has {TblExamOtp.objects.count()} OTPs total")
+            print(f"📊 Sample OTPs:")
+            for otp in all_otps:
+                print(f"   - {otp.otp_code}")
             return Response({
                 'error': 'Invalid OTP code'
             }, status=status.HTTP_400_BAD_REQUEST)
         
         exam_schedule = otp_record.examdetails
+        print(f"\n📅 Exam Schedule Details:")
+        print(f"   - Exam ID: {exam_schedule.examdetails_id}")
+        print(f"   - Course: {exam_schedule.course_id}")
+        print(f"   - Room: {exam_schedule.room.room_id if exam_schedule.room else 'N/A'}")
         
         # Check if attendance already exists
         existing_attendance = TblProctorAttendance.objects.filter(
@@ -420,53 +446,90 @@ def submit_proctor_attendance(request):
         ).first()
         
         if existing_attendance:
+            print(f"⚠️ Attendance already exists:")
+            print(f"   - Attendance ID: {existing_attendance.attendance_id}")
+            print(f"   - Proctor ID: {existing_attendance.proctor_id}")
+            print(f"   - Time in: {existing_attendance.time_in}")
             return Response({
                 'error': 'Attendance already recorded for this exam'
             }, status=status.HTTP_400_BAD_REQUEST)
         
+        print(f"\n💾 Creating attendance record...")
+        
         with transaction.atomic():
+            # Get the user object
+            try:
+                proctor_user = TblUsers.objects.get(user_id=user_id)
+                print(f"   - Found user: {proctor_user.first_name} {proctor_user.last_name}")
+            except TblUsers.DoesNotExist:
+                print(f"❌ User {user_id} not found")
+                return Response({
+                    'error': f'User {user_id} not found'
+                }, status=status.HTTP_400_BAD_REQUEST)
+            
             # Create attendance record
             attendance = TblProctorAttendance.objects.create(
                 examdetails=exam_schedule,
-                proctor_id=user_id,
+                proctor=proctor_user,  # Use the user object, not ID
                 is_substitute=(role == 'sub'),
                 remarks=remarks if remarks else None,
                 otp_used=otp_code,
                 time_in=timezone.now()
             )
             
+            print(f"✅ Created attendance record:")
+            print(f"   - Attendance ID: {attendance.attendance_id}")
+            print(f"   - Proctor ID: {attendance.proctor_id}")
+            print(f"   - Is substitute: {attendance.is_substitute}")
+            print(f"   - Time in: {attendance.time_in}")
+            print(f"   - OTP used: {attendance.otp_used}")
+            
+            # Verify it was saved
+            verify = TblProctorAttendance.objects.filter(
+                attendance_id=attendance.attendance_id
+            ).exists()
+            print(f"   - Verified in DB: {verify}")
+            
             # If substitute, create substitution record
             if role == 'sub':
-                TblProctorSubstitution.objects.create(
+                substitution = TblProctorSubstitution.objects.create(
                     examdetails=exam_schedule,
                     original_proctor_id=exam_schedule.proctor_id,
-                    substitute_proctor_id=user_id,
+                    substitute_proctor=proctor_user,
                     justification=remarks
                 )
+                print(f"✅ Created substitution record: {substitution.substitution_id}")
             
-            # Update exam schedule with time-in
+            # Update exam schedule status
             if not exam_schedule.proctor_timein:
                 exam_schedule.proctor_timein = timezone.now()
                 exam_schedule.save(update_fields=['proctor_timein'])
-            
-            print(f"✅ Attendance recorded: User {user_id} for exam {exam_schedule.examdetails_id}")
+                print(f"✅ Updated exam schedule proctor_timein")
+        
+        print(f"\n{'='*60}")
+        print(f"✅ ATTENDANCE SUBMISSION COMPLETE")
+        print(f"{'='*60}\n")
         
         return Response({
             'message': 'Attendance recorded successfully',
             'attendance_id': attendance.attendance_id,
             'time_in': attendance.time_in.isoformat(),
-            'role': 'substitute' if attendance.is_substitute else 'assigned'
+            'role': 'substitute' if attendance.is_substitute else 'assigned',
+            'proctor_name': f"{proctor_user.first_name} {proctor_user.last_name}"
         }, status=status.HTTP_201_CREATED)
         
     except Exception as e:
-        print(f"❌ Error submitting attendance: {str(e)}")
+        print(f"\n{'='*60}")
+        print(f"❌ ERROR SUBMITTING ATTENDANCE")
+        print(f"{'='*60}")
+        print(f"Error: {str(e)}")
         import traceback
         traceback.print_exc()
+        print(f"{'='*60}\n")
         return Response({
             'error': str(e),
             'detail': 'Failed to submit attendance'
         }, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
-
 
 # ============================================================
 # PROCTOR'S ASSIGNED EXAMS
@@ -635,6 +698,8 @@ def proctor_monitoring_dashboard(request):
         college_name = request.GET.get('college_name')
         exam_date = request.GET.get('exam_date')
         
+        print(f"📊 Monitoring dashboard request - college: {college_name}, date: {exam_date}")
+        
         # Base query with proper prefetch
         queryset = TblExamdetails.objects.select_related(
             'room',
@@ -642,7 +707,8 @@ def proctor_monitoring_dashboard(request):
             'proctor',
             'modality'
         ).prefetch_related(
-            'attendance_records'  # ✅ FIXED: Use correct related_name
+            'attendance_records',  # ✅ Use correct related_name
+            'attendance_records__proctor'  # ✅ Also prefetch proctor info
         )
         
         # Apply filters
@@ -654,6 +720,8 @@ def proctor_monitoring_dashboard(request):
         # Order by date and time
         queryset = queryset.order_by('exam_date', 'exam_start_time')
         
+        print(f"📊 Found {queryset.count()} exam schedules")
+        
         result = []
         for exam in queryset:
             # Get OTP code
@@ -664,30 +732,37 @@ def proctor_monitoring_dashboard(request):
                 print(f"⚠️ Error fetching OTP for exam {exam.examdetails_id}: {str(e)}")
                 otp_code = None
             
-            # ✅ FIXED: Use correct related_name 'attendance_records'
+            # ✅ Get attendance record (use first() to get the actual attendance)
             attendance = exam.attendance_records.first()
             
-            # Determine status
+            print(f"🔍 Exam {exam.examdetails_id} - Attendance: {attendance}")
+            
+            # Determine status based on attendance
             if attendance:
                 if attendance.is_substitute:
                     exam_status = 'substitute'
                 else:
                     exam_status = 'confirmed'
                 code_entry_time = attendance.time_in
+                
+                # Get actual proctor who checked in
+                proctor_user = attendance.proctor
+                proctor_name = f"{proctor_user.first_name} {proctor_user.last_name}"
+                
+                print(f"✅ Exam {exam.examdetails_id} has attendance - Status: {exam_status}")
+                print(f"   - Proctor: {proctor_name}")
+                print(f"   - Time in: {code_entry_time}")
             else:
                 exam_status = 'pending'
                 code_entry_time = None
-            
-            # Get proctor name
-            proctor_name = None
-            if attendance:
-                try:
-                    proctor_user = TblUsers.objects.get(user_id=attendance.proctor_id)
-                    proctor_name = f"{proctor_user.first_name} {proctor_user.last_name}"
-                except TblUsers.DoesNotExist:
-                    pass
-            elif exam.proctor:
-                proctor_name = f"{exam.proctor.first_name} {exam.proctor.last_name}"
+                
+                # Show assigned proctor
+                if exam.proctor:
+                    proctor_name = f"{exam.proctor.first_name} {exam.proctor.last_name}"
+                else:
+                    proctor_name = None
+                
+                print(f"⏳ Exam {exam.examdetails_id} has no attendance - Status: pending")
             
             # Get instructor name
             instructor_name = None
@@ -713,7 +788,7 @@ def proctor_monitoring_dashboard(request):
                 'room_id': exam.room.room_id if exam.room else None,
                 'proctor_name': proctor_name,
                 'instructor_name': instructor_name,
-                'department': exam.college_name,  # Using college as department proxy
+                'department': exam.college_name,
                 'college': exam.college_name,
                 'status': exam_status,
                 'code_entry_time': code_entry_time.isoformat() if code_entry_time else None,

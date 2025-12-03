@@ -31,6 +31,7 @@ interface MonitoringSchedule {
   status: string;
   code_entry_time: string | null;
   otp_code: string | null;
+  approval_status?: string; // NEW: Track approval status
 }
 
 const ProctorMonitoring: React.FC<UserProps> = ({ }) => {
@@ -44,7 +45,7 @@ const ProctorMonitoring: React.FC<UserProps> = ({ }) => {
   const [sortBy, setSortBy] = useState<string>('none');
   const [showSortDropdown, setShowSortDropdown] = useState(false);
 
-  // Fetch monitoring data
+  // Fetch monitoring data - ONLY APPROVED SCHEDULES
   const fetchMonitoringData = useCallback(async () => {
     setLoading(true);
     try {
@@ -53,29 +54,64 @@ const ProctorMonitoring: React.FC<UserProps> = ({ }) => {
         params.college_name = collegeFilter;
       }
 
-      const { data } = await api.get('/proctor-monitoring/', { params });
+      // Fetch exam details (plotted schedules)
+      const { data: examData } = await api.get('/proctor-monitoring/', { params });
 
-      const formattedSchedules: MonitoringSchedule[] = data.map((schedule: any) => ({
-        id: schedule.id,
-        course_id: schedule.course_id,
-        subject: schedule.subject || schedule.course_id,
-        section_name: schedule.section_name || '',
-        exam_date: schedule.exam_date || '',
-        exam_start_time: schedule.exam_start_time || '',
-        exam_end_time: schedule.exam_end_time || '',
-        building_name: schedule.building_name || '',
-        room_id: schedule.room_id || '',
-        proctor_name: schedule.proctor_name || '',
-        instructor_name: schedule.instructor_name || '',
-        department: schedule.department || '',
-        college: schedule.college || '',
-        status: schedule.status || 'pending',
-        code_entry_time: schedule.code_entry_time || null,
-        otp_code: schedule.otp_code || null
-      }));
+      // Fetch approval status for each schedule
+      const schedulesWithApproval = await Promise.all(
+        examData.map(async (schedule: any) => {
+          try {
+            // Get approval status from tbl_scheduleapproval
+            const approvalResponse = await api.get('/tbl_scheduleapproval/', {
+              params: {
+                college_name: schedule.college,
+                status: 'approved' // Only get approved schedules
+              }
+            });
 
-      setApprovedSchedules(formattedSchedules);
-      setHasApprovedSchedules(formattedSchedules.length > 0);
+            // Check if this schedule's college has been approved
+            const isApproved = approvalResponse.data && approvalResponse.data.length > 0;
+
+            return {
+              id: schedule.id,
+              course_id: schedule.course_id,
+              subject: schedule.subject || schedule.course_id,
+              section_name: schedule.section_name || '',
+              exam_date: schedule.exam_date || '',
+              exam_start_time: schedule.exam_start_time || '',
+              exam_end_time: schedule.exam_end_time || '',
+              building_name: schedule.building_name || '',
+              room_id: schedule.room_id || '',
+              proctor_name: schedule.proctor_name || '',
+              instructor_name: schedule.instructor_name || '',
+              department: schedule.department || '',
+              college: schedule.college || '',
+              status: schedule.status || 'pending',
+              code_entry_time: schedule.code_entry_time || null,
+              otp_code: schedule.otp_code || null,
+              approval_status: isApproved ? 'approved' : 'pending'
+            };
+          } catch (error) {
+            console.error(`Error checking approval for schedule ${schedule.id}:`, error);
+            return {
+              ...schedule,
+              approval_status: 'pending'
+            };
+          }
+        })
+      );
+
+      // Filter to show ONLY approved schedules
+      const approvedOnly = schedulesWithApproval.filter(
+        (schedule: MonitoringSchedule) => schedule.approval_status === 'approved'
+      );
+
+      setApprovedSchedules(approvedOnly);
+      setHasApprovedSchedules(approvedOnly.length > 0);
+
+      if (approvedOnly.length === 0) {
+        toast.info('No approved schedules yet. Waiting for dean approval.');
+      }
     } catch (error: any) {
       console.error('Error fetching monitoring data:', error);
       toast.error('Failed to load monitoring data');
@@ -187,16 +223,12 @@ const ProctorMonitoring: React.FC<UserProps> = ({ }) => {
     const bIsNumeric = isNumeric(b);
 
     if (aIsNumeric && bIsNumeric) {
-      // Both are numbers - sort numerically
       return parseFloat(a) - parseFloat(b);
     } else if (aIsNumeric && !bIsNumeric) {
-      // a is number, b is text - numbers come first
       return -1;
     } else if (!aIsNumeric && bIsNumeric) {
-      // a is text, b is number - numbers come first
       return 1;
     } else {
-      // Both are text - sort alphabetically
       return a.localeCompare(b);
     }
   };
@@ -216,10 +248,8 @@ const ProctorMonitoring: React.FC<UserProps> = ({ }) => {
         case 'section_name':
           return smartSort(a.section_name.toLowerCase(), b.section_name.toLowerCase());
         case 'exam_date':
-          // Sort dates as strings (YYYY-MM-DD format)
           return a.exam_date.localeCompare(b.exam_date);
         case 'exam_start_time':
-          // Sort by start time
           return (a.exam_start_time || '').localeCompare(b.exam_start_time || '');
         case 'building_name':
           return smartSort(a.building_name.toLowerCase(), b.building_name.toLowerCase());
@@ -273,8 +303,8 @@ const ProctorMonitoring: React.FC<UserProps> = ({ }) => {
             className={`proctor-monitoring-label ${hasApprovedSchedules ? 'proctor-monitoring-label-approved' : 'proctor-monitoring-label-waiting'}`}
           >
             {hasApprovedSchedules
-              ? '✔ EXAM SCHEDULE HAS BEEN APPROVED. CLICK TO GENERATE EXAM CODES'
-              : '✗ EXAM SCHEDULER WAITING FOR APPROVAL'}
+              ? 'EXAM SCHEDULE HAS BEEN APPROVED. CLICK TO GENERATE EXAM CODES'
+              : 'WAITING FOR DEAN APPROVAL'}
           </p>
           <div style={{ marginTop: '10px', position: 'relative' }} data-sort-dropdown>
             <button
@@ -322,291 +352,45 @@ const ProctorMonitoring: React.FC<UserProps> = ({ }) => {
                   minWidth: '150px'
                 }}
               >
-                <button
-                  type="button"
-                  onClick={() => {
-                    setSortBy('none');
-                    setShowSortDropdown(false);
-                  }}
-                  style={{
-                    width: '100%',
-                    padding: '8px 12px',
-                    textAlign: 'left',
-                    border: 'none',
-                    backgroundColor: sortBy === 'none' ? '#f0f0f0' : 'white',
-                    color: '#000',
-                    cursor: 'pointer',
-                    fontSize: '14px'
-                  }}
-                  onMouseEnter={(e) => {
-                    if (sortBy !== 'none') e.currentTarget.style.backgroundColor = '#f5f5f5';
-                  }}
-                  onMouseLeave={(e) => {
-                    if (sortBy !== 'none') e.currentTarget.style.backgroundColor = 'white';
-                  }}
-                >
-                  None
-                </button>
-                <button
-                  type="button"
-                  onClick={() => {
-                    setSortBy('course_id');
-                    setShowSortDropdown(false);
-                  }}
-                  style={{
-                    width: '100%',
-                    padding: '8px 12px',
-                    textAlign: 'left',
-                    border: 'none',
-                    backgroundColor: sortBy === 'course_id' ? '#f0f0f0' : 'white',
-                    color: '#000',
-                    cursor: 'pointer',
-                    fontSize: '14px',
-                    borderTop: '1px solid #eee'
-                  }}
-                  onMouseEnter={(e) => {
-                    if (sortBy !== 'course_id') e.currentTarget.style.backgroundColor = '#f5f5f5';
-                  }}
-                  onMouseLeave={(e) => {
-                    if (sortBy !== 'course_id') e.currentTarget.style.backgroundColor = 'white';
-                  }}
-                >
-                  Course Code
-                </button>
-                <button
-                  type="button"
-                  onClick={() => {
-                    setSortBy('subject');
-                    setShowSortDropdown(false);
-                  }}
-                  style={{
-                    width: '100%',
-                    padding: '8px 12px',
-                    textAlign: 'left',
-                    border: 'none',
-                    backgroundColor: sortBy === 'subject' ? '#f0f0f0' : 'white',
-                    color: '#000',
-                    cursor: 'pointer',
-                    fontSize: '14px',
-                    borderTop: '1px solid #eee'
-                  }}
-                  onMouseEnter={(e) => {
-                    if (sortBy !== 'subject') e.currentTarget.style.backgroundColor = '#f5f5f5';
-                  }}
-                  onMouseLeave={(e) => {
-                    if (sortBy !== 'subject') e.currentTarget.style.backgroundColor = 'white';
-                  }}
-                >
-                  Subject
-                </button>
-                <button
-                  type="button"
-                  onClick={() => {
-                    setSortBy('section_name');
-                    setShowSortDropdown(false);
-                  }}
-                  style={{
-                    width: '100%',
-                    padding: '8px 12px',
-                    textAlign: 'left',
-                    border: 'none',
-                    backgroundColor: sortBy === 'section_name' ? '#f0f0f0' : 'white',
-                    color: '#000',
-                    cursor: 'pointer',
-                    fontSize: '14px',
-                    borderTop: '1px solid #eee'
-                  }}
-                  onMouseEnter={(e) => {
-                    if (sortBy !== 'section_name') e.currentTarget.style.backgroundColor = '#f5f5f5';
-                  }}
-                  onMouseLeave={(e) => {
-                    if (sortBy !== 'section_name') e.currentTarget.style.backgroundColor = 'white';
-                  }}
-                >
-                  Section
-                </button>
-                <button
-                  type="button"
-                  onClick={() => {
-                    setSortBy('exam_date');
-                    setShowSortDropdown(false);
-                  }}
-                  style={{
-                    width: '100%',
-                    padding: '8px 12px',
-                    textAlign: 'left',
-                    border: 'none',
-                    backgroundColor: sortBy === 'exam_date' ? '#f0f0f0' : 'white',
-                    color: '#000',
-                    cursor: 'pointer',
-                    fontSize: '14px',
-                    borderTop: '1px solid #eee'
-                  }}
-                  onMouseEnter={(e) => {
-                    if (sortBy !== 'exam_date') e.currentTarget.style.backgroundColor = '#f5f5f5';
-                  }}
-                  onMouseLeave={(e) => {
-                    if (sortBy !== 'exam_date') e.currentTarget.style.backgroundColor = 'white';
-                  }}
-                >
-                  Date
-                </button>
-                <button
-                  type="button"
-                  onClick={() => {
-                    setSortBy('exam_start_time');
-                    setShowSortDropdown(false);
-                  }}
-                  style={{
-                    width: '100%',
-                    padding: '8px 12px',
-                    textAlign: 'left',
-                    border: 'none',
-                    backgroundColor: sortBy === 'exam_start_time' ? '#f0f0f0' : 'white',
-                    color: '#000',
-                    cursor: 'pointer',
-                    fontSize: '14px',
-                    borderTop: '1px solid #eee'
-                  }}
-                  onMouseEnter={(e) => {
-                    if (sortBy !== 'exam_start_time') e.currentTarget.style.backgroundColor = '#f5f5f5';
-                  }}
-                  onMouseLeave={(e) => {
-                    if (sortBy !== 'exam_start_time') e.currentTarget.style.backgroundColor = 'white';
-                  }}
-                >
-                  Time
-                </button>
-                <button
-                  type="button"
-                  onClick={() => {
-                    setSortBy('building_name');
-                    setShowSortDropdown(false);
-                  }}
-                  style={{
-                    width: '100%',
-                    padding: '8px 12px',
-                    textAlign: 'left',
-                    border: 'none',
-                    backgroundColor: sortBy === 'building_name' ? '#f0f0f0' : 'white',
-                    color: '#000',
-                    cursor: 'pointer',
-                    fontSize: '14px',
-                    borderTop: '1px solid #eee'
-                  }}
-                  onMouseEnter={(e) => {
-                    if (sortBy !== 'building_name') e.currentTarget.style.backgroundColor = '#f5f5f5';
-                  }}
-                  onMouseLeave={(e) => {
-                    if (sortBy !== 'building_name') e.currentTarget.style.backgroundColor = 'white';
-                  }}
-                >
-                  Building
-                </button>
-                <button
-                  type="button"
-                  onClick={() => {
-                    setSortBy('room_id');
-                    setShowSortDropdown(false);
-                  }}
-                  style={{
-                    width: '100%',
-                    padding: '8px 12px',
-                    textAlign: 'left',
-                    border: 'none',
-                    backgroundColor: sortBy === 'room_id' ? '#f0f0f0' : 'white',
-                    color: '#000',
-                    cursor: 'pointer',
-                    fontSize: '14px',
-                    borderTop: '1px solid #eee'
-                  }}
-                  onMouseEnter={(e) => {
-                    if (sortBy !== 'room_id') e.currentTarget.style.backgroundColor = '#f5f5f5';
-                  }}
-                  onMouseLeave={(e) => {
-                    if (sortBy !== 'room_id') e.currentTarget.style.backgroundColor = 'white';
-                  }}
-                >
-                  Room
-                </button>
-                <button
-                  type="button"
-                  onClick={() => {
-                    setSortBy('proctor_name');
-                    setShowSortDropdown(false);
-                  }}
-                  style={{
-                    width: '100%',
-                    padding: '8px 12px',
-                    textAlign: 'left',
-                    border: 'none',
-                    backgroundColor: sortBy === 'proctor_name' ? '#f0f0f0' : 'white',
-                    color: '#000',
-                    cursor: 'pointer',
-                    fontSize: '14px',
-                    borderTop: '1px solid #eee'
-                  }}
-                  onMouseEnter={(e) => {
-                    if (sortBy !== 'proctor_name') e.currentTarget.style.backgroundColor = '#f5f5f5';
-                  }}
-                  onMouseLeave={(e) => {
-                    if (sortBy !== 'proctor_name') e.currentTarget.style.backgroundColor = 'white';
-                  }}
-                >
-                  Proctor
-                </button>
-                <button
-                  type="button"
-                  onClick={() => {
-                    setSortBy('instructor_name');
-                    setShowSortDropdown(false);
-                  }}
-                  style={{
-                    width: '100%',
-                    padding: '8px 12px',
-                    textAlign: 'left',
-                    border: 'none',
-                    backgroundColor: sortBy === 'instructor_name' ? '#f0f0f0' : 'white',
-                    color: '#000',
-                    cursor: 'pointer',
-                    fontSize: '14px',
-                    borderTop: '1px solid #eee'
-                  }}
-                  onMouseEnter={(e) => {
-                    if (sortBy !== 'instructor_name') e.currentTarget.style.backgroundColor = '#f5f5f5';
-                  }}
-                  onMouseLeave={(e) => {
-                    if (sortBy !== 'instructor_name') e.currentTarget.style.backgroundColor = 'white';
-                  }}
-                >
-                  Instructor
-                </button>
-                <button
-                  type="button"
-                  onClick={() => {
-                    setSortBy('status');
-                    setShowSortDropdown(false);
-                  }}
-                  style={{
-                    width: '100%',
-                    padding: '8px 12px',
-                    textAlign: 'left',
-                    border: 'none',
-                    backgroundColor: sortBy === 'status' ? '#f0f0f0' : 'white',
-                    color: '#000',
-                    cursor: 'pointer',
-                    fontSize: '14px',
-                    borderTop: '1px solid #eee'
-                  }}
-                  onMouseEnter={(e) => {
-                    if (sortBy !== 'status') e.currentTarget.style.backgroundColor = '#f5f5f5';
-                  }}
-                  onMouseLeave={(e) => {
-                    if (sortBy !== 'status') e.currentTarget.style.backgroundColor = 'white';
-                  }}
-                >
-                  Status
-                </button>
+                {['none', 'course_id', 'subject', 'section_name', 'exam_date', 'exam_start_time', 'building_name', 'room_id', 'proctor_name', 'instructor_name', 'status'].map((sortOption) => (
+                  <button
+                    key={sortOption}
+                    type="button"
+                    onClick={() => {
+                      setSortBy(sortOption);
+                      setShowSortDropdown(false);
+                    }}
+                    style={{
+                      width: '100%',
+                      padding: '8px 12px',
+                      textAlign: 'left',
+                      border: 'none',
+                      backgroundColor: sortBy === sortOption ? '#f0f0f0' : 'white',
+                      color: '#000',
+                      cursor: 'pointer',
+                      fontSize: '14px',
+                      borderTop: sortOption !== 'none' ? '1px solid #eee' : 'none'
+                    }}
+                    onMouseEnter={(e) => {
+                      if (sortBy !== sortOption) e.currentTarget.style.backgroundColor = '#f5f5f5';
+                    }}
+                    onMouseLeave={(e) => {
+                      if (sortBy !== sortOption) e.currentTarget.style.backgroundColor = 'white';
+                    }}
+                  >
+                    {sortOption === 'none' ? 'None' :
+                     sortOption === 'course_id' ? 'Course Code' :
+                     sortOption === 'section_name' ? 'Section' :
+                     sortOption === 'exam_date' ? 'Date' :
+                     sortOption === 'exam_start_time' ? 'Time' :
+                     sortOption === 'building_name' ? 'Building' :
+                     sortOption === 'room_id' ? 'Room' :
+                     sortOption === 'proctor_name' ? 'Proctor' :
+                     sortOption === 'instructor_name' ? 'Instructor' :
+                     sortOption === 'status' ? 'Status' : 
+                     sortOption.charAt(0).toUpperCase() + sortOption.slice(1)}
+                  </button>
+                ))}
               </div>
             )}
           </div>
@@ -649,7 +433,6 @@ const ProctorMonitoring: React.FC<UserProps> = ({ }) => {
         <div className="no-data-message">Loading monitoring data...</div>
       ) : (
         <>
-          {/* Table Area */}
           <div className="proctor-monitoring-table-container">
             <table className="proctor-monitoring-table">
               <thead>
@@ -664,7 +447,7 @@ const ProctorMonitoring: React.FC<UserProps> = ({ }) => {
                   <th>Room</th>
                   <th>Proctor</th>
                   <th>Instructor</th>
-                  <th>Exam Code (OTP)</th>
+                  <th>Exam Code</th>
                   <th>Time In</th>
                   <th>Status</th>
                 </tr>
@@ -672,8 +455,7 @@ const ProctorMonitoring: React.FC<UserProps> = ({ }) => {
               <tbody>
                 {sortedSchedules.length > 0 ? (
                   sortedSchedules.map((schedule, index) => {
-                    // Determine status based on schedule data (can be updated to use actual status from backend)
-                    const status = schedule.status || 'pending'; // 'confirmed', 'late', 'absent', 'substitute'
+                    const status = schedule.status || 'pending';
 
                     const getStatusDisplay = (status: string) => {
                       switch (status.toLowerCase()) {
@@ -693,12 +475,10 @@ const ProctorMonitoring: React.FC<UserProps> = ({ }) => {
 
                     const statusDisplay = getStatusDisplay(status);
 
-                    // Format time entry
                     const formatTimeIn = (timeString: string | null | undefined) => {
                       if (!timeString) return '-';
                       try {
                         const date = new Date(timeString);
-                        // Format as HH:MM (hours and minutes only)
                         const hours = date.getHours().toString().padStart(2, '0');
                         const minutes = date.getMinutes().toString().padStart(2, '0');
                         return `${hours}:${minutes}`;
@@ -753,7 +533,9 @@ const ProctorMonitoring: React.FC<UserProps> = ({ }) => {
                 ) : (
                   <tr>
                     <td colSpan={13} className="no-data-message">
-                      No approved schedules found
+                      {hasApprovedSchedules 
+                        ? 'No approved schedules found'
+                        : 'No approved schedules yet. Schedules must be approved by the dean before codes can be generated.'}
                     </td>
                   </tr>
                 )}

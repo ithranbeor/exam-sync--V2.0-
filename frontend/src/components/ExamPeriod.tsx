@@ -327,13 +327,6 @@ const ExamPeriodComponent: React.FC = () => {
     return filtered.slice((currentPage - 1) * itemsPerPage, currentPage * itemsPerPage);
   }, [filtered, currentPage, itemsPerPage]);
 
-  const totalPages = useMemo(() => {
-    if (itemsPerPage === 'all') {
-      return 1;
-    }
-    return Math.ceil(filtered.length / itemsPerPage);
-  }, [filtered.length, itemsPerPage]);
-
   useEffect(() => {
     setSelectedExamIds(prev => {
       const validIds = new Set<number>();
