@@ -4,6 +4,15 @@ import { toast, ToastContainer } from 'react-toastify';
 import 'react-toastify/dist/ReactToastify.css';
 import api from '../lib/apiClient';
 import '../styles/ProctorMonitoring.css';
+import jsPDF from 'jspdf';
+import autoTable from 'jspdf-autotable';
+
+// Extend jsPDF type to include autoTable
+declare module 'jspdf' {
+  interface jsPDF {
+    autoTable: (options: any) => jsPDF;
+  }
+}
 
 interface UserProps {
   user: {
@@ -29,7 +38,7 @@ interface MonitoringSchedule {
   department: string;
   college: string;
   status: string;
-  examdetails_status?: string; // ✅ ADD: Backend's actual status from exam details
+  examdetails_status?: string;
   code_entry_time: string | null;
   otp_code: string | null;
   approval_status?: string;
@@ -55,7 +64,6 @@ const ProctorMonitoring: React.FC<UserProps> = ({ }) => {
       const examEnd = new Date(`${s.exam_date}T${s.exam_end_time}`);
       const hasTimeIn = Boolean(s.code_entry_time);
 
-      // ✅ Use examdetails_status or status for checking
       const currentStatus = (s.examdetails_status || s.status || '').toLowerCase();
 
       if (now > examEnd && !hasTimeIn && currentStatus === "pending") {
@@ -73,7 +81,7 @@ const ProctorMonitoring: React.FC<UserProps> = ({ }) => {
     });
   }, [approvedSchedules]);
 
-  // Fetch monitoring data - ONLY APPROVED SCHEDULES
+  // ✅ FIXED: Optimized fetch - Single approval request instead of N requests
   const fetchMonitoringData = useCallback(async () => {
     setLoading(true);
     try {
@@ -82,68 +90,50 @@ const ProctorMonitoring: React.FC<UserProps> = ({ }) => {
         params.college_name = collegeFilter;
       }
 
-      console.log('📊 Fetching monitoring data...');
       const { data: examData } = await api.get('/proctor-monitoring/', { params });
 
-      console.log('📋 Raw data from backend:', examData);
-
-      // Fetch approval status for each schedule
-      const schedulesWithApproval = await Promise.all(
-        examData.map(async (schedule: any) => {
-          try {
-            const approvalResponse = await api.get('/tbl_scheduleapproval/', {
-              params: {
-                college_name: schedule.college,
-                status: 'approved'
-              }
-            });
-
-            const isApproved = approvalResponse.data && approvalResponse.data.length > 0;
-
-            // ✅ FIXED: Preserve the status from backend (confirmed, late, absent, substitute)
-            const mappedSchedule = {
-              id: schedule.id,
-              course_id: schedule.course_id,
-              subject: schedule.subject || schedule.course_id,
-              section_name: schedule.section_name || '',
-              exam_date: schedule.exam_date || '',
-              exam_start_time: schedule.exam_start_time || '',
-              exam_end_time: schedule.exam_end_time || '',
-              building_name: schedule.building_name || '',
-              room_id: schedule.room_id || '',
-              proctor_name: schedule.proctor_name || '',
-              instructor_name: schedule.instructor_name || '',
-              department: schedule.department || '',
-              college: schedule.college || '',
-              status: schedule.status || 'pending', // Keep original status from backend
-              examdetails_status: schedule.examdetails_status, // ✅ ADD: Preserve backend status
-              code_entry_time: schedule.code_entry_time || null,
-              otp_code: schedule.otp_code || null,
-              approval_status: isApproved ? 'approved' : 'pending'
-            };
-
-            console.log(`✅ Schedule ${schedule.id} mapped with status: ${mappedSchedule.status}`);
-            
-            return mappedSchedule;
-          } catch (error) {
-            console.error(`Error checking approval for schedule ${schedule.id}:`, error);
-            return {
-              ...schedule,
-              approval_status: 'pending'
-            };
-          }
-        })
+      // ✅ PERFORMANCE FIX: Fetch ALL approvals in ONE request
+      const approvalResponse = await api.get('/tbl_scheduleapproval/', {
+        params: { status: 'approved' }
+      });
+      
+      // Create a Set of approved colleges for O(1) lookup
+      const approvedColleges = new Set(
+        approvalResponse.data.map((approval: any) => approval.college_name)
       );
+
+      // Map schedules with instant approval check (no more API calls in loop)
+      const schedulesWithApproval = examData.map((schedule: any) => {
+        const isApproved = approvedColleges.has(schedule.college);
+        
+        const mappedSchedule = {
+          id: schedule.id,
+          course_id: schedule.course_id,
+          subject: schedule.subject || schedule.course_id,
+          section_name: schedule.section_name || '',
+          exam_date: schedule.exam_date || '',
+          exam_start_time: schedule.exam_start_time || '',
+          exam_end_time: schedule.exam_end_time || '',
+          building_name: schedule.building_name || '',
+          room_id: schedule.room_id || '',
+          proctor_name: schedule.proctor_name || '',
+          instructor_name: schedule.instructor_name || '',
+          department: schedule.department || '',
+          college: schedule.college || '',
+          status: schedule.status || 'pending',
+          examdetails_status: schedule.examdetails_status,
+          code_entry_time: schedule.code_entry_time || null,
+          otp_code: schedule.otp_code || null,
+          approval_status: isApproved ? 'approved' : 'pending'
+        };
+        
+        return mappedSchedule;
+      });
 
       // Filter to show ONLY approved schedules
       const approvedOnly = schedulesWithApproval.filter(
         (schedule: MonitoringSchedule) => schedule.approval_status === 'approved'
       );
-
-      console.log(`✅ Found ${approvedOnly.length} approved schedules`);
-      approvedOnly.forEach(s => {
-        console.log(`   - Schedule ${s.id}: status="${s.status}", examdetails_status="${s.examdetails_status}"`);
-      });
 
       setApprovedSchedules(approvedOnly);
       setHasApprovedSchedules(approvedOnly.length > 0);
@@ -160,12 +150,10 @@ const ProctorMonitoring: React.FC<UserProps> = ({ }) => {
     }
   }, [collegeFilter]);
 
-  // Load data on mount and when filter changes
   useEffect(() => {
     fetchMonitoringData();
   }, [fetchMonitoringData]);
 
-  // Close dropdown when clicking outside
   useEffect(() => {
     const handleClickOutside = (event: MouseEvent) => {
       const target = event.target as HTMLElement;
@@ -183,7 +171,6 @@ const ProctorMonitoring: React.FC<UserProps> = ({ }) => {
     };
   }, [showSortDropdown]);
 
-  // Handle generate OTP codes
   const handleGenerateOtpCodes = async () => {
     setGeneratingOtp(true);
     try {
@@ -211,7 +198,6 @@ const ProctorMonitoring: React.FC<UserProps> = ({ }) => {
     }
   };
 
-  // Handle reset OTP codes
   const handleResetOtpCodes = async () => {
     setResettingOtp(true);
     setShowResetConfirm(false);
@@ -240,6 +226,144 @@ const ProctorMonitoring: React.FC<UserProps> = ({ }) => {
     } finally {
       setResettingOtp(false);
     }
+  };
+
+  const handleExportPDF = () => {
+    if (sortedSchedules.length === 0) {
+      toast.info('No data to export');
+      return;
+    }
+
+    // Check if all schedules have OTP codes
+    const hasAllCodes = sortedSchedules.every(s => s.otp_code);
+    if (!hasAllCodes) {
+      toast.error('Cannot export: Some schedules do not have exam codes yet. Please generate codes first.');
+      return;
+    }
+
+    const formatTimeIn = (timeString: string | null | undefined) => {
+      if (!timeString) return 'Not yet';
+      try {
+        const date = new Date(timeString);
+        let hours = date.getHours();
+        const minutes = date.getMinutes().toString().padStart(2, '0');
+        const ampm = hours >= 12 ? 'PM' : 'AM';
+        hours = hours % 12;
+        hours = hours === 0 ? 12 : hours;
+        return `${hours}:${minutes} ${ampm}`;
+      } catch (e) {
+        return 'Invalid';
+      }
+    };
+
+    const doc = new jsPDF('landscape', 'mm', 'a4');
+    
+    // Title
+    doc.setFontSize(16);
+    doc.setFont('helvetica', 'bold');
+    doc.text('EXAM MONITORING REPORT', 148, 15, { align: 'center' });
+    
+    // Date generated
+    doc.setFontSize(10);
+    doc.setFont('helvetica', 'normal');
+    doc.text(`Generated: ${new Date().toLocaleString('en-US', { 
+      year: 'numeric', 
+      month: 'long', 
+      day: 'numeric',
+      hour: '2-digit',
+      minute: '2-digit'
+    })}`, 148, 22, { align: 'center' });
+
+    // Prepare table data
+    const tableData = sortedSchedules.map((schedule, index) => [
+      (index + 1).toString(),
+      schedule.course_id,
+      schedule.section_name,
+      schedule.exam_date,
+      `${formatTo12Hour(schedule.exam_start_time)}\n${formatTo12Hour(schedule.exam_end_time)}`,
+      `${schedule.building_name}\nRoom ${schedule.room_id}`,
+      schedule.instructor_name,
+      schedule.proctor_name,
+      schedule.otp_code || 'N/A',
+      formatTimeIn(schedule.code_entry_time),
+      schedule.status.toUpperCase()
+    ]);
+
+    // Add table using autoTable function directly
+    autoTable(doc, {
+      startY: 28,
+      head: [['#', 'Course', 'Section', 'Date', 'Time', 'Location', 'Instructor', 'Proctor', 'Exam Code', 'Time In', 'Status']],
+      body: tableData,
+      styles: {
+        fontSize: 8,
+        cellPadding: 2,
+        lineColor: [200, 200, 200],
+        lineWidth: 0.1,
+      },
+      headStyles: {
+        fillColor: [10, 55, 101],
+        textColor: [255, 255, 255],
+        fontStyle: 'bold',
+        halign: 'center',
+      },
+      columnStyles: {
+        0: { cellWidth: 8, halign: 'center' },
+        1: { cellWidth: 20 },
+        2: { cellWidth: 18 },
+        3: { cellWidth: 22 },
+        4: { cellWidth: 24, fontSize: 7 },
+        5: { cellWidth: 28, fontSize: 7 },
+        6: { cellWidth: 30 },
+        7: { cellWidth: 30 },
+        8: { cellWidth: 22, halign: 'center', fontStyle: 'bold' },
+        9: { cellWidth: 18, halign: 'center' },
+        10: { cellWidth: 20, halign: 'center', fontStyle: 'bold' }
+      },
+      bodyStyles: {
+        valign: 'middle'
+      },
+      alternateRowStyles: {
+        fillColor: [245, 245, 245]
+      },
+      didDrawCell: (data: any) => {
+        // Color code status column
+        if (data.column.index === 10 && data.section === 'body') {
+          const status = data.cell.raw.toLowerCase();
+          let color;
+          if (status.includes('confirm') || status.includes('present')) {
+            color = [40, 167, 69]; // Green
+          } else if (status.includes('late')) {
+            color = [255, 193, 7]; // Yellow
+          } else if (status.includes('absent')) {
+            color = [220, 53, 69]; // Red
+          } else if (status.includes('substitute')) {
+            color = [23, 162, 184]; // Cyan
+          } else {
+            color = [108, 117, 125]; // Gray
+          }
+          doc.setTextColor(color[0], color[1], color[2]);
+          doc.setFont('helvetica', 'bold');
+        }
+      }
+    });
+
+    // Footer
+    const pageCount = (doc as any).internal.getNumberOfPages();
+    for (let i = 1; i <= pageCount; i++) {
+      doc.setPage(i);
+      doc.setFontSize(8);
+      doc.setTextColor(128, 128, 128);
+      doc.text(
+        `Page ${i} of ${pageCount}`,
+        148,
+        doc.internal.pageSize.height - 10,
+        { align: 'center' }
+      );
+    }
+
+    // Save PDF
+    doc.save(`exam_monitoring_${new Date().toISOString().split('T')[0]}.pdf`);
+    toast.success('PDF exported successfully!');
   };
 
   const hasOtpCodes = approvedSchedules.some(s => s.otp_code);
@@ -455,6 +579,25 @@ const ProctorMonitoring: React.FC<UserProps> = ({ }) => {
           >
             {resettingOtp ? 'RESETTING...' : 'RESET EXAM CODES'}
           </button>
+
+          {/* ✅ NEW: Export Button */}
+          <button
+            onClick={handleExportPDF}
+            disabled={loading || sortedSchedules.length === 0 || !sortedSchedules.every(s => s.otp_code)}
+            style={{
+              opacity: (sortedSchedules.length > 0 && sortedSchedules.every(s => s.otp_code)) ? 1 : 0.6,
+              cursor: (sortedSchedules.length > 0 && sortedSchedules.every(s => s.otp_code)) ? 'pointer' : 'not-allowed',
+              backgroundColor: '#28a745',
+              color: 'white',
+              border: 'none',
+              padding: '10px 20px',
+              borderRadius: '5px',
+              fontWeight: 'bold',
+              fontSize: '14px'
+            }}
+          >
+            EXPORT TO PDF
+          </button>
         </div>
       </div>
 
@@ -484,13 +627,8 @@ const ProctorMonitoring: React.FC<UserProps> = ({ }) => {
               <tbody>
                 {sortedSchedules.length > 0 ? (
                   sortedSchedules.map((schedule, index) => {
-                    // ✅ FIXED: Get status from backend data
-                    // Backend already determines the correct status (confirmed, late, absent, substitute)
                     const backendStatus = schedule.examdetails_status || schedule.status || 'pending';
                     
-                    console.log(`📊 Schedule ${schedule.id} - Backend status: ${backendStatus}`);
-
-                    // FIXED STATUS HANDLER — ensures "late" displays properly
                     const getStatusDisplay = (status: string | null | undefined) => {
                       if (!status) {
                         return { text: 'Pending', className: 'status-pending' };
@@ -516,8 +654,6 @@ const ProctorMonitoring: React.FC<UserProps> = ({ }) => {
 
                       return { text: 'Pending', className: 'status-pending' };
                     };
-
-                    console.log('schedule:', schedule.id, 'status=', schedule.status, 'examdetails_status=', schedule.examdetails_status);
 
                     const statusDisplay = getStatusDisplay(backendStatus);
 

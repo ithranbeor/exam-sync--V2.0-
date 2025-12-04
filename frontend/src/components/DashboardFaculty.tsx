@@ -168,15 +168,15 @@ const DashboardFaculty = () => {
 
   useEffect(() => {
     let resizeTimer: NodeJS.Timeout;
-    
+
     const handleResize = () => {
       clearTimeout(resizeTimer);
       resizeTimer = setTimeout(() => {
         const nowMobile = window.innerWidth <= 1024;
         const wasMobile = isMobile;
-        
+
         setIsMobile(nowMobile);
-        
+
         if (wasMobile !== nowMobile) {
           setIsSidebarOpen(false);
         }
@@ -185,7 +185,7 @@ const DashboardFaculty = () => {
 
     const initialMobile = window.innerWidth <= 1024;
     setIsMobile(initialMobile);
-    
+
     window.addEventListener('resize', handleResize);
     return () => {
       clearTimeout(resizeTimer);
@@ -268,16 +268,16 @@ const DashboardFaculty = () => {
             onMouseLeave={() => handleSidebarHover(false)}
           >
             <div className="sidebar-header">
-              <button 
-                type="button" 
+              <button
+                type="button"
                 className="sidebar-logo-button"
                 onClick={() => setActiveMenu('dashboard')}
-                style={{ 
-                  background: 'none', 
-                  border: 'none', 
-                  cursor: 'pointer', 
-                  display: 'flex', 
-                  alignItems: 'center', 
+                style={{
+                  background: 'none',
+                  border: 'none',
+                  cursor: 'pointer',
+                  display: 'flex',
+                  alignItems: 'center',
                   gap: '10px',
                   padding: 0,
                   width: '100%'

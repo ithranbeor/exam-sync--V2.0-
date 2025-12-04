@@ -18,13 +18,18 @@ import { saveAs } from "file-saver";
 import "../styles/exportSchedule.css";
 import { FaRegStopCircle } from "react-icons/fa";
 
-
+// ✅ NEW: Add approvalStatus prop
 interface ExportScheduleProps {
   onClose: () => void;
   collegeName: string;
+  approvalStatus?: 'pending' | 'approved' | 'rejected' | null;
 }
 
-const ExportSchedule: React.FC<ExportScheduleProps> = ({ onClose, collegeName }) => {
+const ExportSchedule: React.FC<ExportScheduleProps> = ({ 
+  onClose, 
+  collegeName, 
+  approvalStatus
+}) => {
   const [exporting, setExporting] = useState(false);
   const [progress, setProgress] = useState(0);
   const [exportMode, setExportMode] = useState("ALL");
@@ -40,7 +45,7 @@ const ExportSchedule: React.FC<ExportScheduleProps> = ({ onClose, collegeName })
         card.textContent?.match(/\b[A-Za-z]+\s\d{1,2},\s\d{4}/)?.[0]
       )
       .filter((d): d is string => !!d);
-    setAvailableDates([...new Set(dates)]); // ✅ Unique dates
+    setAvailableDates([...new Set(dates)]);
   }, []);
 
   const handleStop = () => {
@@ -66,6 +71,34 @@ const ExportSchedule: React.FC<ExportScheduleProps> = ({ onClose, collegeName })
     });
   };
 
+  // ✅ FIXED: Function to add watermark to PDF with proper typing
+  const addWatermark = (pdf: jsPDF, pageWidth: number, pageHeight: number) => {
+    // Save current graphics state
+    pdf.saveGraphicsState();
+    
+    // Set watermark properties
+    pdf.setFont("helvetica", "bold");
+    pdf.setFontSize(80);
+    pdf.setTextColor(200, 200, 200); // Light gray color
+    
+    // ✅ FIX: Use proper setGState method - jsPDF accepts plain object
+    (pdf as any).setGState({ opacity: 0.2 }); // 20% opacity
+    
+    // Calculate center position
+    const centerX = pageWidth / 2;
+    const centerY = pageHeight / 2;
+    
+    // Add rotated text at center - angle parameter handles rotation
+    pdf.text("APPROVED", centerX, centerY, {
+      align: "center",
+      angle: -45, // Diagonal angle
+      baseline: "middle"
+    });
+    
+    // Restore graphics state
+    pdf.restoreGraphicsState();
+  };
+
   const exportToPDF = async () => {
     stopExport.current = false;
     const cards = getCards();
@@ -74,7 +107,13 @@ const ExportSchedule: React.FC<ExportScheduleProps> = ({ onClose, collegeName })
 
     setExporting(true);
     setProgress(0);
-    toast.info("Generating PDF...");
+    
+    // ✅ Show watermark info if approved
+    if (approvalStatus === 'approved') {
+      toast.info("Generating PDF with APPROVED watermark...");
+    } else {
+      toast.info("Generating PDF...");
+    }
 
     try {
       const pdf = new jsPDF({ orientation: "portrait", unit: "mm", format: "a4" });
@@ -92,13 +131,32 @@ const ExportSchedule: React.FC<ExportScheduleProps> = ({ onClose, collegeName })
 
         if (i > 0) pdf.addPage();
         pdf.addImage(imgData, "JPEG", 5, 5, pageWidth - 10, pageHeight - 10);
+        
+        // ✅ Add watermark if approved
+        if (approvalStatus === 'approved') {
+          addWatermark(pdf, pageWidth, pageHeight);
+        }
+        
         setProgress(Math.round(((i + 1) / cards.length) * 100));
       }
 
-      pdf.save(`${collegeName}_Schedule.pdf`);
-      toast.success("PDF exported successfully!");
+      // ✅ Include approval status in filename
+      const filename = approvalStatus === 'approved' 
+        ? `${collegeName}_Schedule_APPROVED.pdf`
+        : `${collegeName}_Schedule.pdf`;
+      
+      pdf.save(filename);
+      
+      // ✅ Success message mentions watermark if approved
+      if (approvalStatus === 'approved') {
+        toast.success("PDF exported successfully with APPROVED watermark!");
+      } else {
+        toast.success("PDF exported successfully!");
+      }
+      
       onClose();
-    } catch {
+    } catch (error) {
+      console.error("PDF export error:", error);
       toast.error("Failed to export PDF");
     } finally {
       cleanupExportMode();
@@ -117,6 +175,21 @@ const ExportSchedule: React.FC<ExportScheduleProps> = ({ onClose, collegeName })
 
     try {
       const sections: any[] = [];
+      
+      // ✅ Add watermark paragraph at the beginning if approved
+      if (approvalStatus === 'approved') {
+        sections.push(
+          new Paragraph({
+            text: "🔒 APPROVED SCHEDULE",
+            alignment: AlignmentType.CENTER,
+            heading: "Heading1",
+            spacing: {
+              after: 400,
+            },
+          })
+        );
+      }
+      
       for (let i = 0; i < cards.length; i++) {
         if (stopExport.current) return;
 
@@ -156,10 +229,24 @@ const ExportSchedule: React.FC<ExportScheduleProps> = ({ onClose, collegeName })
 
       const doc = new Document({ sections: [{ children: sections }] });
       const blob = await Packer.toBlob(doc);
-      saveAs(blob, `${collegeName}_Schedule.docx`);
-      toast.success("Word exported successfully!");
+      
+      // ✅ Include approval status in filename
+      const filename = approvalStatus === 'approved'
+        ? `${collegeName}_Schedule_APPROVED.docx`
+        : `${collegeName}_Schedule.docx`;
+      
+      saveAs(blob, filename);
+      
+      // ✅ Success message mentions approval if approved
+      if (approvalStatus === 'approved') {
+        toast.success("Word exported successfully with APPROVED status!");
+      } else {
+        toast.success("Word exported successfully!");
+      }
+      
       onClose();
-    } catch {
+    } catch (error) {
+      console.error("Word export error:", error);
       toast.error("Failed to export Word");
     } finally {
       cleanupExportMode();
@@ -184,6 +271,12 @@ const ExportSchedule: React.FC<ExportScheduleProps> = ({ onClose, collegeName })
 
         const tables = cards[i].querySelectorAll("table.exam-table");
         const allData: string[][] = [];
+        
+        // ✅ Add approval status header if approved
+        if (approvalStatus === 'approved' && i === 0) {
+          allData.push(["🔒 APPROVED SCHEDULE"]);
+          allData.push([]); // Empty row for spacing
+        }
 
         tables.forEach((table) => {
           table.querySelectorAll("tr").forEach((row) => {
@@ -196,10 +289,23 @@ const ExportSchedule: React.FC<ExportScheduleProps> = ({ onClose, collegeName })
         setProgress(Math.round(((i + 1) / cards.length) * 100));
       }
 
-      XLSX.writeFile(workbook, `${collegeName}_Schedule.xlsx`);
-      toast.success("Excel exported successfully!");
+      // ✅ Include approval status in filename
+      const filename = approvalStatus === 'approved'
+        ? `${collegeName}_Schedule_APPROVED.xlsx`
+        : `${collegeName}_Schedule.xlsx`;
+      
+      XLSX.writeFile(workbook, filename);
+      
+      // ✅ Success message mentions approval if approved
+      if (approvalStatus === 'approved') {
+        toast.success("Excel exported successfully with APPROVED status!");
+      } else {
+        toast.success("Excel exported successfully!");
+      }
+      
       onClose();
-    } catch {
+    } catch (error) {
+      console.error("Excel export error:", error);
       toast.error("Failed to export Excel");
     } finally {
       cleanupExportMode();
@@ -210,6 +316,24 @@ const ExportSchedule: React.FC<ExportScheduleProps> = ({ onClose, collegeName })
   return (
     <div className="export-container">
       <h2 className="export-title">Export Schedule</h2>
+      
+      {/* ✅ Show approval status indicator */}
+      {approvalStatus === 'approved' && (
+        <div style={{
+          background: '#4CAF50',
+          color: 'white',
+          padding: '10px',
+          borderRadius: '8px',
+          marginBottom: '15px',
+          textAlign: 'center',
+          fontWeight: 'bold'
+        }}>
+          ✅ This schedule is APPROVED
+          <div style={{ fontSize: '12px', marginTop: '5px', opacity: 0.9 }}>
+            Exports will include "APPROVED" watermark
+          </div>
+        </div>
+      )}
 
       <div className="export-options">
         <label className="radio">
@@ -266,12 +390,15 @@ const ExportSchedule: React.FC<ExportScheduleProps> = ({ onClose, collegeName })
       <div className="export-buttons">
         <button className="btn pdf" disabled={exporting} onClick={exportToPDF}>
           Export to PDF
+          {approvalStatus === 'approved' && <span style={{ fontSize: '10px', display: 'block' }}>(with watermark)</span>}
         </button>
         <button className="btn word" disabled={exporting} onClick={exportToWord}>
           Export to Word
+          {approvalStatus === 'approved' && <span style={{ fontSize: '10px', display: 'block' }}>(with status)</span>}
         </button>
         <button className="btn excel" disabled={exporting} onClick={exportToExcel}>
           Export to Excel
+          {approvalStatus === 'approved' && <span style={{ fontSize: '10px', display: 'block' }}>(with status)</span>}
         </button>
       </div>
     </div>

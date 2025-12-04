@@ -730,9 +730,7 @@ def proctor_monitoring_dashboard(request):
     try:
         college_name = request.GET.get('college_name')
         exam_date = request.GET.get('exam_date')
-        
-        print(f"📊 Monitoring dashboard request - college: {college_name}, date: {exam_date}")
-        
+                
         # Base query with proper prefetch
         queryset = TblExamdetails.objects.select_related(
             'room',

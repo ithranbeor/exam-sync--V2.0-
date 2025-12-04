@@ -444,7 +444,8 @@ const ProctorViewExam: React.FC<ProctorViewExamProps> = ({ user }) => {
               color: viewMode === "my-schedule" ? "white" : "#092C4C",
               cursor: "pointer",
               fontWeight: "bold",
-              transition: "all 0.3s ease"
+              transition: "all 0.3s ease",
+              width: "200px",
             }}
           >
             My Schedule
@@ -464,7 +465,8 @@ const ProctorViewExam: React.FC<ProctorViewExamProps> = ({ user }) => {
               color: viewMode === "all-schedule" ? "white" : "#092C4C",
               cursor: "pointer",
               fontWeight: "bold",
-              transition: "all 0.3s ease"
+              transition: "all 0.3s ease",
+              width: "200px",
             }}
           >
             All College Schedule
@@ -513,7 +515,6 @@ const ProctorViewExam: React.FC<ProctorViewExamProps> = ({ user }) => {
             cursor: "pointer",
             minWidth: "250px",
             color: "#092C4C",
-            height: "40%"
           }}
         >
           <input
