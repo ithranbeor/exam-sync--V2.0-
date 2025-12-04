@@ -607,6 +607,9 @@ class TblExamdetailsSerializer(serializers.ModelSerializer):
     modality_id = serializers.IntegerField(write_only=True, required=False, allow_null=True)
     proctor_id = serializers.IntegerField(required=False, allow_null=True)
     examperiod_id = serializers.IntegerField(write_only=True, required=False, allow_null=True)
+
+    examdetails_status = serializers.SerializerMethodField()
+
     
     # ✅ NEW: Support arrays
     sections = serializers.ListField(
@@ -640,6 +643,31 @@ class TblExamdetailsSerializer(serializers.ModelSerializer):
                 'exam_category': obj.examperiod.exam_category,
             }
         return None
+    
+    def get_examdetails_status(self, obj):
+        """
+        Determine proctor attendance status based on TblProctorAttendance.
+        """
+
+        attendance = obj.attendance_records.first()  # because of unique_together
+
+        # No attendance record
+        if not attendance:
+            # Exam already finished → mark absent/late
+            if obj.exam_end_time and timezone.now() > obj.exam_end_time:
+                return "late"  # or "absent" depending on your rule
+            return "pending"
+
+        # Substitute proctor
+        if attendance.is_substitute:
+            return "substitute"
+
+        # OTP used = present
+        if attendance.otp_used and attendance.time_in:
+            return "present"
+
+        # Has record but no OTP = late
+        return "late"
     
     def to_representation(self, instance):
         representation = super().to_representation(instance)
@@ -680,6 +708,8 @@ class TblExamdetailsSerializer(serializers.ModelSerializer):
             'exam_date',
             'college_name',
             'building_name',
+            'examdetails_status',
+
         ]
 
     def create(self, validated_data):

@@ -398,7 +398,7 @@ const DashboardFaculty = () => {
           {activeMenu === 'exam-Date' && <ProctorExamDate />}
           {activeMenu === 'profile' && <Profile user={user} />}
           {activeMenu === 'set-Availability' && <ProctorSetAvailability user={user} />}
-          {activeMenu === 'exam-Schedule' && <ProctorViewExam user={user}  />}
+          {activeMenu === 'exam-Schedule' && <ProctorViewExam user={user} />}
           {activeMenu === 'proctor-Attendance' && <ProctorAttendance user={user} />}
           {activeMenu === 'notification' && <Notification user={user} />}
           {activeMenu === 'set-Modality' && <BayanihanModality user={user} />}

@@ -29,9 +29,10 @@ interface MonitoringSchedule {
   department: string;
   college: string;
   status: string;
+  examdetails_status?: string; // ✅ ADD: Backend's actual status from exam details
   code_entry_time: string | null;
   otp_code: string | null;
-  approval_status?: string; // NEW: Track approval status
+  approval_status?: string;
 }
 
 const ProctorMonitoring: React.FC<UserProps> = ({ }) => {
@@ -54,7 +55,10 @@ const ProctorMonitoring: React.FC<UserProps> = ({ }) => {
       const examEnd = new Date(`${s.exam_date}T${s.exam_end_time}`);
       const hasTimeIn = Boolean(s.code_entry_time);
 
-      if (now > examEnd && !hasTimeIn && s.status.toLowerCase() === "pending") {
+      // ✅ Use examdetails_status or status for checking
+      const currentStatus = (s.examdetails_status || s.status || '').toLowerCase();
+
+      if (now > examEnd && !hasTimeIn && currentStatus === "pending") {
         try {
           setTimeout(() => fetchMonitoringData(), 500);
           await api.patch(`/update-proctor-status/${s.id}/`, {
@@ -78,25 +82,26 @@ const ProctorMonitoring: React.FC<UserProps> = ({ }) => {
         params.college_name = collegeFilter;
       }
 
-      // Fetch exam details (plotted schedules)
+      console.log('📊 Fetching monitoring data...');
       const { data: examData } = await api.get('/proctor-monitoring/', { params });
+
+      console.log('📋 Raw data from backend:', examData);
 
       // Fetch approval status for each schedule
       const schedulesWithApproval = await Promise.all(
         examData.map(async (schedule: any) => {
           try {
-            // Get approval status from tbl_scheduleapproval
             const approvalResponse = await api.get('/tbl_scheduleapproval/', {
               params: {
                 college_name: schedule.college,
-                status: 'approved' // Only get approved schedules
+                status: 'approved'
               }
             });
 
-            // Check if this schedule's college has been approved
             const isApproved = approvalResponse.data && approvalResponse.data.length > 0;
 
-            return {
+            // ✅ FIXED: Preserve the status from backend (confirmed, late, absent, substitute)
+            const mappedSchedule = {
               id: schedule.id,
               course_id: schedule.course_id,
               subject: schedule.subject || schedule.course_id,
@@ -110,13 +115,17 @@ const ProctorMonitoring: React.FC<UserProps> = ({ }) => {
               instructor_name: schedule.instructor_name || '',
               department: schedule.department || '',
               college: schedule.college || '',
-              status: schedule.examdetails_status || schedule.status || 'pending',
+              status: schedule.status || 'pending', // Keep original status from backend
+              examdetails_status: schedule.examdetails_status, // ✅ ADD: Preserve backend status
               code_entry_time: schedule.code_entry_time || null,
               otp_code: schedule.otp_code || null,
               approval_status: isApproved ? 'approved' : 'pending'
             };
+
+            console.log(`✅ Schedule ${schedule.id} mapped with status: ${mappedSchedule.status}`);
+            
+            return mappedSchedule;
           } catch (error) {
-            console.log("STATUS RECEIVED:", schedule.id, schedule.status, schedule.examdetails_status);
             console.error(`Error checking approval for schedule ${schedule.id}:`, error);
             return {
               ...schedule,
@@ -130,6 +139,11 @@ const ProctorMonitoring: React.FC<UserProps> = ({ }) => {
       const approvedOnly = schedulesWithApproval.filter(
         (schedule: MonitoringSchedule) => schedule.approval_status === 'approved'
       );
+
+      console.log(`✅ Found ${approvedOnly.length} approved schedules`);
+      approvedOnly.forEach(s => {
+        console.log(`   - Schedule ${s.id}: status="${s.status}", examdetails_status="${s.examdetails_status}"`);
+      });
 
       setApprovedSchedules(approvedOnly);
       setHasApprovedSchedules(approvedOnly.length > 0);
@@ -173,7 +187,6 @@ const ProctorMonitoring: React.FC<UserProps> = ({ }) => {
   const handleGenerateOtpCodes = async () => {
     setGeneratingOtp(true);
     try {
-      // Get all schedule IDs that don't have OTP codes yet
       const schedulesWithoutOtp = approvedSchedules
         .filter(s => !s.otp_code)
         .map(s => s.id);
@@ -188,8 +201,6 @@ const ProctorMonitoring: React.FC<UserProps> = ({ }) => {
       });
 
       toast.success(`Generated OTP codes for ${response.data.generated_count} schedule(s)`);
-
-      // Refresh data
       await fetchMonitoringData();
     } catch (error: any) {
       console.error('Error generating OTP codes:', error);
@@ -206,7 +217,6 @@ const ProctorMonitoring: React.FC<UserProps> = ({ }) => {
     setShowResetConfirm(false);
 
     try {
-      // Get all schedule IDs that have OTP codes
       const schedulesWithOtp = approvedSchedules
         .filter(s => s.otp_code)
         .map(s => s.id);
@@ -222,8 +232,6 @@ const ProctorMonitoring: React.FC<UserProps> = ({ }) => {
       });
 
       toast.success(`Reset ${response.data.deleted_count} OTP code(s)`);
-
-      // Refresh data
       await fetchMonitoringData();
     } catch (error: any) {
       console.error('Error resetting OTP codes:', error);
@@ -234,15 +242,12 @@ const ProctorMonitoring: React.FC<UserProps> = ({ }) => {
     }
   };
 
-  // Check if any schedules have OTP codes
   const hasOtpCodes = approvedSchedules.some(s => s.otp_code);
 
-  // Helper function to determine if a string is numeric
   const isNumeric = (str: string): boolean => {
     return !isNaN(Number(str)) && !isNaN(parseFloat(str));
   };
 
-  // Smart sort function that handles both text and numbers
   const smartSort = (a: string, b: string): number => {
     const aIsNumeric = isNumeric(a);
     const bIsNumeric = isNumeric(b);
@@ -258,7 +263,6 @@ const ProctorMonitoring: React.FC<UserProps> = ({ }) => {
     }
   };
 
-  // Sort schedules based on selected sort option
   const sortedSchedules = useMemo(() => {
     if (sortBy === 'none') {
       return approvedSchedules;
@@ -480,34 +484,42 @@ const ProctorMonitoring: React.FC<UserProps> = ({ }) => {
               <tbody>
                 {sortedSchedules.length > 0 ? (
                   sortedSchedules.map((schedule, index) => {
-                    const status = schedule.status || 'pending';
+                    // ✅ FIXED: Get status from backend data
+                    // Backend already determines the correct status (confirmed, late, absent, substitute)
+                    const backendStatus = schedule.examdetails_status || schedule.status || 'pending';
+                    
+                    console.log(`📊 Schedule ${schedule.id} - Backend status: ${backendStatus}`);
 
                     // FIXED STATUS HANDLER — ensures "late" displays properly
-                    const getStatusDisplay = (status: string) => {
-                      if (!status) return { text: 'Pending', className: 'status-pending' };
+                    const getStatusDisplay = (status: string | null | undefined) => {
+                      if (!status) {
+                        return { text: 'Pending', className: 'status-pending' };
+                      }
 
-                      const normalized = status.trim().toLowerCase();
+                      const normalized = status.toLowerCase().trim();
 
-                      if (normalized === 'confirmed' || normalized === 'confirm') {
+                      if (normalized.includes('late')) {
+                        return { text: 'Late', className: 'status-late' };
+                      }
+
+                      if (normalized.includes('confirm')) {
                         return { text: 'Present', className: 'status-confirmed' };
                       }
 
-                      if (normalized === 'late') {
-                        return { text: 'Late', className: 'status-late' }; // <-- FIXED
+                      if (normalized.includes('absent')) {
+                        return { text: 'Absent', className: 'status-absent' };
                       }
 
-                      if (normalized === 'absent') {
-                        return { text: 'Absent', className: 'status-absent' }; // <-- FIXED
-                      }
-
-                      if (normalized === 'substitute' || normalized === 'sub') {
+                      if (normalized.includes('sub')) {
                         return { text: 'Substitute', className: 'status-substitute' };
                       }
 
                       return { text: 'Pending', className: 'status-pending' };
                     };
 
-                    const statusDisplay = getStatusDisplay(status);
+                    console.log('schedule:', schedule.id, 'status=', schedule.status, 'examdetails_status=', schedule.examdetails_status);
+
+                    const statusDisplay = getStatusDisplay(backendStatus);
 
                     const formatTimeIn = (timeString: string | null | undefined) => {
                       if (!timeString) return '-';
@@ -518,7 +530,7 @@ const ProctorMonitoring: React.FC<UserProps> = ({ }) => {
 
                         const ampm = hours >= 12 ? 'PM' : 'AM';
                         hours = hours % 12;
-                        hours = hours === 0 ? 12 : hours; // convert 0 to 12
+                        hours = hours === 0 ? 12 : hours;
 
                         return `${hours}:${minutes} ${ampm}`;
                       } catch (e) {
@@ -563,7 +575,7 @@ const ProctorMonitoring: React.FC<UserProps> = ({ }) => {
                         </td>
                         <td>
                           <span className={`status-badge ${statusDisplay.className}`}>
-                            {statusDisplay.text}
+                            {schedule.status}
                           </span>
                         </td>
                       </tr>
