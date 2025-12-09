@@ -8,7 +8,7 @@ from rest_framework.authtoken.models import Token
 from rest_framework import status
 from django.views.decorators.cache import cache_page
 from django.db.models import Q
-from .models import TblUsers, TblScheduleapproval, TblProctorSubstitution, TblProctorAttendance, TblExamOtp, TblAvailableRooms, TblNotification, TblUserRole, TblExamdetails, TblModality, TblAvailability, TblCourseUsers, TblSectioncourse, TblUserRoleHistory, TblRoles, TblBuildings, TblRooms, TblCourse, TblExamperiod, TblProgram, TblTerm, TblCollege, TblDepartment
+from .models import TblUsers, TblScheduleapproval, TblScheduleFooter, TblProctorSubstitution, TblProctorAttendance, TblExamOtp, TblAvailableRooms, TblNotification, TblUserRole, TblExamdetails, TblModality, TblAvailability, TblCourseUsers, TblSectioncourse, TblUserRoleHistory, TblRoles, TblBuildings, TblRooms, TblCourse, TblExamperiod, TblProgram, TblTerm, TblCollege, TblDepartment
 from .serializers import (
     UserSerializer,
     UserRoleSerializer,
@@ -33,7 +33,8 @@ from .serializers import (
     ScheduleSendSerializer,
     TblNotificationSerializer,
     EmailNotificationSerializer,
-    TblAvailableRoomsSerializer
+    TblAvailableRoomsSerializer,
+    TblScheduleFooterSerializer
 )
 from django.core.mail import send_mail
 from django.contrib.auth.hashers import make_password, check_password
@@ -2667,3 +2668,106 @@ def get_user(request, user_id):
         return Response(serializer.data)
     except TblUsers.DoesNotExist:
         return Response({"error": "User not found"}, status=404)
+
+@api_view(['GET', 'POST'])
+@permission_classes([AllowAny])
+def tbl_schedule_footer_list(request):
+    if request.method == 'GET':
+        college_id = request.GET.get('college_id')
+        
+        if college_id:
+            footers = TblScheduleFooter.objects.filter(college_id=college_id)
+        else:
+            footers = TblScheduleFooter.objects.all()
+        
+        serializer = TblScheduleFooterSerializer(footers, many=True)
+        return Response(serializer.data)
+    
+    elif request.method == 'POST':
+        serializer = TblScheduleFooterSerializer(data=request.data)
+        if serializer.is_valid():
+            serializer.save()
+            return Response(serializer.data, status=status.HTTP_201_CREATED)
+        return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
+
+@api_view(['GET', 'PUT', 'DELETE'])
+@permission_classes([AllowAny])
+def tbl_schedule_footer_detail(request, pk):
+    try:
+        footer = TblScheduleFooter.objects.get(pk=pk)
+    except TblScheduleFooter.DoesNotExist:
+        return Response({'error': 'Footer not found'}, status=status.HTTP_404_NOT_FOUND)
+    
+    if request.method == 'GET':
+        serializer = TblScheduleFooterSerializer(footer)
+        return Response(serializer.data)
+    
+    elif request.method == 'PUT':
+        serializer = TblScheduleFooterSerializer(footer, data=request.data, partial=True)
+        if serializer.is_valid():
+            serializer.save()
+            return Response(serializer.data)
+        return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
+    
+    elif request.method == 'DELETE':
+        footer.delete()
+        return Response(status=status.HTTP_204_NO_CONTENT)
+
+@api_view(['POST'])
+@permission_classes([AllowAny])
+def upload_schedule_logo(request):
+    """
+    Upload logo for schedule footer
+    """
+    college_id = request.data.get('college_id')
+    logo_file = request.FILES.get('logo')
+    
+    if not logo_file:
+        return Response({'error': 'No file provided'}, status=status.HTTP_400_BAD_REQUEST)
+    
+    # Validate file type
+    allowed_types = ['image/jpeg', 'image/jpg', 'image/png', 'image/gif', 'image/webp']
+    if logo_file.content_type not in allowed_types:
+        return Response({
+            'error': 'Invalid file type. Allowed: JPEG, PNG, GIF, WEBP'
+        }, status=status.HTTP_400_BAD_REQUEST)
+    
+    try:
+        import base64
+        from io import BytesIO
+        from PIL import Image
+        
+        # Open and resize image
+        img = Image.open(logo_file)
+        
+        # Convert to RGB if needed
+        if img.mode in ('RGBA', 'LA', 'P'):
+            background = Image.new('RGB', img.size, (255, 255, 255))
+            if img.mode == 'P':
+                img = img.convert('RGBA')
+            background.paste(img, mask=img.split()[-1] if img.mode == 'RGBA' else None)
+            img = background
+        
+        # Resize to max 400x400
+        img.thumbnail((400, 400), Image.Resampling.LANCZOS)
+        
+        # Save to BytesIO
+        buffer = BytesIO()
+        img.save(buffer, format='PNG', optimize=True)
+        buffer.seek(0)
+        
+        # Convert to base64
+        img_base64 = base64.b64encode(buffer.read()).decode('utf-8')
+        logo_url = f"data:image/png;base64,{img_base64}"
+        
+        return Response({
+            'message': 'Logo uploaded successfully',
+            'logo_url': logo_url
+        }, status=status.HTTP_200_OK)
+        
+    except Exception as e:
+        print(f"❌ Error processing logo: {str(e)}")
+        return Response({
+            'error': 'Failed to process image',
+            'detail': str(e)
+        }, status=status.HTTP_500_INTERNAL_SERVER_ERROR)

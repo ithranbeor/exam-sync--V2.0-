@@ -425,15 +425,16 @@ body {
 
 .info-badge {
   display: inline-block;
-  padding: 4px 10px;
+  padding: 1px 10px;
   border-radius: 12px;
   font-size: 0.8rem;
-  font-weight: 500;
+  font-weight: 700;
   color: #fff;
   white-space: nowrap;
+  margin: 1px;
 }
 
-.college-badge {
+.college-badges {
   background-color: #2563eb; /* Blue */
 }
 

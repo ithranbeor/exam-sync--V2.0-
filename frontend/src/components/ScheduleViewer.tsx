@@ -78,6 +78,48 @@ const SchedulerView: React.FC<SchedulerViewProps> = ({ user }) => {
     setShowEnvelopeDropdown(false);
     setShowExportDropdown(false);
   };
+  
+  const [footerData, setFooterData] = useState<{
+    prepared_by_name: string;
+    prepared_by_title: string;
+    approved_by_name: string;
+    approved_by_title: string;
+    address_line: string;
+    contact_line: string;
+    logo_url: string | null;
+  } | null>(null);
+
+  // Fetch footer data
+  useEffect(() => {
+    const fetchFooterData = async () => {
+      if (!schedulerCollegeName || schedulerCollegeName === "Add schedule first") return;
+      
+      try {
+        const response = await api.get('/tbl_schedule_footer/', {
+          params: { college_id: schedulerCollegeName }
+        });
+        
+        if (response.data && response.data.length > 0) {
+          setFooterData(response.data[0]);
+        } else {
+          // Set defaults if no footer exists
+          setFooterData({
+            prepared_by_name: 'Type name',
+            prepared_by_title: `Dean, ${schedulerCollegeName}`,
+            approved_by_name: 'Type name',
+            approved_by_title: 'VCAA, USTP-CDO',
+            address_line: 'C.M Recto Avenue, Lapasan, Cagayan de Oro City 9000 Philippines',
+            contact_line: 'Tel Nos. +63 (88) 856 1738; Telefax +63 (88) 856 4696 | http://www.ustp.edu.ph',
+            logo_url: null
+          });
+        }
+      } catch (error) {
+        console.error("Error fetching footer data:", error);
+      }
+    };
+    
+    fetchFooterData();
+  }, [schedulerCollegeName]);
 
   useEffect(() => {
     const handleClickOutside = (event: MouseEvent) => {
@@ -1170,7 +1212,7 @@ const SchedulerView: React.FC<SchedulerViewProps> = ({ user }) => {
             <div className="scheduler-view-container">
               <div className="header" style={{ textAlign: "center", marginBottom: "20px" }}>
                 <img
-                  src="/logo/USTPlogo.png"
+                  src={footerData?.logo_url || "/logo/USTPlogo.png"}
                   alt="School Logo"
                   style={{ width: '200px', height: '160px', marginBottom: '5px' }}
                 />
@@ -1180,7 +1222,7 @@ const SchedulerView: React.FC<SchedulerViewProps> = ({ user }) => {
                 <div style={{ fontSize: '15px', color: '#555', marginBottom: '-10px', fontFamily: 'serif' }}>
                   Alubijid | Balubal | Cagayan de Oro City | Claveria | Jasaan | Oroquieta | Panaon | Villanueva
                 </div>
-                <div style={{ fontSize: '30px', color: '#333', marginBottom: '-10px', fontFamily: 'serif' }}>{collegeName}</div>
+                <div style={{ fontSize: '30px', color: '#333', marginBottom: '-10px', fontFamily: 'serif' }}>{collegeName}, USTP-CDO</div>
                 <div style={{ fontSize: '20px', color: '#333', marginBottom: '-10px', fontFamily: 'serif', fontWeight: 'bold' }}>
                   {termName} Examination Schedule | {semesterName} Semester | A.Y. {yearName}
                 </div>
@@ -1249,7 +1291,7 @@ const SchedulerView: React.FC<SchedulerViewProps> = ({ user }) => {
                   <div className="scheduler-view-container">
                     <div className="header" style={{ textAlign: "center", marginBottom: "20px" }}>
                       <img
-                        src="/logo/USTPlogo.png"
+                        src={footerData?.logo_url || "/logo/USTPlogo.png"}
                         alt="School Logo"
                         style={{ width: '200px', height: '160px', marginBottom: '5px' }}
                       />
@@ -1259,7 +1301,7 @@ const SchedulerView: React.FC<SchedulerViewProps> = ({ user }) => {
                       <div style={{ fontSize: '15px', color: '#555', marginBottom: '-10px', fontFamily: 'serif' }}>
                         Alubijid | Balubal | Cagayan de Oro City | Claveria | Jasaan | Oroquieta | Panaon | Villanueva
                       </div>
-                      <div style={{ fontSize: '30px', color: '#333', marginBottom: '-10px', fontFamily: 'serif' }}>{collegeName}</div>
+                      <div style={{ fontSize: '30px', color: '#333', marginBottom: '-10px', fontFamily: 'serif' }}>{collegeName}, USTP-CDO</div>
                       <div style={{ fontSize: '20px', color: '#333', marginBottom: '-10px', fontFamily: 'serif', fontWeight: 'bold' }}>
                         {termName} Examination Schedule | {semesterName} Semester | A.Y. {yearName}
                       </div>
@@ -1473,6 +1515,54 @@ const SchedulerView: React.FC<SchedulerViewProps> = ({ user }) => {
                         ))}
                       </tbody>
                     </table>
+                    {/* Footer Section */}
+                      <div style={{ 
+                        marginTop: '40px', 
+                        paddingTop: '20px', 
+                        borderTop: '2px solid #092C4C',
+                        fontFamily: 'serif'
+                      }}>
+                        {/* Signature Section */}
+                        <div style={{ 
+                          display: 'flex', 
+                          justifyContent: 'space-between',
+                          marginBottom: '30px'
+                        }}>
+                          {/* Left - Prepared by */}
+                          <div style={{ textAlign: 'left', width: '45%' }}>
+                            <p style={{ margin: '5px 0', fontWeight: 'bold' }}>Prepared by:</p>
+                            <p style={{ margin: '30px 0 5px 0', fontStyle: 'italic' }}>(sgd.)</p>
+                            <p style={{ margin: '5px 0', fontWeight: 'bold', textDecoration: 'underline' }}>
+                              {footerData?.prepared_by_name || 'Type name'}
+                            </p>
+                            <p style={{ margin: '5px 0' }}>
+                              {footerData?.prepared_by_title || `Dean, ${collegeName}`}
+                            </p>
+                          </div>
+                          
+                          {/* Right - Approved by */}
+                          <div style={{ textAlign: 'left', width: '45%' }}>
+                            <p style={{ margin: '5px 0', fontWeight: 'bold' }}>Approved:</p>
+                            <p style={{ margin: '30px 0 5px 0', fontStyle: 'italic' }}>(sgd.)</p>
+                            <p style={{ margin: '5px 0', fontWeight: 'bold', textDecoration: 'underline' }}>
+                              {footerData?.approved_by_name || 'Type name'}
+                            </p>
+                            <p style={{ margin: '5px 0' }}>
+                              {footerData?.approved_by_title || 'VCAA, USTP-CDO'}
+                            </p>
+                          </div>
+                        </div>
+                        
+                        {/* Center - Address */}
+                        <div style={{ textAlign: 'center', fontSize: '12px', color: '#555' }}>
+                          <p style={{ margin: '5px 0' }}>
+                            {footerData?.address_line || 'C.M Recto Avenue, Lapasan, Cagayan de Oro City 9000 Philippines'}
+                          </p>
+                          <p style={{ margin: '5px 0' }}>
+                            {footerData?.contact_line || 'Tel Nos. +63 (88) 856 1738; Telefax +63 (88) 856 4696 | http://www.ustp.edu.ph'}
+                          </p>
+                        </div>
+                      </div>
                   </div>
                 </div>
               );
@@ -1529,7 +1619,7 @@ const SchedulerView: React.FC<SchedulerViewProps> = ({ user }) => {
                   <div className="scheduler-view-container">
                     <div className="header" style={{ textAlign: "center", marginBottom: "20px" }}>
                       <img
-                        src="/logo/USTPlogo.png"
+                        src={footerData?.logo_url || "/logo/USTPlogo.png"}
                         alt="School Logo"
                         style={{ width: '200px', height: '160px', marginBottom: '5px' }}
                       />
@@ -1539,7 +1629,7 @@ const SchedulerView: React.FC<SchedulerViewProps> = ({ user }) => {
                       <div style={{ fontSize: '15px', color: '#555', marginBottom: '-10px', fontFamily: 'serif' }}>
                         Alubijid | Balubal | Cagayan de Oro City | Claveria | Jasaan | Oroquieta | Panaon | Villanueva
                       </div>
-                      <div style={{ fontSize: '30px', color: '#333', marginBottom: '-10px', fontFamily: 'serif' }}>{collegeName}</div>
+                      <div style={{ fontSize: '30px', color: '#333', marginBottom: '-10px', fontFamily: 'serif' }}>{collegeName}, USTP-CDO</div>
                       <div style={{ fontSize: '20px', color: '#333', marginBottom: '-10px', fontFamily: 'serif', fontWeight: 'bold' }}>
                         {termName} Examination Schedule | {semesterName} Semester | A.Y. {yearName}
                       </div>
@@ -1753,6 +1843,54 @@ const SchedulerView: React.FC<SchedulerViewProps> = ({ user }) => {
                         ))}
                       </tbody>
                     </table>
+                    {/* Footer Section */}
+                      <div style={{ 
+                        marginTop: '40px', 
+                        paddingTop: '20px', 
+                        borderTop: '2px solid #092C4C',
+                        fontFamily: 'serif'
+                      }}>
+                        {/* Signature Section */}
+                        <div style={{ 
+                          display: 'flex', 
+                          justifyContent: 'space-between',
+                          marginBottom: '30px'
+                        }}>
+                          {/* Left - Prepared by */}
+                          <div style={{ textAlign: 'left', width: '45%' }}>
+                            <p style={{ margin: '5px 0', fontWeight: 'bold' }}>Prepared by:</p>
+                            <p style={{ margin: '30px 0 5px 0', fontStyle: 'italic' }}>(sgd.)</p>
+                            <p style={{ margin: '5px 0', fontWeight: 'bold', textDecoration: 'underline' }}>
+                              {footerData?.prepared_by_name || 'Type name'}
+                            </p>
+                            <p style={{ margin: '5px 0' }}>
+                              {footerData?.prepared_by_title || `Dean, ${collegeName}`}
+                            </p>
+                          </div>
+                          
+                          {/* Right - Approved by */}
+                          <div style={{ textAlign: 'left', width: '45%' }}>
+                            <p style={{ margin: '5px 0', fontWeight: 'bold' }}>Approved:</p>
+                            <p style={{ margin: '30px 0 5px 0', fontStyle: 'italic' }}>(sgd.)</p>
+                            <p style={{ margin: '5px 0', fontWeight: 'bold', textDecoration: 'underline' }}>
+                              {footerData?.approved_by_name || 'Type name'}
+                            </p>
+                            <p style={{ margin: '5px 0' }}>
+                              {footerData?.approved_by_title || 'VCAA, USTP-CDO'}
+                            </p>
+                          </div>
+                        </div>
+                        
+                        {/* Center - Address */}
+                        <div style={{ textAlign: 'center', fontSize: '12px', color: '#555' }}>
+                          <p style={{ margin: '5px 0' }}>
+                            {footerData?.address_line || 'C.M Recto Avenue, Lapasan, Cagayan de Oro City 9000 Philippines'}
+                          </p>
+                          <p style={{ margin: '5px 0' }}>
+                            {footerData?.contact_line || 'Tel Nos. +63 (88) 856 1738; Telefax +63 (88) 856 4696 | http://www.ustp.edu.ph'}
+                          </p>
+                        </div>
+                      </div>
                   </div>
                 </div>
               );

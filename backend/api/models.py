@@ -631,3 +631,36 @@ class TblProctorSubstitution(models.Model):
     
     def __str__(self):
         return f"{self.substitute_proctor.first_name} substituting {self.original_proctor.first_name} - {self.examdetails.course_id}"
+
+class TblScheduleFooter(models.Model):
+    footer_id = models.AutoField(primary_key=True)
+    college = models.ForeignKey(TblCollege, models.DO_NOTHING, blank=True, null=True)
+    
+    # Left side - Prepared by
+    prepared_by_name = models.CharField(max_length=255, blank=True, null=True)
+    prepared_by_title = models.CharField(max_length=255, default='Dean, CITC')
+    
+    # Right side - Approved by
+    approved_by_name = models.CharField(max_length=255, default='Type name')
+    approved_by_title = models.CharField(max_length=255, default='VCAA, USTP-CDO')
+    
+    # Center footer text
+    address_line = models.TextField(default='C.M Recto Avenue, Lapasan, Cagayan de Oro City 9000 Philippines')
+    contact_line = models.TextField(default='Tel Nos. +63 (88) 856 1738; Telefax +63 (88) 856 4696 | http://www.ustp.edu.ph')
+    
+    # Logo
+    logo_url = models.TextField(blank=True, null=True)  # Base64 or URL
+    
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        managed = True
+        db_table = 'tbl_schedule_footer'
+        indexes = [
+            models.Index(fields=['college']),
+        ]
+    
+    def __str__(self):
+        college_name = self.college.college_name if self.college else 'Default'
+        return f"Footer - {college_name}"

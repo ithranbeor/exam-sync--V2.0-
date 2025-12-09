@@ -15,13 +15,14 @@ interface UserProfile {
   email_address: string;
   contact_number: string;
   avatar_url: string | null;
+  employment_type?: 'full-time' | 'part-time' | null;  // ✅ ADD THIS
 }
 
 interface UserRoleInfo {
   user_role_id: number;
   role_name: string;
   college?: string | null;
-  department?: string | null;
+  department?: string| null;
   status?: string | null;
 }
 
@@ -58,6 +59,7 @@ const Profile: React.FC<ProfileProps> = ({ user }) => {
         email_address: data.email_address || user.email_address,
         contact_number: data.contact_number || '',
         avatar_url: data.avatar_url || null,
+        employment_type: data.employment_type || null,  // ✅ ADD THIS
       };
       setProfile(mapped);
       setOriginalProfile(mapped);
@@ -70,7 +72,7 @@ const Profile: React.FC<ProfileProps> = ({ user }) => {
     }
   }, [user]);
 
-  /** 🔹 Fetch user roles */
+  /** Fetch user roles */
   const fetchRoles = useCallback(async () => {
     if (!user?.user_id) return;
     try {
@@ -212,14 +214,37 @@ const Profile: React.FC<ProfileProps> = ({ user }) => {
         <div className="profile-name-details">
           <div className="profile-full-name">
             {profile.first_name} {profile.middle_name} {profile.last_name}
+            {profile.employment_type && (
+              <span style={{ 
+                marginLeft: '12px',
+                padding: '4px 10px', 
+                borderRadius: '10px',
+                fontSize: '15px',
+                fontWeight: 500,
+                backgroundColor: profile.employment_type === 'full-time' ? '#07426cff' : '#fff3e0',
+                color: profile.employment_type === 'full-time' ? 'white' : '#f57c00'
+              }}>
+                {profile.employment_type === 'full-time' ? 'Full-time' : 'Part-time'}
+              </span>
+            )}
           </div>
           <div className="profile-user-type">
             {userRoles.length ? (
               userRoles.map((r) => (
-                <div key={r.user_role_id}>
-                  <strong>{r.role_name} - </strong>
-                  {r.college && <span className="info-badge college-badge">{r.college}</span>}
-                  {r.department && <span className="info-badge dept-badge">{r.department}</span>}
+                <div key={r.user_role_id} className="role-info-line">
+                  <strong>{r.role_name}: </strong>
+
+                  {r.college && (
+                    <span className="info-badge college-badges">
+                      {r.college}
+                    </span>
+                  )}
+
+                  {r.department && (
+                    <span className="info-badge dept-badge">
+                      {r.department}
+                    </span>
+                  )}
                 </div>
               ))
             ) : (

@@ -78,6 +78,11 @@ urlpatterns = [
     path('api/proctor-monitoring/', views.proctor_monitoring_dashboard, name='proctor_monitoring_dashboard'),
     path('api/reset-exam-otps/', views.reset_exam_otps, name='reset-exam-otps'),
 
+    # Schedule Footer
+    path('api/tbl_schedule_footer/', views.tbl_schedule_footer_list, name='tbl_schedule_footer_list'),
+    path('api/tbl_schedule_footer/<int:pk>/', views.tbl_schedule_footer_detail, name='tbl_schedule_footer_detail'),
+    path('api/upload-schedule-logo/', views.upload_schedule_logo, name='upload_schedule_logo'),
+
     # Redirect frontend routes to React
     re_path(r'^(?!api/).*$', RedirectView.as_view(url='https://exam-sync-frontend.onrender.com/', permanent=False)),
 ]

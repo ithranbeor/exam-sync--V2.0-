@@ -2,7 +2,7 @@
 
 from rest_framework import serializers
 from django.utils import timezone
-from .models import TblScheduleapproval, TblAvailableRooms, TblExamOtp, TblProctorAttendance, TblProctorSubstitution, TblNotification, TblUsers, TblRoles, TblExamdetails, TblAvailability, TblModality, TblSectioncourse, TblBuildings, TblUserRoleHistory, TblRooms, TblUserRole, TblCourseUsers, TblCourse, TblProgram, TblExamperiod, TblUserRole, TblTerm, TblCollege, TblDepartment
+from .models import TblScheduleapproval, TblAvailableRooms,TblScheduleFooter, TblExamOtp, TblProctorAttendance, TblProctorSubstitution, TblNotification, TblUsers, TblRoles, TblExamdetails, TblAvailability, TblModality, TblSectioncourse, TblBuildings, TblUserRoleHistory, TblRooms, TblUserRole, TblCourseUsers, TblCourse, TblProgram, TblExamperiod, TblUserRole, TblTerm, TblCollege, TblDepartment
 from django.contrib.auth.hashers import make_password
 
 class CourseSerializer(serializers.Serializer):
@@ -145,11 +145,37 @@ class TblDepartmentSerializer(serializers.ModelSerializer):
         return instance
 
 class UserRoleSerializer(serializers.ModelSerializer):
-    role_name = serializers.CharField(source='role.role_name')
+    role_name = serializers.CharField(source='role.role_name', read_only=True)
+
+    # ✅ Return readable objects instead of IDs
+    college = serializers.SerializerMethodField()
+    department = serializers.SerializerMethodField()
+
+    def get_college(self, obj):
+        if obj.college_id:
+            return {
+                "college_id": obj.college.college_id,
+                "college_name": obj.college.college_name
+            }
+        return None
+
+    def get_department(self, obj):
+        if obj.department_id:
+            return {
+                "department_id": obj.department.department_id,
+                "department_name": obj.department.department_name
+            }
+        return None
 
     class Meta:
         model = TblUserRole
-        fields = ['user_role_id', 'role_name', 'status', 'college', 'department']
+        fields = [
+            'user_role_id',
+            'role_name',
+            'status',
+            'college',
+            'department'
+        ]
 
 class TblExamperiodSerializer(serializers.ModelSerializer):
     term_id = serializers.IntegerField(source='term.term_id', read_only=True)
@@ -1096,3 +1122,38 @@ class TblProctorSubstitutionSerializer(serializers.ModelSerializer):
             validated_data['substitute_proctor'] = TblUsers.objects.get(user_id=substitute_proctor_id)
         
         return super().create(validated_data)
+    
+class TblScheduleFooterSerializer(serializers.ModelSerializer):
+    college_id = serializers.CharField(write_only=True, required=False, allow_null=True)
+    college_name = serializers.CharField(source='college.college_name', read_only=True)
+    
+    class Meta:
+        model = TblScheduleFooter
+        fields = [
+            'footer_id',
+            'college',
+            'college_id',
+            'college_name',
+            'prepared_by_name',
+            'prepared_by_title',
+            'approved_by_name',
+            'approved_by_title',
+            'address_line',
+            'contact_line',
+            'logo_url',
+            'created_at',
+            'updated_at'
+        ]
+        read_only_fields = ['footer_id', 'created_at', 'updated_at']
+    
+    def create(self, validated_data):
+        college_id = validated_data.pop('college_id', None)
+        if college_id:
+            validated_data['college'] = TblCollege.objects.get(pk=college_id)
+        return super().create(validated_data)
+    
+    def update(self, instance, validated_data):
+        college_id = validated_data.pop('college_id', None)
+        if college_id:
+            instance.college = TblCollege.objects.get(pk=college_id)
+        return super().update(instance, validated_data)
