@@ -306,7 +306,7 @@ export const UserManagement: React.FC<UserManagementProps> = ({}) => {
 
   // Handle Account Save (Add/Edit)
   const handleSaveAccount = async () => {
-    const { user_id, first_name, last_name, email_address, contact_number, status, middle_name } = newAccount;
+    const { user_id, first_name, last_name, email_address, contact_number, employment_type, status, middle_name } = newAccount;
 
     if (!(newAccount.user_id > 0) || !first_name || !last_name || !email_address || !contact_number) {
       toast.error('Please fill all required fields including User ID');
@@ -341,6 +341,7 @@ export const UserManagement: React.FC<UserManagementProps> = ({}) => {
           email_address,
           contact_number,
           status,
+          employment_type 
         });
         toast.success('Account updated successfully!');
       } else {
@@ -355,6 +356,7 @@ export const UserManagement: React.FC<UserManagementProps> = ({}) => {
           email_address,
           contact_number,
           status,
+          employment_type,
           password: defaultPassword,
           created_at: new Date().toISOString(),
         });
@@ -1765,75 +1767,76 @@ export const UserManagement: React.FC<UserManagementProps> = ({}) => {
                 </td>
               </tr>
             ) : (
-                paginatedAccounts.map((account, index) => {
-                    const accountRoles = getUserRoles(account.user_id);
-                    const isSelected = selectedAccountIds.has(account.user_id);
+              paginatedAccounts.map((account, index) => {
+                const accountRoles = getUserRoles(account.user_id);
+                const isSelected = selectedAccountIds.has(account.user_id);
 
-                    return (
-                    <tr
-                        key={account.user_id}
-                        style={{
-                        backgroundColor: isSelected ? '#ffcccc' : 'transparent',
+                return (
+                  <tr
+                    key={account.user_id}
+                    style={{
+                      backgroundColor: isSelected ? '#ffcccc' : 'transparent',
+                    }}
+                  >
+                    <td>{itemsPerPage === 'all' ? index + 1 : (currentPage - 1) * itemsPerPage + index + 1}</td>
+                    <td>{account.user_id}</td>
+                    <td>{account.last_name}, {account.first_name} {account.middle_name ?? ''}</td>
+                    <td>{account.email_address}</td>
+                    <td>{account.contact_number}</td>
+                    <td>
+                      {accountRoles.length > 0 ? (
+                        <pre style={{ whiteSpace: 'pre-wrap', margin: 0, fontSize: '0.85em' }}>
+                          {accountRoles
+                            .map(role => {
+                              const office = [role.college_id, role.department_id].filter(Boolean).join(' / ');
+                              return `${role.role_name}${office ? ` - ${office}` : ''}`;
+                            })
+                            .join('\n')}
+                        </pre>
+                      ) : '-'}
+                    </td>
+                    {/* ✅ NEW CELL */}
+                    <td>
+                      {account.employment_type ? (
+                        <span style={{ 
+                          padding: '3px 8px', 
+                          borderRadius: '4px',
+                          fontSize: '0.85em',
+                          fontWeight: 500,
+                          backgroundColor: account.employment_type === 'full-time' ? '#e3f2fd' : '#fff3e0',
+                          color: account.employment_type === 'full-time' ? '#1976d2' : '#f57c00'
+                        }}>
+                          {account.employment_type === 'full-time' ? 'Full-time' : 'Part-time'}
+                        </span>
+                      ) : '-'}
+                    </td>
+                    <td style={{ color: account.status === 'Suspended' ? 'red' : 'green', fontWeight: 'bold' }}>
+                      {account.status}
+                    </td>
+                    <td>{new Date(account.created_at).toLocaleDateString()}</td>
+                    <td className="action-buttons" style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                      <button
+                        type="button"
+                        className="action-button import"
+                        style={{ fontSize: '0.85em', padding: '5px 10px' }}
+                        onClick={() => {
+                          setSelectedUserId(account.user_id);
+                          setShowDetailsModal(true);
                         }}
-                    >
-                        <td>{itemsPerPage === 'all' ? index + 1 : (currentPage - 1) * itemsPerPage + index + 1}</td>
-                        <td>{account.user_id}</td>
-                        <td>{account.last_name}, {account.first_name} {account.middle_name ?? ''}</td>
-                        <td>{account.email_address}</td>
-                        <td>{account.contact_number}</td>
-                        <td>
-                        {accountRoles.length > 0 ? (
-                            <pre style={{ whiteSpace: 'pre-wrap', margin: 0, fontSize: '0.85em' }}>
-                            {accountRoles
-                                .map(role => {
-                                const office = [role.college_id, role.department_id].filter(Boolean).join(' / ');
-                                return `${role.role_name}${office ? ` - ${office}` : ''}`;
-                                })
-                                .join('\n')}
-                            </pre>
-                        ) : '-'}
-                        </td>
-                        <td>
-                          {account.employment_type ? (
-                            <span style={{ 
-                              padding: '3px 8px', 
-                              borderRadius: '4px',
-                              fontSize: '0.85em',
-                              fontWeight: 500,
-                              backgroundColor: account.employment_type === 'full-time' ? '#e3f2fd' : '#fff3e0',
-                              color: account.employment_type === 'full-time' ? '#1976d2' : '#f57c00'
-                            }}>
-                              {account.employment_type === 'full-time' ? 'Full-time' : 'Part-time'}
-                            </span>
-                          ) : '-'}
-                        </td>
-                        <td style={{ color: account.status === 'Suspended' ? 'red' : 'green', fontWeight: 'bold' }}>
-                        {account.status}
-                        </td>
-                        <td>{new Date(account.created_at).toLocaleDateString()}</td>
-                        <td className="action-buttons" style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-                          <button
-                            type="button"
-                            className="action-button import"
-                            style={{ fontSize: '0.85em', padding: '5px 10px' }}
-                            onClick={() => {
-                              setSelectedUserId(account.user_id);
-                              setShowDetailsModal(true);
-                            }}
-                          >
-                            View
-                          </button>
-                          <input
-                            type="checkbox"
-                            checked={selectedAccountIds.has(account.user_id)}
-                            onChange={() => toggleSelectAccount(account.user_id)}
-                            aria-label={`Select account ${account.user_id}`}
-                            style={{ marginLeft: 'auto' }}
-                          />
-                        </td>
-                    </tr>
-                    );
-                })
+                      >
+                        View
+                      </button>
+                      <input
+                        type="checkbox"
+                        checked={selectedAccountIds.has(account.user_id)}
+                        onChange={() => toggleSelectAccount(account.user_id)}
+                        aria-label={`Select account ${account.user_id}`}
+                        style={{ marginLeft: 'auto' }}
+                      />
+                    </td>
+                  </tr>
+                );
+              })
             )}
             </tbody>
         </table>
@@ -1843,22 +1846,23 @@ export const UserManagement: React.FC<UserManagementProps> = ({}) => {
       {/* User Details Modal */}
       {showDetailsModal && selectedUserId !== null && (
         <div className="modal-overlay">
-            <div className="user-details-modal fixed-modal">
+          <div className="user-details-modal fixed-modal">
             <h3 className="modal-title">User Details</h3>
 
             {(() => {
-                const account = accounts.find(a => a.user_id === selectedUserId);
-                if (!account) return null;
+              const account = accounts.find(a => a.user_id === selectedUserId);
+              if (!account) return null;
 
-                return (
+              return (
                 <div className="account-summary-card horizontal-layout">
-                    <div className="account-column">
+                  <div className="account-column">
                     <p><strong className="account-label">User ID:</strong> {account.user_id}</p>
                     <p><strong className="account-label">Full Name:</strong> {account.last_name}, {account.first_name} {account.middle_name || ''}</p>
                     <p><strong className="account-label">Email:</strong> {account.email_address}</p>
-                    </div>
-                    <div className="account-column">
+                  </div>
+                  <div className="account-column">
                     <p><strong className="account-label">Contact:</strong> {account.contact_number}</p>
+                    {/* ✅ NEW: Show employment type */}
                     <p>
                       <strong className="account-label">Employment:</strong>{' '}
                       {account.employment_type ? (
@@ -1874,35 +1878,35 @@ export const UserManagement: React.FC<UserManagementProps> = ({}) => {
                       ) : 'Not specified'}
                     </p>
                     <p><strong className="account-label">Status:</strong>
-                        <span className={`account-status ${account.status === 'Suspended' ? 'suspended' : 'active'}`}>
+                      <span className={`account-status ${account.status === 'Suspended' ? 'suspended' : 'active'}`}>
                         {account.status}
-                        </span>
+                      </span>
                     </p>
                     <div className="account-actions">
-                        <button
+                      <button
                         type="button"
                         className="icon-button edit-button"
                         onClick={() => {
-                            setNewAccount(account);
-                            setIsEditMode(true);
-                            setShowAccountModal(true);
+                          setNewAccount(account);
+                          setIsEditMode(true);
+                          setShowAccountModal(true);
                         }}
                         title="Edit Account"
-                        >
+                      >
                         <FaPen /> Edit Account
-                        </button>
-                        <button
+                      </button>
+                      <button
                         type="button"
                         className="icon-button delete-button"
                         onClick={() => handleDeleteAccount(account.user_id)}
                         title="Delete Account"
-                        >
+                      >
                         <FaTrash /> Delete Account
-                        </button>
+                      </button>
                     </div>
-                    </div>
+                  </div>
                 </div>
-                );
+              );
             })()}
 
             <h4 className="modal-subtitle">Assigned Roles</h4>
