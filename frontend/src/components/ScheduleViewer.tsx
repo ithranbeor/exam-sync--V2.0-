@@ -3,7 +3,7 @@ import React, { useEffect, useState, useRef } from "react";
 import Select from "react-select";
 import { api } from '../lib/apiClient.ts';
 import "../styles/SchedulerView.css";
-import { FaChevronLeft, FaChevronRight, FaUserEdit, FaEnvelope, FaFileDownload, FaPlus, FaTrash, FaSms, FaPaperPlane } from "react-icons/fa";
+import { FaChevronLeft, FaChevronRight, FaUserEdit, FaEnvelope, FaFileDownload, FaPlus, FaTrash, FaSms, FaPaperPlane, FaCog } from "react-icons/fa";
 import { MdSwapHoriz, MdEmail } from 'react-icons/md';
 import { ToastContainer, toast } from 'react-toastify';
 import 'react-toastify/dist/ReactToastify.css';
@@ -13,6 +13,7 @@ import SmsSender from "../components/SmsSender.tsx";
 import EmailSender from "../components/EmailSender.tsx";
 import DeanSend from "../components/DeanSend.tsx";
 import ExportSchedule from "../components/ExportSchedule.tsx";
+import FooterSettingsModal from "../components/FooterSettingsModal.tsx";
 
 interface ExamDetail {
   examdetails_id?: number; course_id: string; section_name?: string; sections?: string[]; room_id?: string; exam_date?: string; exam_start_time?: string; semester?: string;
@@ -69,6 +70,8 @@ const SchedulerView: React.FC<SchedulerViewProps> = ({ user }) => {
   const [_showExportDropdown, setShowExportDropdown] = useState(false);
   const [collegeDataReady, setCollegeDataReady] = useState(false);
   const exportRef = useRef<HTMLDivElement>(null);
+
+  const [showFooterSettings, setShowFooterSettings] = useState(false);
 
   const resetAllModes = () => {
     setIsModalOpen(false);
@@ -866,6 +869,14 @@ const SchedulerView: React.FC<SchedulerViewProps> = ({ user }) => {
 
       },
       ref: exportRef,
+    },
+    {
+      key: "Footer Settings",
+      icon: <FaCog style={{ fontSize: "20px" }} />,
+      action: () => {
+        resetAllModes();
+        setShowFooterSettings(true);
+      },
     },
     {
       key: "Delete All",
@@ -1952,6 +1963,27 @@ const SchedulerView: React.FC<SchedulerViewProps> = ({ user }) => {
 
       <Modal isOpen={showExportModal} onClose={() => setShowExportModal(false)}>
         <ExportSchedule onClose={() => setShowExportModal(false)} collegeName={collegeName} />
+      </Modal>
+
+      <Modal isOpen={showFooterSettings} onClose={() => setShowFooterSettings(false)}>
+        <FooterSettingsModal
+          isOpen={showFooterSettings}
+          onClose={() => setShowFooterSettings(false)}
+          collegeName={collegeName}
+          onSave={async () => {
+            // Refresh footer data
+            try {
+              const response = await api.get('/tbl_schedule_footer/', {
+                params: { college_id: collegeName }
+              });
+              if (response.data && response.data.length > 0) {
+                setFooterData(response.data[0]);
+              }
+            } catch (error) {
+              console.error("Error refreshing footer data:", error);
+            }
+          }}
+        />
       </Modal>
 
       <ToastContainer position="top-right" autoClose={1500} />
