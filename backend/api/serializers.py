@@ -143,14 +143,6 @@ class TblDepartmentSerializer(serializers.ModelSerializer):
         instance.department_name = validated_data.get('department_name', instance.department_name)
         instance.save()
         return instance
-    
-class UserSerializer(serializers.ModelSerializer):
-    class Meta:
-        model = TblUsers
-        fields = [
-            'user_id', 'first_name', 'middle_name', 'last_name',
-            'email_address', 'contact_number', 'avatar_url', 'status', 'user_uuid'
-        ]
 
 class UserRoleSerializer(serializers.ModelSerializer):
     role_name = serializers.CharField(source='role.role_name')
@@ -305,7 +297,8 @@ class TblUsersSerializer(serializers.ModelSerializer):
             'created_at',
             'avatar_url',
             'full_name',
-            'password'
+            'password',
+            'employment_type',  # ✅ NEW FIELD
         ]
 
     def get_full_name(self, obj):
@@ -337,6 +330,24 @@ class TblUsersSerializer(serializers.ModelSerializer):
         
         instance.save()
         return instance
+
+
+# Also update the basic UserSerializer if it's used elsewhere
+class UserSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = TblUsers
+        fields = [
+            'user_id', 
+            'first_name', 
+            'middle_name', 
+            'last_name',
+            'email_address', 
+            'contact_number', 
+            'avatar_url', 
+            'status', 
+            'user_uuid',
+            'employment_type',
+        ]
 
 class TblRolesSerializer(serializers.ModelSerializer):
     class Meta:

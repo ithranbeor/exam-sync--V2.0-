@@ -18,6 +18,7 @@ interface UserAccount {
   status: string;
   created_at: string;
   avatar_url?: string | null;
+  employment_type?: 'full-time' | 'part-time' | null;
 }
 
 interface Role {
@@ -111,6 +112,7 @@ export const UserManagement: React.FC<UserManagementProps> = ({}) => {
     contact_number: '',
     status: 'Active',
     created_at: new Date().toISOString(),
+    employment_type: null,
   });
 
   const [newAccountRoles, setNewAccountRoles] = useState<NewAccountRole[]>([]);
@@ -1730,6 +1732,7 @@ export const UserManagement: React.FC<UserManagementProps> = ({}) => {
               <th>Email</th>
               <th>Contact</th>
               <th>Role/s</th>
+              <th>Employment Type</th>
               <th>Status</th>
               <th>Created</th>
               <th>
@@ -1751,13 +1754,13 @@ export const UserManagement: React.FC<UserManagementProps> = ({}) => {
           <tbody>
             {loading ? (
               <tr>
-                <td colSpan={9} style={{ textAlign: "center", padding: "20px" }}>
+                <td colSpan={10} style={{ textAlign: "center", padding: "20px" }}>
                   Loading users...
                 </td>
               </tr>
             ) : filteredAccounts.length === 0 ? (
               <tr>
-                <td colSpan={9} style={{ textAlign: "center", padding: "20px" }}>
+                <td colSpan={10} style={{ textAlign: "center", padding: "20px" }}>
                   No users found.
                 </td>
               </tr>
@@ -1789,6 +1792,20 @@ export const UserManagement: React.FC<UserManagementProps> = ({}) => {
                                 .join('\n')}
                             </pre>
                         ) : '-'}
+                        </td>
+                        <td>
+                          {account.employment_type ? (
+                            <span style={{ 
+                              padding: '3px 8px', 
+                              borderRadius: '4px',
+                              fontSize: '0.85em',
+                              fontWeight: 500,
+                              backgroundColor: account.employment_type === 'full-time' ? '#e3f2fd' : '#fff3e0',
+                              color: account.employment_type === 'full-time' ? '#1976d2' : '#f57c00'
+                            }}>
+                              {account.employment_type === 'full-time' ? 'Full-time' : 'Part-time'}
+                            </span>
+                          ) : '-'}
                         </td>
                         <td style={{ color: account.status === 'Suspended' ? 'red' : 'green', fontWeight: 'bold' }}>
                         {account.status}
@@ -1842,6 +1859,20 @@ export const UserManagement: React.FC<UserManagementProps> = ({}) => {
                     </div>
                     <div className="account-column">
                     <p><strong className="account-label">Contact:</strong> {account.contact_number}</p>
+                    <p>
+                      <strong className="account-label">Employment:</strong>{' '}
+                      {account.employment_type ? (
+                        <span style={{ 
+                          padding: '2px 6px', 
+                          borderRadius: '3px',
+                          fontSize: '0.9em',
+                          backgroundColor: account.employment_type === 'full-time' ? '#e3f2fd' : '#fff3e0',
+                          color: account.employment_type === 'full-time' ? '#1976d2' : '#f57c00'
+                        }}>
+                          {account.employment_type === 'full-time' ? 'Full-time' : 'Part-time'}
+                        </span>
+                      ) : 'Not specified'}
+                    </p>
                     <p><strong className="account-label">Status:</strong>
                         <span className={`account-status ${account.status === 'Suspended' ? 'suspended' : 'active'}`}>
                         {account.status}
@@ -1971,6 +2002,28 @@ export const UserManagement: React.FC<UserManagementProps> = ({}) => {
                 />
               </div>
             ))}
+
+            <div className="input-group">
+              <label htmlFor="employment_type">EMPLOYMENT TYPE</label>
+              <select
+                id="employment_type"
+                value={newAccount.employment_type || ''}
+                onChange={(e) => setNewAccount(prev => ({
+                  ...prev,
+                  employment_type: e.target.value ? e.target.value as 'full-time' | 'part-time' : null
+                }))}
+                style={{
+                  padding: '8px',
+                  borderRadius: '4px',
+                  border: '1px solid #ccc',
+                  width: '100%'
+                }}
+              >
+                <option value="">Not Specified</option>
+                <option value="full-time">Full-time</option>
+                <option value="part-time">Part-time</option>
+              </select>
+            </div>
 
             {!isEditMode && (
               <>

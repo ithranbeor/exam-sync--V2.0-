@@ -64,6 +64,8 @@ const SchedulerPlottingSchedule: React.FC<SchedulerProps> = ({ user, onScheduleC
 
   const [alreadyScheduledIds, setAlreadyScheduledIds] = useState<Set<number>>(new Set());
   const [_checkingSchedules, setCheckingSchedules] = useState(false);
+  const [allCollegeUsers, setAllCollegeUsers] = useState<any[]>([]);
+  const [_proctors, setProctors] = useState<any[]>([]);
 
   const times = [
     "07:00", "07:30", "08:00", "08:30", "09:00", "09:30", "10:00", "10:30", "11:00", "11:30",
@@ -87,12 +89,16 @@ const SchedulerPlottingSchedule: React.FC<SchedulerProps> = ({ user, onScheduleC
         const allColleges = collegesResponse.data;
         setCollegesCache(allColleges || []);
 
+        // ---------------------------------------
+        // 🔹 UPDATED ROLE FETCHING + PROCTOR FILTERING
+        // ---------------------------------------
         const userRolesResponse = await api.get('/tbl_user_role', {
           params: {
             user_id: user.user_id,
-            role_id: 3
+            role_id: 3 // Scheduler role
           }
         });
+
         const userRoles: any[] = userRolesResponse.data || [];
 
         if (!userRoles || userRoles.length === 0) {
@@ -112,7 +118,9 @@ const SchedulerPlottingSchedule: React.FC<SchedulerProps> = ({ user, onScheduleC
 
         let schedulerCollegeName = "";
         if (collegeIds.length > 0) {
-          const schedulerCollege = allColleges.find((c: any) => String(c.college_id) === collegeIds[0]);
+          const schedulerCollege = allColleges.find(
+            (c: any) => String(c.college_id) === collegeIds[0]
+          );
           schedulerCollegeName = schedulerCollege?.college_name || "";
           setSchedulerCollegeName(schedulerCollegeName);
         }
@@ -143,17 +151,19 @@ const SchedulerPlottingSchedule: React.FC<SchedulerProps> = ({ user, onScheduleC
         const rooms = roomsResponse.data;
         const buildings = buildingsResponse.data;
 
-        const filteredDepartments = (allDepartments || []).filter((d: any) => 
+        const filteredDepartments = (allDepartments || []).filter((d: any) =>
           collegeIds.includes(String(d.college_id))
         );
-        
-        const allowedDeptIds = filteredDepartments.map((d: any) => String(d.department_id));
-        
-        const filteredPrograms = (allPrograms || []).filter((p: any) => 
+
+        const allowedDeptIds = filteredDepartments.map((d: any) =>
+          String(d.department_id)
+        );
+
+        const filteredPrograms = (allPrograms || []).filter((p: any) =>
           allowedDeptIds.includes(String(p.department_id))
         );
 
-        const filteredExamPeriods = (allExamPeriods || []).filter((p: any) => 
+        const filteredExamPeriods = (allExamPeriods || []).filter((p: any) =>
           collegeIds.includes(String(p.college_id))
         );
 
@@ -162,6 +172,7 @@ const SchedulerPlottingSchedule: React.FC<SchedulerProps> = ({ user, onScheduleC
           return program !== undefined;
         });
 
+        // 🔹 Store filtered academic data
         setExamPeriods(filteredExamPeriods);
         setDepartments(filteredDepartments);
         setPrograms(filteredPrograms);
@@ -169,6 +180,50 @@ const SchedulerPlottingSchedule: React.FC<SchedulerProps> = ({ user, onScheduleC
         setSectionCourses(filteredSectCourses);
         setRoomsCache(rooms || []);
         setBuildingsCache(buildings || []);
+
+        // ----------------------------------------------------
+        // 🔹 FIXED LOGIC: FILTER PROCTORS BY COLLEGE OR COLLEGE-THROUGH-DEPARTMENT
+        // ----------------------------------------------------
+        const proctorRolesResponse = await api.get('/tbl_user_role', {
+          params: {
+            role_id: 5, // Proctor Role
+          },
+        });
+
+        const allProctorRoles = proctorRolesResponse.data || [];
+
+        const filteredProctorRoles = allProctorRoles.filter((p: any) => {
+          if (p.college_id && collegeIds.includes(String(p.college_id))) {
+            return true;
+          }
+          if (p.department_id) {
+            const dept = allDepartments?.find(
+              (d: any) =>
+                String(d.department_id) === String(p.department_id)
+            );
+            if (dept && collegeIds.includes(String(dept.college_id))) {
+              return true;
+            }
+          }
+          return false;
+        });
+
+        const proctorUserIds = Array.from(
+          new Set(filteredProctorRoles.map((p: any) => p.user_id).filter(Boolean))
+        );
+
+        const usersResponse = await api.get('/users/');
+        const allUsers = usersResponse.data;
+
+        const userDetails = allUsers.filter((u: any) =>
+          proctorUserIds.includes(u.user_id)
+        );
+
+        setAllCollegeUsers(userDetails || []);
+        setProctors(userDetails || []);
+
+        // ----------------------------------------------------
+
       } catch (err: any) {
         console.error("Failed to fetch data:", err);
         alert("Failed to fetch data");
@@ -954,6 +1009,14 @@ const SchedulerPlottingSchedule: React.FC<SchedulerProps> = ({ user, onScheduleC
   // ============================================================================
 
   const assignExamSchedules = async () => {
+
+    if (allCollegeUsers.length === 0) {
+      alert("No proctors found for your college. Please ensure proctors are assigned.");
+      return;
+    }
+
+    console.log(`📋 Using ${allCollegeUsers.length} proctors from college: ${schedulerCollegeName}`);
+
     const POPULATION_SIZE = 50;
     const GENERATIONS = 100;
     const MUTATION_RATE = 0.25;
@@ -1040,23 +1103,26 @@ const SchedulerPlottingSchedule: React.FC<SchedulerProps> = ({ user, onScheduleC
     const getAvailableProctors = (date: string, startTime: string): number[] => {
       const isoDate = date.includes('T') ? date.split('T')[0] : date;
 
-      // 1) direct lookup by exact startTime (e.g., "2025-12-10|07:30")
+      // 1) direct lookup by exact startTime
       const directKey = `${isoDate}|${startTime}`;
       if (availabilityMap.has(directKey)) {
-        return Array.from(availabilityMap.get(directKey)!.values());
+        const proctors = Array.from(availabilityMap.get(directKey)!.values());
+        // ✅ FIXED: Filter to only include proctors from scheduler's college
+        return proctors.filter(pid => allCollegeUsers.some(u => u.user_id === pid));
       }
 
-      // 2) lookup by period name (e.g., "2025-12-10|7 AM - 1 PM (Morning)")
+      // 2) lookup by period name
       const period = getPeriodFromTime(startTime);
       if (period) {
         const periodKey = `${isoDate}|${period}`;
         if (availabilityMap.has(periodKey)) {
-          return Array.from(availabilityMap.get(periodKey)!.values());
+          const proctors = Array.from(availabilityMap.get(periodKey)!.values());
+          // ✅ FIXED: Filter to only include proctors from scheduler's college
+          return proctors.filter(pid => allCollegeUsers.some(u => u.user_id === pid));
         }
       }
 
-      // 3) last resort: gather any proctors on the date (any time) — optional
-      // This may be noisy; keep it if you want aggressive fallback:
+      // 3) last resort: gather any proctors on the date
       const anyDatePrefix = `${isoDate}|`;
       const proctors = new Set<number>();
       for (const [k, s] of availabilityMap.entries()) {
@@ -1064,7 +1130,9 @@ const SchedulerPlottingSchedule: React.FC<SchedulerProps> = ({ user, onScheduleC
           s.forEach(p => proctors.add(p));
         }
       }
-      return Array.from(proctors);
+      
+      // ✅ FIXED: Filter to only include proctors from scheduler's college
+      return Array.from(proctors).filter(pid => allCollegeUsers.some(u => u.user_id === pid));
     };
 
     const roomCapacityMap = new Map<string, number>();

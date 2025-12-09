@@ -513,7 +513,19 @@ class TblUsers(models.Model):
     avatar_url = models.CharField(blank=True, null=True)
     status = models.TextField(blank=True, null=True)
     user_uuid = models.UUIDField(blank=True, null=True)
-    password = models.CharField(max_length=128) 
+    password = models.CharField(max_length=128)
+    
+    # ✅ NEW: Employment type field
+    employment_type = models.CharField(
+        max_length=20,
+        blank=True,
+        null=True,
+        choices=[
+            ('full-time', 'Full-time'),
+            ('part-time', 'Part-time'),
+        ],
+        help_text='Employment status: full-time or part-time'
+    )
 
     class Meta:
         managed = True
@@ -552,10 +564,6 @@ class TblExamOtp(models.Model):
 
 
 class TblProctorAttendance(models.Model):
-    """
-    Stores proctor attendance records
-    Records time-in, time-out, substitution status, and remarks
-    """
     attendance_id = models.AutoField(primary_key=True)
     examdetails = models.ForeignKey(
         'TblExamdetails', 

@@ -596,7 +596,9 @@ input {
 
 .icon-button.reactivate-button {
   background-color: #fff3cd;
-  color: #856404;
+  color: #5b4505;
+  border-radius: 100px;
+  padding: 6px;
 }
 
 .icon-button.reactivate-button:hover {

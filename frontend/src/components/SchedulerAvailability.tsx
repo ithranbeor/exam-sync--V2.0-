@@ -262,6 +262,7 @@ const SchedulerAvailability: React.FC<ProctorSetAvailabilityProps> = ({ user }) 
   };
 
   // ✅ Simplified refresh function
+  // ✅ Simplified refresh function
   const fetchAvailability = async () => {
     if (!user?.user_id) return;
     setLoading(true);
@@ -279,12 +280,16 @@ const SchedulerAvailability: React.FC<ProctorSetAvailabilityProps> = ({ user }) 
       const schedulerCollegeId = schedulerRole.college_id;
 
       const { data: proctorRoles } = await api.get(`/tbl_user_role`, {
-        params: { role_id: 5, college_id: schedulerCollegeId }
+        params: { role_id: 5 }
       });
 
       if (!proctorRoles || !Array.isArray(proctorRoles)) return;
 
-      const validProctorRoles = proctorRoles.filter((p: any) => p.user_id != null);
+      // Filter proctors by college BEFORE processing
+      const validProctorRoles = proctorRoles.filter(
+        (p: any) => p.user_id != null && p.college_id === schedulerCollegeId
+      );
+      
       const uniqueUserIds = [...new Set(validProctorRoles.map((p: any) => p.user_id))];
 
       if (uniqueUserIds.length === 0) {
@@ -292,24 +297,52 @@ const SchedulerAvailability: React.FC<ProctorSetAvailabilityProps> = ({ user }) 
         return;
       }
 
-      const availabilityResults = await Promise.all(
-        uniqueUserIds.map(async (userId) => {
-          try {
-            const { data } = await api.get(`/tbl_availability/`, {
-              params: { user_id: userId }
-            });
-            return Array.isArray(data) ? data : [];
-          } catch (err) {
-            return [];
-          }
-        })
-      );
+      // Fetch availability and missing user data in parallel
+      const [availabilityResults, newUserData] = await Promise.all([
+        Promise.all(
+          uniqueUserIds.map(async (userId) => {
+            try {
+              const { data } = await api.get(`/tbl_availability/`, {
+                params: { user_id: userId }
+              });
+              return Array.isArray(data) ? data : [];
+            } catch (err) {
+              return [];
+            }
+          })
+        ),
+        // Fetch user data for users not in cache
+        Promise.all(
+          uniqueUserIds
+            .filter(userId => !userCache.has(userId))
+            .map(async (userId) => {
+              try {
+                const { data } = await api.get(`/users/${userId}/`);
+                return { userId, data };
+              } catch (err) {
+                return { userId, data: null };
+              }
+            })
+        )
+      ]);
+
+      // Update cache with new user data
+      const updatedCache = new Map(userCache);
+      newUserData.forEach(({ userId, data }) => {
+        if (data) {
+          updatedCache.set(userId, data);
+        }
+      });
+      setUserCache(updatedCache);
 
       const allAvailability = availabilityResults.flat();
-      const validAvailability = allAvailability.filter((entry: any) => entry.user_id != null);
+      // Only show availability for proctors in this college
+      const validAvailability = allAvailability.filter((entry: any) => 
+        entry.user_id != null && uniqueUserIds.includes(entry.user_id)
+      );
 
       const mappedAvailability = validAvailability.map((entry: any) => {
-        const userData = userCache.get(entry.user_id);
+        const userData = updatedCache.get(entry.user_id);
         return {
           availability_id: entry.availability_id,
           days: Array.isArray(entry.days) ? entry.days : [],

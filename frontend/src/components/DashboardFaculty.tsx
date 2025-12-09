@@ -388,8 +388,9 @@ const DashboardFaculty = () => {
               <div className="full-width-section">
                 <h2>Shortcut</h2>
                 <div className="try-things-grid">
+                  {roles.includes('proctor') && 
+                  <div className="try-thing-card"><ProctorCourseDetails user={user} /></div>}
                   <div className="try-thing-card"><MiniExamDateCalendar user={user} /></div>
-                  {roles.includes('proctor') && <div className="try-thing-card"><ProctorCourseDetails user={user} /></div>}
                 </div>
               </div>
             </div>

@@ -396,26 +396,70 @@ const ProctorViewExam: React.FC<ProctorViewExamProps> = ({ user }) => {
   }
 
   // Only show schedules if approved
+  // Only show schedules if approved
   if (approvalStatus !== 'approved') {
     return (
-      <div style={{
-        display: 'flex',
-        flexDirection: 'column',
-        justifyContent: 'center',
-        alignItems: 'center',
-        height: '100vh',
-        fontSize: '24px',
-        color: '#092C4C',
-        padding: '20px',
-        textAlign: 'center'
-      }}>
-        <p>
-          {approvalStatus === 'pending' 
-            ? 'Schedule is pending approval from the dean.' 
-            : approvalStatus === 'rejected'
-            ? 'Schedule was rejected. Please contact your scheduler.'
-            : 'No approved schedule available yet.'}
-        </p>
+      <div style={{ position: "relative", width: "100%", overflow: "visible" }}>
+        <div
+          className="scheduler-view-card"
+          style={{
+            minWidth: "100%",
+            maxWidth: "1400px",
+            boxShadow: "0 8px 20px rgba(0,0,0,0.3)",
+            borderRadius: 12,
+            background: "#f9f9f9",
+            margin: "16px auto",
+            padding: 15,
+            transform: "scale(0.9)",
+            transformOrigin: "top center",
+            transition: "transform 0.3s ease"
+          }}
+        >
+          <div className="scheduler-view-container">
+            <div className="header" style={{ textAlign: "center", marginBottom: "20px" }}>
+              <img
+                src="/logo/USTPlogo.png"
+                alt="School Logo"
+                style={{ width: '200px', height: '160px', marginBottom: '5px' }}
+              />
+              <div style={{ fontSize: '30px', color: '#333', marginBottom: '-10px', fontFamily: 'serif' }}>
+                University of Science and Technology of Southern Philippines
+              </div>
+              <div style={{ fontSize: '15px', color: '#555', marginBottom: '-10px', fontFamily: 'serif' }}>
+                Alubijid | Balubal | Cagayan de Oro City | Claveria | Jasaan | Oroquieta | Panaon | Villanueva
+              </div>
+              <div style={{ fontSize: '30px', color: '#333', marginBottom: '-10px', fontFamily: 'serif' }}>{collegeName}</div>
+              <div style={{ fontSize: '20px', color: '#333', marginBottom: '-10px', fontFamily: 'serif', fontWeight: 'bold' }}>
+                Examination Schedule
+              </div>
+            </div>
+            <hr />
+            <div style={{
+              textAlign: 'center',
+              padding: '100px 20px',
+              fontSize: '24px',
+              color: approvalStatus === 'rejected' ? '#d32f2f' : '#666',
+              fontFamily: 'serif'
+            }}>
+              <div style={{
+                backgroundColor: approvalStatus === 'rejected' ? '#ffebee' : approvalStatus === 'pending' ? '#fff3e0' : '#f5f5f5',
+                padding: '40px',
+                borderRadius: '12px',
+                border: `2px solid ${approvalStatus === 'rejected' ? '#d32f2f' : approvalStatus === 'pending' ? '#ff9800' : '#999'}`,
+                maxWidth: '600px',
+                margin: '0 auto'
+              }}>
+                <p style={{ margin: 0, fontWeight: 'bold' }}>
+                  {approvalStatus === 'pending' 
+                    ? 'Schedule is pending approval from the dean.' 
+                    : approvalStatus === 'rejected'
+                    ? 'Schedule was rejected. Please contact your scheduler.'
+                    : 'No approved schedule available yet.'}
+                </p>
+              </div>
+            </div>
+          </div>
+        </div>
       </div>
     );
   }
