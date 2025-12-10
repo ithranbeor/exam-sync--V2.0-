@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useCallback, useMemo } from 'react';
-import { FaSort, FaSearch } from 'react-icons/fa';
+import { FaSort } from 'react-icons/fa';
 import { toast, ToastContainer } from 'react-toastify';
 import 'react-toastify/dist/ReactToastify.css';
 import api from '../lib/apiClient';
@@ -54,7 +54,6 @@ const ProctorMonitoring: React.FC<UserProps> = ({ }) => {
   const [showResetConfirm, setShowResetConfirm] = useState(false);
   const [sortBy, setSortBy] = useState<string>('none');
   const [showSortDropdown, setShowSortDropdown] = useState(false);
-  const [searchTerm, setSearchTerm] = useState('');
 
   useEffect(() => {
     if (approvedSchedules.length === 0) return;
@@ -67,16 +66,16 @@ const ProctorMonitoring: React.FC<UserProps> = ({ }) => {
 
       const currentStatus = (s.examdetails_status || s.status || '').toLowerCase();
 
-      if (now > examEnd && !hasTimeIn && currentStatus === "pending") {
+      if (now > examEnd && !hasTimeIn && currentStatus === 'pending') {
         try {
           setTimeout(() => fetchMonitoringData(), 500);
           await api.patch(`/update-proctor-status/${s.id}/`, {
-            status: "absent",
+            status: 'absent',
           });
 
           console.log(`Auto-marked absent for schedule ${s.id}`);
         } catch (err) {
-          console.error("Failed to auto-mark absent:", err);
+          console.error('Failed to auto-mark absent:', err);
         }
       }
     });
@@ -95,19 +94,19 @@ const ProctorMonitoring: React.FC<UserProps> = ({ }) => {
 
       // ✅ PERFORMANCE FIX: Fetch ALL approvals in ONE request
       const approvalResponse = await api.get('/tbl_scheduleapproval/', {
-        params: { status: 'approved' }
+        params: { status: 'approved' },
       });
-      
+
       // Create a Set of approved colleges for O(1) lookup
       const approvedColleges = new Set(
-        approvalResponse.data.map((approval: any) => approval.college_name)
+        approvalResponse.data.map((approval: any) => approval.college_name),
       );
 
       // Map schedules with instant approval check (no more API calls in loop)
       const schedulesWithApproval = examData.map((schedule: any) => {
         const isApproved = approvedColleges.has(schedule.college);
-        
-        const mappedSchedule = {
+
+        const mappedSchedule: MonitoringSchedule = {
           id: schedule.id,
           course_id: schedule.course_id,
           subject: schedule.subject || schedule.course_id,
@@ -125,15 +124,15 @@ const ProctorMonitoring: React.FC<UserProps> = ({ }) => {
           examdetails_status: schedule.examdetails_status,
           code_entry_time: schedule.code_entry_time || null,
           otp_code: schedule.otp_code || null,
-          approval_status: isApproved ? 'approved' : 'pending'
+          approval_status: isApproved ? 'approved' : 'pending',
         };
-        
+
         return mappedSchedule;
       });
 
       // Filter to show ONLY approved schedules
       const approvedOnly = schedulesWithApproval.filter(
-        (schedule: MonitoringSchedule) => schedule.approval_status === 'approved'
+        (schedule: MonitoringSchedule) => schedule.approval_status === 'approved',
       );
 
       setApprovedSchedules(approvedOnly);
@@ -176,8 +175,8 @@ const ProctorMonitoring: React.FC<UserProps> = ({ }) => {
     setGeneratingOtp(true);
     try {
       const schedulesWithoutOtp = approvedSchedules
-        .filter(s => !s.otp_code)
-        .map(s => s.id);
+        .filter((s) => !s.otp_code)
+        .map((s) => s.id);
 
       if (schedulesWithoutOtp.length === 0) {
         toast.info('All schedules already have OTP codes');
@@ -185,14 +184,15 @@ const ProctorMonitoring: React.FC<UserProps> = ({ }) => {
       }
 
       const response = await api.post('/generate-exam-otps/', {
-        schedule_ids: schedulesWithoutOtp
+        schedule_ids: schedulesWithoutOtp,
       });
 
       toast.success(`Generated OTP codes for ${response.data.generated_count} schedule(s)`);
       await fetchMonitoringData();
     } catch (error: any) {
       console.error('Error generating OTP codes:', error);
-      const errorMessage = error.response?.data?.error || error.message || 'Failed to generate OTP codes';
+      const errorMessage =
+        error.response?.data?.error || error.message || 'Failed to generate OTP codes';
       toast.error(errorMessage);
     } finally {
       setGeneratingOtp(false);
@@ -205,8 +205,8 @@ const ProctorMonitoring: React.FC<UserProps> = ({ }) => {
 
     try {
       const schedulesWithOtp = approvedSchedules
-        .filter(s => s.otp_code)
-        .map(s => s.id);
+        .filter((s) => s.otp_code)
+        .map((s) => s.id);
 
       if (schedulesWithOtp.length === 0) {
         toast.info('No OTP codes to reset');
@@ -215,17 +215,43 @@ const ProctorMonitoring: React.FC<UserProps> = ({ }) => {
       }
 
       const response = await api.post('/reset-exam-otps/', {
-        schedule_ids: schedulesWithOtp
+        schedule_ids: schedulesWithOtp,
       });
 
       toast.success(`Reset ${response.data.deleted_count} OTP code(s)`);
       await fetchMonitoringData();
     } catch (error: any) {
       console.error('Error resetting OTP codes:', error);
-      const errorMessage = error.response?.data?.error || error.message || 'Failed to reset OTP codes';
+      const errorMessage =
+        error.response?.data?.error || error.message || 'Failed to reset OTP codes';
       toast.error(errorMessage);
     } finally {
       setResettingOtp(false);
+    }
+  };
+
+  const formatTo12Hour = (timeString: string | undefined) => {
+    if (!timeString) return '-';
+
+    try {
+      const date = new Date(timeString);
+
+      const options: Intl.DateTimeFormatOptions = {
+        hour: 'numeric',
+        minute: '2-digit',
+        hour12: true,
+        timeZone: 'Asia/Manila',
+      };
+
+      if (isNaN(date.getTime())) {
+        console.error('Invalid Date input:', timeString);
+        return '-';
+      }
+
+      return date.toLocaleTimeString('en-US', options);
+    } catch (e) {
+      console.error('Error formatting time:', timeString, e);
+      return '-';
     }
   };
 
@@ -236,7 +262,7 @@ const ProctorMonitoring: React.FC<UserProps> = ({ }) => {
     }
 
     // Check if all schedules have OTP codes
-    const hasAllCodes = sortedSchedules.every(s => s.otp_code);
+    const hasAllCodes = sortedSchedules.every((s) => s.otp_code);
     if (!hasAllCodes) {
       toast.error('Cannot export: Some schedules do not have exam codes yet. Please generate codes first.');
       return;
@@ -258,22 +284,27 @@ const ProctorMonitoring: React.FC<UserProps> = ({ }) => {
     };
 
     const doc = new jsPDF('landscape', 'mm', 'a4');
-    
+
     // Title
     doc.setFontSize(16);
     doc.setFont('helvetica', 'bold');
     doc.text('EXAM MONITORING REPORT', 148, 15, { align: 'center' });
-    
+
     // Date generated
     doc.setFontSize(10);
     doc.setFont('helvetica', 'normal');
-    doc.text(`Generated: ${new Date().toLocaleString('en-US', { 
-      year: 'numeric', 
-      month: 'long', 
-      day: 'numeric',
-      hour: '2-digit',
-      minute: '2-digit'
-    })}`, 148, 22, { align: 'center' });
+    doc.text(
+      `Generated: ${new Date().toLocaleString('en-US', {
+        year: 'numeric',
+        month: 'long',
+        day: 'numeric',
+        hour: '2-digit',
+        minute: '2-digit',
+      })}`,
+      148,
+      22,
+      { align: 'center' },
+    );
 
     // Prepare table data
     const tableData = sortedSchedules.map((schedule, index) => [
@@ -287,7 +318,7 @@ const ProctorMonitoring: React.FC<UserProps> = ({ }) => {
       schedule.proctor_name,
       schedule.otp_code || 'N/A',
       formatTimeIn(schedule.code_entry_time),
-      schedule.status.toUpperCase()
+      schedule.status.toUpperCase(),
     ]);
 
     // Add table using autoTable function directly
@@ -318,19 +349,19 @@ const ProctorMonitoring: React.FC<UserProps> = ({ }) => {
         7: { cellWidth: 30 },
         8: { cellWidth: 22, halign: 'center', fontStyle: 'bold' },
         9: { cellWidth: 18, halign: 'center' },
-        10: { cellWidth: 20, halign: 'center', fontStyle: 'bold' }
+        10: { cellWidth: 20, halign: 'center', fontStyle: 'bold' },
       },
       bodyStyles: {
-        valign: 'middle'
+        valign: 'middle',
       },
       alternateRowStyles: {
-        fillColor: [245, 245, 245]
+        fillColor: [245, 245, 245],
       },
       didDrawCell: (data: any) => {
         // Color code status column
         if (data.column.index === 10 && data.section === 'body') {
-          const status = data.cell.raw.toLowerCase();
-          let color;
+          const status = String(data.cell.raw).toLowerCase();
+          let color: [number, number, number];
           if (status.includes('confirm') || status.includes('present')) {
             color = [40, 167, 69]; // Green
           } else if (status.includes('late')) {
@@ -345,7 +376,7 @@ const ProctorMonitoring: React.FC<UserProps> = ({ }) => {
           doc.setTextColor(color[0], color[1], color[2]);
           doc.setFont('helvetica', 'bold');
         }
-      }
+      },
     });
 
     // Footer
@@ -358,7 +389,7 @@ const ProctorMonitoring: React.FC<UserProps> = ({ }) => {
         `Page ${i} of ${pageCount}`,
         148,
         doc.internal.pageSize.height - 10,
-        { align: 'center' }
+        { align: 'center' },
       );
     }
 
@@ -389,37 +420,11 @@ const ProctorMonitoring: React.FC<UserProps> = ({ }) => {
   };
 
   const sortedSchedules = useMemo(() => {
-    let data = approvedSchedules;
-
-    if (searchTerm.trim()) {
-      const term = searchTerm.toLowerCase();
-      data = data.filter((schedule) => {
-        const combined = [
-          schedule.course_id,
-          schedule.subject,
-          schedule.section_name,
-          schedule.exam_date,
-          schedule.exam_start_time,
-          schedule.exam_end_time,
-          schedule.building_name,
-          schedule.room_id,
-          schedule.proctor_name,
-          schedule.instructor_name,
-          schedule.status,
-        ]
-          .filter(Boolean)
-          .join(' ')
-          .toLowerCase();
-
-        return combined.includes(term);
-      });
-    }
-
     if (sortBy === 'none') {
-      return data;
+      return approvedSchedules;
     }
 
-    return [...data].sort((a, b) => {
+    return [...approvedSchedules].sort((a, b) => {
       switch (sortBy) {
         case 'course_id':
           return smartSort(a.course_id.toLowerCase(), b.course_id.toLowerCase());
@@ -442,25 +447,191 @@ const ProctorMonitoring: React.FC<UserProps> = ({ }) => {
         case 'status':
           return smartSort(a.status.toLowerCase(), b.status.toLowerCase());
         default:
-    </div>
+          return 0;
+      }
+    });
+  }, [approvedSchedules, sortBy]);
 
-    <div className="proctor-monitoring-header-right">
-      <div className="search-bar">
-        <input
-          type="text"
-          placeholder="Search by course, proctor, room..."
-          value={searchTerm}
-          onChange={(e) => setSearchTerm(e.target.value)}
-        />
-        <button type="button" className="search-button">
-          <FaSearch />
-        </button>
+  return (
+    <div className="proctor-monitoring-container">
+      <ToastContainer position="top-right" autoClose={3000} />
+
+      <div className="proctor-monitoring-header">
+        <div className="proctor-monitoring-header-left">
+          <p
+            className={`proctor-monitoring-label ${
+              hasApprovedSchedules
+                ? 'proctor-monitoring-label-approved'
+                : 'proctor-monitoring-label-waiting'
+            }`}
+          >
+            {hasApprovedSchedules
+              ? 'EXAM SCHEDULE HAS BEEN APPROVED. CLICK TO GENERATE EXAM CODES'
+              : 'WAITING FOR DEAN APPROVAL'}
+          </p>
+          <div style={{ marginTop: '10px', position: 'relative' }} data-sort-dropdown>
+            <button
+              type='button'
+              onClick={() => setShowSortDropdown(!showSortDropdown)}
+              style={{
+                backgroundColor: '#0A3765',
+                color: 'white',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                gap: '6px',
+                padding: '8px 16px',
+                borderRadius: '8px',
+                border: 'none',
+                cursor: 'pointer',
+                fontSize: '14px',
+                fontWeight: 500,
+                minWidth: '100px',
+                transition: 'background-color 0.2s ease'
+              }}
+              onMouseEnter={(e) => {
+                e.currentTarget.style.backgroundColor = '#0d4a7a';
+              }}
+              onMouseLeave={(e) => {
+                e.currentTarget.style.backgroundColor = '#0A3765';
+              }}
+              title="Sort by"
+            >
+              <FaSort />
+              <span>Sort by</span>
+            </button>
+            {showSortDropdown && (
+              <div
+                style={{
+                  position: 'absolute',
+                  top: '100%',
+                  left: 0,
+                  marginTop: '4px',
+                  backgroundColor: 'white',
+                  border: '1px solid #ddd',
+                  borderRadius: '8px',
+                  boxShadow: '0 2px 8px rgba(0,0,0,0.15)',
+                  zIndex: 1000,
+                  minWidth: '150px'
+                }}
+              >
+                {['none', 'course_id', 'subject', 'section_name', 'exam_date', 'exam_start_time', 'building_name', 'room_id', 'proctor_name', 'instructor_name', 'status'].map((sortOption) => (
+                  <button
+                    key={sortOption}
+                    type="button"
+                    onClick={() => {
+                      setSortBy(sortOption);
+                      setShowSortDropdown(false);
+                    }}
+                    style={{
+                      width: '100%',
+                      padding: '8px 12px',
+                      textAlign: 'left',
+                      border: 'none',
+                      backgroundColor: sortBy === sortOption ? '#f0f0f0' : 'white',
+                      color: '#000',
+                      cursor: 'pointer',
+                      fontSize: '14px',
+                      borderTop: sortOption !== 'none' ? '1px solid #eee' : 'none'
+                    }}
+                    onMouseEnter={(e) => {
+                      if (sortBy !== sortOption) e.currentTarget.style.backgroundColor = '#f5f5f5';
+                    }}
+                    onMouseLeave={(e) => {
+                      if (sortBy !== sortOption) e.currentTarget.style.backgroundColor = 'white';
+                    }}
+                  >
+                    {sortOption === 'none' ? 'None' :
+                     sortOption === 'course_id' ? 'Course Code' :
+                     sortOption === 'section_name' ? 'Section' :
+                     sortOption === 'exam_date' ? 'Date' :
+                     sortOption === 'exam_start_time' ? 'Time' :
+                     sortOption === 'building_name' ? 'Building' :
+                     sortOption === 'room_id' ? 'Room' :
+                     sortOption === 'proctor_name' ? 'Proctor' :
+                     sortOption === 'instructor_name' ? 'Instructor' :
+                     sortOption === 'status' ? 'Status' :
+                     sortOption.charAt(0).toUpperCase() + sortOption.slice(1)}
+                  </button>
+                ))}
+              </div>
+            )}
+          </div>
+        </div>
+
+        <div style={{ display: 'flex', gap: '10px', marginLeft: 'auto' }}>
+          <button
+            className="proctor-monitoring-create-button"
+            onClick={handleGenerateOtpCodes}
+            disabled={generatingOtp || loading || !hasApprovedSchedules}
+            style={{
+              opacity: hasApprovedSchedules ? 1 : 0.6,
+              cursor: hasApprovedSchedules ? 'pointer' : 'not-allowed'
+            }}
+          >
+            {generatingOtp ? 'GENERATING...' : 'GENERATE EXAM CODES'}
+          </button>
+
+          <button
+            className="proctor-monitoring-reset-button"
+            onClick={() => setShowResetConfirm(true)}
+            disabled={resettingOtp || loading || !hasOtpCodes}
+            style={{
+              opacity: hasOtpCodes ? 1 : 0.6,
+              cursor: hasOtpCodes ? 'pointer' : 'not-allowed',
+              backgroundColor: '#dc3545',
+              color: 'white',
+              border: 'none',
+              padding: '10px 20px',
+              borderRadius: '5px',
+              fontWeight: 'bold',
+              fontSize: '14px'
+            }}
+          >
+            {resettingOtp ? 'RESETTING...' : 'RESET EXAM CODES'}
+          </button>
+
+          <button
+            onClick={handleExportPDF}
+            disabled={loading || sortedSchedules.length === 0 || !sortedSchedules.every(s => s.otp_code)}
+            style={{
+              opacity: (sortedSchedules.length > 0 && sortedSchedules.every(s => s.otp_code)) ? 1 : 0.6,
+              cursor: (sortedSchedules.length > 0 && sortedSchedules.every(s => s.otp_code)) ? 'pointer' : 'not-allowed',
+              backgroundColor: '#28a745',
+              color: 'white',
+              border: 'none',
+              padding: '10px 20px',
+              borderRadius: '5px',
+              fontWeight: 'bold',
+              fontSize: '14px'
+            }}
+          >
+            EXPORT TO PDF
+          </button>
+        </div>
       </div>
 
-      <div style={{ display: 'flex', gap: '10px' }}>
-        <button
-          type='button'
-          onClick={() => setShowSortDropdown(!showSortDropdown)}
+      {loading ? (
+        <div className="no-data-message">Loading monitoring data...</div>
+      ) : (
+        <>
+          <div className="proctor-monitoring-table-container">
+            <table className="proctor-monitoring-table">
+              <thead>
+                <tr>
+                  <th>#</th>
+                  <th>Course Code</th>
+                  <th>Subject</th>
+                  <th>Section</th>
+                  <th>Date</th>
+                  <th>Time</th>
+                  <th>Building</th>
+                  <th>Room</th>
+                  <th>Proctor</th>
+                  <th>Instructor</th>
+                  <th>Exam Code</th>
+                  <th>Time In</th>
+                  <th>Status</th>
                 </tr>
               </thead>
               <tbody>
@@ -468,7 +639,7 @@ const ProctorMonitoring: React.FC<UserProps> = ({ }) => {
                   sortedSchedules.map((schedule, index) => {
                     // ✅ FIXED: Use backend status directly
                     const backendStatus = schedule.examdetails_status || schedule.status || 'pending';
-                    
+
                     const getStatusDisplay = (status: string | null | undefined) => {
                       if (!status) {
                         return { text: 'Pending', className: 'status-pending' };
