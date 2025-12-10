@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useCallback, useMemo } from 'react';
-import { FaSort } from 'react-icons/fa';
+import { FaSort, FaSearch } from 'react-icons/fa';
 import { toast, ToastContainer } from 'react-toastify';
 import 'react-toastify/dist/ReactToastify.css';
 import api from '../lib/apiClient';
@@ -54,6 +54,7 @@ const ProctorMonitoring: React.FC<UserProps> = ({ }) => {
   const [showResetConfirm, setShowResetConfirm] = useState(false);
   const [sortBy, setSortBy] = useState<string>('none');
   const [showSortDropdown, setShowSortDropdown] = useState(false);
+  const [searchTerm, setSearchTerm] = useState('');
 
   useEffect(() => {
     if (approvedSchedules.length === 0) return;
@@ -388,11 +389,37 @@ const ProctorMonitoring: React.FC<UserProps> = ({ }) => {
   };
 
   const sortedSchedules = useMemo(() => {
-    if (sortBy === 'none') {
-      return approvedSchedules;
+    let data = approvedSchedules;
+
+    if (searchTerm.trim()) {
+      const term = searchTerm.toLowerCase();
+      data = data.filter((schedule) => {
+        const combined = [
+          schedule.course_id,
+          schedule.subject,
+          schedule.section_name,
+          schedule.exam_date,
+          schedule.exam_start_time,
+          schedule.exam_end_time,
+          schedule.building_name,
+          schedule.room_id,
+          schedule.proctor_name,
+          schedule.instructor_name,
+          schedule.status,
+        ]
+          .filter(Boolean)
+          .join(' ')
+          .toLowerCase();
+
+        return combined.includes(term);
+      });
     }
 
-    return [...approvedSchedules].sort((a, b) => {
+    if (sortBy === 'none') {
+      return data;
+    }
+
+    return [...data].sort((a, b) => {
       switch (sortBy) {
         case 'course_id':
           return smartSort(a.course_id.toLowerCase(), b.course_id.toLowerCase());
@@ -415,213 +442,25 @@ const ProctorMonitoring: React.FC<UserProps> = ({ }) => {
         case 'status':
           return smartSort(a.status.toLowerCase(), b.status.toLowerCase());
         default:
-          return 0;
-      }
-    });
-  }, [approvedSchedules, sortBy]);
+    </div>
 
-  const formatTo12Hour = (timeString: string | undefined) => {
-    if (!timeString) return '-';
-
-    try {
-      const date = new Date(timeString);
-
-      const options: Intl.DateTimeFormatOptions = {
-        hour: 'numeric',
-        minute: '2-digit',
-        hour12: true,
-        timeZone: 'Asia/Manila'
-      };
-
-      if (isNaN(date.getTime())) {
-        console.error('Invalid Date input:', timeString);
-        return '-';
-      }
-
-      return date.toLocaleTimeString('en-US', options);
-
-    } catch (e) {
-      console.error('Error formatting time:', timeString, e);
-      return '-';
-    }
-  };
-
-  return (
-    <div className="proctor-monitoring-container">
-      <ToastContainer position="top-right" autoClose={3000} />
-
-      <div className="proctor-monitoring-header">
-        <div className="proctor-monitoring-header-left">
-          <p
-            className={`proctor-monitoring-label ${hasApprovedSchedules ? 'proctor-monitoring-label-approved' : 'proctor-monitoring-label-waiting'}`}
-          >
-            {hasApprovedSchedules
-              ? 'EXAM SCHEDULE HAS BEEN APPROVED. CLICK TO GENERATE EXAM CODES'
-              : 'WAITING FOR DEAN APPROVAL'}
-          </p>
-          <div style={{ marginTop: '10px', position: 'relative' }} data-sort-dropdown>
-            <button
-              type='button'
-              onClick={() => setShowSortDropdown(!showSortDropdown)}
-              style={{
-                backgroundColor: sortBy !== 'none' ? '#0A3765' : '#0A3765',
-                color: 'white',
-                display: 'flex',
-                alignItems: 'center',
-                justifyContent: 'center',
-                gap: '6px',
-                padding: '8px 16px',
-                borderRadius: '8px',
-                border: 'none',
-                cursor: 'pointer',
-                fontSize: '14px',
-                fontWeight: '500',
-                minWidth: '100px',
-                transition: 'background-color 0.2s ease'
-              }}
-              onMouseEnter={(e) => {
-                e.currentTarget.style.backgroundColor = '#0d4a7a';
-              }}
-              onMouseLeave={(e) => {
-                e.currentTarget.style.backgroundColor = '#0A3765';
-              }}
-              title="Sort by"
-            >
-              <FaSort />
-              <span>Sort by</span>
-            </button>
-            {showSortDropdown && (
-              <div
-                style={{
-                  position: 'absolute',
-                  top: '100%',
-                  left: 0,
-                  marginTop: '4px',
-                  backgroundColor: 'white',
-                  border: '1px solid #ddd',
-                  borderRadius: '8px',
-                  boxShadow: '0 2px 8px rgba(0,0,0,0.15)',
-                  zIndex: 1000,
-                  minWidth: '150px'
-                }}
-              >
-                {['none', 'course_id', 'subject', 'section_name', 'exam_date', 'exam_start_time', 'building_name', 'room_id', 'proctor_name', 'instructor_name', 'status'].map((sortOption) => (
-                  <button
-                    key={sortOption}
-                    type="button"
-                    onClick={() => {
-                      setSortBy(sortOption);
-                      setShowSortDropdown(false);
-                    }}
-                    style={{
-                      width: '100%',
-                      padding: '8px 12px',
-                      textAlign: 'left',
-                      border: 'none',
-                      backgroundColor: sortBy === sortOption ? '#f0f0f0' : 'white',
-                      color: '#000',
-                      cursor: 'pointer',
-                      fontSize: '14px',
-                      borderTop: sortOption !== 'none' ? '1px solid #eee' : 'none'
-                    }}
-                    onMouseEnter={(e) => {
-                      if (sortBy !== sortOption) e.currentTarget.style.backgroundColor = '#f5f5f5';
-                    }}
-                    onMouseLeave={(e) => {
-                      if (sortBy !== sortOption) e.currentTarget.style.backgroundColor = 'white';
-                    }}
-                  >
-                    {sortOption === 'none' ? 'None' :
-                     sortOption === 'course_id' ? 'Course Code' :
-                     sortOption === 'section_name' ? 'Section' :
-                     sortOption === 'exam_date' ? 'Date' :
-                     sortOption === 'exam_start_time' ? 'Time' :
-                     sortOption === 'building_name' ? 'Building' :
-                     sortOption === 'room_id' ? 'Room' :
-                     sortOption === 'proctor_name' ? 'Proctor' :
-                     sortOption === 'instructor_name' ? 'Instructor' :
-                     sortOption === 'status' ? 'Status' : 
-                     sortOption.charAt(0).toUpperCase() + sortOption.slice(1)}
-                  </button>
-                ))}
-              </div>
-            )}
-          </div>
-        </div>
-        <div style={{ display: 'flex', gap: '10px' }}>
-          <button
-            className="proctor-monitoring-create-button"
-            onClick={handleGenerateOtpCodes}
-            disabled={generatingOtp || loading || !hasApprovedSchedules}
-            style={{
-              opacity: hasApprovedSchedules ? 1 : 0.6,
-              cursor: hasApprovedSchedules ? 'pointer' : 'not-allowed'
-            }}
-          >
-            {generatingOtp ? 'GENERATING...' : 'GENERATE EXAM CODES'}
-          </button>
-
-          <button
-            className="proctor-monitoring-reset-button"
-            onClick={() => setShowResetConfirm(true)}
-            disabled={resettingOtp || loading || !hasOtpCodes}
-            style={{
-              opacity: hasOtpCodes ? 1 : 0.6,
-              cursor: hasOtpCodes ? 'pointer' : 'not-allowed',
-              backgroundColor: '#dc3545',
-              color: 'white',
-              border: 'none',
-              padding: '10px 20px',
-              borderRadius: '5px',
-              fontWeight: 'bold',
-              fontSize: '14px'
-            }}
-          >
-            {resettingOtp ? 'RESETTING...' : 'RESET EXAM CODES'}
-          </button>
-
-          {/* ✅ NEW: Export Button */}
-          <button
-            onClick={handleExportPDF}
-            disabled={loading || sortedSchedules.length === 0 || !sortedSchedules.every(s => s.otp_code)}
-            style={{
-              opacity: (sortedSchedules.length > 0 && sortedSchedules.every(s => s.otp_code)) ? 1 : 0.6,
-              cursor: (sortedSchedules.length > 0 && sortedSchedules.every(s => s.otp_code)) ? 'pointer' : 'not-allowed',
-              backgroundColor: '#28a745',
-              color: 'white',
-              border: 'none',
-              padding: '10px 20px',
-              borderRadius: '5px',
-              fontWeight: 'bold',
-              fontSize: '14px'
-            }}
-          >
-            EXPORT TO PDF
-          </button>
-        </div>
+    <div className="proctor-monitoring-header-right">
+      <div className="search-bar">
+        <input
+          type="text"
+          placeholder="Search by course, proctor, room..."
+          value={searchTerm}
+          onChange={(e) => setSearchTerm(e.target.value)}
+        />
+        <button type="button" className="search-button">
+          <FaSearch />
+        </button>
       </div>
 
-      {loading ? (
-        <div className="no-data-message">Loading monitoring data...</div>
-      ) : (
-        <>
-          <div className="proctor-monitoring-table-container">
-            <table className="proctor-monitoring-table">
-              <thead>
-                <tr>
-                  <th>#</th>
-                  <th>Course Code</th>
-                  <th>Subject</th>
-                  <th>Section</th>
-                  <th>Date</th>
-                  <th>Time</th>
-                  <th>Building</th>
-                  <th>Room</th>
-                  <th>Proctor</th>
-                  <th>Instructor</th>
-                  <th>Exam Code</th>
-                  <th>Time In</th>
-                  <th>Status</th>
+      <div style={{ display: 'flex', gap: '10px' }}>
+        <button
+          type='button'
+          onClick={() => setShowSortDropdown(!showSortDropdown)}
                 </tr>
               </thead>
               <tbody>
