@@ -424,7 +424,8 @@ def submit_proctor_attendance(request):
         print(f"\n📅 Exam Schedule Details:")
         print(f"   - Exam ID: {exam_schedule.examdetails_id}")
         print(f"   - Course: {exam_schedule.course_id}")
-        print(f"   - Scheduled Start: {exam_schedule.exam_start_time}")
+        print(f"   - Exam Date: {exam_schedule.exam_date}")
+        print(f"   - Start Time: {exam_schedule.exam_start_time}")
         print(f"   - Start Time Type: {type(exam_schedule.exam_start_time)}")
         
         # Check if attendance already exists
@@ -455,8 +456,10 @@ def submit_proctor_attendance(request):
                     'error': f'User {user_id} not found'
                 }, status=status.HTTP_400_BAD_REQUEST)
             
-            # Create attendance record with current time
+            # Get current time
             current_time = timezone.now()
+            
+            # Create attendance record
             attendance = TblProctorAttendance.objects.create(
                 examdetails=exam_schedule,
                 proctor=proctor_user,
@@ -476,40 +479,56 @@ def submit_proctor_attendance(request):
             if role == 'assigned':
                 from datetime import datetime as dt, time as dt_time
                 
+                # Parse exam date
                 exam_date_obj = None
                 if exam_schedule.exam_date:
                     try:
                         exam_date_obj = dt.strptime(exam_schedule.exam_date, '%Y-%m-%d').date()
+                        print(f"   - Parsed exam date: {exam_date_obj}")
                     except Exception as e:
                         print(f"⚠️ Error parsing exam_date: {e}")
                 
                 if exam_date_obj and exam_schedule.exam_start_time:
-                    # ✅ FIX: Extract time component if exam_start_time is datetime
+                    # ✅ FIX: Extract time component properly
                     if isinstance(exam_schedule.exam_start_time, dt):
+                        # If it's a datetime object, extract the time
                         exam_start_time = exam_schedule.exam_start_time.time()
                     elif isinstance(exam_schedule.exam_start_time, dt_time):
+                        # If it's already a time object, use it directly
                         exam_start_time = exam_schedule.exam_start_time
                     else:
+                        # Fallback: default to confirmed if we can't parse
                         print(f"⚠️ Unexpected exam_start_time type: {type(exam_schedule.exam_start_time)}")
                         exam_schedule.status = "confirmed"
                         exam_schedule.proctor_timein = current_time
                         exam_schedule.save(update_fields=["status", "proctor_timein"])
                         print(f"✅ Updated exam schedule - Status: confirmed (fallback)")
+                        
+                        return Response({
+                            'message': 'Attendance recorded successfully',
+                            'attendance_id': attendance.attendance_id,
+                            'time_in': attendance.time_in.isoformat(),
+                            'status': exam_schedule.status,
+                            'role': 'substitute' if attendance.is_substitute else 'assigned',
+                            'proctor_name': f"{proctor_user.first_name} {proctor_user.last_name}"
+                        }, status=status.HTTP_201_CREATED)
                     
-                    # Create datetime for scheduled start
+                    # ✅ Create datetime for scheduled start (in Philippines timezone)
                     exam_start_datetime = timezone.make_aware(
-                        dt.combine(exam_date_obj, exam_start_time)
+                        dt.combine(exam_date_obj, exam_start_time),
+                        timezone.get_current_timezone()
                     )
                     
-                    # Calculate difference in minutes
-                    time_diff_minutes = (current_time - exam_start_datetime).total_seconds() / 60
+                    # ✅ Calculate difference in minutes
+                    time_diff = current_time - exam_start_datetime
+                    time_diff_minutes = time_diff.total_seconds() / 60
                     
                     print(f"\n⏱️ Time Check:")
                     print(f"   - Scheduled Start: {exam_start_datetime}")
                     print(f"   - Actual Time In: {current_time}")
                     print(f"   - Difference: {time_diff_minutes:.1f} minutes")
                     
-                    # Mark as LATE if more than 7 minutes after start
+                    # ✅ Mark as LATE if more than 7 minutes after start
                     if time_diff_minutes > 7:
                         exam_schedule.status = "late"
                         print(f"   - Status: LATE (arrived {time_diff_minutes:.1f} minutes after start)")
@@ -517,6 +536,7 @@ def submit_proctor_attendance(request):
                         exam_schedule.status = "confirmed"
                         print(f"   - Status: ON TIME")
                 else:
+                    # If we can't determine timing, default to confirmed
                     exam_schedule.status = "confirmed"
                     print(f"   - Status: CONFIRMED (no scheduled time to compare)")
             else:
@@ -524,7 +544,7 @@ def submit_proctor_attendance(request):
                 exam_schedule.status = "substitute"
                 print(f"   - Status: SUBSTITUTE")
             
-            # Update the exam schedule
+            # ✅ Update the exam schedule with the determined status
             exam_schedule.proctor_timein = current_time
             exam_schedule.save(update_fields=["status", "proctor_timein"])
             print(f"✅ Updated exam schedule - Status: {exam_schedule.status}")
@@ -547,7 +567,7 @@ def submit_proctor_attendance(request):
             'message': 'Attendance recorded successfully',
             'attendance_id': attendance.attendance_id,
             'time_in': attendance.time_in.isoformat(),
-            'status': exam_schedule.status,  # Return the actual status
+            'status': exam_schedule.status,  # ✅ Return the actual status
             'role': 'substitute' if attendance.is_substitute else 'assigned',
             'proctor_name': f"{proctor_user.first_name} {proctor_user.last_name}"
         }, status=status.HTTP_201_CREATED)
