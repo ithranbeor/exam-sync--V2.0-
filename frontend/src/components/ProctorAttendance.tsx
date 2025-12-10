@@ -317,7 +317,7 @@ const ProctorAttendance: React.FC<UserProps> = ({ user }) => {
 
   // Update handleVerifyOtp to show success modal instead of just status
   const handleVerifyOtp = async () => {
-    if (!otpCode.trim() || !user?.user_id) {
+    if (!otpCode.trim() || !user?.user_id || !selectedExam?.id) {
       return;
     }
 
@@ -325,7 +325,8 @@ const ProctorAttendance: React.FC<UserProps> = ({ user }) => {
     try {
       const response = await api.post('/verify-otp/', {
         otp_code: otpCode.trim(),
-        user_id: user.user_id
+        user_id: user.user_id,
+        exam_schedule_id: selectedExam.id  // ✅ ADD THIS - send the exam ID
       });
 
       const { valid, verification_status, message, exam_schedule_id, ...examData } = response.data;

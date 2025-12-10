@@ -242,6 +242,7 @@ def verify_otp(request):
     try:
         otp_code = request.data.get('otp_code', '').strip()
         user_id = request.data.get('user_id')
+        exam_schedule_id = request.data.get('exam_schedule_id')  # ✅ ADD THIS - must match the exam being verified
         
         # ✅ FIX: Convert user_id to integer immediately
         try:
@@ -251,6 +252,13 @@ def verify_otp(request):
                 'valid': False,
                 'message': 'Invalid user_id format'
             }, status=status.HTTP_400_BAD_REQUEST)
+        
+        # ✅ FIX: Require exam_schedule_id
+        if not exam_schedule_id:
+            return Response({
+                'valid': False,
+                'message': 'Exam schedule ID is required'
+            }, status=status.HTTP_400_BAD_REQUEST)
                 
         if not otp_code or not user_id:
             return Response({
@@ -258,18 +266,21 @@ def verify_otp(request):
                 'message': 'OTP code and user_id are required'
             }, status=status.HTTP_400_BAD_REQUEST)
         
-        # Find OTP record
+        # ✅ FIX: Find OTP record AND verify it belongs to THIS exam
         try:
             otp_record = TblExamOtp.objects.select_related(
                 'examdetails',
                 'examdetails__room',
                 'examdetails__proctor',
                 'examdetails__modality'
-            ).get(otp_code=otp_code)
+            ).get(
+                otp_code=otp_code,
+                examdetails_id=exam_schedule_id  # ✅ CRITICAL: OTP must match this specific exam
+            )
         except TblExamOtp.DoesNotExist:
             return Response({
                 'valid': False,
-                'message': 'Invalid OTP code'
+                'message': 'Invalid OTP code for this exam'
             }, status=status.HTTP_200_OK)
         
         # Check if expired
