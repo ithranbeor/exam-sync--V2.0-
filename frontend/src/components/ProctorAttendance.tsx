@@ -290,12 +290,19 @@ const ProctorAttendance: React.FC<UserProps> = ({ user }) => {
   }, [fetchAssignedExams]);
 
   const handleCardClick = (exam: ExamDetails, isSubstitution: boolean = false) => {
+    console.log('🔍 Card clicked:', {
+      exam_id: exam.id,
+      course: exam.course_id,
+      isSubstitution
+    });
+    
     setSelectedExam(exam);
     setIsSubstitutionMode(isSubstitution);
     setShowModal(true);
     setOtpCode('');
     setRemarks('');
     setOtpValidationStatus('idle');
+    setVerificationData(null);  // ✅ Clear previous verification data
   };
 
   const handleCloseModal = () => {
@@ -318,33 +325,57 @@ const ProctorAttendance: React.FC<UserProps> = ({ user }) => {
   // Update handleVerifyOtp to show success modal instead of just status
   const handleVerifyOtp = async () => {
     if (!otpCode.trim() || !user?.user_id || !selectedExam?.id) {
+      toast.error('Missing required information');
       return;
     }
+
+    console.log('🔐 Verifying OTP:', {
+      otp_code: otpCode.trim(),
+      user_id: user.user_id,
+      exam_schedule_id: selectedExam.id,  // ✅ This ensures OTP is validated for THIS specific exam
+      isSubstitutionMode
+    });
 
     setVerifyingOtp(true);
     try {
       const response = await api.post('/verify-otp/', {
         otp_code: otpCode.trim(),
         user_id: user.user_id,
-        exam_schedule_id: selectedExam.id  // ✅ ADD THIS - send the exam ID
+        exam_schedule_id: selectedExam.id  // ✅ CRITICAL: Send exam ID to backend
       });
 
       const { valid, verification_status, message, exam_schedule_id, ...examData } = response.data;
 
+      console.log('✅ OTP Verification Response:', {
+        valid,
+        verification_status,
+        message,
+        exam_schedule_id
+      });
+
       if (valid) {
+        // ✅ FIX: Verification status should match whether user is assigned to THIS exam
         setOtpValidationStatus(verification_status as 'valid-assigned' | 'valid-not-assigned');
         setVerificationData({ exam_schedule_id, ...examData });
         
-        // Show success modal instead of toast
+        // Show success modal
         setShowVerificationSuccess(true);
+        
+        // ✅ Log what status was determined
+        console.log(`📝 Status determined: ${verification_status}`);
+        if (verification_status === 'valid-assigned') {
+          console.log('✅ User IS assigned to this exam - No remarks required');
+        } else {
+          console.log('⚠️ User is NOT assigned to this exam - Substitution mode, remarks required');
+        }
       } else {
         setOtpValidationStatus('invalid');
         toast.error(message || 'Invalid OTP code');
       }
     } catch (error: any) {
-      console.error('Error verifying OTP:', error);
+      console.error('❌ Error verifying OTP:', error);
       setOtpValidationStatus('invalid');
-      const errorMessage = error.response?.data?.error || error.message || 'Failed to verify OTP';
+      const errorMessage = error.response?.data?.message || error.response?.data?.error || error.message || 'Failed to verify OTP';
       toast.error(errorMessage);
     } finally {
       setVerifyingOtp(false);
@@ -385,7 +416,16 @@ const ProctorAttendance: React.FC<UserProps> = ({ user }) => {
     }
 
     const role = otpValidationStatus === 'valid-assigned' ? 'assigned' : 'sub';
-    // Validate remarks for substitute
+    
+    console.log('📤 Submitting attendance:', {
+      otp_code: otpCode.trim(),
+      user_id: user.user_id,
+      role,
+      verification_status: otpValidationStatus,
+      has_remarks: !!remarks.trim()
+    });
+
+    // ✅ FIX: Validate remarks for substitute ONLY
     if (role === 'sub' && !remarks.trim()) {
       toast.error('Remarks are required for substitute proctors');
       return;
@@ -398,12 +438,13 @@ const ProctorAttendance: React.FC<UserProps> = ({ user }) => {
         user_id: user.user_id,
         remarks: remarks.trim() || undefined,
         role: role
-        // ✅ REMOVED is_late - backend will determine this
       });
+
+      console.log('✅ Attendance submitted successfully:', response.data);
 
       toast.success(response.data.message || 'Attendance recorded successfully');
       
-      // ✅ Check status from response
+      // Check status from response
       if (response.data.status === 'late') {
         toast.warning('Marked as LATE - You arrived more than 7 minutes after start time', {
           autoClose: 5000
@@ -417,7 +458,7 @@ const ProctorAttendance: React.FC<UserProps> = ({ user }) => {
       setShowVerificationSuccess(false);
       handleCloseModal();
     } catch (error: any) {
-      console.error('Error submitting attendance:', error);
+      console.error('❌ Error submitting attendance:', error);
       const errorMessage = error.response?.data?.error || error.message || 'Failed to submit attendance';
       toast.error(errorMessage);
     } finally {
