@@ -739,8 +739,8 @@ def proctor_monitoring_dashboard(request):
             'proctor',
             'modality'
         ).prefetch_related(
-            'attendance_records',  # ✅ Use correct related_name
-            'attendance_records__proctor'  # ✅ Also prefetch proctor info
+            'attendance_records',
+            'attendance_records__proctor'
         )
         
         # Apply filters
@@ -764,28 +764,28 @@ def proctor_monitoring_dashboard(request):
                 print(f"⚠️ Error fetching OTP for exam {exam.examdetails_id}: {str(e)}")
                 otp_code = None
             
-            # ✅ Get attendance record (use first() to get the actual attendance)
+            # ✅ Get attendance record
             attendance = exam.attendance_records.first()
             
-            print(f"🔍 Exam {exam.examdetails_id} - Attendance: {attendance}")
+            # ✅ CRITICAL FIX: Use exam.status from TblExamdetails (the actual DB field)
+            # This is set by submit_proctor_attendance and reflects the true status
+            db_status = exam.status or 'pending'
             
-            # Determine status based on attendance
+            print(f"🔍 Exam {exam.examdetails_id} - DB Status: {db_status}")
+            
+            # Determine who the proctor is
             if attendance:
-                if attendance.is_substitute:
-                    exam_status = 'substitute'
-                else:
-                    exam_status = 'confirmed'
                 code_entry_time = attendance.time_in
                 
                 # Get actual proctor who checked in
                 proctor_user = attendance.proctor
                 proctor_name = f"{proctor_user.first_name} {proctor_user.last_name}"
                 
-                print(f"✅ Exam {exam.examdetails_id} has attendance - Status: {exam_status}")
+                print(f"✅ Exam {exam.examdetails_id} has attendance")
                 print(f"   - Proctor: {proctor_name}")
                 print(f"   - Time in: {code_entry_time}")
+                print(f"   - DB Status: {db_status}")
             else:
-                exam_status = 'pending'
                 code_entry_time = None
                 
                 # Show assigned proctor
@@ -794,7 +794,7 @@ def proctor_monitoring_dashboard(request):
                 else:
                     proctor_name = None
                 
-                print(f"⏳ Exam {exam.examdetails_id} has no attendance - Status: pending")
+                print(f"⏳ Exam {exam.examdetails_id} has no attendance - Status: {db_status}")
             
             # Get instructor name
             instructor_name = None
@@ -822,13 +822,13 @@ def proctor_monitoring_dashboard(request):
                 'instructor_name': instructor_name,
                 'department': exam.college_name,
                 'college': exam.college_name,
-                'status': exam_status,
-                'examdetails_status': exam_status, 
+                'status': db_status,  # ✅ This is the actual status from TblExamdetails
+                'examdetails_status': db_status,  # ✅ CRITICAL: Add this field explicitly
                 'code_entry_time': code_entry_time.isoformat() if code_entry_time else None,
                 'otp_code': otp_code
             })
         
-        print(f"✅ Returning {len(result)} exam schedules")
+        print(f"✅ Returning {len(result)} exam schedules with statuses")
         return Response(result, status=status.HTTP_200_OK)
         
     except Exception as e:

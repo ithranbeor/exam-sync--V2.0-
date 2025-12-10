@@ -110,6 +110,18 @@ const ProctorAttendance: React.FC<UserProps> = ({ user }) => {
     try {
       const { data } = await api.get(`/proctor-assigned-exams/${user.user_id}/`);
       
+      console.log('=== ALL FETCHED EXAMS (Before Filter) ===');
+      console.log('Total exams:', data.length);
+      data.forEach((exam: any) => {
+        console.log({
+          course: exam.course_id,
+          date: exam.exam_date,
+          start: exam.exam_start_time,
+          end: exam.exam_end_time,
+          status: exam.status
+        });
+      });
+      
       const formattedExams: ExamDetails[] = data.map((exam: any) => ({
         id: exam.id,
         course_id: exam.course_id,
@@ -125,16 +137,27 @@ const ProctorAttendance: React.FC<UserProps> = ({ user }) => {
         status: exam.status || 'pending'
       }));
       
-      // ✅ Split into ongoing and recent (confirmed/submitted)
-      const ongoing = formattedExams.filter((exam: ExamDetails) => {
-        const isOngoing = isExamOngoing(exam.exam_date, exam.exam_start_time, exam.exam_end_time);
+      console.log('=== CHECKING EACH EXAM ===');
+      formattedExams.forEach(exam => {
+        const ongoing = isExamOngoing(exam.exam_date, exam.exam_start_time, exam.exam_end_time);
         const notConfirmed = exam.status !== 'confirmed' && exam.status !== 'confirm';
-        return isOngoing && notConfirmed;
+        console.log(`${exam.course_id}: ongoing=${ongoing}, notConfirmed=${notConfirmed}`);
+      });
+      
+      // ✅ TEMPORARY FIX: Comment out the ongoing check to see ALL your schedules
+      const ongoing = formattedExams.filter((exam: ExamDetails) => {
+        // const isOngoing = isExamOngoing(exam.exam_date, exam.exam_start_time, exam.exam_end_time);
+        const notConfirmed = exam.status !== 'confirmed' && exam.status !== 'confirm';
+        return notConfirmed; // ✅ Show all non-confirmed exams (ignore time for now)
       });
       
       const recent = formattedExams.filter((exam: ExamDetails) => {
         return exam.status === 'confirmed' || exam.status === 'confirm';
       });
+      
+      console.log('=== FILTERED EXAMS ===');
+      console.log('Ongoing exams count:', ongoing.length);
+      console.log('Recent submissions:', recent.length);
       
       setProctorAssignedExams(ongoing);
       setRecentSubmissions(recent);
