@@ -126,7 +126,7 @@ const ProctorAttendance: React.FC<UserProps> = ({ user }) => {
         course_id: exam.course_id,
         subject: exam.subject || exam.course_id,
         section_name: exam.section_name || '',
-        exam_date: exam.exam_date,
+        exam_date: exam.exam_date || '',
         exam_start_time: exam.exam_start_time || '',
         exam_end_time: exam.exam_end_time || '',
         building_name: exam.building_name || '',
@@ -143,22 +143,16 @@ const ProctorAttendance: React.FC<UserProps> = ({ user }) => {
         console.log(`${exam.course_id}: ongoing=${ongoing}, notConfirmed=${notConfirmed}`);
       });
       
-      // ✅ TEMPORARY FIX: Comment out the ongoing check to see ALL your schedules
-      const ongoing = formattedExams.filter((exam: ExamDetails) => {
-        // const isOngoing = isExamOngoing(exam.exam_date, exam.exam_start_time, exam.exam_end_time);
+      const filteredExams = formattedExams.filter((exam: ExamDetails) => {
+        const ongoing = isExamOngoing(exam.exam_date, exam.exam_start_time, exam.exam_end_time);
         const notConfirmed = exam.status !== 'confirmed' && exam.status !== 'confirm';
-        return notConfirmed; // ✅ Show all non-confirmed exams (ignore time for now)
-      });
-      
-      const recent = formattedExams.filter((exam: ExamDetails) => {
-        return exam.status === 'confirmed' || exam.status === 'confirm';
+        return ongoing && notConfirmed;
       });
       
       console.log('=== FILTERED EXAMS ===');
-      console.log('Ongoing exams count:', ongoing.length);
-      console.log('Recent submissions:', recent.length);
+      console.log('Ongoing exams count:', filteredExams.length);
       
-      setProctorAssignedExams(ongoing);
+      setProctorAssignedExams(filteredExams);
     } catch (error: any) {
       console.error('Error fetching assigned exams:', error);
       toast.error('Failed to load assigned exams');
@@ -290,19 +284,12 @@ const ProctorAttendance: React.FC<UserProps> = ({ user }) => {
   }, [fetchAssignedExams]);
 
   const handleCardClick = (exam: ExamDetails, isSubstitution: boolean = false) => {
-    console.log('🔍 Card clicked:', {
-      exam_id: exam.id,
-      course: exam.course_id,
-      isSubstitution
-    });
-    
     setSelectedExam(exam);
     setIsSubstitutionMode(isSubstitution);
     setShowModal(true);
     setOtpCode('');
     setRemarks('');
     setOtpValidationStatus('idle');
-    setVerificationData(null);  // ✅ Clear previous verification data
   };
 
   const handleCloseModal = () => {
@@ -324,58 +311,33 @@ const ProctorAttendance: React.FC<UserProps> = ({ user }) => {
 
   // Update handleVerifyOtp to show success modal instead of just status
   const handleVerifyOtp = async () => {
-    if (!otpCode.trim() || !user?.user_id || !selectedExam?.id) {
-      toast.error('Missing required information');
+    if (!otpCode.trim() || !user?.user_id) {
       return;
     }
-
-    console.log('🔐 Verifying OTP:', {
-      otp_code: otpCode.trim(),
-      user_id: user.user_id,
-      exam_schedule_id: selectedExam.id,  // ✅ This ensures OTP is validated for THIS specific exam
-      isSubstitutionMode
-    });
 
     setVerifyingOtp(true);
     try {
       const response = await api.post('/verify-otp/', {
         otp_code: otpCode.trim(),
-        user_id: user.user_id,
-        exam_schedule_id: selectedExam.id  // ✅ CRITICAL: Send exam ID to backend
+        user_id: user.user_id
       });
 
       const { valid, verification_status, message, exam_schedule_id, ...examData } = response.data;
 
-      console.log('✅ OTP Verification Response:', {
-        valid,
-        verification_status,
-        message,
-        exam_schedule_id
-      });
-
       if (valid) {
-        // ✅ FIX: Verification status should match whether user is assigned to THIS exam
         setOtpValidationStatus(verification_status as 'valid-assigned' | 'valid-not-assigned');
         setVerificationData({ exam_schedule_id, ...examData });
         
-        // Show success modal
+        // Show success modal instead of toast
         setShowVerificationSuccess(true);
-        
-        // ✅ Log what status was determined
-        console.log(`📝 Status determined: ${verification_status}`);
-        if (verification_status === 'valid-assigned') {
-          console.log('✅ User IS assigned to this exam - No remarks required');
-        } else {
-          console.log('⚠️ User is NOT assigned to this exam - Substitution mode, remarks required');
-        }
       } else {
         setOtpValidationStatus('invalid');
         toast.error(message || 'Invalid OTP code');
       }
     } catch (error: any) {
-      console.error('❌ Error verifying OTP:', error);
+      console.error('Error verifying OTP:', error);
       setOtpValidationStatus('invalid');
-      const errorMessage = error.response?.data?.message || error.response?.data?.error || error.message || 'Failed to verify OTP';
+      const errorMessage = error.response?.data?.error || error.message || 'Failed to verify OTP';
       toast.error(errorMessage);
     } finally {
       setVerifyingOtp(false);
@@ -415,17 +377,9 @@ const ProctorAttendance: React.FC<UserProps> = ({ user }) => {
       return;
     }
 
-    const role = otpValidationStatus === 'valid-assigned' ? 'assigned' : 'sub';
-    
-    console.log('📤 Submitting attendance:', {
-      otp_code: otpCode.trim(),
-      user_id: user.user_id,
-      role,
-      verification_status: otpValidationStatus,
-      has_remarks: !!remarks.trim()
-    });
+    const role = (isSubstitutionMode || otpValidationStatus === 'valid-not-assigned') ? 'sub' : 'assigned';
 
-    // ✅ FIX: Validate remarks for substitute ONLY
+    // Validate remarks for substitute
     if (role === 'sub' && !remarks.trim()) {
       toast.error('Remarks are required for substitute proctors');
       return;
@@ -438,13 +392,12 @@ const ProctorAttendance: React.FC<UserProps> = ({ user }) => {
         user_id: user.user_id,
         remarks: remarks.trim() || undefined,
         role: role
+        // ✅ REMOVED is_late - backend will determine this
       });
-
-      console.log('✅ Attendance submitted successfully:', response.data);
 
       toast.success(response.data.message || 'Attendance recorded successfully');
       
-      // Check status from response
+      // ✅ Check status from response
       if (response.data.status === 'late') {
         toast.warning('Marked as LATE - You arrived more than 7 minutes after start time', {
           autoClose: 5000
@@ -458,7 +411,7 @@ const ProctorAttendance: React.FC<UserProps> = ({ user }) => {
       setShowVerificationSuccess(false);
       handleCloseModal();
     } catch (error: any) {
-      console.error('❌ Error submitting attendance:', error);
+      console.error('Error submitting attendance:', error);
       const errorMessage = error.response?.data?.error || error.message || 'Failed to submit attendance';
       toast.error(errorMessage);
     } finally {
@@ -709,44 +662,123 @@ const ProctorAttendance: React.FC<UserProps> = ({ user }) => {
                       {verifyingOtp ? 'Verifying...' : 'Verify'}
                     </button>
                   </div>
+                  {/* Verification Success Modal */}
+                  {showVerificationSuccess && (
+                    <div 
+                      style={{
+                        position: 'fixed',
+                        top: 0,
+                        left: 0,
+                        right: 0,
+                        bottom: 0,
+                        backgroundColor: 'rgba(0, 0, 0, 0.7)',
+                        display: 'flex',
+                        justifyContent: 'center',
+                        alignItems: 'center',
+                        zIndex: 10000
+                      }}
+                      onClick={() => setShowVerificationSuccess(false)}
+                    >
+                      <div
+                        style={{
+                          backgroundColor: 'white',
+                          padding: '30px',
+                          borderRadius: '15px',
+                          maxWidth: '500px',
+                          width: '90%',
+                          boxShadow: '0 8px 16px rgba(0, 0, 0, 0.3)',
+                          textAlign: 'center'
+                        }}
+                        onClick={(e) => e.stopPropagation()}>                 
+                        {showVerificationSuccess && (
+                          <div 
+                            style={{
+                              borderRadius: '8px',
+                              padding: '12px',
+                              marginBottom: '2px',
+                              color: '#856404'}}
+                            onClick={() => setShowVerificationSuccess(false)}
+                          >
+                            <div style={{
+                              borderRadius: '8px',
+                              padding: '12px',
+                              marginBottom: '2px'}} 
+                              onClick={(e) => e.stopPropagation()}>
+                              <div style={{ fontSize: '60px', marginBottom: '2px', color: '#28a745' }}><FaCheckCircle/></div>
+                              <h2 style={{ color: '#28a745', marginBottom: '5px' }}>Code Verified!</h2>
+                              <p style={{ color: '#666', marginBottom: '25px', fontSize: '16px' }}>
+                                {otpValidationStatus === 'valid-assigned' 
+                                  ? 'You are assigned to this exam. Click submit to confirm your attendance.'
+                                  : 'Valid code, but you are not assigned. You will be marked as a substitute proctor.'}
+                              </p>
+                              
+
+                              <div style={{ display: 'flex', gap: '10px', justifyContent: 'center' }}>
+                                {/* buttons */}
+                              </div>
+                            </div>
+                          </div>
+                        )}
+
+                        <div style={{ display: 'flex', gap: '10px', justifyContent: 'center' }}>
+                          <button
+                            onClick={() => setShowVerificationSuccess(false)}
+                            style={{
+                              padding: '12px 24px',
+                              backgroundColor: '#6c757d',
+                              color: 'white',
+                              border: 'none',
+                              borderRadius: '8px',
+                              cursor: 'pointer',
+                              fontWeight: 'bold',
+                              fontSize: '14px'
+                            }}
+                          >
+                            Cancel
+                          </button>
+                          <button
+                            onClick={handleSubmit}
+                            disabled={
+                              ((isSubstitutionMode || otpValidationStatus === 'valid-not-assigned') && !remarks.trim()) ||
+                              submittingAttendance
+                            }
+                            style={{
+                              padding: '12px 24px',
+                              backgroundColor: submittingAttendance ? '#ccc' : '#28a745',
+                              color: 'white',
+                              border: 'none',
+                              borderRadius: '8px',
+                              cursor: submittingAttendance ? 'not-allowed' : 'pointer',
+                              fontWeight: 'bold',
+                              fontSize: '14px'
+                            }}
+                          >
+                            {submittingAttendance ? 'Submitting...' : 'Submit Attendance'}
+                          </button>
+                        </div>
+                      </div>
+                    </div>
+                  )}
                 </div>
 
-                {/* Only show remarks field AFTER verification */}
-                {otpValidationStatus === 'valid-not-assigned' && (
-                  <div className="proctor-attendance-modal-input-group">
-                    <label htmlFor="remarks-input" className="proctor-attendance-modal-label">
-                      Remarks (Required for substitution):
-                    </label>
-                    <textarea
-                      id="remarks-input"
-                      className={`proctor-attendance-modal-textarea ${!remarks.trim() ? 'proctor-attendance-required-field' : ''}`}
-                      placeholder="Please provide a reason for substitution (e.g., emergency leave, illness, etc.)"
-                      rows={3}
-                      value={remarks}
-                      onChange={(e) => setRemarks(e.target.value)}
-                    />
-                    {!remarks.trim() && (
-                      <span className="proctor-attendance-field-error">Remarks are required for substitution</span>
-                    )}
-                  </div>
-                )}
-
-                {/* Optional remarks for assigned proctors */}
-                {otpValidationStatus === 'valid-assigned' && (
-                  <div className="proctor-attendance-modal-input-group">
-                    <label htmlFor="remarks-input" className="proctor-attendance-modal-label">
-                      Remarks (Optional):
-                    </label>
-                    <textarea
-                      id="remarks-input"
-                      className="proctor-attendance-modal-textarea"
-                      placeholder="Enter any remarks or notes..."
-                      rows={3}
-                      value={remarks}
-                      onChange={(e) => setRemarks(e.target.value)}
-                    />
-                  </div>
-                )}
+                <div className="proctor-attendance-modal-input-group">
+                  <label htmlFor="remarks-input" className="proctor-attendance-modal-label">
+                    Remarks {isSubstitutionMode || otpValidationStatus === 'valid-not-assigned' ? '(Required for substitution)' : '(Optional)'}:
+                  </label>
+                  <textarea
+                    id="remarks-input"
+                    className={`proctor-attendance-modal-textarea ${(isSubstitutionMode || otpValidationStatus === 'valid-not-assigned') && !remarks.trim() ? 'proctor-attendance-required-field' : ''}`}
+                    placeholder={isSubstitutionMode || otpValidationStatus === 'valid-not-assigned'
+                      ? "Please provide a reason for substitution (e.g., emergency leave, illness, etc.)"
+                      : "Enter any remarks or notes..."}
+                    rows={3}
+                    value={remarks}
+                    onChange={(e) => setRemarks(e.target.value)}
+                  />
+                  {(isSubstitutionMode || otpValidationStatus === 'valid-not-assigned') && !remarks.trim() && (
+                    <span className="proctor-attendance-field-error">Remarks are required for substitution</span>
+                  )}
+                </div>
               </div>
             </div>
 
@@ -756,113 +788,6 @@ const ProctorAttendance: React.FC<UserProps> = ({ user }) => {
                 onClick={handleCloseModal}
               >
                 Close
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
-
-      {/* Verification Success Modal - MOVED OUTSIDE main modal */}
-      {showVerificationSuccess && (
-        <div 
-          style={{
-            position: 'fixed',
-            top: 0,
-            left: 0,
-            right: 0,
-            bottom: 0,
-            backgroundColor: 'rgba(0, 0, 0, 0.7)',
-            display: 'flex',
-            justifyContent: 'center',
-            alignItems: 'center',
-            zIndex: 10000
-          }}
-          onClick={() => setShowVerificationSuccess(false)}
-        >
-          <div
-            style={{
-              backgroundColor: 'white',
-              padding: '30px',
-              borderRadius: '15px',
-              maxWidth: '500px',
-              width: '90%',
-              boxShadow: '0 8px 16px rgba(0, 0, 0, 0.3)',
-              textAlign: 'center'
-            }}
-            onClick={(e) => e.stopPropagation()}
-          >
-            <div style={{ fontSize: '60px', marginBottom: '15px', color: '#28a745' }}>
-              <FaCheckCircle/>
-            </div>
-            <h2 style={{ color: '#28a745', marginBottom: '10px' }}>Code Verified!</h2>
-            <p style={{ color: '#666', marginBottom: '25px', fontSize: '16px' }}>
-              {otpValidationStatus === 'valid-assigned' 
-                ? 'You are assigned to this exam. Click submit to confirm your attendance.'
-                : 'Valid code, but you are not assigned. You will be marked as a substitute proctor.'}
-            </p>
-
-            {/* Show remarks input INSIDE success modal if substitute */}
-            {otpValidationStatus === 'valid-not-assigned' && (
-              <div style={{ marginBottom: '20px', textAlign: 'left' }}>
-                <label style={{ display: 'block', marginBottom: '8px', fontWeight: 'bold', color: '#333' }}>
-                  Remarks (Required for substitution):
-                </label>
-                <textarea
-                  value={remarks}
-                  onChange={(e) => setRemarks(e.target.value)}
-                  placeholder="Please provide a reason for substitution (e.g., emergency leave, illness, etc.)"
-                  rows={3}
-                  style={{
-                    width: '100%',
-                    padding: '10px',
-                    borderRadius: '8px',
-                    border: '1px solid #ddd',
-                    fontSize: '14px',
-                    resize: 'vertical'
-                  }}
-                />
-                {!remarks.trim() && (
-                  <span style={{ color: '#dc3545', fontSize: '12px', marginTop: '5px', display: 'block' }}>
-                    Remarks are required for substitution
-                  </span>
-                )}
-              </div>
-            )}
-
-            <div style={{ display: 'flex', gap: '10px', justifyContent: 'center' }}>
-              <button
-                onClick={() => setShowVerificationSuccess(false)}
-                style={{
-                  padding: '12px 24px',
-                  backgroundColor: '#6c757d',
-                  color: 'white',
-                  border: 'none',
-                  borderRadius: '8px',
-                  cursor: 'pointer',
-                  fontWeight: 'bold',
-                  fontSize: '14px'
-                }}
-              >
-                Cancel
-              </button>
-              <button
-                onClick={handleSubmit}
-                disabled={
-                  (otpValidationStatus === 'valid-not-assigned' && !remarks.trim()) ||
-                  submittingAttendance
-                }
-                style={{
-                  padding: '12px 24px',
-                  backgroundColor: submittingAttendance ? '#ccc' : '#28a745',
-                  color: 'white',
-                  border: 'none',
-                  borderRadius: '8px',
-                  cursor: submittingAttendance || (otpValidationStatus === 'valid-not-assigned' && !remarks.trim()) ? 'not-allowed' : 'pointer',
-                  fontWeight: 'bold',
-                  fontSize: '14px'
-                }}
-              >
-                {submittingAttendance ? 'Submitting...' : 'Submit Attendance'}
               </button>
             </div>
           </div>

@@ -242,23 +242,6 @@ def verify_otp(request):
     try:
         otp_code = request.data.get('otp_code', '').strip()
         user_id = request.data.get('user_id')
-        exam_schedule_id = request.data.get('exam_schedule_id')  # ✅ CRITICAL: Must match the exam being verified
-        
-        # ✅ FIX: Convert user_id to integer immediately
-        try:
-            user_id = int(user_id)
-        except (ValueError, TypeError):
-            return Response({
-                'valid': False,
-                'message': 'Invalid user_id format'
-            }, status=status.HTTP_400_BAD_REQUEST)
-        
-        # ✅ FIX 1: Require exam_schedule_id to ensure OTP matches the exam
-        if not exam_schedule_id:
-            return Response({
-                'valid': False,
-                'message': 'Exam schedule ID is required'
-            }, status=status.HTTP_400_BAD_REQUEST)
                 
         if not otp_code or not user_id:
             return Response({
@@ -266,21 +249,18 @@ def verify_otp(request):
                 'message': 'OTP code and user_id are required'
             }, status=status.HTTP_400_BAD_REQUEST)
         
-        # ✅ FIX 2: Find OTP record AND verify it belongs to THIS specific exam
+        # Find OTP record
         try:
             otp_record = TblExamOtp.objects.select_related(
                 'examdetails',
                 'examdetails__room',
                 'examdetails__proctor',
                 'examdetails__modality'
-            ).get(
-                otp_code=otp_code,
-                examdetails_id=exam_schedule_id  # ✅ CRITICAL: OTP must match this specific exam
-            )
+            ).get(otp_code=otp_code)
         except TblExamOtp.DoesNotExist:
             return Response({
                 'valid': False,
-                'message': 'Invalid OTP code for this exam'
+                'message': 'Invalid OTP code'
             }, status=status.HTTP_200_OK)
         
         # Check if expired
@@ -295,7 +275,6 @@ def verify_otp(request):
         
         exam_schedule = otp_record.examdetails
   
-        # Check exam timing
         if exam_schedule.exam_start_time and exam_schedule.exam_end_time:
             from datetime import datetime as dt
             
@@ -331,50 +310,28 @@ def verify_otp(request):
                     print(f"⚠️ Error parsing exam times: {str(e)}")
                     # Continue anyway
         
-        # ✅ FIX 3: Determine if user is assigned proctor for THIS exam
+        # Check if user is the assigned proctor
         is_assigned = False
         assigned_proctor_name = None
         
-        print(f"👤 Checking if user {user_id} (type: {type(user_id)}) is assigned proctor")
-        print(f"👤 Schedule proctor_id: {exam_schedule.proctor_id} (type: {type(exam_schedule.proctor_id)})")
+        print(f"👤 Checking if user {user_id} is assigned proctor")
+        print(f"👤 Schedule proctor_id: {exam_schedule.proctor_id}")
         print(f"👤 Schedule proctors array: {exam_schedule.proctors}")
-        print(f"👤 Exam ID being verified: {exam_schedule_id}")
         
-        # Convert proctor_id to int for comparison
-        schedule_proctor_id = None
-        if exam_schedule.proctor_id:
-            try:
-                schedule_proctor_id = int(exam_schedule.proctor_id)
-            except (ValueError, TypeError):
-                schedule_proctor_id = exam_schedule.proctor_id
-        
-        # ✅ FIX 4: Check if user is assigned to THIS SPECIFIC exam
-        if schedule_proctor_id == user_id:
+        # Check both single proctor_id and proctors array
+        if exam_schedule.proctor_id == user_id:
             is_assigned = True
             print(f"✅ User is assigned proctor (proctor_id match)")
-        elif exam_schedule.proctors:
-            # Convert all proctors array items to int for comparison
-            proctors_int = []
-            for p in exam_schedule.proctors:
-                try:
-                    proctors_int.append(int(p))
-                except (ValueError, TypeError):
-                    proctors_int.append(p)
-            
-            if user_id in proctors_int:
-                is_assigned = True
-                print(f"✅ User is assigned proctor (in proctors array)")
-        
-        if not is_assigned:
-            print(f"⚠️ User {user_id} is NOT assigned proctor for exam {exam_schedule_id}")
-            print(f"   Schedule proctor_id: {schedule_proctor_id}")
-            print(f"   Schedule proctors: {exam_schedule.proctors}")
+        elif exam_schedule.proctors and user_id in exam_schedule.proctors:
+            is_assigned = True
+            print(f"✅ User is assigned proctor (in proctors array)")
+        else:
+            print(f"⚠️ User is NOT assigned proctor")
         
         # Get assigned proctor name
         if exam_schedule.proctor:
             assigned_proctor_name = f"{exam_schedule.proctor.first_name} {exam_schedule.proctor.last_name}"
         
-        # ✅ FIX 5: Set verification status based on whether user is assigned to THIS exam
         verification_status = "valid-assigned" if is_assigned else "valid-not-assigned"
         message = "OTP verified. You are assigned to this exam." if is_assigned else "OTP is valid, but you are not the assigned proctor. Do you want to substitute?"
         
@@ -408,6 +365,7 @@ def verify_otp(request):
             'error': str(e),
             'detail': 'Failed to verify OTP'
         }, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+
 
 # ============================================================
 # ATTENDANCE SUBMISSION
