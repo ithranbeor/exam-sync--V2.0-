@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useCallback, useMemo } from 'react';
-import { FaSort } from 'react-icons/fa';
+import { FaSort, FaSearch, FaFilter } from 'react-icons/fa';
 import { toast, ToastContainer } from 'react-toastify';
 import 'react-toastify/dist/ReactToastify.css';
 import api from '../lib/apiClient';
@@ -54,6 +54,9 @@ const ProctorMonitoring: React.FC<UserProps> = ({ }) => {
   const [showResetConfirm, setShowResetConfirm] = useState(false);
   const [sortBy, setSortBy] = useState<string>('none');
   const [showSortDropdown, setShowSortDropdown] = useState(false);
+  const [searchTerm, setSearchTerm] = useState('');
+  const [showStatusDropdown, setShowStatusDropdown] = useState(false);
+  const [statusFilter, setStatusFilter] = useState<'all'|'present'|'absent'|'substitute'|'pending'>('all');
 
   useEffect(() => {
     if (approvedSchedules.length === 0) return;
@@ -420,11 +423,50 @@ const ProctorMonitoring: React.FC<UserProps> = ({ }) => {
   };
 
   const sortedSchedules = useMemo(() => {
-    if (sortBy === 'none') {
-      return approvedSchedules;
+    let data = approvedSchedules;
+
+    if (searchTerm && searchTerm.trim()) {
+      const term = searchTerm.toLowerCase();
+      data = data.filter((schedule) => {
+        const combined = [
+          schedule.course_id,
+          schedule.subject,
+          schedule.section_name,
+          schedule.exam_date,
+          schedule.exam_start_time,
+          schedule.exam_end_time,
+          schedule.building_name,
+          schedule.room_id,
+          schedule.proctor_name,
+          schedule.instructor_name,
+          schedule.status,
+        ]
+          .filter(Boolean)
+          .join(' ')
+          .toLowerCase();
+
+        return combined.includes(term);
+      });
     }
 
-    return [...approvedSchedules].sort((a, b) => {
+    if (sortBy === 'none') {
+      return data;
+    }
+    // Apply status filter if set
+    if (statusFilter && statusFilter !== 'all') {
+      data = data.filter((schedule) => {
+        const status = (schedule.examdetails_status || schedule.status || '').toLowerCase();
+        if (statusFilter === 'present') {
+          return status.includes('confirm') || status.includes('present');
+        }
+        if (statusFilter === 'absent') return status.includes('absent');
+        if (statusFilter === 'substitute') return status.includes('sub');
+        if (statusFilter === 'pending') return status.includes('pending') || status === '';
+        return true;
+      });
+    }
+
+    return [...data].sort((a, b) => {
       switch (sortBy) {
         case 'course_id':
           return smartSort(a.course_id.toLowerCase(), b.course_id.toLowerCase());
@@ -450,7 +492,7 @@ const ProctorMonitoring: React.FC<UserProps> = ({ }) => {
           return 0;
       }
     });
-  }, [approvedSchedules, sortBy]);
+  }, [approvedSchedules, sortBy, searchTerm, statusFilter]);
 
   return (
     <div className="proctor-monitoring-container">
@@ -469,37 +511,33 @@ const ProctorMonitoring: React.FC<UserProps> = ({ }) => {
               ? 'EXAM SCHEDULE HAS BEEN APPROVED. CLICK TO GENERATE EXAM CODES'
               : 'WAITING FOR DEAN APPROVAL'}
           </p>
-          <div style={{ marginTop: '10px', position: 'relative' }} data-sort-dropdown>
-            <button
-              type='button'
-              onClick={() => setShowSortDropdown(!showSortDropdown)}
-              style={{
-                backgroundColor: '#0A3765',
-                color: 'white',
-                display: 'flex',
-                alignItems: 'center',
-                justifyContent: 'center',
-                gap: '6px',
-                padding: '8px 16px',
-                borderRadius: '8px',
-                border: 'none',
-                cursor: 'pointer',
-                fontSize: '14px',
-                fontWeight: 500,
-                minWidth: '100px',
-                transition: 'background-color 0.2s ease'
-              }}
-              onMouseEnter={(e) => {
-                e.currentTarget.style.backgroundColor = '#0d4a7a';
-              }}
-              onMouseLeave={(e) => {
-                e.currentTarget.style.backgroundColor = '#0A3765';
-              }}
-              title="Sort by"
-            >
+          <div className="pm-button-row" data-sort-dropdown>
+            <button type='button' className="pm-control-button pm-sort-button" onClick={() => setShowSortDropdown(!showSortDropdown)} title="Sort by">
               <FaSort />
               <span>Sort by</span>
             </button>
+            {/* Status filter button - same design as Sort by button */}
+            <div className="pm-status-wrapper" data-status-dropdown>
+              <button type='button' className="pm-control-button pm-status-button" onClick={() => setShowStatusDropdown(!showStatusDropdown)} title="Filter by status">
+                <FaFilter />
+                <span>{statusFilter === 'all' ? 'Status' : statusFilter.charAt(0).toUpperCase() + statusFilter.slice(1)}</span>
+              </button>
+
+              {showStatusDropdown && (
+                <div className="pm-dropdown">
+                  {['all', 'present', 'absent', 'substitute', 'pending'].map((opt) => (
+                    <button
+                      key={opt}
+                      type="button"
+                      onClick={() => { setStatusFilter(opt as any); setShowStatusDropdown(false); }}
+                      className={`pm-dropdown-item ${statusFilter === opt ? 'active' : ''}`}
+                    >
+                      {opt === 'all' ? 'All' : opt.charAt(0).toUpperCase() + opt.slice(1)}
+                    </button>
+                  ))}
+                </div>
+              )}
+            </div>
             {showSortDropdown && (
               <div
                 style={{
@@ -559,55 +597,69 @@ const ProctorMonitoring: React.FC<UserProps> = ({ }) => {
           </div>
         </div>
 
-        <div style={{ display: 'flex', gap: '10px', marginLeft: 'auto' }}>
-          <button
-            className="proctor-monitoring-create-button"
-            onClick={handleGenerateOtpCodes}
-            disabled={generatingOtp || loading || !hasApprovedSchedules}
-            style={{
-              opacity: hasApprovedSchedules ? 1 : 0.6,
-              cursor: hasApprovedSchedules ? 'pointer' : 'not-allowed'
-            }}
-          >
-            {generatingOtp ? 'GENERATING...' : 'GENERATE EXAM CODES'}
-          </button>
+        <div className="pm-actions-column">
+          <div className="search-bar">
+            <input
+              type="text"
+              placeholder="Search by course, proctor, room..."
+              value={searchTerm}
+              onChange={(e) => setSearchTerm(e.target.value)}
+            />
+            <button type="button" className="search-button">
+              <FaSearch />
+            </button>
+          </div>
 
-          <button
-            className="proctor-monitoring-reset-button"
-            onClick={() => setShowResetConfirm(true)}
-            disabled={resettingOtp || loading || !hasOtpCodes}
-            style={{
-              opacity: hasOtpCodes ? 1 : 0.6,
-              cursor: hasOtpCodes ? 'pointer' : 'not-allowed',
-              backgroundColor: '#dc3545',
-              color: 'white',
-              border: 'none',
-              padding: '10px 20px',
-              borderRadius: '5px',
-              fontWeight: 'bold',
-              fontSize: '14px'
-            }}
-          >
-            {resettingOtp ? 'RESETTING...' : 'RESET EXAM CODES'}
-          </button>
+          <div className="pm-action-buttons-row">
+            <button
+              className="proctor-monitoring-create-button"
+              onClick={handleGenerateOtpCodes}
+              disabled={generatingOtp || loading || !hasApprovedSchedules}
+              style={{
+                opacity: hasApprovedSchedules ? 1 : 0.6,
+                cursor: hasApprovedSchedules ? 'pointer' : 'not-allowed'
+              }}
+            >
+              {generatingOtp ? 'GENERATING...' : 'GENERATE EXAM CODES'}
+            </button>
 
-          <button
-            onClick={handleExportPDF}
-            disabled={loading || sortedSchedules.length === 0 || !sortedSchedules.every(s => s.otp_code)}
-            style={{
-              opacity: (sortedSchedules.length > 0 && sortedSchedules.every(s => s.otp_code)) ? 1 : 0.6,
-              cursor: (sortedSchedules.length > 0 && sortedSchedules.every(s => s.otp_code)) ? 'pointer' : 'not-allowed',
-              backgroundColor: '#28a745',
-              color: 'white',
-              border: 'none',
-              padding: '10px 20px',
-              borderRadius: '5px',
-              fontWeight: 'bold',
-              fontSize: '14px'
-            }}
-          >
-            EXPORT TO PDF
-          </button>
+            <button
+              className="proctor-monitoring-reset-button"
+              onClick={() => setShowResetConfirm(true)}
+              disabled={resettingOtp || loading || !hasOtpCodes}
+              style={{
+                opacity: hasOtpCodes ? 1 : 0.6,
+                cursor: hasOtpCodes ? 'pointer' : 'not-allowed',
+                backgroundColor: '#dc3545',
+                color: 'white',
+                border: 'none',
+                padding: '10px 20px',
+                borderRadius: '5px',
+                fontWeight: 'bold',
+                fontSize: '14px'
+              }}
+            >
+              {resettingOtp ? 'RESETTING...' : 'RESET EXAM CODES'}
+            </button>
+
+            <button
+              onClick={handleExportPDF}
+              disabled={loading || sortedSchedules.length === 0 || !sortedSchedules.every(s => s.otp_code)}
+              style={{
+                opacity: (sortedSchedules.length > 0 && sortedSchedules.every(s => s.otp_code)) ? 1 : 0.6,
+                cursor: (sortedSchedules.length > 0 && sortedSchedules.every(s => s.otp_code)) ? 'pointer' : 'not-allowed',
+                backgroundColor: '#28a745',
+                color: 'white',
+                border: 'none',
+                padding: '10px 20px',
+                borderRadius: '5px',
+                fontWeight: 'bold',
+                fontSize: '14px'
+              }}
+            >
+              EXPORT TO PDF
+            </button>
+          </div>
         </div>
       </div>
 

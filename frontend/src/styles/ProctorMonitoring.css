@@ -24,6 +24,84 @@
   flex: 1;
 }
 
+/* Header button row for Sort + Status */
+.pm-button-row {
+  margin-top: 10px;
+  position: relative;
+  display: flex;
+  gap: 8px;
+  align-items: center;
+}
+
+.pm-control-button {
+  background-color: #0A3765;
+  color: white;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  padding: 8px 16px;
+  border-radius: 8px;
+  border: none;
+  cursor: pointer;
+  font-size: 14px;
+  font-weight: 500;
+  min-width: 100px;
+  transition: background-color 0.2s ease;
+}
+
+.pm-control-button:hover {
+  background-color: #0d4a7a;
+}
+
+.pm-status-button {
+  min-width: 120px;
+}
+
+.pm-status-wrapper {
+  display: inline-block;
+  position: relative;
+}
+
+.pm-dropdown {
+  position: absolute;
+  top: 100%;
+  left: 0;
+  margin-top: 4px;
+  background-color: white;
+  border: 1px solid #ddd;
+  border-radius: 8px;
+  box-shadow: 0 2px 8px rgba(0,0,0,0.15);
+  z-index: 1000;
+  min-width: 150px;
+}
+
+.pm-dropdown-item {
+  width: 100%;
+  padding: 8px 12px;
+  text-align: left;
+  border: none;
+  background-color: white;
+  color: #000;
+  cursor: pointer;
+  font-size: 14px;
+}
+
+.pm-dropdown-item + .pm-dropdown-item { border-top: 1px solid #eee; }
+
+.pm-dropdown-item.active, .pm-dropdown-item:hover { background-color: #f0f0f0; }
+
+/* Actions column on the right: search above buttons */
+.pm-actions-column {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  margin-left: auto;
+  align-items: flex-end;
+}
+
+.pm-action-buttons-row { display: flex; gap: 12px; margin-top: 6px; }
+
 .proctor-monitoring-label {
   font-size: 14px;
   margin: 0;
