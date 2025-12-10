@@ -477,64 +477,47 @@ def submit_proctor_attendance(request):
             
             # ✅ FIXED: Determine status - Late or On-time (only for assigned, not substitutes)
             if role == 'assigned':
-                from datetime import datetime as dt, time as dt_time
+                from datetime import datetime as dt
                 
-                # Parse exam date
-                exam_date_obj = None
-                if exam_schedule.exam_date:
+                # Parse exam date and start time
+                if exam_schedule.exam_date and exam_schedule.exam_start_time:
                     try:
-                        exam_date_obj = dt.strptime(exam_schedule.exam_date, '%Y-%m-%d').date()
-                        print(f"   - Parsed exam date: {exam_date_obj}")
-                    except Exception as e:
-                        print(f"⚠️ Error parsing exam_date: {e}")
-                
-                if exam_date_obj and exam_schedule.exam_start_time:
-                    # ✅ FIX: Extract time component properly
-                    if isinstance(exam_schedule.exam_start_time, dt):
-                        # If it's a datetime object, extract the time
-                        exam_start_time = exam_schedule.exam_start_time.time()
-                    elif isinstance(exam_schedule.exam_start_time, dt_time):
-                        # If it's already a time object, use it directly
-                        exam_start_time = exam_schedule.exam_start_time
-                    else:
-                        # Fallback: default to confirmed if we can't parse
-                        print(f"⚠️ Unexpected exam_start_time type: {type(exam_schedule.exam_start_time)}")
-                        exam_schedule.status = "confirmed"
-                        exam_schedule.proctor_timein = current_time
-                        exam_schedule.save(update_fields=["status", "proctor_timein"])
-                        print(f"✅ Updated exam schedule - Status: confirmed (fallback)")
+                        # ✅ FIX: Handle exam_start_time properly regardless of its type
+                        if isinstance(exam_schedule.exam_start_time, dt):
+                            # It's already a full datetime object - use it directly
+                            exam_start_datetime = exam_schedule.exam_start_time
+                            # Make sure it's timezone-aware
+                            if timezone.is_naive(exam_start_datetime):
+                                exam_start_datetime = timezone.make_aware(exam_start_datetime)
+                        else:
+                            # It's a time object - combine with exam_date
+                            exam_date_obj = dt.strptime(exam_schedule.exam_date, '%Y-%m-%d').date()
+                            exam_start_datetime = timezone.make_aware(
+                                dt.combine(exam_date_obj, exam_schedule.exam_start_time)
+                            )
                         
-                        return Response({
-                            'message': 'Attendance recorded successfully',
-                            'attendance_id': attendance.attendance_id,
-                            'time_in': attendance.time_in.isoformat(),
-                            'status': exam_schedule.status,
-                            'role': 'substitute' if attendance.is_substitute else 'assigned',
-                            'proctor_name': f"{proctor_user.first_name} {proctor_user.last_name}"
-                        }, status=status.HTTP_201_CREATED)
-                    
-                    # ✅ Create datetime for scheduled start (in Philippines timezone)
-                    exam_start_datetime = timezone.make_aware(
-                        dt.combine(exam_date_obj, exam_start_time),
-                        timezone.get_current_timezone()
-                    )
-                    
-                    # ✅ Calculate difference in minutes
-                    time_diff = current_time - exam_start_datetime
-                    time_diff_minutes = time_diff.total_seconds() / 60
-                    
-                    print(f"\n⏱️ Time Check:")
-                    print(f"   - Scheduled Start: {exam_start_datetime}")
-                    print(f"   - Actual Time In: {current_time}")
-                    print(f"   - Difference: {time_diff_minutes:.1f} minutes")
-                    
-                    # ✅ Mark as LATE if more than 7 minutes after start
-                    if time_diff_minutes > 7:
-                        exam_schedule.status = "late"
-                        print(f"   - Status: LATE (arrived {time_diff_minutes:.1f} minutes after start)")
-                    else:
+                        # ✅ Calculate difference in minutes
+                        time_diff = current_time - exam_start_datetime
+                        time_diff_minutes = time_diff.total_seconds() / 60
+                        
+                        print(f"\n⏱️ Time Check:")
+                        print(f"   - Scheduled Start: {exam_start_datetime}")
+                        print(f"   - Actual Time In: {current_time}")
+                        print(f"   - Difference: {time_diff_minutes:.1f} minutes")
+                        
+                        # ✅ Mark as LATE if more than 7 minutes after start
+                        if time_diff_minutes > 7:
+                            exam_schedule.status = "late"
+                            print(f"   - Status: LATE (arrived {time_diff_minutes:.1f} minutes after start)")
+                        else:
+                            exam_schedule.status = "confirmed"
+                            print(f"   - Status: ON TIME")
+                            
+                    except Exception as e:
+                        print(f"⚠️ Error parsing exam times: {e}")
+                        # Fallback to confirmed if we can't parse
                         exam_schedule.status = "confirmed"
-                        print(f"   - Status: ON TIME")
+                        print(f"   - Status: CONFIRMED (fallback due to parsing error)")
                 else:
                     # If we can't determine timing, default to confirmed
                     exam_schedule.status = "confirmed"
