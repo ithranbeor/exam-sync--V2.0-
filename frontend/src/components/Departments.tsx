@@ -220,12 +220,37 @@ const Departments: React.FC = () => {
     return filtered;
   }, [departments, searchTerm, sortBy]);
 
-  const paginatedDepartments = useMemo(() => {
+  const totalItems = filteredDepartments.length;
+
+  const effectiveItemsPerPage = useMemo(() => {
+    if (totalItems === 0) return 1;
+
     if (itemsPerPage === 'all') {
-      return filteredDepartments;
+      // "Show All" should display 20 rows per page
+      return 20;
     }
-    return filteredDepartments.slice((currentPage - 1) * itemsPerPage, currentPage * itemsPerPage);
-  }, [filteredDepartments, currentPage, itemsPerPage]);
+
+    return itemsPerPage;
+  }, [itemsPerPage, totalItems]);
+
+  const totalPages = useMemo(() => {
+    if (totalItems === 0) return 1;
+    return Math.max(1, Math.ceil(totalItems / effectiveItemsPerPage));
+  }, [totalItems, effectiveItemsPerPage]);
+
+  const paginatedDepartments = useMemo(() => {
+    if (totalItems === 0) return [];
+    return filteredDepartments.slice(
+      (currentPage - 1) * effectiveItemsPerPage,
+      currentPage * effectiveItemsPerPage,
+    );
+  }, [filteredDepartments, currentPage, effectiveItemsPerPage, totalItems]);
+
+  useEffect(() => {
+    if (currentPage > totalPages) {
+      setCurrentPage(totalPages);
+    }
+  }, [currentPage, totalPages]);
 
   const toggleSelect = (id: string) => {
     setSelectedIds((prev) => {
@@ -856,6 +881,28 @@ const Departments: React.FC = () => {
         </div>
       </div>
 
+      <div className="pagination-controls">
+        <button
+          type="button"
+          className="pagination-arrow-btn"
+          onClick={() => setCurrentPage((prev) => Math.max(1, prev - 1))}
+          disabled={currentPage <= 1 || totalItems === 0}
+        >
+          {"<"}
+        </button>
+        <span className="pagination-page-number">
+          {totalItems === 0 ? '0/0' : `${currentPage}/${totalPages}`}
+        </span>
+        <button
+          type="button"
+          className="pagination-arrow-btn"
+          onClick={() => setCurrentPage((prev) => Math.min(totalPages, prev + 1))}
+          disabled={currentPage >= totalPages || totalItems === 0}
+        >
+          {">"}
+        </button>
+      </div>
+
       <div className="table-scroll-wrapper">
         <div className="table-scroll-hint">
           <FaChevronLeft /> Swipe or use buttons to scroll <FaChevronRight />
@@ -925,7 +972,7 @@ const Departments: React.FC = () => {
                     backgroundColor: isSelected ? '#f8d7da' : 'transparent',
                   }}
                 >
-                  <td>{itemsPerPage === 'all' ? index + 1 : (currentPage - 1) * itemsPerPage + index + 1}</td>
+                  <td>{(currentPage - 1) * effectiveItemsPerPage + index + 1}</td>
                   <td>{dept.department_id}</td>
                   <td>{dept.department_name}</td>
                   <td>{dept.college?.college_name || dept.college?.college_id}</td>

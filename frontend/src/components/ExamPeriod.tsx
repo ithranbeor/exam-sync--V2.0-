@@ -291,7 +291,7 @@ const ExamPeriodComponent: React.FC = () => {
       (!filterTerm || e.term_id.toString() === filterTerm) &&
       (!filterDept || e.department_id === filterDept) &&
       (!filterCollege || e.college_id === filterCollege) &&
-    (e.start_date)
+      (e.start_date)
     );
 
     // Apply sorting
@@ -325,12 +325,37 @@ const ExamPeriodComponent: React.FC = () => {
     return filtered;
   }, [examPeriods, search, filterYear, filterCategory, filterTerm, filterDept, filterCollege, sortBy, terms, departments, colleges]);
 
-  const paginatedExamPeriods = useMemo(() => {
+  const totalItems = filtered.length;
+
+  const effectiveItemsPerPage = useMemo(() => {
+    if (totalItems === 0) return 1;
+
     if (itemsPerPage === 'all') {
-      return filtered;
+      // "Show All" should display 20 rows per page
+      return 20;
     }
-    return filtered.slice((currentPage - 1) * itemsPerPage, currentPage * itemsPerPage);
-  }, [filtered, currentPage, itemsPerPage]);
+
+    return itemsPerPage;
+  }, [itemsPerPage, totalItems]);
+
+  const totalPages = useMemo(() => {
+    if (totalItems === 0) return 1;
+    return Math.max(1, Math.ceil(totalItems / effectiveItemsPerPage));
+  }, [totalItems, effectiveItemsPerPage]);
+
+  const paginatedExamPeriods = useMemo(() => {
+    if (totalItems === 0) return [];
+    return filtered.slice(
+      (currentPage - 1) * effectiveItemsPerPage,
+      currentPage * effectiveItemsPerPage,
+    );
+  }, [filtered, currentPage, effectiveItemsPerPage, totalItems]);
+
+  useEffect(() => {
+    if (currentPage > totalPages) {
+      setCurrentPage(totalPages);
+    }
+  }, [currentPage, totalPages]);
 
   useEffect(() => {
     setSelectedExamIds(prev => {
@@ -1100,6 +1125,28 @@ const ExamPeriodComponent: React.FC = () => {
         </div>
       </div>
 
+      <div className="pagination-controls">
+        <button
+          type="button"
+          className="pagination-arrow-btn"
+          onClick={() => setCurrentPage((prev) => Math.max(1, prev - 1))}
+          disabled={currentPage <= 1 || totalItems === 0}
+        >
+          {"<"}
+        </button>
+        <span className="pagination-page-number">
+          {totalItems === 0 ? '0/0' : `${currentPage}/${totalPages}`}
+        </span>
+        <button
+          type="button"
+          className="pagination-arrow-btn"
+          onClick={() => setCurrentPage((prev) => Math.min(totalPages, prev + 1))}
+          disabled={currentPage >= totalPages || totalItems === 0}
+        >
+          {">"}
+        </button>
+      </div>
+
       {showFilters && (
         <div className="advanced-filters">
           <select value={filterYear} onChange={(e) => setFilterYear(e.target.value)}>
@@ -1202,7 +1249,7 @@ const ExamPeriodComponent: React.FC = () => {
                     backgroundColor: isSelected ? '#f8d7da' : 'transparent',
                   }}
                 >
-                  <td>{itemsPerPage === 'all' ? i + 1 : (currentPage - 1) * itemsPerPage + i + 1}</td>
+                  <td>{(currentPage - 1) * effectiveItemsPerPage + i + 1}</td>
                   <td>{new Date(e.start_date).toLocaleDateString()}</td>
                   <td>{new Date(e.end_date).toLocaleDateString()}</td>
                   <td>{e.academic_year}</td>

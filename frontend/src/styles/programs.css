@@ -564,6 +564,77 @@ h3 {
 }
 
 /* ============================================
+   PAGINATION CONTROLS
+   ============================================ */
+
+.pagination-controls {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  margin-bottom: 20px;
+  padding: 10px;
+}
+
+.pagination-controls button {
+  background-color: #ffb800;
+  color: #333;
+  border: none;
+  border-radius: 50%;
+  width: 38px;
+  height: 38px;
+  font-size: 18px;
+  font-weight: bold;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: background-color 0.3s ease, transform 0.1s ease;
+}
+
+.pagination-controls button:hover:not(:disabled) {
+  background-color: #e6a700;
+  transform: scale(1.05);
+}
+
+.pagination-controls button:active:not(:disabled) {
+  transform: scale(0.95);
+}
+
+.pagination-controls button:disabled {
+  background-color: #ccc;
+  color: #666;
+  cursor: not-allowed;
+  opacity: 0.6;
+}
+
+.pagination-controls span {
+  color: #000;
+  font-weight: 500;
+  font-size: 14px;
+  min-width: 100px;
+  text-align: center;
+}
+
+.pagination-controls .pagination-arrow-btn {
+  font-weight: 900;
+  font-size: 22px;
+  line-height: 1;
+  color: #fff !important;
+  text-shadow: 0 1px 2px rgba(0, 0, 0, 0.3);
+}
+
+.pagination-controls .pagination-arrow-btn:disabled {
+  color: #999 !important;
+}
+
+.pagination-controls .pagination-page-number {
+  font-size: 15px;
+  font-weight: 600;
+  color: #333;
+}
+
+/* ============================================
    TABLET STYLES (768px - 1024px)
    ============================================ */
 
@@ -886,6 +957,7 @@ h3 {
 
 /* Custom Number Input Spinner Styling - Hide Default Spinners */
 .custom-number-input {
+  appearance: textfield;
   -moz-appearance: textfield; /* Firefox */
 }
 

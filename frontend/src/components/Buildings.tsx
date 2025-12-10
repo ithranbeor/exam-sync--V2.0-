@@ -359,12 +359,37 @@ const Buildings: React.FC = () => {
     return filtered;
   }, [buildings, searchTerm, sortBy, roomCounts]);
 
-  const paginatedBuildings = useMemo(() => {
+  const totalItems = filtered.length;
+
+  const effectiveItemsPerPage = useMemo(() => {
+    if (totalItems === 0) return 1;
+
     if (itemsPerPage === 'all') {
-      return filtered;
+      // "Show All" should display 20 rows per page
+      return 20;
     }
-    return filtered.slice((currentPage - 1) * itemsPerPage, currentPage * itemsPerPage);
-  }, [filtered, currentPage, itemsPerPage]);
+
+    return itemsPerPage;
+  }, [itemsPerPage, totalItems]);
+
+  const totalPages = useMemo(() => {
+    if (totalItems === 0) return 1;
+    return Math.max(1, Math.ceil(totalItems / effectiveItemsPerPage));
+  }, [totalItems, effectiveItemsPerPage]);
+
+  const paginatedBuildings = useMemo(() => {
+    if (totalItems === 0) return [];
+    return filtered.slice(
+      (currentPage - 1) * effectiveItemsPerPage,
+      currentPage * effectiveItemsPerPage,
+    );
+  }, [filtered, currentPage, effectiveItemsPerPage, totalItems]);
+
+  useEffect(() => {
+    if (currentPage > totalPages) {
+      setCurrentPage(totalPages);
+    }
+  }, [currentPage, totalPages]);
 
   const handleBulkDelete = async () => {
     const ids = Array.from(selectedBuildingIds);
@@ -868,6 +893,28 @@ const Buildings: React.FC = () => {
         </div>
       </div>
 
+      <div className="pagination-controls">
+        <button
+          type="button"
+          className="pagination-arrow-btn"
+          onClick={() => setCurrentPage((prev) => Math.max(1, prev - 1))}
+          disabled={currentPage <= 1 || totalItems === 0}
+        >
+          {"<"}
+        </button>
+        <span className="pagination-page-number">
+          {totalItems === 0 ? '0/0' : `${currentPage}/${totalPages}`}
+        </span>
+        <button
+          type="button"
+          className="pagination-arrow-btn"
+          onClick={() => setCurrentPage((prev) => Math.min(totalPages, prev + 1))}
+          disabled={currentPage >= totalPages || totalItems === 0}
+        >
+          {">"}
+        </button>
+      </div>
+
       <div className="table-scroll-wrapper">
         <div className="table-scroll-hint">
           <FaChevronLeft /> Swipe or use buttons to scroll <FaChevronRight />
@@ -937,7 +984,7 @@ const Buildings: React.FC = () => {
                     backgroundColor: isSelected ? '#f8d7da' : 'transparent',
                   }}
                 >
-                  <td>{itemsPerPage === 'all' ? index + 1 : (currentPage - 1) * itemsPerPage + index + 1}</td>
+                  <td>{(currentPage - 1) * effectiveItemsPerPage + index + 1}</td>
                   <td>{b.building_id}</td>
                   <td>{b.building_name}</td>
                   <td>{roomCounts[b.building_id] || 0}</td>

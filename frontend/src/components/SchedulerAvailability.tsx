@@ -657,12 +657,37 @@ const SchedulerAvailability: React.FC<ProctorSetAvailabilityProps> = ({ user }) 
     return filtered;
   }, [entries, searchTerm, sortBy]);
 
-  const paginatedEntries = useMemo(() => {
+  const totalItems = filteredEntries.length;
+
+  const effectiveItemsPerPage = useMemo(() => {
+    if (totalItems === 0) return 1;
+
     if (itemsPerPage === 'all') {
-      return filteredEntries;
+      // "Show All" should display 20 rows per page
+      return 20;
     }
-    return filteredEntries.slice((currentPage - 1) * itemsPerPage, currentPage * itemsPerPage);
-  }, [filteredEntries, currentPage, itemsPerPage]);
+
+    return itemsPerPage;
+  }, [itemsPerPage, totalItems]);
+
+  const totalPages = useMemo(() => {
+    if (totalItems === 0) return 1;
+    return Math.max(1, Math.ceil(totalItems / effectiveItemsPerPage));
+  }, [totalItems, effectiveItemsPerPage]);
+
+  const paginatedEntries = useMemo(() => {
+    if (totalItems === 0) return [];
+    return filteredEntries.slice(
+      (currentPage - 1) * effectiveItemsPerPage,
+      currentPage * effectiveItemsPerPage,
+    );
+  }, [filteredEntries, currentPage, effectiveItemsPerPage, totalItems]);
+
+  useEffect(() => {
+    if (currentPage > totalPages) {
+      setCurrentPage(totalPages);
+    }
+  }, [currentPage, totalPages]);
 
   const isAllSelected = filteredEntries.length > 0 && filteredEntries.every((entry) => selectedAvailabilityIds.has(entry.availability_id));
 
@@ -1254,6 +1279,28 @@ const SchedulerAvailability: React.FC<ProctorSetAvailabilityProps> = ({ user }) 
         </div>
       </div>
 
+      <div className="pagination-controls">
+        <button
+          type="button"
+          className="pagination-arrow-btn"
+          onClick={() => setCurrentPage((prev) => Math.max(1, prev - 1))}
+          disabled={currentPage <= 1 || totalItems === 0}
+        >
+          {"<"}
+        </button>
+        <span className="pagination-page-number">
+          {totalItems === 0 ? '0/0' : `${currentPage}/${totalPages}`}
+        </span>
+        <button
+          type="button"
+          className="pagination-arrow-btn"
+          onClick={() => setCurrentPage((prev) => Math.min(totalPages, prev + 1))}
+          disabled={currentPage >= totalPages || totalItems === 0}
+        >
+          {">"}
+        </button>
+      </div>
+
       <div className="table-scroll-wrapper">
         <div className="table-scroll-hint">
           <FaChevronLeft /> Swipe or use buttons to scroll <FaChevronRight />
@@ -1319,7 +1366,7 @@ const SchedulerAvailability: React.FC<ProctorSetAvailabilityProps> = ({ user }) 
                         backgroundColor: isSelected ? '#ffcccc' : 'transparent',
                       }}
                     >
-                      <td>{itemsPerPage === 'all' ? idx + 1 : (currentPage - 1) * itemsPerPage + idx + 1}</td>
+                      <td>{(currentPage - 1) * effectiveItemsPerPage + idx + 1}</td>
                       <td>{entry.user_fullname}</td>
                       <td>{entry.days?.map(d => new Date(d).toLocaleDateString()).join(', ')}</td>
                       <td>{entry.time_slots?.join(', ')}</td>

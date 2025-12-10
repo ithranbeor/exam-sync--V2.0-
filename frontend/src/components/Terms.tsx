@@ -185,12 +185,37 @@ const Terms: React.FC = () => {
     return filtered;
   }, [terms, searchTerm, sortBy]);
 
-  const paginatedTerms = useMemo(() => {
+  const totalItems = filteredTerms.length;
+
+  const effectiveItemsPerPage = useMemo(() => {
+    if (totalItems === 0) return 1;
+
     if (itemsPerPage === 'all') {
-      return filteredTerms;
+      // "Show All" should display 20 rows per page
+      return 20;
     }
-    return filteredTerms.slice((currentPage - 1) * itemsPerPage, currentPage * itemsPerPage);
-  }, [filteredTerms, currentPage, itemsPerPage]);
+
+    return itemsPerPage;
+  }, [itemsPerPage, totalItems]);
+
+  const totalPages = useMemo(() => {
+    if (totalItems === 0) return 1;
+    return Math.max(1, Math.ceil(totalItems / effectiveItemsPerPage));
+  }, [totalItems, effectiveItemsPerPage]);
+
+  const paginatedTerms = useMemo(() => {
+    if (totalItems === 0) return [];
+    return filteredTerms.slice(
+      (currentPage - 1) * effectiveItemsPerPage,
+      currentPage * effectiveItemsPerPage,
+    );
+  }, [filteredTerms, currentPage, effectiveItemsPerPage, totalItems]);
+
+  useEffect(() => {
+    if (currentPage > totalPages) {
+      setCurrentPage(totalPages);
+    }
+  }, [currentPage, totalPages]);
 
   // ✅ Add or edit term
   const handleModalSubmit = async () => {
@@ -791,6 +816,28 @@ const Terms: React.FC = () => {
         </div>
       </div>
 
+      <div className="pagination-controls">
+        <button
+          type="button"
+          className="pagination-arrow-btn"
+          onClick={() => setCurrentPage((prev) => Math.max(1, prev - 1))}
+          disabled={currentPage <= 1 || totalItems === 0}
+        >
+          {"<"}
+        </button>
+        <span className="pagination-page-number">
+          {totalItems === 0 ? '0/0' : `${currentPage}/${totalPages}`}
+        </span>
+        <button
+          type="button"
+          className="pagination-arrow-btn"
+          onClick={() => setCurrentPage((prev) => Math.min(totalPages, prev + 1))}
+          disabled={currentPage >= totalPages || totalItems === 0}
+        >
+          {">"}
+        </button>
+      </div>
+
       <div className="table-scroll-wrapper">
         <div className="table-scroll-hint">
           <FaChevronLeft /> Swipe or use buttons to scroll <FaChevronRight />
@@ -858,7 +905,7 @@ const Terms: React.FC = () => {
                     backgroundColor: isSelected ? '#f8d7da' : 'transparent',
                   }}
                 >
-                  <td>{itemsPerPage === 'all' ? index + 1 : (currentPage - 1) * itemsPerPage + index + 1}</td>
+                  <td>{(currentPage - 1) * effectiveItemsPerPage + index + 1}</td>
                   <td>{term.term_name}</td>
                   <td className="action-buttons" style={{ display: "flex", alignItems: "center", gap: 8 }}>
                     <button
