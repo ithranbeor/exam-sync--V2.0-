@@ -26,7 +26,6 @@ interface Gene {
 
 type Chromosome = Gene[];
 
-// ✅ NEW: Global tracking structures for conflict prevention
 interface GlobalTracker {
   roomOccupancy: Map<string, Array<{ start: number; end: number; sectionId: number }>>;
   proctorOccupancy: Map<string, Array<{ start: number; end: number; sectionId: number }>>;

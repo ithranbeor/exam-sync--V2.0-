@@ -43,6 +43,7 @@ const ProctorAttendance: React.FC<UserProps> = ({ user }) => {
   const [submittingAttendance, setSubmittingAttendance] = useState(false);
   const [_verificationData, setVerificationData] = useState<any>(null);
   const [showVerificationSuccess, setShowVerificationSuccess] = useState(false);
+  const [recentSubmissions, setRecentSubmissions] = useState<ExamDetails[]>([]);
 
   const isTimeConflict = (
     startA: string,
@@ -109,24 +110,12 @@ const ProctorAttendance: React.FC<UserProps> = ({ user }) => {
     try {
       const { data } = await api.get(`/proctor-assigned-exams/${user.user_id}/`);
       
-      console.log('=== ALL FETCHED EXAMS (Before Filter) ===');
-      console.log('Total exams:', data.length);
-      data.forEach((exam: any) => {
-        console.log({
-          course: exam.course_id,
-          date: exam.exam_date,
-          start: exam.exam_start_time,
-          end: exam.exam_end_time,
-          status: exam.status
-        });
-      });
-      
       const formattedExams: ExamDetails[] = data.map((exam: any) => ({
         id: exam.id,
         course_id: exam.course_id,
         subject: exam.subject || exam.course_id,
         section_name: exam.section_name || '',
-        exam_date: exam.exam_date || '',
+        exam_date: exam.exam_date,
         exam_start_time: exam.exam_start_time || '',
         exam_end_time: exam.exam_end_time || '',
         building_name: exam.building_name || '',
@@ -136,23 +125,19 @@ const ProctorAttendance: React.FC<UserProps> = ({ user }) => {
         status: exam.status || 'pending'
       }));
       
-      console.log('=== CHECKING EACH EXAM ===');
-      formattedExams.forEach(exam => {
-        const ongoing = isExamOngoing(exam.exam_date, exam.exam_start_time, exam.exam_end_time);
+      // ✅ Split into ongoing and recent (confirmed/submitted)
+      const ongoing = formattedExams.filter((exam: ExamDetails) => {
+        const isOngoing = isExamOngoing(exam.exam_date, exam.exam_start_time, exam.exam_end_time);
         const notConfirmed = exam.status !== 'confirmed' && exam.status !== 'confirm';
-        console.log(`${exam.course_id}: ongoing=${ongoing}, notConfirmed=${notConfirmed}`);
+        return isOngoing && notConfirmed;
       });
       
-      const filteredExams = formattedExams.filter((exam: ExamDetails) => {
-        const ongoing = isExamOngoing(exam.exam_date, exam.exam_start_time, exam.exam_end_time);
-        const notConfirmed = exam.status !== 'confirmed' && exam.status !== 'confirm';
-        return ongoing && notConfirmed;
+      const recent = formattedExams.filter((exam: ExamDetails) => {
+        return exam.status === 'confirmed' || exam.status === 'confirm';
       });
       
-      console.log('=== FILTERED EXAMS ===');
-      console.log('Ongoing exams count:', filteredExams.length);
-      
-      setProctorAssignedExams(filteredExams);
+      setProctorAssignedExams(ongoing);
+      setRecentSubmissions(recent);
     } catch (error: any) {
       console.error('Error fetching assigned exams:', error);
       toast.error('Failed to load assigned exams');
@@ -494,6 +479,72 @@ const ProctorAttendance: React.FC<UserProps> = ({ user }) => {
               </div>
             </div>
           </div>
+          {recentSubmissions.length > 0 && (
+            <div className="proctor-attendance-section" style={{ marginTop: '40px' }}>
+              <h3 className="proctor-attendance-section-title">Recent Submissions</h3>
+              <div className="proctor-attendance-canvas">
+                <div className="proctor-attendance-schedules-grid">
+                  {recentSubmissions.map((exam) => (
+                    <div
+                      key={exam.id}
+                      className="proctor-attendance-schedule-card"
+                      style={{
+                        opacity: 0.6,
+                        backgroundColor: '#f5f5f5',
+                        cursor: 'default',
+                        pointerEvents: 'none'
+                      }}
+                    >
+                      <div className="proctor-attendance-schedule-header">
+                        <h3 className="proctor-attendance-schedule-subject">
+                          {exam.course_id} - {exam.subject}
+                        </h3>
+                        <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                          <span className="proctor-attendance-schedule-code">{exam.course_id}</span>
+                          <span className="status-badge status-confirmed" style={{ backgroundColor: '#28a745' }}>
+                            SUBMITTED
+                          </span>
+                        </div>
+                      </div>
+
+                      <div className="proctor-attendance-schedule-details">
+                        <div className="proctor-attendance-detail-row">
+                          <span className="proctor-attendance-detail-label">Section:</span>
+                          <span className="proctor-attendance-detail-value">{exam.section_name}</span>
+                        </div>
+                        <div className="proctor-attendance-detail-row">
+                          <span className="proctor-attendance-detail-label">Date:</span>
+                          <span className="proctor-attendance-detail-value">{exam.exam_date}</span>
+                        </div>
+                        <div className="proctor-attendance-detail-row">
+                          <span className="proctor-attendance-detail-label">Time:</span>
+                          <span className="proctor-attendance-detail-value">
+                            {formatTo12Hour(exam.exam_start_time)} - {formatTo12Hour(exam.exam_end_time)}
+                          </span>
+                        </div>
+                        <div className="proctor-attendance-detail-row">
+                          <span className="proctor-attendance-detail-label">Building:</span>
+                          <span className="proctor-attendance-detail-value">{exam.building_name}</span>
+                        </div>
+                        <div className="proctor-attendance-detail-row">
+                          <span className="proctor-attendance-detail-label">Room:</span>
+                          <span className="proctor-attendance-detail-value">{exam.room_id}</span>
+                        </div>
+                        <div className="proctor-attendance-detail-row">
+                          <span className="proctor-attendance-detail-label">Instructor:</span>
+                          <span className="proctor-attendance-detail-value">{exam.instructor_name}</span>
+                        </div>
+                      </div>
+                      
+                      <div className="proctor-attendance-click-hint" style={{ color: '#28a745', fontWeight: 'bold' }}>
+                        ✓ Attendance Confirmed
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            </div>
+          )}
 
           {/* Second Section: All Exams (for substitution) */}
           <div className="proctor-attendance-section">

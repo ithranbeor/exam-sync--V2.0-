@@ -70,6 +70,7 @@ const SchedulerView: React.FC<SchedulerViewProps> = ({ user }) => {
   const [_showExportDropdown, setShowExportDropdown] = useState(false);
   const [collegeDataReady, setCollegeDataReady] = useState(false);
   const exportRef = useRef<HTMLDivElement>(null);
+  const [schedulerCollegeId, setSchedulerCollegeId] = useState<string>("");
 
   const [showFooterSettings, setShowFooterSettings] = useState(false);
 
@@ -95,20 +96,24 @@ const SchedulerView: React.FC<SchedulerViewProps> = ({ user }) => {
   // Fetch footer data
   useEffect(() => {
     const fetchFooterData = async () => {
-      if (!schedulerCollegeName || schedulerCollegeName === "Add schedule first") return;
+      if (!schedulerCollegeId) return;
       
       try {
+        console.log(`🔍 Fetching footer for college_id: ${schedulerCollegeId}`);
+        
         const response = await api.get('/tbl_schedule_footer/', {
-          params: { college_id: schedulerCollegeName }
+          params: { college_id: schedulerCollegeId }  // ✅ Use college_id
         });
         
         if (response.data && response.data.length > 0) {
+          console.log(`✅ Found footer:`, response.data[0]);
           setFooterData(response.data[0]);
         } else {
+          console.log(`ℹ️ No footer found, using defaults`);
           // Set defaults if no footer exists
           setFooterData({
             prepared_by_name: 'Type name',
-            prepared_by_title: `Dean, ${schedulerCollegeName}`,
+            prepared_by_title: `Dean, ${collegeName}`,
             approved_by_name: 'Type name',
             approved_by_title: 'VCAA, USTP-CDO',
             address_line: 'C.M Recto Avenue, Lapasan, Cagayan de Oro City 9000 Philippines',
@@ -122,7 +127,7 @@ const SchedulerView: React.FC<SchedulerViewProps> = ({ user }) => {
     };
     
     fetchFooterData();
-  }, [schedulerCollegeName]);
+  }, [schedulerCollegeId, collegeName]); 
 
   useEffect(() => {
     const handleClickOutside = (event: MouseEvent) => {
@@ -164,6 +169,9 @@ const SchedulerView: React.FC<SchedulerViewProps> = ({ user }) => {
         }
 
         const schedulerCollegeId = schedulerRoles[0].college_id;
+
+        setSchedulerCollegeId(schedulerCollegeId);
+        console.log(`✅ Scheduler college_id: ${schedulerCollegeId}`);
 
         const collegeResponse = await api.get(`/tbl_college/${schedulerCollegeId}/`);
         const collegeName = collegeResponse.data?.college_name;
@@ -1540,10 +1548,10 @@ const SchedulerView: React.FC<SchedulerViewProps> = ({ user }) => {
                           marginBottom: '30px'
                         }}>
                           {/* Left - Prepared by */}
-                          <div style={{ textAlign: 'left', width: '45%' }}>
+                          <div style={{ textAlign: 'left', width: '45%', color: 'black' }}>
                             <p style={{ margin: '5px 0', fontWeight: 'bold' }}>Prepared by:</p>
-                            <p style={{ margin: '30px 0 5px 0', fontStyle: 'italic' }}>(sgd.)</p>
-                            <p style={{ margin: '5px 0', fontWeight: 'bold', textDecoration: 'underline' }}>
+                            <p style={{ margin: '3px 0 5px 0', fontStyle: 'italic' }}>(sgd.)</p>
+                            <p style={{ margin: '5px 0', fontWeight: 'bold' }}>
                               {footerData?.prepared_by_name || 'Type name'}
                             </p>
                             <p style={{ margin: '5px 0' }}>
@@ -1552,10 +1560,10 @@ const SchedulerView: React.FC<SchedulerViewProps> = ({ user }) => {
                           </div>
                           
                           {/* Right - Approved by */}
-                          <div style={{ textAlign: 'left', width: '45%' }}>
+                          <div style={{ textAlign: 'left', width: '45%', color: 'black' }}>
                             <p style={{ margin: '5px 0', fontWeight: 'bold' }}>Approved:</p>
-                            <p style={{ margin: '30px 0 5px 0', fontStyle: 'italic' }}>(sgd.)</p>
-                            <p style={{ margin: '5px 0', fontWeight: 'bold', textDecoration: 'underline' }}>
+                            <p style={{ margin: '3px 0 5px 0', fontStyle: 'italic' }}>(sgd.)</p>
+                            <p style={{ margin: '5px 0', fontWeight: 'bold'}}>
                               {footerData?.approved_by_name || 'Type name'}
                             </p>
                             <p style={{ margin: '5px 0' }}>
@@ -1565,7 +1573,7 @@ const SchedulerView: React.FC<SchedulerViewProps> = ({ user }) => {
                         </div>
                         
                         {/* Center - Address */}
-                        <div style={{ textAlign: 'center', fontSize: '12px', color: '#555' }}>
+                        <div style={{ textAlign: 'center', fontSize: '15px', color: 'black' }}>
                           <p style={{ margin: '5px 0' }}>
                             {footerData?.address_line || 'C.M Recto Avenue, Lapasan, Cagayan de Oro City 9000 Philippines'}
                           </p>
@@ -1868,10 +1876,10 @@ const SchedulerView: React.FC<SchedulerViewProps> = ({ user }) => {
                           marginBottom: '30px'
                         }}>
                           {/* Left - Prepared by */}
-                          <div style={{ textAlign: 'left', width: '45%' }}>
+                          <div style={{ textAlign: 'left', width: '45%', color: 'black'}}>
                             <p style={{ margin: '5px 0', fontWeight: 'bold' }}>Prepared by:</p>
-                            <p style={{ margin: '30px 0 5px 0', fontStyle: 'italic' }}>(sgd.)</p>
-                            <p style={{ margin: '5px 0', fontWeight: 'bold', textDecoration: 'underline' }}>
+                            <p style={{ margin: '3px 0 5px 0', fontStyle: 'italic' }}>(sgd.)</p>
+                            <p style={{ margin: '5px 0', fontWeight: 'bold' }}>
                               {footerData?.prepared_by_name || 'Type name'}
                             </p>
                             <p style={{ margin: '5px 0' }}>
@@ -1880,10 +1888,10 @@ const SchedulerView: React.FC<SchedulerViewProps> = ({ user }) => {
                           </div>
                           
                           {/* Right - Approved by */}
-                          <div style={{ textAlign: 'left', width: '45%' }}>
+                          <div style={{ textAlign: 'left', width: '45%', color: 'black' }}>
                             <p style={{ margin: '5px 0', fontWeight: 'bold' }}>Approved:</p>
-                            <p style={{ margin: '30px 0 5px 0', fontStyle: 'italic' }}>(sgd.)</p>
-                            <p style={{ margin: '5px 0', fontWeight: 'bold', textDecoration: 'underline' }}>
+                            <p style={{ margin: '3px 0 5px 0', fontStyle: 'italic' }}>(sgd.)</p>
+                            <p style={{ margin: '5px 0', fontWeight: 'bold'}}>
                               {footerData?.approved_by_name || 'Type name'}
                             </p>
                             <p style={{ margin: '5px 0' }}>
@@ -1893,7 +1901,7 @@ const SchedulerView: React.FC<SchedulerViewProps> = ({ user }) => {
                         </div>
                         
                         {/* Center - Address */}
-                        <div style={{ textAlign: 'center', fontSize: '12px', color: '#555' }}>
+                        <div style={{ textAlign: 'center', fontSize: '15px', color: 'black' }}>
                           <p style={{ margin: '5px 0' }}>
                             {footerData?.address_line || 'C.M Recto Avenue, Lapasan, Cagayan de Oro City 9000 Philippines'}
                           </p>
@@ -1971,12 +1979,15 @@ const SchedulerView: React.FC<SchedulerViewProps> = ({ user }) => {
           onClose={() => setShowFooterSettings(false)}
           collegeName={collegeName}
           onSave={async () => {
-            // Refresh footer data
             try {
+              console.log(`🔄 Refreshing footer for college_id: ${schedulerCollegeId}`);
+              
               const response = await api.get('/tbl_schedule_footer/', {
-                params: { college_id: collegeName }
+                params: { college_id: schedulerCollegeId }
               });
+              
               if (response.data && response.data.length > 0) {
+                console.log(`✅ Footer refreshed:`, response.data[0]);
                 setFooterData(response.data[0]);
               }
             } catch (error) {

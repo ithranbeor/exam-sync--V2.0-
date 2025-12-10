@@ -42,50 +42,123 @@ const FooterSettingsModal: React.FC<FooterSettingsModalProps> = ({
   const [logoPreview, setLogoPreview] = useState<string | null>(null);
   const [isLoading, setIsLoading] = useState(false);
   const [isSaving, setIsSaving] = useState(false);
+  const [collegeId, setCollegeId] = useState<string | null>(null);
+  const [deanName, setDeanName] = useState<string>('');
+  const [vcaaName, setVcaaName] = useState<string>('');
 
+  // Fetch dean name and VCAA name
   useEffect(() => {
-    if (isOpen && collegeName && collegeName !== "Add schedule first") {
+    const fetchRoleNames = async () => {
+      if (!collegeName || collegeName === "Add schedule first") return;
+      
+      try {
+        // Fetch Dean name (role_id: 1)
+        const deanResponse = await api.get('/tbl_user_role', {
+          params: {
+            college_name: collegeName,
+            role_id: 1
+          }
+        });
+
+        if (deanResponse.data && deanResponse.data.length > 0) {
+          const deanRole = deanResponse.data[0];
+          if (deanRole.user && deanRole.user.first_name && deanRole.user.last_name) {
+            const fullDeanName = `${deanRole.user.first_name} ${deanRole.user.last_name}`;
+            setDeanName(fullDeanName);
+            console.log(`✅ Found dean: ${fullDeanName}`);
+          } else {
+            console.warn('⚠️ Dean user data incomplete');
+          }
+        } else {
+          console.warn('⚠️ No dean found for college');
+        }
+
+        // Fetch VCAA name (role_id: 2)
+        const vcaaResponse = await api.get('/tbl_user_role', {
+          params: {
+            role_id: 2
+          }
+        });
+
+        if (vcaaResponse.data && vcaaResponse.data.length > 0) {
+          const vcaaRole = vcaaResponse.data[0];
+          if (vcaaRole.user && vcaaRole.user.first_name && vcaaRole.user.last_name) {
+            const fullVcaaName = `${vcaaRole.user.first_name} ${vcaaRole.user.last_name}`;
+            setVcaaName(fullVcaaName);
+            console.log(`✅ Found VCAA: ${fullVcaaName}`);
+          } else {
+            console.warn('⚠️ VCAA user data incomplete');
+          }
+        } else {
+          console.warn('⚠️ No VCAA found');
+        }
+      } catch (error) {
+        console.error("Error fetching role names:", error);
+      }
+    };
+    
+    fetchRoleNames();
+  }, [collegeName]);
+
+  // Fetch college_id from college_name
+  useEffect(() => {
+    const fetchCollegeId = async () => {
+      if (!collegeName || collegeName === "Add schedule first") return;
+      
+      try {
+        const response = await api.get('/tbl_college/');
+        
+        if (response.data && response.data.length > 0) {
+          const college = response.data.find((c: any) => c.college_name === collegeName);
+          if (college) {
+            setCollegeId(college.college_id);
+            console.log(`✅ Found college_id: ${college.college_id} for ${collegeName}`);
+          } else {
+            console.error(`❌ College not found: ${collegeName}`);
+          }
+        }
+      } catch (error) {
+        console.error("Error fetching college ID:", error);
+      }
+    };
+    
+    fetchCollegeId();
+  }, [collegeName]);
+
+  // Wait for collegeId before fetching footer data
+  useEffect(() => {
+    if (isOpen && collegeId) {
       fetchFooterData();
     }
-  }, [isOpen, collegeName]);
+  }, [isOpen, collegeId]);
 
   const fetchFooterData = async () => {
+    if (!collegeId) return;
+    
     setIsLoading(true);
     try {
+      console.log(`🔍 Fetching footer data for college_id: ${collegeId}`);
+      
       const response = await api.get('/tbl_schedule_footer/', {
-        params: { college_id: collegeName }
+        params: { college_id: collegeId }
       });
 
       if (response.data && response.data.length > 0) {
         const data = response.data[0];
+        console.log(`✅ Found existing footer:`, data);
         setFooterData(data);
         setLogoPreview(data.logo_url);
       } else {
-        // Get dean name from college
-        try {
-          const rolesResponse = await api.get('/tbl_user_role', {
-            params: {
-              college_name: collegeName,
-              role_id: 1
-            }
-          });
-
-          let deanName = 'Type name';
-          if (rolesResponse.data && rolesResponse.data.length > 0) {
-            const deanRole = rolesResponse.data[0];
-            if (deanRole.user) {
-              deanName = `${deanRole.user.first_name} ${deanRole.user.last_name}`;
-            }
-          }
-
-          setFooterData(prev => ({
-            ...prev,
-            prepared_by_name: deanName,
-            prepared_by_title: `Dean, ${collegeName}`
-          }));
-        } catch (error) {
-          console.error("Error fetching dean info:", error);
-        }
+        console.log(`ℹ️ No existing footer found, using role names from state...`);
+        
+        // Use the dean name and VCAA name from state if available
+        setFooterData(prev => ({
+          ...prev,
+          prepared_by_name: deanName || 'Type name',
+          prepared_by_title: `Dean, ${collegeName}`,
+          approved_by_name: vcaaName || 'Type name',
+          approved_by_title: 'VCAA, USTP-CDO'
+        }));
       }
     } catch (error) {
       console.error("Error fetching footer data:", error);
@@ -139,15 +212,33 @@ const FooterSettingsModal: React.FC<FooterSettingsModalProps> = ({
   };
 
   const handleSave = async () => {
+    if (!collegeId) {
+      toast.error('College ID not found. Please try again.');
+      return;
+    }
+
+    // Validate required fields
+    if (!footerData.prepared_by_name?.trim()) {
+      toast.error('Prepared by name is required');
+      return;
+    }
+
+    if (!footerData.approved_by_name?.trim()) {
+      toast.error('Approved by name is required');
+      return;
+    }
+
     setIsSaving(true);
     try {
       let logoUrl = footerData.logo_url;
 
       // Upload logo if changed
       if (logoFile) {
+        console.log(`📤 Uploading logo for college_id: ${collegeId}`);
+        
         const formData = new FormData();
         formData.append('logo', logoFile);
-        formData.append('college_id', collegeName);
+        formData.append('college_id', collegeId);
 
         const uploadResponse = await api.post('/upload-schedule-logo/', formData, {
           headers: {
@@ -156,46 +247,137 @@ const FooterSettingsModal: React.FC<FooterSettingsModalProps> = ({
         });
 
         logoUrl = uploadResponse.data.logo_url;
+        console.log(`✅ Logo uploaded successfully`);
       }
 
+      // Clean data before sending
       const dataToSave = {
-        ...footerData,
-        college_id: collegeName,
+        college_id: collegeId,
+        prepared_by_name: (footerData.prepared_by_name || '').trim(),
+        prepared_by_title: (footerData.prepared_by_title || `Dean, ${collegeName}`).trim(),
+        approved_by_name: (footerData.approved_by_name || '').trim(),
+        approved_by_title: (footerData.approved_by_title || 'VCAA, USTP-CDO').trim(),
+        address_line: (footerData.address_line || 'C.M Recto Avenue, Lapasan, Cagayan de Oro City 9000 Philippines').trim(),
+        contact_line: (footerData.contact_line || 'Tel Nos. +63 (88) 856 1738; Telefax +63 (88) 856 4696 | http://www.ustp.edu.ph').trim(),
         logo_url: logoUrl
       };
+
+      console.log(`💾 Saving footer data:`, JSON.stringify(dataToSave, null, 2));
 
       if (footerData.footer_id) {
         // Update existing
         await api.put(`/tbl_schedule_footer/${footerData.footer_id}/`, dataToSave);
         toast.success('Footer settings updated successfully!');
+        console.log(`✅ Footer updated: ${footerData.footer_id}`);
       } else {
         // Create new
         await api.post('/tbl_schedule_footer/', dataToSave);
         toast.success('Footer settings saved successfully!');
+        console.log(`✅ New footer created`);
       }
 
       onSave();
       onClose();
     } catch (error: any) {
-      console.error("Error saving footer settings:", error);
-      toast.error(error?.response?.data?.error || 'Failed to save footer settings');
+      console.error("❌ Error saving footer settings:", error);
+      console.error("❌ Error response data:", error?.response?.data);
+      
+      // Better error handling
+      let errorMessage = 'Failed to save footer settings';
+      
+      if (error?.response?.data) {
+        const data = error.response.data;
+        if (typeof data === 'object') {
+          // Extract first error message from validation errors
+          const firstError = Object.values(data)[0];
+          if (Array.isArray(firstError)) {
+            errorMessage = firstError[0];
+          } else if (typeof firstError === 'string') {
+            errorMessage = firstError;
+          }
+        } else if (typeof data === 'string') {
+          errorMessage = data;
+        }
+      }
+      
+      toast.error(errorMessage);
     } finally {
       setIsSaving(false);
     }
   };
 
-  const handleReset = () => {
-    setFooterData({
-      prepared_by_name: '',
-      prepared_by_title: `Dean, ${collegeName}`,
-      approved_by_name: '',
-      approved_by_title: 'VCAA, USTP-CDO',
-      address_line: 'C.M Recto Avenue, Lapasan, Cagayan de Oro City 9000 Philippines',
-      contact_line: 'Tel Nos. +63 (88) 856 1738; Telefax +63 (88) 856 4696 | http://www.ustp.edu.ph',
-      logo_url: null
-    });
-    setLogoFile(null);
-    setLogoPreview(null);
+  const handleReset = async () => {
+    if (!collegeId) {
+      toast.error('College ID not found. Please try again.');
+      return;
+    }
+
+    setIsSaving(true);
+    try {
+      // Use dean name and VCAA name from state for reset
+      const resetData = {
+        college_id: collegeId,
+        prepared_by_name: (deanName || 'Type name').trim(),
+        prepared_by_title: `Dean, ${collegeName}`,
+        approved_by_name: (vcaaName || 'Type name').trim(),
+        approved_by_title: 'VCAA, USTP-CDO',
+        address_line: 'C.M Recto Avenue, Lapasan, Cagayan de Oro City 9000 Philippines',
+        contact_line: 'Tel Nos. +63 (88) 856 1738; Telefax +63 (88) 856 4696 | http://www.ustp.edu.ph',
+        logo_url: null
+      };
+
+      console.log(`🔄 Resetting footer data to defaults:`, JSON.stringify(resetData, null, 2));
+
+      if (footerData.footer_id) {
+        // Update existing
+        await api.put(`/tbl_schedule_footer/${footerData.footer_id}/`, resetData);
+        toast.success('Footer settings reset to default values!');
+        console.log(`✅ Footer reset: ${footerData.footer_id}`);
+      } else {
+        // Create new with default values
+        await api.post('/tbl_schedule_footer/', resetData);
+        toast.success('Footer settings reset to default values!');
+        console.log(`✅ New footer created with defaults`);
+      }
+
+      // Update local state to match saved data
+      setFooterData({
+        ...resetData,
+        footer_id: footerData.footer_id // Keep the footer_id if it exists
+      });
+      setLogoFile(null);
+      setLogoPreview(null);
+
+      // Refresh the data from server
+      await fetchFooterData();
+      
+      // Trigger parent refresh
+      onSave();
+
+    } catch (error: any) {
+      console.error("❌ Error resetting footer settings:", error);
+      console.error("❌ Error response data:", error?.response?.data);
+      
+      let errorMessage = 'Failed to reset footer settings';
+      
+      if (error?.response?.data) {
+        const data = error.response.data;
+        if (typeof data === 'object') {
+          const firstError = Object.values(data)[0];
+          if (Array.isArray(firstError)) {
+            errorMessage = firstError[0];
+          } else if (typeof firstError === 'string') {
+            errorMessage = firstError;
+          }
+        } else if (typeof data === 'string') {
+          errorMessage = data;
+        }
+      }
+      
+      toast.error(errorMessage);
+    } finally {
+      setIsSaving(false);
+    }
   };
 
   if (!isOpen) return null;
@@ -205,7 +387,7 @@ const FooterSettingsModal: React.FC<FooterSettingsModalProps> = ({
       <div className="footer-settings-modal">
         <div className="footer-settings-header">
           <h2>Schedule Footer Settings</h2>
-          <button className="close-button" onClick={onClose}>&times;</button>
+          <button type="button" className="close-button" onClick={onClose}>&times;</button>
         </div>
 
         <div className="footer-settings-content">
@@ -340,7 +522,7 @@ const FooterSettingsModal: React.FC<FooterSettingsModalProps> = ({
               type="button"
               className="save-btn" 
               onClick={handleSave}
-              disabled={isSaving || isLoading}
+              disabled={isSaving || isLoading || !collegeId}
             >
               {isSaving ? 'Saving...' : 'Save Changes'}
             </button>

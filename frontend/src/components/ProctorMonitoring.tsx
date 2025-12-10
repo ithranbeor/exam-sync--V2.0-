@@ -627,6 +627,7 @@ const ProctorMonitoring: React.FC<UserProps> = ({ }) => {
               <tbody>
                 {sortedSchedules.length > 0 ? (
                   sortedSchedules.map((schedule, index) => {
+                    // ✅ FIXED: Use backend status directly
                     const backendStatus = schedule.examdetails_status || schedule.status || 'pending';
                     
                     const getStatusDisplay = (status: string | null | undefined) => {
@@ -636,11 +637,12 @@ const ProctorMonitoring: React.FC<UserProps> = ({ }) => {
 
                       const normalized = status.toLowerCase().trim();
 
+                      // ✅ FIXED: Check "late" BEFORE "confirm" to prevent misclassification
                       if (normalized.includes('late')) {
                         return { text: 'Late', className: 'status-late' };
                       }
 
-                      if (normalized.includes('confirm')) {
+                      if (normalized.includes('confirm') || normalized.includes('present')) {
                         return { text: 'Present', className: 'status-confirmed' };
                       }
 
@@ -710,8 +712,9 @@ const ProctorMonitoring: React.FC<UserProps> = ({ }) => {
                           {formatTimeIn(codeEntryTime)}
                         </td>
                         <td>
+                          {/* ✅ FIXED: Display statusDisplay.text instead of schedule.status */}
                           <span className={`status-badge ${statusDisplay.className}`}>
-                            {schedule.status}
+                            {statusDisplay.text}
                           </span>
                         </td>
                       </tr>

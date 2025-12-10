@@ -823,6 +823,7 @@ def proctor_monitoring_dashboard(request):
                 'department': exam.college_name,
                 'college': exam.college_name,
                 'status': exam_status,
+                'examdetails_status': exam_status, 
                 'code_entry_time': code_entry_time.isoformat() if code_entry_time else None,
                 'otp_code': otp_code
             })

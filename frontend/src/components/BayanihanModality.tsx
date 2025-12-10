@@ -678,17 +678,25 @@ const BayanihanModality: React.FC<UserProps> = ({ user }) => {
     }
 
     // Check if any room assignment exceeds capacity
+    // Check if any sections are not assigned to any room - THIS MUST BE CHECKED FIRST
     const hasUnassigned = calculateRoomAssignments.some(
       assignment => assignment.roomId === '⚠️ NOT ASSIGNED'
     );
 
     if (hasUnassigned) {
-      toast.error('Some night class sections are not assigned to any room. Please select more rooms.');
+      const unassignedSections = calculateRoomAssignments
+        .filter(a => a.roomId === '⚠️ NOT ASSIGNED')
+        .flatMap(a => a.sections)
+        .join(', ');
+      
+      toast.error(`Cannot submit: These sections are not assigned to any room: ${unassignedSections}. Please select more rooms.`);
+      setIsSubmitting(false);
       return;
     }
 
     // Check if any room assignment exceeds capacity
     const hasOverCapacity = calculateRoomAssignments.some(assignment => {
+      if (assignment.roomId === '⚠️ NOT ASSIGNED') return false; // Skip unassigned
       const room = roomOptions.find(r => r.room_id === assignment.roomId);
       return assignment.totalStudents > (room?.room_capacity || 0);
     });
@@ -1200,6 +1208,77 @@ const BayanihanModality: React.FC<UserProps> = ({ user }) => {
               placeholder="-- Select Building --"
               isClearable
             />
+            {calculateRoomAssignments.length > 0 && (
+              <div style={{
+                margin: '15px 0',
+                padding: '12px',
+                backgroundColor: '#f8f9fa',
+                borderRadius: '6px',
+                border: '1px solid #dee2e6'
+              }}>
+                <h4 style={{ marginBottom: '10px', fontSize: '14px', color: '#495057' }}>
+                  Assignment Preview:
+                </h4>
+                <div style={{
+                  maxHeight: '150px',
+                  overflowY: 'auto',
+                  fontSize: '13px'
+                }}>
+                  {calculateRoomAssignments.map((assignment, idx) => {
+                    const isUnassigned = assignment.roomId === '⚠️ NOT ASSIGNED';
+                    const room = roomOptions.find(r => r.room_id === assignment.roomId);
+                    const isOverCapacity = !isUnassigned && assignment.totalStudents > (room?.room_capacity || 0);
+
+                    return (
+                      <div key={idx} style={{
+                        padding: '8px',
+                        marginBottom: '6px',
+                        backgroundColor: isUnassigned ? '#ffebee' : (isOverCapacity ? '#fff3cd' : 'white'),
+                        borderRadius: '4px',
+                        border: isUnassigned ? '2px solid #d32f2f' : (isOverCapacity ? '1px solid #ffc107' : '1px solid #e0e0e0')
+                      }}>
+                        <strong style={{ color: isUnassigned ? '#d32f2f' : '#212529' }}>
+                          {isUnassigned ? '⚠️ NOT ASSIGNED' : `Room ${assignment.roomId}`}
+                        </strong>
+                        {!isUnassigned && ` (${assignment.totalStudents}/${room?.room_capacity || 'N/A'})`}
+                        {assignment.isNightClass && (
+                          <span style={{
+                            marginLeft: '6px',
+                            padding: '1px 6px',
+                            backgroundColor: '#1a237e',
+                            color: 'white',
+                            borderRadius: '10px',
+                            fontSize: '10px',
+                            fontWeight: 'bold'
+                          }}>
+                            NIGHT
+                          </span>
+                        )}
+                        <br />
+                        <small style={{ color: '#6c757d' }}>
+                          {assignment.sections.join(', ')}
+                        </small>
+                      </div>
+                    );
+                  })}
+                </div>
+                
+                {/* Summary status */}
+                <div style={{
+                  marginTop: '10px',
+                  padding: '8px',
+                  backgroundColor: calculateRoomAssignments.some(a => a.roomId === '⚠️ NOT ASSIGNED') ? '#ffebee' : '#d4edda',
+                  borderRadius: '4px',
+                  fontSize: '12px',
+                  fontWeight: 'bold',
+                  color: calculateRoomAssignments.some(a => a.roomId === '⚠️ NOT ASSIGNED') ? '#d32f2f' : '#155724'
+                }}>
+                  {calculateRoomAssignments.some(a => a.roomId === '⚠️ NOT ASSIGNED') 
+                    ? '⚠️ Some sections need room assignment'
+                    : '✓ All sections assigned'}
+                </div>
+              </div>
+            )}
 
             <div className="room-grid">
               {filteredAndSortedRooms.map(r => {
