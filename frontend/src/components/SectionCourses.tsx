@@ -32,6 +32,11 @@ interface User {
   full_name: string;
 }
 
+interface College {
+  college_id: string;
+  college_name: string;
+}
+
 interface SectionCourse {
   id?: number;
   course?: Course;
@@ -53,6 +58,9 @@ const SectionCourses: React.FC = () => {
   const [courses, setCourses] = useState<Course[]>([]);
   const [programs, setPrograms] = useState<Program[]>([]);
   const [terms, setTerms] = useState<Term[]>([]);
+  const [colleges, setColleges] = useState<College[]>([]);
+  const [userRoles, setUserRoles] = useState<any[]>([]);
+  const [selectedCollege, setSelectedCollege] = useState<string>('all');
   const [courseInstructorsMap, setCourseInstructorsMap] = useState<Record<string, User[]>>({});
   const [searchTerm, setSearchTerm] = useState('');
   const [showModal, setShowModal] = useState(false);
@@ -123,12 +131,14 @@ const SectionCourses: React.FC = () => {
   const fetchAll = useCallback(async () => {
     setLoading(true);
     try {
-      const [secRes, courseRes, progRes, termRes, courseUserRes] = await Promise.all([
+      const [secRes, courseRes, progRes, termRes, courseUserRes, collegesRes, userRolesRes] = await Promise.all([
         api.get('/tbl_sectioncourse/'),
         api.get('/courses/'),
         api.get('/programs/'),
         api.get('/tbl_term'),
-        api.get('/tbl_course_users/')
+        api.get('/tbl_course_users/'),
+        api.get('/tbl_college/'),
+        api.get('/tbl_user_role')
       ]);
 
       // ✅ FIX: Extract data from the new response structure
@@ -151,6 +161,9 @@ const SectionCourses: React.FC = () => {
         }
       }));
       setTerms(mappedTerms);
+
+      setColleges((collegesRes.data && collegesRes.data) || []);
+      setUserRoles((userRolesRes.data && userRolesRes.data) || []);
 
       const instructorMap: Record<string, User[]> = {};
       courseUserData.forEach((row: any) => {
@@ -669,8 +682,22 @@ const SectionCourses: React.FC = () => {
       });
     }
 
+    // Apply college filter (if not 'all') - include section when the instructor belongs to selected college
+    if (selectedCollege && selectedCollege !== 'all') {
+      filtered = filtered.filter((sc) => {
+        const uid = sc.user_id || sc.user?.user_id;
+        if (!uid) return false;
+
+        const role = userRoles.find((r: any) => Number(r.user_id || r.user) === Number(uid));
+        if (!role) return false;
+
+        const collegeId = role.college_id || (role.college && role.college.college_id) || role.college;
+        return String(collegeId) === String(selectedCollege);
+      });
+    }
+
     return filtered;
-  }, [searchTerm, sectionCourses, sortBy]);
+  }, [searchTerm, sectionCourses, sortBy, selectedCollege, userRoles]);
 
   const totalItems = filtered.length;
 
@@ -834,7 +861,7 @@ const SectionCourses: React.FC = () => {
       <div className="colleges-actions">
         <div style={{ display: 'flex', alignItems: 'center', gap: 8, width: '100%' }}>
           <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-            <button type='button' className="action-button add-new" onClick={() => {
+            <button type='button' className="action-button add-new with-label" onClick={() => {
           setEditMode(false);
           setNewSection({
             course_id: '',
@@ -846,9 +873,9 @@ const SectionCourses: React.FC = () => {
           } as SectionCourse);
           setShowModal(true);
         }}>
-          <FaPlus/>
+          <FaPlus/><span className="btn-label">Add</span>
         </button>
-            <button type='button' className="action-button import" onClick={() => setShowImport(true)}><FaFileImport/></button>
+            <button type='button' className="action-button import with-label" onClick={() => setShowImport(true)}><FaFileImport/><span className="btn-label">Import</span></button>
             <div style={{ position: 'relative' }} data-sort-dropdown>
               <button 
                 type='button' 
@@ -879,7 +906,7 @@ const SectionCourses: React.FC = () => {
                 title="Sort by"
               >
                 <FaSort/>
-                <span>Sort by</span>
+                <span className="btn-label">Sort by</span>
               </button>
               {showSortDropdown && (
                 <div 
@@ -1138,7 +1165,7 @@ const SectionCourses: React.FC = () => {
                   e.currentTarget.style.backgroundColor = '#0A3765';
                 }}
               >
-                <span>Show rows: {itemsPerPage === 'all' ? 'All' : itemsPerPage}</span>
+                <span className="btn-label">Show rows: {itemsPerPage === 'all' ? 'All' : itemsPerPage}</span>
                 <FaChevronDown size={12} />
               </button>
               {showItemsPerPageDropdown && (
@@ -1379,6 +1406,20 @@ const SectionCourses: React.FC = () => {
               )}
             </div>
           </div>
+            <div className="input-group" style={{ marginBottom: 0, marginLeft: '8px' }}>
+              <select
+                value={selectedCollege}
+                onChange={(e) => setSelectedCollege(e.target.value)}
+                className="college-filter-select"
+              >
+                <option value="all">All Colleges</option>
+                {colleges.map((college) => (
+                  <option key={college.college_id} value={college.college_id}>
+                    {college.college_name}
+                  </option>
+                ))}
+              </select>
+            </div>
           <div style={{ marginLeft: 'auto', display: 'flex', alignItems: 'center', gap: 8 }}>
             <button
               type="button"
