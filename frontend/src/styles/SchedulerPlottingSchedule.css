@@ -129,7 +129,7 @@
 }
 
 /* Button */
-.btn-save {
+.btn-saves {
     width: 100%;
     padding: 12px 14px;
     border-radius: 40px;
@@ -142,13 +142,13 @@
     transition: background 0.2s ease, transform 0.08s ease;
 }
 
-.btn-save:hover {
+.btn-saves:hover {
     background: #0d3b66;
     transform: translateY(-1px);
     box-shadow: 0 4px 12px rgba(9, 44, 76, 0.15);
 }
 
-.btn-save:active {
+.btn-saves:active {
     transform: translateY(0);
     box-shadow: none;
 }
@@ -192,7 +192,7 @@
         font-size: 13px;
     }
 
-    .btn-save {
+    .btn-saves {
         padding: 11px 13px;
         font-size: 14px;
     }
@@ -248,7 +248,7 @@
         font-size: 13px;
     }
 
-    .btn-save {
+    .btn-saves {
         padding: 11px 13px;
         font-size: 14px;
     }
@@ -325,7 +325,7 @@
         border-radius: 6px;
     }
 
-    .btn-save {
+    .btn-saves {
         padding: 10px 12px;
         font-size: 14px;
         border-radius: 30px;

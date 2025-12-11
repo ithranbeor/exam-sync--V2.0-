@@ -14,6 +14,8 @@ import EmailSender from "../components/EmailSender.tsx";
 import DeanSend from "../components/DeanSend.tsx";
 import ExportSchedule from "../components/ExportSchedule.tsx";
 import FooterSettingsModal from "../components/FooterSettingsModal.tsx";
+import ManualScheduleEditor from '../components/ManualScheduleEditor.tsx';
+import { FaEdit } from 'react-icons/fa';
 
 interface ExamDetail {
   examdetails_id?: number; course_id: string; section_name?: string; sections?: string[]; room_id?: string; exam_date?: string; exam_start_time?: string; semester?: string;
@@ -71,8 +73,11 @@ const SchedulerView: React.FC<SchedulerViewProps> = ({ user }) => {
   const [collegeDataReady, setCollegeDataReady] = useState(false);
   const exportRef = useRef<HTMLDivElement>(null);
   const [schedulerCollegeId, setSchedulerCollegeId] = useState<string>("");
-
   const [showFooterSettings, setShowFooterSettings] = useState(false);
+  const [showManualEditor, setShowManualEditor] = useState(false);
+  const [manualEditorSections, setManualEditorSections] = useState<any[]>([]);
+  const [persistentUnscheduled, setPersistentUnscheduled] = useState<any[]>([]);
+  const [showUnscheduledBadge, setShowUnscheduledBadge] = useState(false);
 
   const resetAllModes = () => {
     setIsModalOpen(false);
@@ -81,6 +86,20 @@ const SchedulerView: React.FC<SchedulerViewProps> = ({ user }) => {
     setShowSwapInstructions(false);
     setShowEnvelopeDropdown(false);
     setShowExportDropdown(false);
+  };
+
+  const saveUnscheduledSections = (sections: any[]) => {
+    if (schedulerCollegeName && schedulerCollegeName !== "Add schedule first") {
+      if (sections.length > 0) {
+        localStorage.setItem(`unscheduled_${schedulerCollegeName}`, JSON.stringify(sections));
+        setPersistentUnscheduled(sections);
+        setShowUnscheduledBadge(true);
+      } else {
+        localStorage.removeItem(`unscheduled_${schedulerCollegeName}`);
+        setPersistentUnscheduled([]);
+        setShowUnscheduledBadge(false);
+      }
+    }
   };
   
   const [footerData, setFooterData] = useState<{
@@ -92,6 +111,28 @@ const SchedulerView: React.FC<SchedulerViewProps> = ({ user }) => {
     contact_line: string;
     logo_url: string | null;
   } | null>(null);
+
+  useEffect(() => {
+    const loadUnscheduledSections = () => {
+      const stored = localStorage.getItem(`unscheduled_${schedulerCollegeName}`);
+      if (stored) {
+        try {
+          const parsed = JSON.parse(stored);
+          if (Array.isArray(parsed) && parsed.length > 0) {
+            setPersistentUnscheduled(parsed);
+            setShowUnscheduledBadge(true);
+            console.log(`📋 Loaded ${parsed.length} unscheduled sections from storage`);
+          }
+        } catch (e) {
+          console.error("Failed to parse stored unscheduled sections:", e);
+        }
+      }
+    };
+
+    if (schedulerCollegeName && schedulerCollegeName !== "Add schedule first") {
+      loadUnscheduledSections();
+    }
+  }, [schedulerCollegeName]);
 
   // Fetch footer data
   useEffect(() => {
@@ -372,74 +413,66 @@ const SchedulerView: React.FC<SchedulerViewProps> = ({ user }) => {
   }, [user, collegeName, approvalStatus, examData.length]);
 
   const getSectionDisplay = (exam: ExamDetail): string => {
-  if (!exam.sections || exam.sections.length === 0) {
-    return exam.section_name || "N/A";
-  }
-
-  // Keep only section-like tokens (no spaces or commas) and dedupe
-  const rawSections = Array.from(new Set(
-    exam.sections
-      .map(s => (s ?? "").toString().trim())
-      .filter(Boolean)
-  ));
-
-  // Accept tokens that match: prefix + digits + optional _suffix (no spaces, no commas)
-  const validSections = rawSections.filter(s =>
-    /^(.+?)(\d+)(_[A-Za-z0-9]+)?$/.test(s) && !/[\s,]/.test(s)
-  );
-
-  if (validSections.length === 0) {
-    // nothing valid found — fallback (do NOT return proctors)
-    return exam.section_name || "N/A";
-  }
-
-  if (validSections.length === 1) return validSections[0];
-
-  // Sort consistently (by prefix, then numeric)
-  validSections.sort((a, b) => {
-    const ma = a.match(/^(.+?)(\d+)(_[A-Za-z0-9]+)?$/)!;
-    const mb = b.match(/^(.+?)(\d+)(_[A-Za-z0-9]+)?$/)!;
-    const prefixA = ma[1], prefixB = mb[1];
-    if (prefixA !== prefixB) return prefixA.localeCompare(prefixB);
-    const na = parseInt(ma[2], 10), nb = parseInt(mb[2], 10);
-    return na - nb;
-  });
-
-  // Group by prefix + suffix (so different tracks are separate groups)
-  const groups: Record<string, { num: number; original: string }[]> = {};
-  validSections.forEach(s => {
-    const m = s.match(/^(.+?)(\d+)(_[A-Za-z0-9]+)?$/)!;
-    const prefix = m[1];
-    const num = parseInt(m[2], 10);
-    const suffix = m[3] || "";
-    const key = prefix + suffix; // e.g. "IT4R_Track2" or "IT4R" if no suffix
-    groups[key] = groups[key] || [];
-    groups[key].push({ num, original: s });
-  });
-
-  // Build ranges per group (compress consecutive numbers)
-  const parts: string[] = [];
-  Object.keys(groups).forEach(key => {
-    const items = groups[key].sort((a, b) => a.num - b.num);
-    let startIdx = 0;
-    for (let i = 0; i < items.length; i++) {
-      const isEnd = i === items.length - 1 || items[i + 1].num !== items[i].num + 1;
-      if (isEnd) {
-        const size = i - startIdx + 1;
-        if (size >= 2) {
-          // compress into range
-          parts.push(`${items[startIdx].original} - ${items[i].original}`);
-        } else {
-          // single item
-          parts.push(items[i].original);
-        }
-        startIdx = i + 1;
-      }
+    if (!exam.sections || exam.sections.length === 0) {
+      return exam.section_name || "N/A";
     }
-  });
 
-  return parts.join(", ");
-};
+    const rawSections = Array.from(new Set(
+      exam.sections
+        .map(s => (s ?? "").toString().trim())
+        .filter(Boolean)
+    ));
+
+    const validSections = rawSections.filter(s =>
+      /^(.+?)(\d+)(_[A-Za-z0-9]+)?$/.test(s) && !/[\s,]/.test(s)
+    );
+
+    if (validSections.length === 0) {
+      return exam.section_name || "N/A";
+    }
+
+    if (validSections.length === 1) return validSections[0];
+
+    validSections.sort((a, b) => {
+      const ma = a.match(/^(.+?)(\d+)(_[A-Za-z0-9]+)?$/)!;
+      const mb = b.match(/^(.+?)(\d+)(_[A-Za-z0-9]+)?$/)!;
+      const prefixA = ma[1], prefixB = mb[1];
+      if (prefixA !== prefixB) return prefixA.localeCompare(prefixB);
+      const na = parseInt(ma[2], 10), nb = parseInt(mb[2], 10);
+      return na - nb;
+    });
+
+    const groups: Record<string, { num: number; original: string }[]> = {};
+    validSections.forEach(s => {
+      const m = s.match(/^(.+?)(\d+)(_[A-Za-z0-9]+)?$/)!;
+      const prefix = m[1];
+      const num = parseInt(m[2], 10);
+      const suffix = m[3] || "";
+      const key = prefix + suffix;
+      groups[key] = groups[key] || [];
+      groups[key].push({ num, original: s });
+    });
+
+    const parts: string[] = [];
+    Object.keys(groups).forEach(key => {
+      const items = groups[key].sort((a, b) => a.num - b.num);
+      let startIdx = 0;
+      for (let i = 0; i < items.length; i++) {
+        const isEnd = i === items.length - 1 || items[i + 1].num !== items[i].num + 1;
+        if (isEnd) {
+          const size = i - startIdx + 1;
+          if (size >= 2) {
+            parts.push(`${items[startIdx].original} - ${items[i].original}`);
+          } else {
+            parts.push(items[i].original);
+          }
+          startIdx = i + 1;
+        }
+      }
+    });
+
+    return parts.join(", ");
+  };
 
   // ✅ NEW: Helper function to get instructor display
   const getInstructorDisplay = (exam: ExamDetail): string => {
@@ -704,15 +737,12 @@ const SchedulerView: React.FC<SchedulerViewProps> = ({ user }) => {
         return;
       }
 
-      // Delete the schedules
       const response = await api.post('/tbl_examdetails/batch-delete/', {
         college_name: schedulerCollegeName
       });
 
-      // Delete the approval status for this college
       toast.dismiss(loadingToast);
 
-      // Delete the approval status for this college
       try {
         const approvalResponse = await api.get('/tbl_scheduleapproval/', {
           params: { college_name: schedulerCollegeName }
@@ -728,22 +758,20 @@ const SchedulerView: React.FC<SchedulerViewProps> = ({ user }) => {
         console.error("Error deleting approval status:", approvalError);
       }
 
-      // Reset local state immediately
       setApprovalStatus(null);
       setRemarks(null);
-
-      // Clear exam data completely
       setExamData([]);
 
+      // ✅ Clear unscheduled sections storage
+      saveUnscheduledSections([]);
+  
       toast.success(`Successfully deleted ${response.data.deleted_count} schedules for ${schedulerCollegeName}!`);
-
+    
     } catch (error: any) {
       console.error("Error deleting schedules:", error);
       toast.dismiss(loadingToast);
       toast.error(`Failed to delete schedules: ${error?.response?.data?.error || error?.message || 'Unknown error'}`);
     }
-    setApprovalStatus(null);
-    setRemarks(null);
   };
 
   const getAvailableProctorsForExam = (
@@ -890,6 +918,62 @@ const SchedulerView: React.FC<SchedulerViewProps> = ({ user }) => {
       key: "Delete All",
       icon: <FaTrash style={{ fontSize: "18px" }} />,
       action: handleDeleteAllSchedules,
+    },
+    {
+      key: "Edit Manually",
+      icon: (
+        <div style={{ position: 'relative', display: 'inline-block' }}>
+          <FaEdit style={{ fontSize: "20px", color: "#10b981" }} />
+          {showUnscheduledBadge && (
+            <span style={{
+              position: 'absolute',
+              top: '-8px',
+              right: '-8px',
+              background: '#ef4444',
+              color: 'white',
+              borderRadius: '50%',
+              width: '18px',
+              height: '18px',
+              fontSize: '11px',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              fontWeight: 'bold',
+              border: '2px solid white'
+            }}>
+              {persistentUnscheduled.length}
+            </span>
+          )}
+        </div>
+      ),
+      action: () => {
+        if (approvalStatus === "pending") {
+          toast.warn("Waiting for dean approval");
+        } else if (approvalStatus === "approved") {
+          toast.warn("Schedule already approved. Cannot modify.");
+        } else {
+          resetAllModes();
+          
+          // ✅ Check for unscheduled sections
+          if (persistentUnscheduled.length > 0) {
+            const result = window.confirm(
+              `Found ${persistentUnscheduled.length} unscheduled section(s) from previous attempt.\n\n` +
+              `Would you like to schedule them now?`
+            );
+            
+            if (result) {
+              setManualEditorSections(persistentUnscheduled);
+              setShowManualEditor(true);
+            }
+          } else if (examData.length === 0) {
+            toast.info("No schedules found. Please add schedules first.");
+          } else {
+            // Allow manual editing of existing schedules
+            setManualEditorSections([]);
+            setShowManualEditor(true);
+          }
+        }
+      },
     },
   ];
 
@@ -1916,10 +2000,11 @@ const SchedulerView: React.FC<SchedulerViewProps> = ({ user }) => {
             });
           })
         )}
+        // Replace around line ~950:
         <Modal isOpen={isModalOpen} onClose={() => setIsModalOpen(false)}>
           <AddScheduleForm
             user={user}
-            onScheduleCreated={async () => {
+            onScheduleCreated={async (unscheduled?: any[]) => {
               try {
                 const params: any = {};
                 if (schedulerCollegeName && schedulerCollegeName !== "Add schedule first") {
@@ -1928,13 +2013,38 @@ const SchedulerView: React.FC<SchedulerViewProps> = ({ user }) => {
 
                 const examsResponse = await api.get('/tbl_examdetails', { params });
                 if (examsResponse.data) {
-                  console.log(`✅ Immediate refresh: ${examsResponse.data.length} schedules loaded`);
                   setExamData(examsResponse.data);
                 }
               } catch (error) {
                 console.error("Error fetching data:", error);
               }
+              
               setIsModalOpen(false);
+              
+              // ✅ Save unscheduled sections for later access
+              if (unscheduled && unscheduled.length > 0) {
+                console.log(`📋 Received ${unscheduled.length} unscheduled sections from AddScheduleForm`);
+                saveUnscheduledSections(unscheduled); // ✅ NOW THIS WORKS
+                
+                const result = window.confirm(
+                  `Schedule generation complete!\n\n` +
+                  `${unscheduled.length} section(s) need manual scheduling.\n\n` +
+                  `Would you like to schedule them now?`
+                );
+                
+                if (result) {
+                  setManualEditorSections(unscheduled);
+                  setShowManualEditor(true);
+                } else {
+                  toast.info(
+                    `${unscheduled.length} section(s) saved for manual scheduling. ` +
+                    `Click "Edit Manually" button to schedule them later.`,
+                    { autoClose: 8000 }
+                  );
+                }
+              } else {
+                saveUnscheduledSections([]); // ✅ Clear storage if all scheduled
+              }
             }}
           />
         </Modal>
@@ -1996,6 +2106,53 @@ const SchedulerView: React.FC<SchedulerViewProps> = ({ user }) => {
           }}
         />
       </Modal>
+
+      <Modal isOpen={showManualEditor} onClose={() => setShowManualEditor(false)}>
+      <ManualScheduleEditor
+        unscheduledSections={manualEditorSections.length > 0 ? manualEditorSections : persistentUnscheduled}
+        examDates={uniqueDates.filter((date): date is string => date !== undefined)}
+        schedulerCollegeName={schedulerCollegeName}
+        onClose={() => {
+          setShowManualEditor(false);
+          setManualEditorSections([]);
+        }}
+        onScheduleCreated={async (remainingUnscheduled?: any[]) => {
+          try {
+            const params: any = {};
+            if (schedulerCollegeName && schedulerCollegeName !== "Add schedule first") {
+              params.college_name = schedulerCollegeName;
+            }
+
+            const examsResponse = await api.get('/tbl_examdetails', { params });
+            if (examsResponse.data) {
+              setExamData(examsResponse.data);
+            }
+          } catch (error) {
+            console.error("Error fetching data:", error);
+          }
+          
+          // ✅ Update persistent storage with remaining unscheduled
+          if (remainingUnscheduled && remainingUnscheduled.length > 0) {
+            saveUnscheduledSections(remainingUnscheduled); // ✅ NOW THIS WORKS
+            toast.info(
+              `${remainingUnscheduled.length} section(s) still need manual scheduling.`,
+              { autoClose: 5000 }
+            );
+          } else {
+            saveUnscheduledSections([]); // ✅ Clear if all done
+            toast.success("All sections scheduled successfully!");
+          }
+          
+          setShowManualEditor(false);
+          setManualEditorSections([]);
+        }}
+        academicYear={yearName}
+        semester={semesterName}
+        examCategory={termName}
+        examPeriod={examPeriodName}
+        duration={{ hours: 1, minutes: 30 }}
+      />
+    </Modal>
 
       <ToastContainer position="top-right" autoClose={1500} />
     </div>

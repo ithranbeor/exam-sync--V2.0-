@@ -913,6 +913,27 @@ const BayanihanModality: React.FC<UserProps> = ({ user }) => {
           <form className="availability-form" onSubmit={handleSubmit}>
             <div className="availability-grid">    
 
+              <div className="form-group">
+                <label>Modality Type</label>
+                <Select
+                  options={[
+                    { value: 'Hands-on (Laboratory)', label: 'Hands-on (Laboratory)' },
+                    { value: 'Written (Lecture)', label: 'Written (Lecture)' },
+                    { value: 'Written (Laboratory)', label: 'Written (Laboratory)' },
+                  ]}
+                  value={form.modality ? { value: form.modality, label: form.modality } : null}
+                  onChange={selected => setForm(prev => ({ 
+                    ...prev, 
+                    modality: selected?.value || '',
+                    course: '',      // ✅ Reset course when modality changes
+                    sections: [],    // ✅ Reset sections when modality changes
+                    rooms: []        // ✅ Reset rooms when modality changes
+                  }))}
+                  placeholder="Select modality..."
+                  isClearable
+                />
+              </div>
+
               {/* PROGRAM */}
               <div className="form-group">
                 <label>Program</label>
@@ -937,10 +958,19 @@ const BayanihanModality: React.FC<UserProps> = ({ user }) => {
                 <label>Course</label>
                 <Select
                   isDisabled={!form.program}
-                  options={filteredCourseOptions.map(c => ({
-                    value: c.course_id,
-                    label: `${c.course_id} (${c.course_name})`
-                  }))}
+                  options={filteredCourseOptions.map(c => {
+                    // Check if this course already has a modality of the selected type
+                    const hasModalityForType = userModalities.some(m => 
+                      m.course_id === c.course_id && 
+                      m.modality_type === form.modality
+                    );
+                    
+                    return {
+                      value: c.course_id,
+                      label: `${c.course_id} (${c.course_name})`,
+                      isDisabled: hasModalityForType && form.modality !== ''
+                    };
+                  })}
                   value={form.course ? {
                     value: form.course,
                     label: `${filteredCourseOptions.find(c => c.course_id === form.course)?.course_id} (${filteredCourseOptions.find(c => c.course_id === form.course)?.course_name})`
@@ -948,22 +978,52 @@ const BayanihanModality: React.FC<UserProps> = ({ user }) => {
                   onChange={selected => {
                     const courseId = selected?.value || "";
 
+                    // Check if course already has this modality type
+                    if (courseId && form.modality) {
+                      const existingModality = userModalities.find(m => 
+                        m.course_id === courseId && 
+                        m.modality_type === form.modality
+                      );
+                      
+                      if (existingModality) {
+                        toast.warn(`This course already has a ${form.modality} modality submitted.`);
+                        // ✅ Don't proceed if already exists
+                        return;
+                      }
+                    }
+
                     // Filter sections for this course
                     const autoSections = sectionOptions
                       .filter(s => s.course_id === courseId)
                       .map(s => s.section_name)
-                      .sort((a, b) => a.localeCompare(b));  // A–Z or 1–10
+                      .sort((a, b) => a.localeCompare(b));
 
                     setForm(prev => ({
                       ...prev,
                       course: courseId,
-                      sections: autoSections,  
+                      sections: autoSections,  // ✅ Auto-select all sections
                       rooms: []             
                     }));
                   }}
                   placeholder="Select course..."
                   isClearable
+                  styles={{
+                    option: (base, state) => ({
+                      ...base,
+                      backgroundColor: state.isDisabled ? '#f5f5f5' : state.isFocused ? '#e3f2fd' : 'white',
+                      color: state.isDisabled ? '#999' : '#333',
+                      cursor: state.isDisabled ? 'not-allowed' : 'pointer',
+                      '&:hover': {
+                        backgroundColor: state.isDisabled ? '#f5f5f5' : '#e3f2fd'
+                      }
+                    })
+                  }}
                 />
+                {form.modality && (
+                  <small style={{ marginTop: "4px", display: "block", color: "#666" }}>
+                    Grayed out courses already have a {form.modality} modality submitted
+                  </small>
+                )}
               </div>
 
               {/* SECTIONS */}
@@ -973,9 +1033,9 @@ const BayanihanModality: React.FC<UserProps> = ({ user }) => {
                 {form.course ? (
                   <Select
                     isMulti
-                    isDisabled={true}   // 🔒 READ-ONLY
+                    isDisabled={false}   // ✅ NOW EDITABLE
                     closeMenuOnSelect={false}
-                    hideSelectedOptions={true}
+                    hideSelectedOptions={false}
 
                     options={filteredSectionOptions
                       .map(s => ({ value: s.value, label: s.label }))
@@ -987,6 +1047,19 @@ const BayanihanModality: React.FC<UserProps> = ({ user }) => {
                       .map(sec => ({ value: sec, label: sec }))
                     }
 
+                    // ✅ Allow sections to be added/removed
+                    onChange={(selectedOptions) => {
+                      const selectedSections = selectedOptions 
+                        ? selectedOptions.map(opt => opt.value) 
+                        : [];
+                      
+                      setForm(prev => ({
+                        ...prev,
+                        sections: selectedSections,
+                        rooms: [] // Reset rooms when sections change
+                      }));
+                    }}
+
                     styles={{
                       multiValue: (base) => ({
                         ...base,
@@ -994,13 +1067,9 @@ const BayanihanModality: React.FC<UserProps> = ({ user }) => {
                         borderRadius: "6px",
                         padding: "2px 4px"
                       }),
-                      multiValueRemove: () => ({
-                        display: "none" 
-                      }),
                       control: (base) => ({
                         ...base,
-                        cursor: "not-allowed",
-                        backgroundColor: "#f8fafc"
+                        backgroundColor: "#fff"
                       }),
                       valueContainer: (base) => ({
                         ...base,
@@ -1013,21 +1082,11 @@ const BayanihanModality: React.FC<UserProps> = ({ user }) => {
                   <p style={{ color: "#888" }}>Select a course first</p>
                 )}
 
-              </div>
-
-              <div className="form-group">
-                <label>Modality Type</label>
-                <Select
-                  options={[
-                    { value: 'Hands-on (Laboratory)', label: 'Hands-on (Laboratory)' },
-                    { value: 'Written (Lecture)', label: 'Written (Lecture)' },
-                    { value: 'Written (Laboratory)', label: 'Written (Laboratory)' },
-                  ]}
-                  value={form.modality ? { value: form.modality, label: form.modality } : null}
-                  onChange={selected => setForm(prev => ({ ...prev, modality: selected?.value || '' }))}
-                  placeholder="Select modality..."
-                  isClearable
-                />
+                {form.course && form.sections.length > 0 && (
+                  <small style={{ marginTop: "4px", display: "block", color: "#666" }}>
+                    {form.sections.length} section(s) selected. You can add or remove sections as needed.
+                  </small>
+                )}
               </div>
 
               <div className="form-group">
@@ -1262,7 +1321,7 @@ const BayanihanModality: React.FC<UserProps> = ({ user }) => {
                     );
                   })}
                 </div>
-                
+            
                 {/* Summary status */}
                 <div style={{
                   marginTop: '10px',
@@ -1301,6 +1360,9 @@ const BayanihanModality: React.FC<UserProps> = ({ user }) => {
                   >
                     <div className="room-label">
                       {r.room_id} <small>({r.room_type})</small>
+                    </div>
+                    <div className="room-label">
+                      Capacity: {r.room_capacity}
                     </div>
 
                     {!isDisabled && (
