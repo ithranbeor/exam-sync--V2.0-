@@ -32,9 +32,17 @@ interface Course {
   leaders?: number[];
 }
 
+interface College {
+  college_id: string;
+  college_name: string;
+}
+
 const Courses: React.FC = () => {
   const [courses, setCourses] = useState<Course[]>([]);
   const [terms, setTerms] = useState<Term[]>([]);
+  const [colleges, setColleges] = useState<College[]>([]);
+  const [userRoles, setUserRoles] = useState<any[]>([]);
+  const [selectedCollege, setSelectedCollege] = useState<string>('all');
   const [users, setUsers] = useState<User[]>([]);
   const [searchTerm, setSearchTerm] = useState("");
   const [showModal, setShowModal] = useState(false);
@@ -54,6 +62,7 @@ const Courses: React.FC = () => {
   const [itemsPerPage, setItemsPerPage] = useState<number | 'all'>('all');
   const [showItemsPerPageDropdown, setShowItemsPerPageDropdown] = useState(false);
   const [customItemsPerPage, setCustomItemsPerPage] = useState<string>('');
+  // college dropdown popover not needed; using a plain select like UserManagement
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
   const [isBulkDeleting, setIsBulkDeleting] = useState(false);
   const [sortBy, setSortBy] = useState<string>('none');
@@ -139,9 +148,12 @@ const Courses: React.FC = () => {
       if (showItemsPerPageDropdown && !target.closest('[data-items-per-page-dropdown]')) {
         setShowItemsPerPageDropdown(false);
       }
+      if (showCollegeDropdown && !target.closest('[data-college-dropdown]')) {
+        setShowCollegeDropdown(false);
+      }
     };
 
-    if (showSortDropdown || showItemsPerPageDropdown) {
+      if (showSortDropdown || showItemsPerPageDropdown) {
       document.addEventListener('mousedown', handleClickOutside);
     }
 
@@ -161,17 +173,21 @@ const Courses: React.FC = () => {
         const othersPromise = Promise.all([
           api.get("/tbl_term"),
           api.get("/users/"),
+          api.get("/tbl_college/"),
+          api.get("/tbl_user_role"),
         ]);
 
         // Fetch courses first to show them immediately
         const { data: coursesData } = await coursesPromise;
         if (mounted) setCourses(coursesData);
 
-        // Fetch terms and users in background
-        const [termsRes, usersRes] = await othersPromise;
+        // Fetch terms, users, colleges, and user roles in background
+        const [termsRes, usersRes, collegesRes, userRolesRes] = await othersPromise;
         if (mounted) {
           setTerms(termsRes.data);
           setUsers(usersRes.data);
+          setColleges(collegesRes.data || []);
+          setUserRoles(userRolesRes.data || []);
         }
       } catch {
         toast.error("Failed to fetch some data");
@@ -248,6 +264,28 @@ const Courses: React.FC = () => {
       return matchesCourseId || matchesCourseName || matchesTerm || matchesInstructors;
     });
 
+    // Apply college filter (if not 'all') - include course when any instructor belongs to selected college
+    if (selectedCollege && selectedCollege !== 'all') {
+      filtered = filtered.filter((c) => {
+        const ids = c.user_ids || [];
+        if (ids.length === 0) return false;
+
+        // check userRoles for any instructor
+        for (const uid of ids) {
+          const role = userRoles.find((r: any) => {
+            // role may include user_id or user
+            return Number(r.user_id || r.user) === Number(uid);
+          });
+          if (role) {
+            const collegeId = role.college_id || (role.college && role.college.college_id) || role.college;
+            if (String(collegeId) === String(selectedCollege)) return true;
+          }
+        }
+
+        return false;
+      });
+    }
+
     // Apply sorting
     if (sortBy !== 'none') {
       filtered = [...filtered].sort((a, b) => {
@@ -265,7 +303,7 @@ const Courses: React.FC = () => {
     }
 
     return filtered;
-  }, [courses, searchTerm, sortBy]);
+  }, [courses, searchTerm, sortBy, selectedCollege, userRoles]);
 
   const totalItems = filteredCourses.length;
 
@@ -740,6 +778,7 @@ const Courses: React.FC = () => {
                 </div>
               )}
             </div>
+            {/* removed left-side college popover - using right-side select like UserManagement */}
             <div style={{ position: 'relative' }} data-items-per-page-dropdown>
               <button
                 type="button"
@@ -1012,7 +1051,21 @@ const Courses: React.FC = () => {
                 </div>
               )}
             </div>
-          </div>
+            <div className="input-group" style={{ marginBottom: 0, marginLeft: '8px' }}>
+              <select
+                value={selectedCollege}
+                onChange={(e) => setSelectedCollege(e.target.value)}
+                className="college-filter-select"
+              >
+                <option value="all">All Colleges</option>
+                {colleges.map((college) => (
+                  <option key={college.college_id} value={college.college_id}>
+                    {college.college_name}
+                  </option>
+                ))}
+              </select>
+            </div>
+            </div>
           <div style={{ marginLeft: "auto", display: "flex", alignItems: "center", gap: 8 }}>
             <button
               type="button"

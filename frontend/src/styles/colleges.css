@@ -1480,3 +1480,29 @@ body {
   -webkit-appearance: none;
   margin: 0;
 }
+
+/* ============================================
+   COLLEGE FILTER SELECT
+   ============================================ */
+.college-filter-select {
+  background-color: white;
+  color: #333;
+  padding: 8px 12px;
+  font-size: 0.9rem;
+  border-radius: 8px;
+  border: 1px solid #ccc;
+  width: 350px;
+  max-width: 350px;
+  cursor: pointer;
+  transition: border-color 0.2s ease, box-shadow 0.2s ease;
+}
+
+.college-filter-select:hover {
+  border-color: #999;
+}
+
+.college-filter-select:focus {
+  outline: none;
+  border-color: #0A3765;
+  box-shadow: 0 0 0 2px rgba(10, 55, 101, 0.1);
+}
