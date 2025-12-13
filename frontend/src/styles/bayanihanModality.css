@@ -1149,6 +1149,27 @@ button.open-modal-btn:hover {
 
   .bayanihan-card {
     box-shadow: none;
+
+  /* Action buttons used in the modal footer */
+  .action-button.with-label {
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+    padding: 10px 16px;
+    border-radius: 8px;
+    font-weight: 700;
+    font-size: 14px;
+    justify-content: center;
+    width: 140px; /* Ensure add/delete buttons have the same width */
+  }
+
+  .action-button.add-new { background-color: #144f1fff; color: white; border: none; }
+  .action-button.add-new:hover { filter: brightness(0.98); }
+
+  .action-button.delete { background-color: #dc3545; color: white; border: none; }
+  .action-button.delete:hover { filter: brightness(0.95); }
+
+  .action-button.with-label .btn-label { margin-left: 6px; }
     border: 1px solid #ddd;
   }
 }

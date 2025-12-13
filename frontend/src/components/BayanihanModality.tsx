@@ -1256,34 +1256,41 @@ const BayanihanModality: React.FC<UserProps> = ({ user }) => {
                 </div>
               </div>
             )}
-            <div style={{ textAlign: "center", marginTop: "10px" }}>
-              <button type="submit" disabled={isSubmitting || calculateRoomAssignments.length === 0} className="action-button with-label" style={{ backgroundColor: '#144f1fff', color: 'white', padding: '10px', border: 'none', borderRadius: '8px', cursor: isSubmitting || calculateRoomAssignments.length === 0 ? 'not-allowed' : 'pointer' }}>
-                <FaPlus style={{ color: 'white', fontSize: '20px' }} />
-                <span className="btn-label">Submit</span>
+            <div style={{ display: 'flex', justifyContent: 'center', gap: '12px', marginTop: '12px' }}>
+              <button type="submit" disabled={isSubmitting || calculateRoomAssignments.length === 0}
+                className="action-button add-new with-label"
+                style={{
+                  padding: '10px 16px',
+                  borderRadius: '8px',
+                  cursor: isSubmitting || calculateRoomAssignments.length === 0 ? 'not-allowed' : 'pointer',
+                  backgroundColor: '#144f1fff',
+                  color: 'white',
+                  border: 'none'
+                }}
+              >
+                <FaPlus style={{ color: 'white', fontSize: '18px' }} />
+                <span className="btn-label">Add</span>
               </button>
-            </div>
 
-            {/* Add this after the submit button or create a new section */}
-            <div style={{ marginTop: '20px', textAlign: 'center' }}>
+              {/* Delete button: placed beside Add and uses similar label + icon */}
               <button
                 type="button"
                 onClick={() => setShowDeleteConfirm(true)}
-                className="delete-button"
+                className="action-button delete with-label"
                 title="Delete all modalities"
                 style={{
+                  padding: '10px 16px',
+                  borderRadius: '8px',
+                  cursor: 'pointer',
                   backgroundColor: '#dc3545',
                   color: 'white',
                   border: 'none',
-                  padding: '10px',
-                  borderRadius: '50px',
-                  cursor: 'pointer',
-                  fontSize: '16px',
-                  fontWeight: 'bold',
                   display: 'inline-flex',
-                  alignItems: 'center',
+                  alignItems: 'center'
                 }}
               >
-                <FaTrash />
+                <FaTrash style={{ color: 'white', fontSize: '18px' }} />
+                <span className="btn-label">Delete</span>
               </button>
             </div>
           </form>
