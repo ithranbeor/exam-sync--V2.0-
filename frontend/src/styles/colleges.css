@@ -189,6 +189,14 @@ body {
   color: inherit;
 }
 
+/* Make Sort and Show Rows labels larger and bolder for better readability */
+.action-button.with-label .btn-label,
+.action-button.sort-by-button span,
+.action-button.show-rows-button span {
+  font-size: 16px;
+  font-weight: 800;
+}
+
 .action-button.import:hover {
   background-color: #e6a700;
 }
@@ -231,6 +239,17 @@ body {
 }
 
 .action-button.select-all:hover {
+  background-color: #e6a700;
+}
+
+/* Yellow filter toggle button used to show/hide filters */
+.action-button.filter-toggle {
+  background-color: #ffb800;
+  color: white;
+  min-width: 120px;
+}
+
+.action-button.filter-toggle:hover {
   background-color: #e6a700;
 }
 
