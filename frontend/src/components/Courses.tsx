@@ -148,9 +148,6 @@ const Courses: React.FC = () => {
       if (showItemsPerPageDropdown && !target.closest('[data-items-per-page-dropdown]')) {
         setShowItemsPerPageDropdown(false);
       }
-      if (showCollegeDropdown && !target.closest('[data-college-dropdown]')) {
-        setShowCollegeDropdown(false);
-      }
     };
 
       if (showSortDropdown || showItemsPerPageDropdown) {
