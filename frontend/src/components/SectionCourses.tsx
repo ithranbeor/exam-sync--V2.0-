@@ -879,35 +879,14 @@ const SectionCourses: React.FC = () => {
             <div style={{ position: 'relative' }} data-sort-dropdown>
               <button 
                 type='button' 
-                className="action-button" 
+                className="action-button with-label sort-by-button" 
                 onClick={() => setShowSortDropdown(!showSortDropdown)}
-                style={{ 
-                  backgroundColor: sortBy !== 'none' ? '#0A3765' : '#0A3765',
-                  color: 'white',
-                  display: 'flex',
-                  alignItems: 'center',
-                  justifyContent: 'center',
-                  gap: '6px',
-                  padding: '8px 16px',
-                  borderRadius: '8px',
-                  border: 'none',
-                  cursor: 'pointer',
-                  fontSize: '14px',
-                  fontWeight: '500',
-                  minWidth: '100px',
-                  transition: 'background-color 0.2s ease'
-                }}
-                onMouseEnter={(e) => {
-                  e.currentTarget.style.backgroundColor = '#0d4a7a';
-                }}
-                onMouseLeave={(e) => {
-                  e.currentTarget.style.backgroundColor = '#0A3765';
-                }}
                 title="Sort by"
               >
                 <FaSort/>
                 <span className="btn-label">Sort by</span>
               </button>
+
               {showSortDropdown && (
                 <div 
                   style={{
@@ -1136,38 +1115,13 @@ const SectionCourses: React.FC = () => {
             <div style={{ position: 'relative' }} data-items-per-page-dropdown>
               <button
                 type="button"
-                className="action-button"
+                className="action-button with-label show-rows-button"
                 onClick={() => setShowItemsPerPageDropdown(!showItemsPerPageDropdown)}
-                style={{
-                  backgroundColor: '#0A3765',
-                  color: 'white',
-                  display: 'flex',
-                  alignItems: 'center',
-                  justifyContent: 'center',
-                  gap: '6px',
-                  padding: '8px 16px',
-                  borderRadius: '8px',
-                  border: 'none',
-                  cursor: 'pointer',
-                  fontSize: '14px',
-                  fontWeight: '500',
-                  width: 'auto',
-                  minWidth: 'fit-content',
-                  whiteSpace: 'nowrap',
-                  transition: 'background-color 0.2s ease',
-                  height: '38px',
-                  boxSizing: 'border-box'
-                }}
-                onMouseEnter={(e) => {
-                  e.currentTarget.style.backgroundColor = '#0d4a7a';
-                }}
-                onMouseLeave={(e) => {
-                  e.currentTarget.style.backgroundColor = '#0A3765';
-                }}
               >
-                <span className="btn-label">Show rows: {itemsPerPage === 'all' ? 'All' : itemsPerPage}</span>
                 <FaChevronDown size={12} />
+                <span className="btn-label">Show rows: {itemsPerPage === 'all' ? 'All' : itemsPerPage}</span>
               </button>
+
               {showItemsPerPageDropdown && (
                 <div
                   style={{

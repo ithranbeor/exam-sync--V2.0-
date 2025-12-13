@@ -193,6 +193,25 @@ body {
   background-color: #e6a700;
 }
 
+/* Blue action buttons used for Sort By and Show Rows controls */
+.action-button.sort-by-button,
+.action-button.show-rows-button {
+  background-color: #0A3765;
+}
+
+.action-button.sort-by-button:hover,
+.action-button.show-rows-button:hover {
+  background-color: #0d4a7a;
+}
+
+.action-button.sort-by-button {
+  min-width: 140px;
+}
+
+.action-button.show-rows-button {
+  min-width: 200px;
+}
+
 .action-button.delete {
   background-color: #d63e3e;
 }
