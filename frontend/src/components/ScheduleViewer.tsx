@@ -101,7 +101,7 @@ const SchedulerView: React.FC<SchedulerViewProps> = ({ user }) => {
       }
     }
   };
-  
+
   const [footerData, setFooterData] = useState<{
     prepared_by_name: string;
     prepared_by_title: string;
@@ -138,14 +138,14 @@ const SchedulerView: React.FC<SchedulerViewProps> = ({ user }) => {
   useEffect(() => {
     const fetchFooterData = async () => {
       if (!schedulerCollegeId) return;
-      
+
       try {
         console.log(`🔍 Fetching footer for college_id: ${schedulerCollegeId}`);
-        
+
         const response = await api.get('/tbl_schedule_footer/', {
           params: { college_id: schedulerCollegeId }  // ✅ Use college_id
         });
-        
+
         if (response.data && response.data.length > 0) {
           console.log(`✅ Found footer:`, response.data[0]);
           setFooterData(response.data[0]);
@@ -166,9 +166,9 @@ const SchedulerView: React.FC<SchedulerViewProps> = ({ user }) => {
         console.error("Error fetching footer data:", error);
       }
     };
-    
+
     fetchFooterData();
-  }, [schedulerCollegeId, collegeName]); 
+  }, [schedulerCollegeId, collegeName]);
 
   useEffect(() => {
     const handleClickOutside = (event: MouseEvent) => {
@@ -344,7 +344,7 @@ const SchedulerView: React.FC<SchedulerViewProps> = ({ user }) => {
     fetchData();
     const interval = setInterval(fetchData, 2000);
     return () => clearInterval(interval);
-  }, [user, schedulerCollegeName, collegeDataReady]); 
+  }, [user, schedulerCollegeName, collegeDataReady]);
 
   useEffect(() => {
     const checkApprovalStatus = async () => {
@@ -495,17 +495,17 @@ const SchedulerView: React.FC<SchedulerViewProps> = ({ user }) => {
       if (names.length === 0) return 'Not Assigned';
       return names.join(', ');
     }
-    
+
     // ✅ For single proctor, prioritize proctor_id over proctors[0]
     if (exam.proctor_id) {
       return getUserName(exam.proctor_id);
     }
-    
+
     // ✅ Fallback to proctors array if proctor_id is missing
     if (exam.proctors && exam.proctors.length === 1) {
       return getUserName(exam.proctors[0]);
     }
-    
+
     return 'Not Assigned';
   };
 
@@ -518,12 +518,12 @@ const SchedulerView: React.FC<SchedulerViewProps> = ({ user }) => {
 
       // ✅ FIX: Update BOTH proctor_id AND proctors array in local state
       setExamData(prev =>
-        prev.map(e => e.examdetails_id === examId 
-          ? { 
-              ...e, 
-              proctor_id: proctorId,
-              proctors: [proctorId]  // ✅ Ensure proctors array matches proctor_id
-            } 
+        prev.map(e => e.examdetails_id === examId
+          ? {
+            ...e,
+            proctor_id: proctorId,
+            proctors: [proctorId]  // ✅ Ensure proctors array matches proctor_id
+          }
           : e
         )
       );
@@ -610,34 +610,34 @@ const SchedulerView: React.FC<SchedulerViewProps> = ({ user }) => {
   const searchFilteredData = searchTerm.trim() === ""
     ? filteredExamData
     : filteredExamData.filter(exam => {
-        const searchLower = searchTerm.toLowerCase();
-        
-        // Check sections (both array and legacy)
-        const sectionMatch = 
-          (exam.sections && exam.sections.some(s => s.toLowerCase().includes(searchLower))) ||
-          exam.section_name?.toLowerCase().includes(searchLower);
-        
-        // Check instructors (both array and legacy)
-        const instructorMatch = 
-          (exam.instructors && exam.instructors.some(id => getUserName(id).toLowerCase().includes(searchLower))) ||
-          getUserName(exam.instructor_id).toLowerCase().includes(searchLower);
-        
-        // Check proctors (both array and legacy)
-        const proctorMatch = 
-          (exam.proctors && exam.proctors.some(id => getUserName(id).toLowerCase().includes(searchLower))) ||
-          getUserName(exam.proctor_id).toLowerCase().includes(searchLower);
-        
-        return (
-          exam.course_id?.toLowerCase().includes(searchLower) ||
-          sectionMatch ||
-          exam.room_id?.toLowerCase().includes(searchLower) ||
-          instructorMatch ||
-          proctorMatch ||
-          exam.exam_date?.includes(searchTerm) ||
-          exam.exam_start_time?.includes(searchTerm) ||
-          exam.exam_end_time?.includes(searchTerm)
-        );
-      });
+      const searchLower = searchTerm.toLowerCase();
+
+      // Check sections (both array and legacy)
+      const sectionMatch =
+        (exam.sections && exam.sections.some(s => s.toLowerCase().includes(searchLower))) ||
+        exam.section_name?.toLowerCase().includes(searchLower);
+
+      // Check instructors (both array and legacy)
+      const instructorMatch =
+        (exam.instructors && exam.instructors.some(id => getUserName(id).toLowerCase().includes(searchLower))) ||
+        getUserName(exam.instructor_id).toLowerCase().includes(searchLower);
+
+      // Check proctors (both array and legacy)
+      const proctorMatch =
+        (exam.proctors && exam.proctors.some(id => getUserName(id).toLowerCase().includes(searchLower))) ||
+        getUserName(exam.proctor_id).toLowerCase().includes(searchLower);
+
+      return (
+        exam.course_id?.toLowerCase().includes(searchLower) ||
+        sectionMatch ||
+        exam.room_id?.toLowerCase().includes(searchLower) ||
+        instructorMatch ||
+        proctorMatch ||
+        exam.exam_date?.includes(searchTerm) ||
+        exam.exam_start_time?.includes(searchTerm) ||
+        exam.exam_end_time?.includes(searchTerm)
+      );
+    });
 
   const getFilterOptions = () => {
     const uniqueOptions = new Set<string>();
@@ -749,7 +749,7 @@ const SchedulerView: React.FC<SchedulerViewProps> = ({ user }) => {
         });
 
         if (approvalResponse.data && approvalResponse.data.length > 0) {
-          const deletePromises = approvalResponse.data.map((approval: any) => 
+          const deletePromises = approvalResponse.data.map((approval: any) =>
             api.delete(`/tbl_scheduleapproval/${approval.request_id || approval.id}/`)
           );
           await Promise.all(deletePromises);
@@ -764,9 +764,9 @@ const SchedulerView: React.FC<SchedulerViewProps> = ({ user }) => {
 
       // ✅ Clear unscheduled sections storage
       saveUnscheduledSections([]);
-  
+
       toast.success(`Successfully deleted ${response.data.deleted_count} schedules for ${schedulerCollegeName}!`);
-    
+
     } catch (error: any) {
       console.error("Error deleting schedules:", error);
       toast.dismiss(loadingToast);
@@ -953,14 +953,14 @@ const SchedulerView: React.FC<SchedulerViewProps> = ({ user }) => {
           toast.warn("Schedule already approved. Cannot modify.");
         } else {
           resetAllModes();
-          
+
           // ✅ Check for unscheduled sections
           if (persistentUnscheduled.length > 0) {
             const result = window.confirm(
               `Found ${persistentUnscheduled.length} unscheduled section(s) from previous attempt.\n\n` +
               `Would you like to schedule them now?`
             );
-            
+
             if (result) {
               setManualEditorSections(persistentUnscheduled);
               setShowManualEditor(true);
@@ -1539,25 +1539,25 @@ const SchedulerView: React.FC<SchedulerViewProps> = ({ user }) => {
                                     }}
                                   >
                                     <p><strong>{exam.course_id}</strong></p>
-                                    
+
                                     {/* ✅ UPDATED: Show all sections without tooltip limit */}
-                                    <p style={{ 
+                                    <p style={{
                                       fontSize: exam.sections && exam.sections.length > 3 ? '10px' : '12px',
                                       lineHeight: '1.2'
                                     }}>
                                       {getSectionDisplay(exam)}
                                     </p>
-                                    
+
                                     {/* ✅ UPDATED: Show all instructors without tooltip, adjust font for many */}
-                                    <p style={{ 
+                                    <p style={{
                                       fontSize: exam.instructors && exam.instructors.length > 2 ? '10px' : '12px',
                                       lineHeight: '1.2'
                                     }}>
                                       Instructor: {getInstructorDisplay(exam)}
                                     </p>
-                                    
+
                                     {/* ✅ UPDATED: Proctor section - show all without tooltip */}
-                                    <p style={{ 
+                                    <p style={{
                                       fontSize: exam.proctors && exam.proctors.length > 2 ? '10px' : '12px',
                                       lineHeight: '1.2'
                                     }}>
@@ -1565,8 +1565,8 @@ const SchedulerView: React.FC<SchedulerViewProps> = ({ user }) => {
                                       {activeProctorEdit === exam.examdetails_id || activeProctorEdit === -1 ? (
                                         exam.proctors && exam.proctors.length > 1 ? (
                                           // ✅ Multiple proctors - show full list, not editable
-                                          <span 
-                                            style={{ 
+                                          <span
+                                            style={{
                                               marginLeft: '5px',
                                               fontSize: '10px',
                                               color: '#333',
@@ -1595,7 +1595,7 @@ const SchedulerView: React.FC<SchedulerViewProps> = ({ user }) => {
                                             options={getAvailableProctorsForExam(exam, examData, allCollegeUsers, users)}
                                             placeholder="--Select Proctor--"
                                             isSearchable
-                                            styles={{ 
+                                            styles={{
                                               menu: (provided) => ({ ...provided, zIndex: 9999 }),
                                               control: (provided) => ({ ...provided, fontSize: '10px' }),
                                               option: (provided) => ({ ...provided, fontSize: '10px' })
@@ -1608,7 +1608,7 @@ const SchedulerView: React.FC<SchedulerViewProps> = ({ user }) => {
                                         </span>
                                       )}
                                     </p>
-                                    
+
                                     <p>{formatTo12Hour(examStartTimeStr)} - {formatTo12Hour(examEndTimeStr)}</p>
                                   </div>
                                 </td>
@@ -1619,53 +1619,53 @@ const SchedulerView: React.FC<SchedulerViewProps> = ({ user }) => {
                       </tbody>
                     </table>
                     {/* Footer Section */}
-                      <div style={{ 
-                        marginTop: '40px', 
-                        paddingTop: '20px', 
-                        borderTop: '2px solid #092C4C',
-                        fontFamily: 'serif'
+                    <div style={{
+                      marginTop: '40px',
+                      paddingTop: '20px',
+                      borderTop: '2px solid #092C4C',
+                      fontFamily: 'serif'
+                    }}>
+                      {/* Signature Section */}
+                      <div style={{
+                        display: 'flex',
+                        justifyContent: 'space-between',
+                        marginBottom: '30px'
                       }}>
-                        {/* Signature Section */}
-                        <div style={{ 
-                          display: 'flex', 
-                          justifyContent: 'space-between',
-                          marginBottom: '30px'
-                        }}>
-                          {/* Left - Prepared by */}
-                          <div style={{ textAlign: 'left', width: '45%', color: 'black' }}>
-                            <p style={{ margin: '5px 0', fontWeight: 'bold' }}>Prepared by:</p>
-                            <p style={{ margin: '3px 0 5px 0', fontStyle: 'italic' }}>(sgd.)</p>
-                            <p style={{ margin: '5px 0', fontWeight: 'bold' }}>
-                              {footerData?.prepared_by_name || 'Type name'}
-                            </p>
-                            <p style={{ margin: '5px 0' }}>
-                              {footerData?.prepared_by_title || `Dean, ${collegeName}`}
-                            </p>
-                          </div>
-                          
-                          {/* Right - Approved by */}
-                          <div style={{ textAlign: 'left', width: '45%', color: 'black' }}>
-                            <p style={{ margin: '5px 0', fontWeight: 'bold' }}>Approved:</p>
-                            <p style={{ margin: '3px 0 5px 0', fontStyle: 'italic' }}>(sgd.)</p>
-                            <p style={{ margin: '5px 0', fontWeight: 'bold'}}>
-                              {footerData?.approved_by_name || 'Type name'}
-                            </p>
-                            <p style={{ margin: '5px 0' }}>
-                              {footerData?.approved_by_title || 'VCAA, USTP-CDO'}
-                            </p>
-                          </div>
-                        </div>
-                        
-                        {/* Center - Address */}
-                        <div style={{ textAlign: 'center', fontSize: '15px', color: 'black' }}>
-                          <p style={{ margin: '5px 0' }}>
-                            {footerData?.address_line || 'C.M Recto Avenue, Lapasan, Cagayan de Oro City 9000 Philippines'}
+                        {/* Left - Prepared by */}
+                        <div style={{ textAlign: 'left', width: '45%', color: 'black' }}>
+                          <p style={{ margin: '5px 0', fontWeight: 'bold' }}>Prepared by:</p>
+                          <p style={{ margin: '3px 0 5px 0', fontStyle: 'italic' }}>(sgd.)</p>
+                          <p style={{ margin: '5px 0', fontWeight: 'bold' }}>
+                            {footerData?.prepared_by_name || 'Type name'}
                           </p>
                           <p style={{ margin: '5px 0' }}>
-                            {footerData?.contact_line || 'Tel Nos. +63 (88) 856 1738; Telefax +63 (88) 856 4696 | http://www.ustp.edu.ph'}
+                            {footerData?.prepared_by_title || `Dean, ${collegeName}`}
+                          </p>
+                        </div>
+
+                        {/* Right - Approved by */}
+                        <div style={{ textAlign: 'left', width: '45%', color: 'black' }}>
+                          <p style={{ margin: '5px 0', fontWeight: 'bold' }}>Approved:</p>
+                          <p style={{ margin: '3px 0 5px 0', fontStyle: 'italic' }}>(sgd.)</p>
+                          <p style={{ margin: '5px 0', fontWeight: 'bold' }}>
+                            {footerData?.approved_by_name || 'Type name'}
+                          </p>
+                          <p style={{ margin: '5px 0' }}>
+                            {footerData?.approved_by_title || 'VCAA, USTP-CDO'}
                           </p>
                         </div>
                       </div>
+
+                      {/* Center - Address */}
+                      <div style={{ textAlign: 'center', fontSize: '15px', color: 'black' }}>
+                        <p style={{ margin: '5px 0' }}>
+                          {footerData?.address_line || 'C.M Recto Avenue, Lapasan, Cagayan de Oro City 9000 Philippines'}
+                        </p>
+                        <p style={{ margin: '5px 0' }}>
+                          {footerData?.contact_line || 'Tel Nos. +63 (88) 856 1738; Telefax +63 (88) 856 4696 | http://www.ustp.edu.ph'}
+                        </p>
+                      </div>
+                    </div>
                   </div>
                 </div>
               );
@@ -1867,25 +1867,25 @@ const SchedulerView: React.FC<SchedulerViewProps> = ({ user }) => {
                                     }}
                                   >
                                     <p><strong>{exam.course_id}</strong></p>
-                                    
+
                                     {/* ✅ UPDATED: Show all sections without tooltip limit */}
-                                    <p style={{ 
+                                    <p style={{
                                       fontSize: exam.sections && exam.sections.length > 3 ? '10px' : '12px',
                                       lineHeight: '1.2'
                                     }}>
                                       {getSectionDisplay(exam)}
                                     </p>
-                                    
+
                                     {/* ✅ UPDATED: Show all instructors without tooltip, adjust font for many */}
-                                    <p style={{ 
+                                    <p style={{
                                       fontSize: exam.instructors && exam.instructors.length > 2 ? '10px' : '12px',
                                       lineHeight: '1.2'
                                     }}>
                                       Instructor: {getInstructorDisplay(exam)}
                                     </p>
-                                    
+
                                     {/* ✅ UPDATED: Proctor section - show all without tooltip */}
-                                    <p style={{ 
+                                    <p style={{
                                       fontSize: exam.proctors && exam.proctors.length > 2 ? '10px' : '12px',
                                       lineHeight: '1.2'
                                     }}>
@@ -1893,8 +1893,8 @@ const SchedulerView: React.FC<SchedulerViewProps> = ({ user }) => {
                                       {activeProctorEdit === exam.examdetails_id || activeProctorEdit === -1 ? (
                                         exam.proctors && exam.proctors.length > 1 ? (
                                           // ✅ Multiple proctors - show full list, not editable
-                                          <span 
-                                            style={{ 
+                                          <span
+                                            style={{
                                               marginLeft: '5px',
                                               fontSize: '10px',
                                               color: '#333',
@@ -1923,7 +1923,7 @@ const SchedulerView: React.FC<SchedulerViewProps> = ({ user }) => {
                                             options={getAvailableProctorsForExam(exam, examData, allCollegeUsers, users)}
                                             placeholder="--Select Proctor--"
                                             isSearchable
-                                            styles={{ 
+                                            styles={{
                                               menu: (provided) => ({ ...provided, zIndex: 9999 }),
                                               control: (provided) => ({ ...provided, fontSize: '10px' }),
                                               option: (provided) => ({ ...provided, fontSize: '10px' })
@@ -1936,7 +1936,7 @@ const SchedulerView: React.FC<SchedulerViewProps> = ({ user }) => {
                                         </span>
                                       )}
                                     </p>
-                                    
+
                                     <p>{formatTo12Hour(examStartTimeStr)} - {formatTo12Hour(examEndTimeStr)}</p>
                                   </div>
                                 </td>
@@ -1947,53 +1947,53 @@ const SchedulerView: React.FC<SchedulerViewProps> = ({ user }) => {
                       </tbody>
                     </table>
                     {/* Footer Section */}
-                      <div style={{ 
-                        marginTop: '40px', 
-                        paddingTop: '20px', 
-                        borderTop: '2px solid #092C4C',
-                        fontFamily: 'serif'
+                    <div style={{
+                      marginTop: '40px',
+                      paddingTop: '20px',
+                      borderTop: '2px solid #092C4C',
+                      fontFamily: 'serif'
+                    }}>
+                      {/* Signature Section */}
+                      <div style={{
+                        display: 'flex',
+                        justifyContent: 'space-between',
+                        marginBottom: '30px'
                       }}>
-                        {/* Signature Section */}
-                        <div style={{ 
-                          display: 'flex', 
-                          justifyContent: 'space-between',
-                          marginBottom: '30px'
-                        }}>
-                          {/* Left - Prepared by */}
-                          <div style={{ textAlign: 'left', width: '45%', color: 'black'}}>
-                            <p style={{ margin: '5px 0', fontWeight: 'bold' }}>Prepared by:</p>
-                            <p style={{ margin: '3px 0 5px 0', fontStyle: 'italic' }}>(sgd.)</p>
-                            <p style={{ margin: '5px 0', fontWeight: 'bold' }}>
-                              {footerData?.prepared_by_name || 'Type name'}
-                            </p>
-                            <p style={{ margin: '5px 0' }}>
-                              {footerData?.prepared_by_title || `Dean, ${collegeName}`}
-                            </p>
-                          </div>
-                          
-                          {/* Right - Approved by */}
-                          <div style={{ textAlign: 'left', width: '45%', color: 'black' }}>
-                            <p style={{ margin: '5px 0', fontWeight: 'bold' }}>Approved:</p>
-                            <p style={{ margin: '3px 0 5px 0', fontStyle: 'italic' }}>(sgd.)</p>
-                            <p style={{ margin: '5px 0', fontWeight: 'bold'}}>
-                              {footerData?.approved_by_name || 'Type name'}
-                            </p>
-                            <p style={{ margin: '5px 0' }}>
-                              {footerData?.approved_by_title || 'VCAA, USTP-CDO'}
-                            </p>
-                          </div>
-                        </div>
-                        
-                        {/* Center - Address */}
-                        <div style={{ textAlign: 'center', fontSize: '15px', color: 'black' }}>
-                          <p style={{ margin: '5px 0' }}>
-                            {footerData?.address_line || 'C.M Recto Avenue, Lapasan, Cagayan de Oro City 9000 Philippines'}
+                        {/* Left - Prepared by */}
+                        <div style={{ textAlign: 'left', width: '45%', color: 'black' }}>
+                          <p style={{ margin: '5px 0', fontWeight: 'bold' }}>Prepared by:</p>
+                          <p style={{ margin: '3px 0 5px 0', fontStyle: 'italic' }}>(sgd.)</p>
+                          <p style={{ margin: '5px 0', fontWeight: 'bold' }}>
+                            {footerData?.prepared_by_name || 'Type name'}
                           </p>
                           <p style={{ margin: '5px 0' }}>
-                            {footerData?.contact_line || 'Tel Nos. +63 (88) 856 1738; Telefax +63 (88) 856 4696 | http://www.ustp.edu.ph'}
+                            {footerData?.prepared_by_title || `Dean, ${collegeName}`}
+                          </p>
+                        </div>
+
+                        {/* Right - Approved by */}
+                        <div style={{ textAlign: 'left', width: '45%', color: 'black' }}>
+                          <p style={{ margin: '5px 0', fontWeight: 'bold' }}>Approved:</p>
+                          <p style={{ margin: '3px 0 5px 0', fontStyle: 'italic' }}>(sgd.)</p>
+                          <p style={{ margin: '5px 0', fontWeight: 'bold' }}>
+                            {footerData?.approved_by_name || 'Type name'}
+                          </p>
+                          <p style={{ margin: '5px 0' }}>
+                            {footerData?.approved_by_title || 'VCAA, USTP-CDO'}
                           </p>
                         </div>
                       </div>
+
+                      {/* Center - Address */}
+                      <div style={{ textAlign: 'center', fontSize: '15px', color: 'black' }}>
+                        <p style={{ margin: '5px 0' }}>
+                          {footerData?.address_line || 'C.M Recto Avenue, Lapasan, Cagayan de Oro City 9000 Philippines'}
+                        </p>
+                        <p style={{ margin: '5px 0' }}>
+                          {footerData?.contact_line || 'Tel Nos. +63 (88) 856 1738; Telefax +63 (88) 856 4696 | http://www.ustp.edu.ph'}
+                        </p>
+                      </div>
+                    </div>
                   </div>
                 </div>
               );
@@ -2018,20 +2018,20 @@ const SchedulerView: React.FC<SchedulerViewProps> = ({ user }) => {
               } catch (error) {
                 console.error("Error fetching data:", error);
               }
-              
+
               setIsModalOpen(false);
-              
+
               // ✅ Save unscheduled sections for later access
               if (unscheduled && unscheduled.length > 0) {
                 console.log(`📋 Received ${unscheduled.length} unscheduled sections from AddScheduleForm`);
                 saveUnscheduledSections(unscheduled); // ✅ NOW THIS WORKS
-                
+
                 const result = window.confirm(
                   `Schedule generation complete!\n\n` +
                   `${unscheduled.length} section(s) need manual scheduling.\n\n` +
                   `Would you like to schedule them now?`
                 );
-                
+
                 if (result) {
                   setManualEditorSections(unscheduled);
                   setShowManualEditor(true);
@@ -2091,11 +2091,11 @@ const SchedulerView: React.FC<SchedulerViewProps> = ({ user }) => {
           onSave={async () => {
             try {
               console.log(`🔄 Refreshing footer for college_id: ${schedulerCollegeId}`);
-              
+
               const response = await api.get('/tbl_schedule_footer/', {
                 params: { college_id: schedulerCollegeId }
               });
-              
+
               if (response.data && response.data.length > 0) {
                 console.log(`✅ Footer refreshed:`, response.data[0]);
                 setFooterData(response.data[0]);
@@ -2108,51 +2108,51 @@ const SchedulerView: React.FC<SchedulerViewProps> = ({ user }) => {
       </Modal>
 
       <Modal isOpen={showManualEditor} onClose={() => setShowManualEditor(false)}>
-      <ManualScheduleEditor
-        unscheduledSections={manualEditorSections.length > 0 ? manualEditorSections : persistentUnscheduled}
-        examDates={uniqueDates.filter((date): date is string => date !== undefined)}
-        schedulerCollegeName={schedulerCollegeName}
-        onClose={() => {
-          setShowManualEditor(false);
-          setManualEditorSections([]);
-        }}
-        onScheduleCreated={async (remainingUnscheduled?: any[]) => {
-          try {
-            const params: any = {};
-            if (schedulerCollegeName && schedulerCollegeName !== "Add schedule first") {
-              params.college_name = schedulerCollegeName;
+        <ManualScheduleEditor
+          unscheduledSections={manualEditorSections.length > 0 ? manualEditorSections : persistentUnscheduled}
+          examDates={uniqueDates.filter((date): date is string => date !== undefined)}
+          schedulerCollegeName={schedulerCollegeName}
+          onClose={() => {
+            setShowManualEditor(false);
+            setManualEditorSections([]);
+          }}
+          onScheduleCreated={async (remainingUnscheduled?: any[]) => {
+            try {
+              const params: any = {};
+              if (schedulerCollegeName && schedulerCollegeName !== "Add schedule first") {
+                params.college_name = schedulerCollegeName;
+              }
+
+              const examsResponse = await api.get('/tbl_examdetails', { params });
+              if (examsResponse.data) {
+                setExamData(examsResponse.data);
+              }
+            } catch (error) {
+              console.error("Error fetching data:", error);
             }
 
-            const examsResponse = await api.get('/tbl_examdetails', { params });
-            if (examsResponse.data) {
-              setExamData(examsResponse.data);
+            // ✅ Update persistent storage with remaining unscheduled
+            if (remainingUnscheduled && remainingUnscheduled.length > 0) {
+              saveUnscheduledSections(remainingUnscheduled); // ✅ NOW THIS WORKS
+              toast.info(
+                `${remainingUnscheduled.length} section(s) still need manual scheduling.`,
+                { autoClose: 5000 }
+              );
+            } else {
+              saveUnscheduledSections([]); // ✅ Clear if all done
+              toast.success("All sections scheduled successfully!");
             }
-          } catch (error) {
-            console.error("Error fetching data:", error);
-          }
-          
-          // ✅ Update persistent storage with remaining unscheduled
-          if (remainingUnscheduled && remainingUnscheduled.length > 0) {
-            saveUnscheduledSections(remainingUnscheduled); // ✅ NOW THIS WORKS
-            toast.info(
-              `${remainingUnscheduled.length} section(s) still need manual scheduling.`,
-              { autoClose: 5000 }
-            );
-          } else {
-            saveUnscheduledSections([]); // ✅ Clear if all done
-            toast.success("All sections scheduled successfully!");
-          }
-          
-          setShowManualEditor(false);
-          setManualEditorSections([]);
-        }}
-        academicYear={yearName}
-        semester={semesterName}
-        examCategory={termName}
-        examPeriod={examPeriodName}
-        duration={{ hours: 1, minutes: 30 }}
-      />
-    </Modal>
+
+            setShowManualEditor(false);
+            setManualEditorSections([]);
+          }}
+          academicYear={yearName}
+          semester={semesterName}
+          examCategory={termName}
+          examPeriod={examPeriodName}
+          duration={{ hours: 1, minutes: 30 }}
+        />
+      </Modal>
 
       <ToastContainer position="top-right" autoClose={1500} />
     </div>

@@ -61,6 +61,7 @@ MIDDLEWARE = [
 # ──────────────────────────────────────────────
 CORS_ALLOWED_ORIGINS = [
     "https://exam-sync-v2-0-lkat.onrender.com",
+    "https://exam-sync-v2-0-mwnp.onrender.com",
     "https://www.examsyncv2.com",  # <-- ADD THIS
     "http://localhost:5173",
     "http://127.0.0.1:5173",

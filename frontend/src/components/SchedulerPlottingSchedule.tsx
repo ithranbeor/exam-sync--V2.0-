@@ -249,7 +249,7 @@ const SchedulerPlottingSchedule: React.FC<SchedulerProps> = ({ user, onScheduleC
       }
 
       try {
-        const relevantSections = sectionCourses.filter(sc => 
+        const relevantSections = sectionCourses.filter(sc =>
           formData.selectedPrograms.includes(sc.program_id)
         );
 
@@ -262,7 +262,7 @@ const SchedulerPlottingSchedule: React.FC<SchedulerProps> = ({ user, onScheduleC
 
         const coursesResponse = await api.get('/courses/');
         const allCourses = coursesResponse.data || [];
-        
+
         const filteredCourses = allCourses.filter((c: any) => courseIds.includes(c.course_id));
 
         setCourses(filteredCourses);
@@ -290,7 +290,7 @@ const SchedulerPlottingSchedule: React.FC<SchedulerProps> = ({ user, onScheduleC
 
         const modalitiesResponse = await api.get('/tbl_modality/', { params });
         const mods = modalitiesResponse.data || [];
-        
+
         const filteredMods = mods.filter((m: any) => {
           const isAllowedProgram = formData.selectedPrograms.includes(m.program_id);
           return isAllowedProgram;
@@ -324,9 +324,9 @@ const SchedulerPlottingSchedule: React.FC<SchedulerProps> = ({ user, onScheduleC
         const scheduled = new Set<number>(
           response.data.map((s: any) => Number(s.modality_id))
         );
-        
+
         setAlreadyScheduledIds(scheduled);
-        
+
         if (scheduled.size > 0) {
           console.log(`⚠️ ${scheduled.size} section(s) already scheduled`);
         }
@@ -373,7 +373,7 @@ const SchedulerPlottingSchedule: React.FC<SchedulerProps> = ({ user, onScheduleC
 
   const examDateOptions = useMemo(() => {
     if (!examPeriods.length || !userCollegeIds.length) return [];
-    const allowedPeriods = examPeriods.filter((p: any) => 
+    const allowedPeriods = examPeriods.filter((p: any) =>
       userCollegeIds.includes(String(p.college_id))
     );
     const days: { key: string; iso: string; label: string }[] = [];
@@ -382,18 +382,18 @@ const SchedulerPlottingSchedule: React.FC<SchedulerProps> = ({ user, onScheduleC
       if (!period.start_date || !period.end_date) return;
       const start = new Date(period.start_date);
       const end = new Date(period.end_date);
-      
+
       for (let d = new Date(start); d <= end; d.setDate(d.getDate() + 1)) {
         const iso = formatLocal(new Date(d));
-        const label = d.toLocaleDateString("en-US", { 
-          year: "numeric", 
-          month: "long", 
-          day: "numeric" 
+        const label = d.toLocaleDateString("en-US", {
+          year: "numeric",
+          month: "long",
+          day: "numeric"
         });
-        days.push({ 
-          key: `${period.examperiod_id}-${iso}`, 
-          iso, 
-          label 
+        days.push({
+          key: `${period.examperiod_id}-${iso}`,
+          iso,
+          label
         });
       }
     });
@@ -512,7 +512,7 @@ const SchedulerPlottingSchedule: React.FC<SchedulerProps> = ({ user, onScheduleC
     courseDateAssignment: Map<string, string>
   ): Chromosome => {
     const chromosome: Chromosome = [];
-    
+
     // ✅ NEW: Create global trackers for this chromosome
     const globalTracker: GlobalTracker = {
       roomOccupancy: new Map(),
@@ -534,17 +534,17 @@ const SchedulerPlottingSchedule: React.FC<SchedulerProps> = ({ user, onScheduleC
 
     // ✅ IMPROVED: Assign one time slot per course type with GUARANTEED non-conflict
     const courseTypeTimeSlots = new Map<string, { date: string; timeSlot: string }>();
-    
+
     sectionsByCourseType.forEach((sections, courseKey) => {
       const firstSection = sections[0];
       const isNightClass = firstSection.is_night_class === "YES";
 
       const validTimesForCourse = isNightClass
         ? eveningTimeSlots.filter(t => {
-            const [h, m] = t.split(":").map(Number);
-            const end = (h * 60 + m) + totalDurationMinutes;
-            return end <= 21 * 60;
-          })
+          const [h, m] = t.split(":").map(Number);
+          const end = (h * 60 + m) + totalDurationMinutes;
+          return end <= 21 * 60;
+        })
         : validTimes.filter(t => !eveningTimeSlots.includes(t));
 
       const courseId = firstSection.course_id;
@@ -557,18 +557,18 @@ const SchedulerPlottingSchedule: React.FC<SchedulerProps> = ({ user, onScheduleC
       // ✅ Try to find a time slot where ALL sections can fit without conflicts
       let foundTimeSlot = false;
       const shuffledTimeList = [...validTimesForCourse].sort(() => Math.random() - 0.5);
-      
+
       for (const candidateTime of shuffledTimeList) {
         const startMinutes = timeToMinutes(candidateTime);
         const endMinutes = startMinutes + totalDurationMinutes;
 
         // Check if ALL sections can be scheduled at this time
         let canScheduleAll = true;
-        
+
         for (const section of sections) {
           const suitableRooms = modalityRoomsMap.get(section.modality_id) || [];
           let foundRoom = false;
-          
+
           for (const room of suitableRooms) {
             const roomDateKey = `${date}|${room}`;
             if (isResourceFree(globalTracker.roomOccupancy, roomDateKey, startMinutes, endMinutes)) {
@@ -576,7 +576,7 @@ const SchedulerPlottingSchedule: React.FC<SchedulerProps> = ({ user, onScheduleC
               break;
             }
           }
-          
+
           if (!foundRoom) {
             canScheduleAll = false;
             break;
@@ -623,14 +623,14 @@ const SchedulerPlottingSchedule: React.FC<SchedulerProps> = ({ user, onScheduleC
       for (const room of [...suitableRooms].sort(() => Math.random() - 0.5)) {
         const roomObj = roomsCache.find(r => r.room_id === room);
         const roomCapacity = roomObj?.room_capacity || 0;
-        
+
         // Check capacity - skip rooms that are too small
         if (totalStudents > roomCapacity) {
           continue; // Skip this room, try next
         }
-        
+
         const roomDateKey = `${date}|${room}`;
-        
+
         // ✅ Use globalTracker (not finalTracker) inside generateRandomChromosome
         if (isResourceFree(globalTracker.roomOccupancy, roomDateKey, startMinutes, endMinutes)) {
           roomId = room;
@@ -644,7 +644,7 @@ const SchedulerPlottingSchedule: React.FC<SchedulerProps> = ({ user, onScheduleC
         // Fallback: assign any room (even if capacity is wrong) - genetic algorithm will penalize this
         for (const room of [...suitableRooms].sort(() => Math.random() - 0.5)) {
           const roomDateKey = `${date}|${room}`;
-          
+
           if (isResourceFree(globalTracker.roomOccupancy, roomDateKey, startMinutes, endMinutes)) {
             roomId = room;
             markResourceOccupied(globalTracker.roomOccupancy, roomDateKey, startMinutes, endMinutes, Number(section.modality_id));
@@ -675,7 +675,7 @@ const SchedulerPlottingSchedule: React.FC<SchedulerProps> = ({ user, onScheduleC
         const m = slotMinutes % 60;
         examSlots.push(`${String(h).padStart(2, "0")}:${String(m).padStart(2, "0")}`);
       }
-      
+
       for (const slot of examSlots) {
         const globalKey = `${date}|${slot}`;
         if (!globalTimeSlotYearLevels.has(globalKey)) globalTimeSlotYearLevels.set(globalKey, new Map());
@@ -692,22 +692,35 @@ const SchedulerPlottingSchedule: React.FC<SchedulerProps> = ({ user, onScheduleC
       // Priority 1: Night class instructor (only if available and no conflict)
       if (isNightClass && section.instructor_id) {
         const instrKey = `${date}|${section.instructor_id}`;
-        if (availableProctors.includes(section.instructor_id) && 
-            isResourceFree(globalTracker.proctorOccupancy, instrKey, startMinutes, endMinutes)) {
+        if (availableProctors.includes(section.instructor_id) &&
+          isResourceFree(globalTracker.proctorOccupancy, instrKey, startMinutes, endMinutes)) {
           proctorId = section.instructor_id;
           markResourceOccupied(globalTracker.proctorOccupancy, instrKey, startMinutes, endMinutes, Number(section.modality_id));
         }
       }
 
       // Priority 2: Find any free proctor from available list
+      // Priority 2: Find any free proctor from available list
       if (proctorId === -1) {
+        console.log(`🔍 Looking for proctor for ${section.course_id} at ${date} ${timeSlot}`);
+        console.log(`📋 Available proctors: ${shuffledProctors.length}`);
+
+        let foundFreeProctor = false;
         for (const pid of shuffledProctors) {
           const key = `${date}|${pid}`;
-          if (isResourceFree(globalTracker.proctorOccupancy, key, startMinutes, endMinutes)) {
+          const isFree = isResourceFree(globalTracker.proctorOccupancy, key, startMinutes, endMinutes);
+
+          if (isFree) {
             proctorId = pid;
             markResourceOccupied(globalTracker.proctorOccupancy, key, startMinutes, endMinutes, Number(section.modality_id));
+            foundFreeProctor = true;
+            console.log(`✅ Assigned proctor ${pid}`);
             break;
           }
+        }
+
+        if (!foundFreeProctor) {
+          console.error(`❌ NO FREE PROCTOR FOUND despite ${shuffledProctors.length} being available!`);
         }
       }
 
@@ -831,7 +844,7 @@ const SchedulerPlottingSchedule: React.FC<SchedulerProps> = ({ user, onScheduleC
         collegeMap.set(collegeId, new Set());
       }
       collegeMap.get(collegeId)!.add(yearLevel);
-      
+
       if (collegeMap.get(collegeId)!.size > 1) {
         fitness -= 8000;
       }
@@ -858,9 +871,9 @@ const SchedulerPlottingSchedule: React.FC<SchedulerProps> = ({ user, onScheduleC
         if (!proctorTimeRanges.has(proctorDateKey)) {
           proctorTimeRanges.set(proctorDateKey, []);
         }
-        proctorTimeRanges.get(proctorDateKey)!.push({ 
-          start: startMinutes, 
-          end: endMinutes, 
+        proctorTimeRanges.get(proctorDateKey)!.push({
+          start: startMinutes,
+          end: endMinutes,
           sectionId: Number(gene.sectionId),
           deptId: departmentId
         });
@@ -870,16 +883,16 @@ const SchedulerPlottingSchedule: React.FC<SchedulerProps> = ({ user, onScheduleC
           proctorTimeRanges.set(proctorDateKey, []);
         }
         const existingProctorRanges = proctorTimeRanges.get(proctorDateKey)!;
-        
+
         existingProctorRanges.forEach(existing => {
           if (rangesOverlap(startMinutes, endMinutes, existing.start, existing.end)) {
             fitness -= 30000;
           }
         });
-        
-        existingProctorRanges.push({ 
-          start: startMinutes, 
-          end: endMinutes, 
+
+        existingProctorRanges.push({
+          start: startMinutes,
+          end: endMinutes,
           sectionId: Number(gene.sectionId),
           deptId: departmentId
         });
@@ -927,15 +940,15 @@ const SchedulerPlottingSchedule: React.FC<SchedulerProps> = ({ user, onScheduleC
     getAvailableProctors: (date: string, time: string) => number[],
     mutationRate: number
   ): Chromosome => {
-    
+
     const courseTypeTimeSlots = new Map<string, { date: string; timeSlot: string }>();
-    
+
     chromosome.forEach(gene => {
       const section = sectionMap.get(gene.sectionId);
       if (section) {
         const isNightClass = section.is_night_class === "YES";
         const courseKey = isNightClass ? `${section.course_id}_NIGHT` : section.course_id;
-        
+
         if (!courseTypeTimeSlots.has(courseKey)) {
           courseTypeTimeSlots.set(courseKey, { date: gene.date, timeSlot: gene.timeSlot });
         }
@@ -946,30 +959,30 @@ const SchedulerPlottingSchedule: React.FC<SchedulerProps> = ({ user, onScheduleC
 
     chromosome.forEach(gene => {
       if (Math.random() >= mutationRate) return;
-      
+
       const section = sectionMap.get(gene.sectionId);
       if (!section) return;
 
       const isNightClass = section.is_night_class === "YES";
       const courseKey = isNightClass ? `${section.course_id}_NIGHT` : section.course_id;
-      
+
       if (mutatedCourses.has(courseKey)) return;
 
       const mutationType = Math.floor(Math.random() * 4);
-      const validTimesForSection = isNightClass 
+      const validTimesForSection = isNightClass
         ? eveningTimeSlots.filter(t => {
-            const [h, m] = t.split(":").map(Number);
-            const totalDurationMinutes = duration.hours * 60 + duration.minutes;
-            const end = (h * 60 + m) + totalDurationMinutes;
-            return end <= 21 * 60;
-          })
+          const [h, m] = t.split(":").map(Number);
+          const totalDurationMinutes = duration.hours * 60 + duration.minutes;
+          const end = (h * 60 + m) + totalDurationMinutes;
+          return end <= 21 * 60;
+        })
         : validTimes;
 
       if (mutationType === 0 && Math.random() < 0.3) {
         const newDate = sortedDates[Math.floor(Math.random() * sortedDates.length)];
         mutatedCourses.set(courseKey, { date: newDate });
         courseTypeTimeSlots.set(courseKey, { date: newDate, timeSlot: gene.timeSlot });
-        
+
       } else if (mutationType === 1) {
         const newTimeSlot = validTimesForSection[Math.floor(Math.random() * validTimesForSection.length)];
         mutatedCourses.set(courseKey, { timeSlot: newTimeSlot });
@@ -988,49 +1001,49 @@ const SchedulerPlottingSchedule: React.FC<SchedulerProps> = ({ user, onScheduleC
       const courseMutation = mutatedCourses.get(courseKey);
       if (courseMutation) {
         let newGene = { ...gene };
-        
+
         if (courseMutation.date) {
           newGene.date = courseMutation.date;
         }
-        
+
         if (courseMutation.timeSlot) {
           newGene.timeSlot = courseMutation.timeSlot;
         }
-        
+
         const availableProctors = getAvailableProctors(newGene.date, newGene.timeSlot);
         let newProctorId = -1;
-        
+
         if (isNightClass && section.instructor_id && availableProctors.includes(section.instructor_id)) {
           newProctorId = section.instructor_id;
         } else {
           const shuffled = [...availableProctors].sort(() => Math.random() - 0.5);
           newProctorId = shuffled.length > 0 ? shuffled[0] : -1;
         }
-        
+
         newGene.proctorId = newProctorId;
         return newGene;
       }
 
       if (Math.random() < mutationRate) {
         const mutationType = Math.floor(Math.random() * 4);
-        
+
         if (mutationType === 2) {
           const newRoomId = suitableRooms.length > 0
             ? suitableRooms[Math.floor(Math.random() * suitableRooms.length)]
             : "";
           return { ...gene, roomId: newRoomId };
-          
+
         } else if (mutationType === 3) {
           const availableProctors = getAvailableProctors(gene.date, gene.timeSlot);
           let newProctorId = -1;
-          
+
           if (isNightClass && section.instructor_id && availableProctors.includes(section.instructor_id)) {
             newProctorId = section.instructor_id;
           } else {
             const shuffled = [...availableProctors].sort(() => Math.random() - 0.5);
             newProctorId = shuffled.length > 0 ? shuffled[0] : -1;
           }
-          
+
           return { ...gene, proctorId: newProctorId };
         }
       }
@@ -1044,7 +1057,6 @@ const SchedulerPlottingSchedule: React.FC<SchedulerProps> = ({ user, onScheduleC
   // ============================================================================
 
   const assignExamSchedules = async () => {
-
     if (allCollegeUsers.length === 0) {
       alert("No proctors found for your college. Please ensure proctors are assigned.");
       return;
@@ -1169,7 +1181,7 @@ const SchedulerPlottingSchedule: React.FC<SchedulerProps> = ({ user, onScheduleC
           s.forEach(p => proctors.add(p));
         }
       }
-      
+
       // ✅ FIXED: Filter to only include proctors from scheduler's college
       return Array.from(proctors).filter(pid => allCollegeUsers.some(u => u.user_id === pid));
     };
@@ -1193,32 +1205,32 @@ const SchedulerPlottingSchedule: React.FC<SchedulerProps> = ({ user, onScheduleC
     formData.selectedModalities.forEach(modalityId => {
       const selectedModality = modalities.find(m => m.modality_id === modalityId);
       if (selectedModality) {
-        const sections = Array.isArray(selectedModality.sections) 
-          ? selectedModality.sections 
+        const sections = Array.isArray(selectedModality.sections)
+          ? selectedModality.sections
           : [selectedModality.section_name];
-        
+
         const instructorIds = sections.map((sectionName: string) => {
           const sectionCourseData = sectionCourses.find(
             sc => sc.program_id === selectedModality.program_id &&
-                  sc.course_id === selectedModality.course_id &&
-                  sc.section_name === sectionName
+              sc.course_id === selectedModality.course_id &&
+              sc.section_name === sectionName
           );
           return sectionCourseData?.user_id ?? null;
         }).filter(Boolean);
 
-        const uniqueInstructorIds: number[] = instructorIds.filter((id: number, index: number) => 
+        const uniqueInstructorIds: number[] = instructorIds.filter((id: number, index: number) =>
           instructorIds.indexOf(id) === index
         );
-        
+
         const isNightClass = sections.some((sectionName: string) => {
           const sectionCourseData = sectionCourses.find(
             sc => sc.program_id === selectedModality.program_id &&
-                  sc.course_id === selectedModality.course_id &&
-                  sc.section_name === sectionName
+              sc.course_id === selectedModality.course_id &&
+              sc.section_name === sectionName
           );
           return sectionCourseData?.is_night_class === "YES";
         });
-        
+
         const enrichedModality = {
           ...selectedModality,
           sections: sections,
@@ -1226,7 +1238,7 @@ const SchedulerPlottingSchedule: React.FC<SchedulerProps> = ({ user, onScheduleC
           is_night_class: isNightClass ? "YES" : "NO",
           enrolled_students: selectedModality.total_students ?? 0
         };
-        
+
         allModalities.push(enrichedModality);
         modalityMap.set(modalityId, enrichedModality);
       }
@@ -1242,11 +1254,11 @@ const SchedulerPlottingSchedule: React.FC<SchedulerProps> = ({ user, onScheduleC
       const [startHour, startMinute] = startTime.split(":").map(Number);
       const endMinutes = (startHour * 60 + startMinute) + totalDurationMinutes;
       const maxEndTime = 21 * 60;
-      
+
       if (endMinutes > maxEndTime) {
         return false;
       }
-      
+
       if (isNightClass) {
         return eveningTimeSlots.includes(startTime);
       }
@@ -1268,27 +1280,27 @@ const SchedulerPlottingSchedule: React.FC<SchedulerProps> = ({ user, onScheduleC
     allModalities.forEach(section => {
       const enrolledCount = section.enrolled_students ?? 0;
       const suitableRooms = modalityRoomsMap.get(section.modality_id) || [];
-      
+
       if (suitableRooms.length === 0) {
         warnings.push(
           `⚠️ ${section.course_id} - ${section.section_name}: No suitable rooms (${enrolledCount} students)`
         );
       }
-      
+
       if (Array.isArray(section.sections) && section.sections.length > 1) {
         const totalStudents = section.total_students || enrolledCount;
-        
+
         let hasValidRoom = false;
         for (const roomId of suitableRooms) {
           const room = roomsCache.find(r => r.room_id === roomId);
           const roomCapacity = room?.room_capacity || 0;
-          
+
           if (totalStudents <= roomCapacity) {
             hasValidRoom = true;
             break;
           }
         }
-        
+
         if (!hasValidRoom) {
           warnings.push(
             `⚠️ ${section.course_id} (${section.sections.join(', ')}): Capacity issue (${totalStudents} students, max room capacity insufficient)`
@@ -1300,7 +1312,7 @@ const SchedulerPlottingSchedule: React.FC<SchedulerProps> = ({ user, onScheduleC
     const datesWithoutProctors: string[] = [];
     sortedDates.forEach(date => {
       const isoDate = date.includes('T') ? date.split('T')[0] : date;
-      
+
       let hasAnyProctors = false;
       for (const timeSlot of validTimes) {
         const proctors = getAvailableProctors(isoDate, timeSlot);
@@ -1310,10 +1322,10 @@ const SchedulerPlottingSchedule: React.FC<SchedulerProps> = ({ user, onScheduleC
         }
       }
       if (!hasAnyProctors) {
-        const formattedDate = new Date(date).toLocaleDateString('en-US', { 
-          year: 'numeric', 
-          month: 'long', 
-          day: 'numeric' 
+        const formattedDate = new Date(date).toLocaleDateString('en-US', {
+          year: 'numeric',
+          month: 'long',
+          day: 'numeric'
         });
         datesWithoutProctors.push(formattedDate);
       }
@@ -1331,7 +1343,7 @@ const SchedulerPlottingSchedule: React.FC<SchedulerProps> = ({ user, onScheduleC
           const end = (h * 60 + m) + totalDurationMinutes;
           return end <= 21 * 60;
         });
-        
+
         if (validEveningSlots.length === 0) {
           warnings.push(
             `⚠️ Night class ${section.course_id} - ${section.section_name}: No valid evening time slots`
@@ -1355,9 +1367,9 @@ const SchedulerPlottingSchedule: React.FC<SchedulerProps> = ({ user, onScheduleC
           modality_id: modalityIds.join(',')
         }
       });
-      
+
       const existingSchedules = existingSchedulesResponse.data || [];
-      
+
       if (existingSchedules.length > 0) {
         alert(`Cannot generate schedule - sections already scheduled`);
         return;
@@ -1382,7 +1394,7 @@ const SchedulerPlottingSchedule: React.FC<SchedulerProps> = ({ user, onScheduleC
       const randomDate = sortedDates[Math.floor(Math.random() * sortedDates.length)];
       courseDateAssignment.set(courseId, randomDate);
     });
-    
+
     let population: Chromosome[] = [];
     for (let i = 0; i < POPULATION_SIZE; i++) {
       population.push(generateRandomChromosome(
@@ -1408,7 +1420,7 @@ const SchedulerPlottingSchedule: React.FC<SchedulerProps> = ({ user, onScheduleC
 
       const fitnesses = population.map(c => calculateFitness(c, modalityMap, totalDurationMinutes, programs, departments));
       const currentBestIdx = fitnesses.indexOf(Math.max(...fitnesses));
-      
+
       if (fitnesses[currentBestIdx] > bestFitness) {
         bestFitness = fitnesses[currentBestIdx];
         bestChromosome = population[currentBestIdx];
@@ -1447,8 +1459,8 @@ const SchedulerPlottingSchedule: React.FC<SchedulerProps> = ({ user, onScheduleC
 
     // ✅ IMPROVED: Convert to schedule with STRICT validation
     const scheduledExams: any[] = [];
-    const unscheduledSections: string[] = [];
-    
+    const unscheduledSections: any[] = [];
+
     // ✅ NEW: Use global tracker for final validation
     const finalTracker: GlobalTracker = {
       roomOccupancy: new Map(),
@@ -1458,63 +1470,119 @@ const SchedulerPlottingSchedule: React.FC<SchedulerProps> = ({ user, onScheduleC
 
     const finalCourseDates = new Map<string, Set<string>>();
 
+    finalTracker.roomOccupancy.clear();
+    finalTracker.proctorOccupancy.clear();
+
+    const attemptedScheduling = new Map<number, {
+      date: string;
+      time: string;
+      room: string;
+      proctor: number;
+      conflicts: string[];
+    }>();
+
     for (const gene of bestChromosome) {
       const section = modalityMap.get(gene.sectionId);
       if (!section) continue;
 
       const { date, timeSlot, roomId, proctorId } = gene;
       const courseId = section.course_id;
-
-      if (!allAvailableTimeSlots.includes(timeSlot)) {
-        unscheduledSections.push(`${section.course_id} - ${section.section_name} (invalid time slot)`);
-        continue;
-      }
-
       const startMinutes = timeToMinutes(timeSlot);
       const endMinutes = startMinutes + totalDurationMinutes;
-      
+
+      // Track what was attempted
+      const conflicts: string[] = [];
+
+      // Store attempted scheduling info
+      attemptedScheduling.set(section.modality_id, {
+        date,
+        time: timeSlot,
+        room: roomId || '',
+        proctor: proctorId,
+        conflicts: [] // Will be populated below
+      });
+
+      // Validation checks with detailed conflict tracking
+      if (!roomId || roomId.trim() === "") {
+        conflicts.push('No suitable room available');
+      }
+
+      if (proctorId === -1) {
+        conflicts.push('No available proctor');
+      }
+
+      // Check time validity
+      if (!allAvailableTimeSlots.includes(timeSlot)) {
+        conflicts.push('Invalid time slot');
+      }
+
       if (endMinutes > 21 * 60) {
-        unscheduledSections.push(`${section.course_id} - ${section.section_name} (would end after 9 PM)`);
-        continue;
+        conflicts.push('Would end after 9 PM');
       }
 
-      // ✅ IMPROVED: Strict validation
-      if (!roomId || roomId.trim() === "" || proctorId === -1) {
-        unscheduledSections.push(`${section.course_id} - ${section.section_name} (missing room or proctor)`);
-        continue;
+      // Check room conflicts
+      const roomDateKey = `${date}|${roomId}`;
+      if (roomId && !isResourceFree(finalTracker.roomOccupancy, roomDateKey, startMinutes, endMinutes)) {
+        conflicts.push('Room conflict at this time');
       }
 
-      // ✅ Check course date consistency
+      // Check proctor conflicts
+      if (proctorId !== -1) {
+        const proctorDateKey = `${date}|${proctorId}`;
+        if (!isResourceFree(finalTracker.proctorOccupancy, proctorDateKey, startMinutes, endMinutes)) {
+          conflicts.push('Proctor conflict at this time');
+        }
+      }
+
+      // Check course date consistency
       if (!finalCourseDates.has(courseId)) {
         finalCourseDates.set(courseId, new Set());
       }
       finalCourseDates.get(courseId)!.add(date);
 
       if (finalCourseDates.get(courseId)!.size > 1) {
-        unscheduledSections.push(`${section.course_id} - ${section.section_name} (course split across dates)`);
-        continue;
+        conflicts.push('Course split across multiple dates');
       }
 
-      // ✅ STRICT: Check room conflicts
-      const roomDateKey = `${date}|${roomId}`;
-      if (!isResourceFree(finalTracker.roomOccupancy, roomDateKey, startMinutes, endMinutes)) {
-        console.error(`❌ ROOM CONFLICT: Room ${roomId} already occupied at ${date} ${timeSlot}`);
-        unscheduledSections.push(`${section.course_id} - ${section.section_name} (room conflict)`);
-        continue;
+      // If ANY conflicts exist, mark as unscheduled
+      if (conflicts.length > 0) {
+        // Update the attempted scheduling record with conflicts
+        const attempted = attemptedScheduling.get(section.modality_id);
+        if (attempted) {
+          attempted.conflicts = conflicts;
+        }
+
+        unscheduledSections.push({
+          modality_id: section.modality_id,
+          course_id: section.course_id,
+          section_name: section.sections?.[0] || section.section_name,
+          sections: section.sections || [section.section_name],
+          program_id: section.program_id,
+          instructor_id: section.instructors?.[0] || section.instructor_id,
+          instructors: section.instructors || [],
+          total_students: section.total_students || section.enrolled_students || 0,
+          possible_rooms: section.possible_rooms || [],
+          is_night_class: section.is_night_class,
+          conflicts: conflicts,
+          attempted_assignment: attempted || {
+            date: date,
+            time: timeSlot,
+            room: roomId || '',
+            proctor: proctorId
+          }
+        });
+        continue; // Skip to next section
       }
 
-      // ✅ STRICT: Check proctor conflicts
-      const proctorDateKey = `${date}|${proctorId}`;
-      if (!isResourceFree(finalTracker.proctorOccupancy, proctorDateKey, startMinutes, endMinutes)) {
-        console.error(`❌ PROCTOR CONFLICT: Proctor ${proctorId} already assigned at ${date} ${timeSlot}`);
-        unscheduledSections.push(`${section.course_id} - ${section.section_name} (proctor conflict)`);
-        continue; // Skip this section
-      }
-
-      // ✅ Mark resources as occupied
+      // ✅ Only mark resources as occupied if NO conflicts
       markResourceOccupied(finalTracker.roomOccupancy, roomDateKey, startMinutes, endMinutes, Number(section.modality_id));
-      markResourceOccupied(finalTracker.proctorOccupancy, proctorDateKey, startMinutes, endMinutes, Number(section.modality_id));
 
+      if (proctorId !== -1) {
+        const proctorDateKey = `${date}|${proctorId}`;
+        markResourceOccupied(finalTracker.proctorOccupancy, proctorDateKey, startMinutes, endMinutes, Number(section.modality_id));
+      }
+
+      // ✅ Rest of the scheduling code (exam period matching, building name, etc.)
       const examDate = new Date(date);
       const matchedPeriod = examPeriods.find(p => {
         const periodStart = new Date(p.start_date);
@@ -1526,10 +1594,24 @@ const SchedulerPlottingSchedule: React.FC<SchedulerProps> = ({ user, onScheduleC
       });
 
       if (!matchedPeriod) {
-        unscheduledSections.push(`${section.course_id} - ${section.section_name} (no matching exam period)`);
+        unscheduledSections.push({
+          modality_id: section.modality_id,
+          course_id: section.course_id,
+          section_name: section.sections?.[0] || section.section_name,
+          sections: section.sections || [section.section_name],
+          program_id: section.program_id,
+          instructor_id: section.instructors?.[0],
+          instructors: section.instructors || [],
+          total_students: section.total_students || 0,
+          possible_rooms: section.possible_rooms || [],
+          is_night_class: section.is_night_class,
+          conflicts: ['No matching exam period for this date'],
+          attempted_assignment: { date, time: timeSlot, room: roomId, proctor: proctorId }
+        });
         continue;
       }
 
+      // Build the complete schedule entry
       const [startHour, startMinute] = timeSlot.split(":").map(Number);
       const endHour = startHour + Math.floor((startMinute + totalDurationMinutes) / 60);
       const endMinute = (startMinute + totalDurationMinutes) % 60;
@@ -1541,18 +1623,16 @@ const SchedulerPlottingSchedule: React.FC<SchedulerProps> = ({ user, onScheduleC
       const buildingId = roomToBuildingMap.get(roomId);
       const buildingName = buildingId ? buildingMap.get(buildingId) : "Unknown Building";
 
-      // ✅ Build proctors array for grouped sections
       const proctorsArray: number[] = [];
       const availableForAssignment = getAvailableProctors(date, timeSlot);
 
       for (let i = 0; i < section.sections.length; i++) {
         let sectionProctor = -1;
-        
-        const availableForSection = availableForAssignment.filter(pid => 
+        const availableForSection = availableForAssignment.filter(pid =>
           !proctorsArray.includes(pid) &&
           isResourceFree(finalTracker.proctorOccupancy, `${date}|${pid}`, startMinutes, endMinutes)
         );
-        
+
         if (availableForSection.length > 0) {
           sectionProctor = availableForSection[Math.floor(Math.random() * availableForSection.length)];
           markResourceOccupied(finalTracker.proctorOccupancy, `${date}|${sectionProctor}`, startMinutes, endMinutes, Number(section.modality_id));
@@ -1565,41 +1645,25 @@ const SchedulerPlottingSchedule: React.FC<SchedulerProps> = ({ user, onScheduleC
             sectionProctor = -9999;
           }
         }
-        
         proctorsArray.push(sectionProctor);
       }
 
-      const canonicalProctorId =
-        Array.isArray(proctorsArray) && proctorsArray.length > 0
-          ? (proctorsArray[0] === -9999 ? null : proctorsArray[0])
-          : (proctorId === -1 || proctorId === -9999 ? null : proctorId);
+      const canonicalProctorId = Array.isArray(proctorsArray) && proctorsArray.length > 0
+        ? (proctorsArray[0] === -9999 ? null : proctorsArray[0])
+        : (proctorId === -1 || proctorId === -9999 ? null : proctorId);
 
       scheduledExams.push({
         program_id: section.program_id,
         course_id: section.course_id,
         modality_id: section.modality_id,
         room_id: roomId,
-
         sections: section.sections,
         instructors: section.instructors,
         proctors: proctorsArray,
-
-        instructors_display: (() => {
-          const uniqueInstructors: number[] = [];
-          section.instructors.forEach((instrId: number) => {
-            if (instrId && !uniqueInstructors.includes(instrId)) {
-              uniqueInstructors.push(instrId);
-            }
-          });
-          return uniqueInstructors;
-        })(),
-
+        instructors_display: Array.from(new Set(section.instructors.filter(Boolean))),
         section_name: section.sections[0],
         instructor_id: section.instructors[0] ?? null,
-
-        // 🔥 Replace proctor_id here
         proctor_id: canonicalProctorId,
-
         examperiod_id: matchedPeriod.examperiod_id,
         exam_date: date,
         exam_start_time: startTimestamp,
@@ -1619,66 +1683,22 @@ const SchedulerPlottingSchedule: React.FC<SchedulerProps> = ({ user, onScheduleC
     console.log(`✅ Successfully scheduled ${scheduledExams.length}/${allModalities.length} sections`);
     console.log(`❌ Failed to schedule ${unscheduledSections.length} sections`);
 
-    let enhancedUnscheduled: any[] = [];
-    
-    if (unscheduledSections.length > 0) {
-      console.log(`❌ Failed to schedule ${unscheduledSections.length} sections`);
-      
-      // Enhance unscheduled sections with conflict details
-      enhancedUnscheduled = unscheduledSections.map(sectionStr => {
-        const match = sectionStr.match(/^(.+?) - (.+?) \((.+?)\)$/);
-        if (!match) return null;
-        
-        const [_, courseId, sectionName, reason] = match;
-        
-        const section = allModalities.find(m => 
-          m.course_id === courseId && m.sections?.[0] === sectionName
-        );
-        
-        if (!section) return null;
-
-        const conflicts: string[] = [];
-        
-        if (reason.includes('room conflict') || reason.includes('missing room')) {
-          conflicts.push('Room unavailable or conflict');
-        }
-        if (reason.includes('proctor conflict') || reason.includes('missing proctor')) {
-          conflicts.push('Proctor unavailable');
-        }
-        if (reason.includes('time') || reason.includes('after 9 PM')) {
-          conflicts.push('Time slot conflict');
-        }
-        if (reason.includes('course split')) {
-          conflicts.push('Course date consistency issue');
-        }
-        if (reason.includes('no matching exam period')) {
-          conflicts.push('No matching exam period');
-        }
-        
-        return {
-          modality_id: section.modality_id,
-          course_id: section.course_id,
-          section_name: section.sections?.[0] || sectionName,
-          sections: section.sections || [sectionName],
-          program_id: section.program_id,
-          instructor_id: section.instructors?.[0],
-          instructors: section.instructors || [],
-          total_students: section.total_students || section.enrolled_students || 0,
-          possible_rooms: section.possible_rooms || [],
-          is_night_class: section.is_night_class,
-          conflicts: conflicts.length > 0 ? conflicts : ['Scheduling conflict']
-        };
-      }).filter(Boolean);
-    }
-
-    // ✅ CRITICAL: Save successfully scheduled sections FIRST (if any)
+    // ✅ SAVE TO DATABASE FIRST - BEFORE ANY DIALOGS
     if (scheduledExams.length > 0) {
       try {
+        console.log(`🔍 Attempting to save ${scheduledExams.length} exams to database`);
+        console.log('📦 Sample exam data:', scheduledExams[0]);
+
         await api.post('/tbl_examdetails', scheduledExams);
         console.log(`✅ Successfully saved ${scheduledExams.length} section(s) to database`);
-        toast.success(`Successfully scheduled ${scheduledExams.length} section(s)!`);
+
+        toast.success(
+          `✅ ${scheduledExams.length} section(s) scheduled successfully!`,
+          { autoClose: 3000 }
+        );
       } catch (error: any) {
-        console.error("Database error:", error);
+        console.error("❌ Database save error:", error);
+        console.error("❌ Error response:", error.response?.data);
         const errorMessage = error.response?.data?.error || error.message || "Unknown error";
         alert("Error saving schedule: " + errorMessage);
         setLoading(false);
@@ -1688,52 +1708,45 @@ const SchedulerPlottingSchedule: React.FC<SchedulerProps> = ({ user, onScheduleC
 
     setLoading(false);
 
-    // ✅ THEN: Handle unscheduled sections if any
-    if (enhancedUnscheduled.length > 0) {
-      console.log(`📋 Setting ${enhancedUnscheduled.length} unscheduled sections`);
-      setUnscheduledSections(enhancedUnscheduled);
-      
+    // ✅ NOW handle unscheduled sections dialog
+    if (unscheduledSections.length > 0) {
+      console.log(`📋 ${unscheduledSections.length} sections need manual scheduling`);
+
+      const conflictSummary = new Map<string, number>();
+      unscheduledSections.forEach(section => {
+        section.conflicts.forEach((conflict: string) => {
+          conflictSummary.set(conflict, (conflictSummary.get(conflict) || 0) + 1);
+        });
+      });
+
+      const conflictList = Array.from(conflictSummary.entries())
+        .map(([conflict, count]) => `• ${conflict}: ${count} section(s)`)
+        .join('\n');
+
       const result = window.confirm(
         `✅ Successfully scheduled ${scheduledExams.length} section(s)!\n\n` +
-        `⚠️ ${enhancedUnscheduled.length} section(s) could not be scheduled automatically.\n\n` +
-        `Common issues:\n` +
-        `• Room conflicts or unavailable rooms\n` +
-        `• Proctor conflicts or unavailable proctors\n` +
-        `• Time slot conflicts\n\n` +
+        `⚠️ ${unscheduledSections.length} section(s) could not be scheduled automatically:\n\n` +
+        `${conflictList}\n\n` +
         `Would you like to schedule them manually now?`
       );
-      
+
       if (result) {
+        setUnscheduledSections(unscheduledSections);
         setShowManualEditor(true);
-        return; // ✅ Don't call onScheduleCreated yet
+        return;
+      } else {
+        toast.info(
+          `${unscheduledSections.length} section(s) need manual scheduling. Use "Edit Manually" button later.`,
+          { autoClose: 8000 }
+        );
       }
     }
 
-    // ✅ If user declined or no unscheduled sections, notify parent
+    // ✅ Notify parent component
     if (onScheduleCreated) {
       setTimeout(() => {
-        onScheduleCreated(enhancedUnscheduled.length > 0 ? enhancedUnscheduled : undefined);
+        onScheduleCreated(unscheduledSections.length > 0 ? unscheduledSections : undefined);
       }, 500);
-    }
-
-    try {
-      await api.post('/tbl_examdetails', scheduledExams);
-      toast.success(`Successfully scheduled ${scheduledExams.length} section(s)!`);
-      
-      if (unscheduledSections.length > 0) {
-        toast.warning(`${unscheduledSections.length} section(s) need manual scheduling`);
-      }
-      
-      if (onScheduleCreated) {
-        setTimeout(() => {
-          // ✅ Now enhancedUnscheduled is defined in the correct scope
-          onScheduleCreated(enhancedUnscheduled.length > 0 ? enhancedUnscheduled : undefined);
-        }, 1000);
-      }
-    } catch (error: any) {
-      console.error("Database error:", error);
-      const errorMessage = error.response?.data?.error || error.message || "Unknown error";
-      alert("Error saving schedule: " + errorMessage);
     }
   };
 
@@ -1958,7 +1971,7 @@ const SchedulerPlottingSchedule: React.FC<SchedulerProps> = ({ user, onScheduleC
 
                 return Array.from(labelMap.entries()).map(([baseLabel, ids]) => ({
                   value: ids,
-                  label: `${baseLabel} (${ids.length})`, 
+                  label: `${baseLabel} (${ids.length})`,
                 }));
               })()}
 
@@ -1976,7 +1989,7 @@ const SchedulerPlottingSchedule: React.FC<SchedulerProps> = ({ user, onScheduleC
 
                 return Array.from(labelMap.entries()).map(([baseLabel, ids]) => ({
                   value: ids,
-                  label: `${baseLabel} (${ids.length})`,   
+                  label: `${baseLabel} (${ids.length})`,
                 }));
               })()}
 
@@ -2066,11 +2079,11 @@ const SchedulerPlottingSchedule: React.FC<SchedulerProps> = ({ user, onScheduleC
           <h3 className="preview-header">
             Selected Modality Preview ({formData.selectedModalities.length})
             {alreadyScheduledIds.size > 0 && (
-              <span style={{ 
-                color: '#f59e0b', 
-                fontSize: '14px', 
+              <span style={{
+                color: '#f59e0b',
+                fontSize: '14px',
                 marginLeft: '10px',
-                fontWeight: 'normal' 
+                fontWeight: 'normal'
               }}>
                 ⚠️ {alreadyScheduledIds.size} already scheduled
               </span>
@@ -2090,24 +2103,24 @@ const SchedulerPlottingSchedule: React.FC<SchedulerProps> = ({ user, onScheduleC
                   const modality = filteredModalitiesBySelection.find(m => m.modality_id === modalityId);
                   const course = filteredCoursesByPrograms.find(c => c.course_id === modality?.course_id);
                   const isScheduled = alreadyScheduledIds.has(modalityId);
-                  
+
                   // ✅ Handle sections as array
-                  const sectionsDisplay = Array.isArray(modality?.sections) 
-                    ? modality.sections.join(', ') 
+                  const sectionsDisplay = Array.isArray(modality?.sections)
+                    ? modality.sections.join(', ')
                     : modality?.section_name || 'N/A';
-                  
+
                   const searchString = [
-                    course?.course_id, 
-                    sectionsDisplay, 
+                    course?.course_id,
+                    sectionsDisplay,
                     modality?.modality_type
                   ].join(' ').toLowerCase();
-                  
+
                   return { modality, course, searchString, modalityId, isScheduled, sectionsDisplay };
                 })
                 .filter(item => !modalityPreviewSearchTerm || item.searchString.includes(modalityPreviewSearchTerm.toLowerCase()))
                 .map(({ modality, course, modalityId, isScheduled, sectionsDisplay }) => (
-                  <div 
-                    key={modalityId} 
+                  <div
+                    key={modalityId}
                     className="modality-item"
                     style={{
                       backgroundColor: isScheduled ? '#fef3c7' : 'transparent',
@@ -2145,11 +2158,11 @@ const SchedulerPlottingSchedule: React.FC<SchedulerProps> = ({ user, onScheduleC
                     </p>
                     <p className="modality-detail">Remarks: {modality?.modality_remarks ?? 'N/A'}</p>
                     {isScheduled && (
-                      <p style={{ 
-                        color: '#f59e0b', 
-                        fontSize: '13px', 
+                      <p style={{
+                        color: '#f59e0b',
+                        fontSize: '13px',
                         marginTop: '8px',
-                        fontWeight: '500' 
+                        fontWeight: '500'
                       }}>
                         ⚠️ This modality group already has an exam schedule
                       </p>
@@ -2221,28 +2234,28 @@ const SchedulerPlottingSchedule: React.FC<SchedulerProps> = ({ user, onScheduleC
           onClick={handleSaveClick}
           className="btn-saves"
           disabled={loading || alreadyScheduledIds.size > 0}
-          style={{ 
-            display: "flex", 
-            alignItems: "center", 
-            justifyContent: "center", 
-            gap: "8px", 
-            fontSize: "20px", 
+          style={{
+            display: "flex",
+            alignItems: "center",
+            justifyContent: "center",
+            gap: "8px",
+            fontSize: "20px",
             width: "45px",
             opacity: alreadyScheduledIds.size > 0 ? 0.5 : 1,
             cursor: alreadyScheduledIds.size > 0 ? 'not-allowed' : 'pointer'
           }}
-          title={alreadyScheduledIds.size > 0 
-            ? 'Cannot generate - some sections are already scheduled' 
+          title={alreadyScheduledIds.size > 0
+            ? 'Cannot generate - some sections are already scheduled'
             : 'Generate schedule'}
         >
           {loading ? <FaSpinner className="spin" /> : <FaPlay />}
         </button>
         {alreadyScheduledIds.size > 0 && (
-          <p style={{ 
-            color: '#f59e0b', 
-            fontSize: '14px', 
+          <p style={{
+            color: '#f59e0b',
+            fontSize: '14px',
             marginTop: '8px',
-            textAlign: 'center' 
+            textAlign: 'center'
           }}>
             Remove already scheduled sections to proceed
           </p>

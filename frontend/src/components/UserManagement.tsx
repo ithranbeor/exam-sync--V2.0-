@@ -1,5 +1,5 @@
 import React, { useEffect, useState, useRef, useMemo, useCallback } from 'react';
-import { FaSearch, FaPen, FaTrash, FaCalendarAlt, FaLock, FaLockOpen, FaDownload,  FaPlus, FaFileImport, FaTimes, FaChevronLeft, FaChevronRight, FaSort, FaChevronDown } from 'react-icons/fa';
+import { FaSearch, FaPen, FaTrash, FaCalendarAlt, FaLock, FaLockOpen, FaDownload, FaPlus, FaFileImport, FaTimes, FaChevronLeft, FaChevronRight, FaSort, FaChevronDown } from 'react-icons/fa';
 import { api } from '../lib/apiClient.ts';
 import { ToastContainer, toast } from 'react-toastify';
 import * as XLSX from 'xlsx';
@@ -69,17 +69,17 @@ interface NewAccountRole {
   date_ended: string | null;
 }
 
-export const UserManagement: React.FC<UserManagementProps> = ({}) => {
+export const UserManagement: React.FC<UserManagementProps> = ({ }) => {
   const [accounts, setAccounts] = useState<UserAccount[]>([]);
   const [roles, setRoles] = useState<Role[]>([]);
   const [colleges, setColleges] = useState<College[]>([]);
   const [departments, setDepartments] = useState<Department[]>([]);
   const [userRoles, setUserRoles] = useState<UserRole[]>([]);
-  
+
   const [searchTerm, setSearchTerm] = useState('');
   const [selectedCollege, setSelectedCollege] = useState<string>('');
   const [loading, setLoading] = useState(true);
-  const [importLoading, setImportLoading] = useState(false); 
+  const [importLoading, setImportLoading] = useState(false);
 
   // Modals
   const [showDetailsModal, setShowDetailsModal] = useState(false);
@@ -87,7 +87,7 @@ export const UserManagement: React.FC<UserManagementProps> = ({}) => {
   const [showAddRoleModal, setShowAddRoleModal] = useState(false);
   const [showImportAccountsModal, setShowImportAccountsModal] = useState(false);
   const [showImportRolesModal, setShowImportRolesModal] = useState(false);
-  
+
   const [isEditMode, setIsEditMode] = useState(false);
   const [selectedUserId, setSelectedUserId] = useState<number | null>(null);
   const [editingRole, setEditingRole] = useState<UserRole | null>(null);
@@ -153,13 +153,13 @@ export const UserManagement: React.FC<UserManagementProps> = ({}) => {
       const rolesData = rolesRes.data;
       const collegesData = collegesRes.data;
       const departmentsData = departmentsRes.data;
-      
+
       setRoles(rolesData);
       setColleges(collegesData);
       setDepartments(departmentsData);
 
       const today = new Date().toISOString().split("T")[0];
-      
+
       // Enrich user roles with names
       const normalized = userRolesRes.data.map((r: any) => {
         let computedStatus = r.status ?? "Active";
@@ -325,7 +325,7 @@ export const UserManagement: React.FC<UserManagementProps> = ({}) => {
         toast.error('Please select a role for all role entries');
         return;
       }
-      
+
       if (!role.college_id && !role.department_id) {
         toast.error('Each role must have either a college or department assigned');
         return;
@@ -341,12 +341,12 @@ export const UserManagement: React.FC<UserManagementProps> = ({}) => {
           email_address,
           contact_number,
           status,
-          employment_type 
+          employment_type
         });
         toast.success('Account updated successfully!');
       } else {
         const defaultPassword = `${last_name}@${user_id}`;
-        
+
         // Create account
         await api.post('/create-account/', {
           user_id,
@@ -549,7 +549,7 @@ export const UserManagement: React.FC<UserManagementProps> = ({}) => {
     reader.onload = async evt => {
       setImportLoading(true);
       toast.info('Importing accounts... Please wait.', { autoClose: false, toastId: 'import-progress' });
-      
+
       const data = new Uint8Array(evt.target?.result as ArrayBuffer);
       const wb = XLSX.read(data, { type: 'array' });
       const ws = wb.Sheets[wb.SheetNames[0]];
@@ -563,7 +563,7 @@ export const UserManagement: React.FC<UserManagementProps> = ({}) => {
       for (let rowIndex = 0; rowIndex < json.length; rowIndex++) {
         const row = json[rowIndex];
         const rowNumber = rowIndex + 2; // +2 because Excel rows start at 1 and header is row 1
-        
+
         try {
           const user_id = Number(row.user_id ?? row.id);
           const first_name = String(row.first_name ?? '').trim();
@@ -695,10 +695,10 @@ export const UserManagement: React.FC<UserManagementProps> = ({}) => {
               }
 
               // Check if this exact role combination already exists for this user
-              const existingRole = userRoles.find(ur => 
-                ur.user === user_id && 
-                ur.role === roleId && 
-                ur.college === collegeId && 
+              const existingRole = userRoles.find(ur =>
+                ur.user === user_id &&
+                ur.role === roleId &&
+                ur.college === collegeId &&
                 ur.department === departmentId
               );
 
@@ -770,7 +770,7 @@ export const UserManagement: React.FC<UserManagementProps> = ({}) => {
           { autoClose: 10000 }
         );
       }
-      
+
       await fetchData();
       setImportLoading(false);
       setShowImportAccountsModal(false);
@@ -788,7 +788,7 @@ export const UserManagement: React.FC<UserManagementProps> = ({}) => {
     reader.onload = async (evt) => {
       setImportLoading(true); // Start loading
       toast.info('Importing roles... Please wait.', { autoClose: false, toastId: 'import-roles-progress' });
-      
+
       const data = new Uint8Array(evt.target?.result as ArrayBuffer);
       const wb = XLSX.read(data, { type: "array" });
       const ws = wb.Sheets[wb.SheetNames[0]];
@@ -806,40 +806,40 @@ export const UserManagement: React.FC<UserManagementProps> = ({}) => {
           continue;
         }
 
-       try {
-        const convertedDateStart = excelSerialToDate(date_start);
-        const convertedDateEnded = excelSerialToDate(date_ended);
+        try {
+          const convertedDateStart = excelSerialToDate(date_start);
+          const convertedDateEnded = excelSerialToDate(date_ended);
 
-        // Check if this exact role combination already exists
-        const existingRole = userRoles.find(ur => 
-          ur.user === user && 
-          ur.role === role && 
-          ur.college === (college || null) && 
-          ur.department === (department || null)
-        );
+          // Check if this exact role combination already exists
+          const existingRole = userRoles.find(ur =>
+            ur.user === user &&
+            ur.role === role &&
+            ur.college === (college || null) &&
+            ur.department === (department || null)
+          );
 
-        if (existingRole) {
-          // Update existing role dates if provided
-          if (convertedDateStart || convertedDateEnded) {
-            await api.put(`/tbl_user_role/${existingRole.user_role_id}/`, {
-              date_start: convertedDateStart || existingRole.date_start,
-              date_ended: convertedDateEnded || existingRole.date_ended,
+          if (existingRole) {
+            // Update existing role dates if provided
+            if (convertedDateStart || convertedDateEnded) {
+              await api.put(`/tbl_user_role/${existingRole.user_role_id}/`, {
+                date_start: convertedDateStart || existingRole.date_start,
+                date_ended: convertedDateEnded || existingRole.date_ended,
+              });
+            }
+          } else {
+            // Create new role
+            await api.post("/tbl_user_role/CRUD/", {
+              user,
+              role,
+              college: college || null,
+              department: department || null,
+              date_start: convertedDateStart || null,
+              date_ended: convertedDateEnded || null,
+              status: "Active",
             });
           }
-        } else {
-          // Create new role
-          await api.post("/tbl_user_role/CRUD/", {
-            user,
-            role,
-            college: college || null,
-            department: department || null,
-            date_start: convertedDateStart || null,
-            date_ended: convertedDateEnded || null,
-            status: "Active",
-          });
-        }
-        successCount++;
-      } catch (err) {
+          successCount++;
+        } catch (err) {
           console.error(err);
           errorCount++;
         }
@@ -869,7 +869,7 @@ export const UserManagement: React.FC<UserManagementProps> = ({}) => {
       [2025000001, 'Juan', 'Dela Cruz', 'A.', 'juan@example.com', '09123456789', 'Active', '1;2', 'CITC;CITC', 'DIT;', '2025-01-01', '2025-12-31'],
       [2025000002, 'Maria', 'Santos', 'B.', 'maria@example.com', '09987654321', 'Active', '3', '', 'DIT', '2025-01-01', '2025-12-31'],
     ]);
-    
+
     // Add note
     XLSX.utils.sheet_add_aoa(ws, [
       [''],
@@ -883,7 +883,7 @@ export const UserManagement: React.FC<UserManagementProps> = ({}) => {
       ['- date_starts and date_endeds: Use format YYYY-MM-DD or leave empty'],
       ['- Make sure the number of values in roles, colleges, departments, date_starts, and date_endeds match']
     ], { origin: 'A5' });
-    
+
     const wb = XLSX.utils.book_new();
     XLSX.utils.book_append_sheet(wb, ws, 'ImportTemplate');
     XLSX.writeFile(wb, 'Accounts_Import_Template.xlsx');
@@ -895,7 +895,7 @@ export const UserManagement: React.FC<UserManagementProps> = ({}) => {
       [2025000001, 1, 'CITC', 'DIT', '2025-01-01', '2025-12-31'],
       [2025000001, 2, 'CITC', '', '2025-01-01', '2025-12-31']
     ]);
-    
+
     // Add note
     XLSX.utils.sheet_add_aoa(ws, [
       [''],
@@ -907,7 +907,7 @@ export const UserManagement: React.FC<UserManagementProps> = ({}) => {
       ['- Each role must have either college OR department (or both)'],
       ['- date_start and date_ended: Use format YYYY-MM-DD or leave empty']
     ], { origin: 'A5' });
-    
+
     const wb = XLSX.utils.book_new();
     XLSX.utils.book_append_sheet(wb, ws, 'RolesTemplate');
     XLSX.writeFile(wb, 'UserRoles_Import_Template.xlsx');
@@ -931,14 +931,14 @@ export const UserManagement: React.FC<UserManagementProps> = ({}) => {
       const roleNames = accountRoles.map(r => r.role_name?.toLowerCase() || '').join(' ');
 
       // Check if matches search term (ID, name, email, or role)
-      const matchesSearch = !searchTerm || 
-        userId.includes(search) || 
-        fullName.includes(search) || 
+      const matchesSearch = !searchTerm ||
+        userId.includes(search) ||
+        fullName.includes(search) ||
         email.includes(search) ||
         roleNames.includes(search);
 
       // Check if matches college filter
-      const matchesCollege = !selectedCollege || 
+      const matchesCollege = !selectedCollege ||
         accountRoles.some(r => r.college_id === selectedCollege);
 
       return matchesSearch && matchesCollege;
@@ -1047,7 +1047,7 @@ export const UserManagement: React.FC<UserManagementProps> = ({}) => {
       const { scrollLeft, scrollWidth, clientWidth } = container;
       setCanScrollLeft(scrollLeft > 0);
       setCanScrollRight(scrollLeft < scrollWidth - clientWidth - 1);
-      
+
       // Update scroll indicator classes
       container.classList.toggle('scrollable-left', scrollLeft > 0);
       container.classList.toggle('scrollable-right', scrollLeft < scrollWidth - clientWidth - 1);
@@ -1073,10 +1073,10 @@ export const UserManagement: React.FC<UserManagementProps> = ({}) => {
     if (!container) return;
 
     const scrollAmount = container.clientWidth * 0.8;
-    const scrollTo = direction === 'left' 
-      ? container.scrollLeft - scrollAmount 
+    const scrollTo = direction === 'left'
+      ? container.scrollLeft - scrollAmount
       : container.scrollLeft + scrollAmount;
-    
+
     container.scrollTo({
       left: scrollTo,
       behavior: 'smooth'
@@ -1101,7 +1101,7 @@ export const UserManagement: React.FC<UserManagementProps> = ({}) => {
 
   // Update account role
   const updateNewAccountRole = (index: number, field: keyof NewAccountRole, value: any) => {
-    setNewAccountRoles(prev => prev.map((role, i) => 
+    setNewAccountRoles(prev => prev.map((role, i) =>
       i === index ? { ...role, [field]: value } : role
     ));
   };
@@ -1109,27 +1109,27 @@ export const UserManagement: React.FC<UserManagementProps> = ({}) => {
   // Helper function to convert Excel serial date to YYYY-MM-DD format
   const excelSerialToDate = (serial: string | number): string | null => {
     if (!serial) return null;
-    
+
     const num = Number(serial);
-    
+
     // If it's already a valid date string (YYYY-MM-DD format), return it
     if (isNaN(num) && /^\d{4}-\d{2}-\d{2}$/.test(String(serial))) {
       return String(serial);
     }
-    
+
     // If it's not a number, return null
     if (isNaN(num)) return null;
-    
+
     // Excel serial date starts from 1900-01-01
     // Note: Excel incorrectly treats 1900 as a leap year, so we need to account for that
     const excelEpoch = new Date(1899, 11, 30); // December 30, 1899
     const date = new Date(excelEpoch.getTime() + num * 24 * 60 * 60 * 1000);
-    
+
     // Format as YYYY-MM-DD
     const year = date.getFullYear();
     const month = String(date.getMonth() + 1).padStart(2, '0');
     const day = String(date.getDate()).padStart(2, '0');
-    
+
     return `${year}-${month}-${day}`;
   };
 
@@ -1175,7 +1175,7 @@ export const UserManagement: React.FC<UserManagementProps> = ({}) => {
                 }]);
               }}
             >
-              <FaPlus/><span className="btn-label">Add</span>
+              <FaPlus /><span className="btn-label">Add</span>
             </button>
 
             <button
@@ -1183,14 +1183,14 @@ export const UserManagement: React.FC<UserManagementProps> = ({}) => {
               className="action-button import with-label"
               onClick={() => setShowImportAccountsModal(true)}
             >
-              <FaFileImport/><span className="btn-label">Import</span>
+              <FaFileImport /><span className="btn-label">Import</span>
             </button>
             <div style={{ position: 'relative' }} data-sort-dropdown>
-              <button 
-                type='button' 
-                className="action-button" 
+              <button
+                type='button'
+                className="action-button"
                 onClick={() => setShowSortDropdown(!showSortDropdown)}
-                style={{ 
+                style={{
                   backgroundColor: sortBy !== 'none' ? '#0A3765' : '#0A3765',
                   color: 'white',
                   display: 'flex',
@@ -1214,11 +1214,11 @@ export const UserManagement: React.FC<UserManagementProps> = ({}) => {
                 }}
                 title="Sort by"
               >
-                <FaSort/>
+                <FaSort />
                 <span>Sort by</span>
               </button>
               {showSortDropdown && (
-                <div 
+                <div
                   style={{
                     position: 'absolute',
                     top: '100%',
@@ -1281,7 +1281,7 @@ export const UserManagement: React.FC<UserManagementProps> = ({}) => {
                       if (sortBy !== 'user_id') e.currentTarget.style.backgroundColor = 'white';
                     }}
                   >
-                    User ID 
+                    User ID
                   </button>
                   <button
                     type="button"
@@ -1696,7 +1696,7 @@ export const UserManagement: React.FC<UserManagementProps> = ({}) => {
               disabled={isBulkDeletingAccounts || selectedAccountIds.size === 0}
               title={selectedAccountIds.size > 0 ? `Delete ${selectedAccountIds.size} selected` : 'Delete selected'}
             >
-              <FaTrash/>
+              <FaTrash />
             </button>
           </div>
         </div>
@@ -1726,120 +1726,120 @@ export const UserManagement: React.FC<UserManagementProps> = ({}) => {
         </button>
         <div className="colleges-table-container" ref={tableContainerRef}>
           <table className="accounts-table colleges-table">
-          <thead>
-            <tr>
-              <th>#</th>
-              <th>ID</th>
-              <th>Full Name</th>
-              <th>Email</th>
-              <th>Contact</th>
-              <th>Role/s</th>
-              <th>Employment Type</th>
-              <th>Status</th>
-              <th>Created</th>
-              <th>
-                <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-                  <span>Actions</span>
-                  <input
-                    type="checkbox"
-                    checked={isAllSelected}
-                    onChange={toggleSelectAll}
-                    disabled={loading || filteredAccounts.length === 0}
-                    aria-label="Select all accounts"
-                    title="Select all"
-                    style={{ marginLeft: 'auto' }}
-                  />
-                </div>
-              </th>
-            </tr>
-          </thead>
-          <tbody>
-            {loading ? (
+            <thead>
               <tr>
-                <td colSpan={10} style={{ textAlign: "center", padding: "20px" }}>
-                  Loading users...
-                </td>
+                <th>#</th>
+                <th>ID</th>
+                <th>Full Name</th>
+                <th>Email</th>
+                <th>Contact</th>
+                <th>Role/s</th>
+                <th>Employment Type</th>
+                <th>Status</th>
+                <th>Created</th>
+                <th>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                    <span>Actions</span>
+                    <input
+                      type="checkbox"
+                      checked={isAllSelected}
+                      onChange={toggleSelectAll}
+                      disabled={loading || filteredAccounts.length === 0}
+                      aria-label="Select all accounts"
+                      title="Select all"
+                      style={{ marginLeft: 'auto' }}
+                    />
+                  </div>
+                </th>
               </tr>
-            ) : filteredAccounts.length === 0 ? (
-              <tr>
-                <td colSpan={10} style={{ textAlign: "center", padding: "20px" }}>
-                  No users found.
-                </td>
-              </tr>
-            ) : (
-              paginatedAccounts.map((account, index) => {
-                const accountRoles = getUserRoles(account.user_id);
-                const isSelected = selectedAccountIds.has(account.user_id);
+            </thead>
+            <tbody>
+              {loading ? (
+                <tr>
+                  <td colSpan={10} style={{ textAlign: "center", padding: "20px" }}>
+                    Loading users...
+                  </td>
+                </tr>
+              ) : filteredAccounts.length === 0 ? (
+                <tr>
+                  <td colSpan={10} style={{ textAlign: "center", padding: "20px" }}>
+                    No users found.
+                  </td>
+                </tr>
+              ) : (
+                paginatedAccounts.map((account, index) => {
+                  const accountRoles = getUserRoles(account.user_id);
+                  const isSelected = selectedAccountIds.has(account.user_id);
 
-                return (
-                  <tr
-                    key={account.user_id}
-                    style={{
-                      backgroundColor: isSelected ? '#ffcccc' : 'transparent',
-                    }}
-                  >
-                    <td>{itemsPerPage === 'all' ? index + 1 : (currentPage - 1) * itemsPerPage + index + 1}</td>
-                    <td>{account.user_id}</td>
-                    <td>{account.last_name}, {account.first_name} {account.middle_name ?? ''}</td>
-                    <td>{account.email_address}</td>
-                    <td>{account.contact_number}</td>
-                    <td>
-                      {accountRoles.length > 0 ? (
-                        <pre style={{ whiteSpace: 'pre-wrap', margin: 0, fontSize: '0.85em' }}>
-                          {accountRoles
-                            .map(role => {
-                              const office = [role.college_id, role.department_id].filter(Boolean).join(' / ');
-                              return `${role.role_name}${office ? ` - ${office}` : ''}`;
-                            })
-                            .join('\n')}
-                        </pre>
-                      ) : '-'}
-                    </td>
-                    {/* ✅ NEW CELL */}
-                    <td>
-                      {account.employment_type ? (
-                        <span style={{ 
-                          padding: '3px 8px', 
-                          borderRadius: '4px',
-                          fontSize: '0.85em',
-                          fontWeight: 500,
-                          backgroundColor: account.employment_type === 'full-time' ? '#e3f2fd' : '#fff3e0',
-                          color: account.employment_type === 'full-time' ? '#1976d2' : '#f57c00'
-                        }}>
-                          {account.employment_type === 'full-time' ? 'Full-time' : 'Part-time'}
-                        </span>
-                      ) : '-'}
-                    </td>
-                    <td style={{ color: account.status === 'Suspended' ? 'red' : 'green', fontWeight: 'bold' }}>
-                      {account.status}
-                    </td>
-                    <td>{new Date(account.created_at).toLocaleDateString()}</td>
-                    <td className="action-buttons" style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-                      <button
-                        type="button"
-                        className="action-button import"
-                        style={{ fontSize: '0.85em', padding: '5px 10px' }}
-                        onClick={() => {
-                          setSelectedUserId(account.user_id);
-                          setShowDetailsModal(true);
-                        }}
-                      >
-                        View
-                      </button>
-                      <input
-                        type="checkbox"
-                        checked={selectedAccountIds.has(account.user_id)}
-                        onChange={() => toggleSelectAccount(account.user_id)}
-                        aria-label={`Select account ${account.user_id}`}
-                        style={{ marginLeft: 'auto' }}
-                      />
-                    </td>
-                  </tr>
-                );
-              })
-            )}
+                  return (
+                    <tr
+                      key={account.user_id}
+                      style={{
+                        backgroundColor: isSelected ? '#ffcccc' : 'transparent',
+                      }}
+                    >
+                      <td>{itemsPerPage === 'all' ? index + 1 : (currentPage - 1) * itemsPerPage + index + 1}</td>
+                      <td>{account.user_id}</td>
+                      <td>{account.last_name}, {account.first_name} {account.middle_name ?? ''}</td>
+                      <td>{account.email_address}</td>
+                      <td>{account.contact_number}</td>
+                      <td>
+                        {accountRoles.length > 0 ? (
+                          <pre style={{ whiteSpace: 'pre-wrap', margin: 0, fontSize: '0.85em' }}>
+                            {accountRoles
+                              .map(role => {
+                                const office = [role.college_id, role.department_id].filter(Boolean).join(' / ');
+                                return `${role.role_name}${office ? ` - ${office}` : ''}`;
+                              })
+                              .join('\n')}
+                          </pre>
+                        ) : '-'}
+                      </td>
+                      {/* ✅ NEW CELL */}
+                      <td>
+                        {account.employment_type ? (
+                          <span style={{
+                            padding: '3px 8px',
+                            borderRadius: '4px',
+                            fontSize: '0.85em',
+                            fontWeight: 500,
+                            backgroundColor: account.employment_type === 'full-time' ? '#e3f2fd' : '#fff3e0',
+                            color: account.employment_type === 'full-time' ? '#1976d2' : '#f57c00'
+                          }}>
+                            {account.employment_type === 'full-time' ? 'Full-time' : 'Part-time'}
+                          </span>
+                        ) : '-'}
+                      </td>
+                      <td style={{ color: account.status === 'Suspended' ? 'red' : 'green', fontWeight: 'bold' }}>
+                        {account.status}
+                      </td>
+                      <td>{new Date(account.created_at).toLocaleDateString()}</td>
+                      <td className="action-buttons" style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                        <button
+                          type="button"
+                          className="action-button import"
+                          style={{ fontSize: '0.85em', padding: '5px 10px' }}
+                          onClick={() => {
+                            setSelectedUserId(account.user_id);
+                            setShowDetailsModal(true);
+                          }}
+                        >
+                          View
+                        </button>
+                        <input
+                          type="checkbox"
+                          checked={selectedAccountIds.has(account.user_id)}
+                          onChange={() => toggleSelectAccount(account.user_id)}
+                          aria-label={`Select account ${account.user_id}`}
+                          style={{ marginLeft: 'auto' }}
+                        />
+                      </td>
+                    </tr>
+                  );
+                })
+              )}
             </tbody>
-        </table>
+          </table>
         </div>
       </div>
 
@@ -1866,8 +1866,8 @@ export const UserManagement: React.FC<UserManagementProps> = ({}) => {
                     <p>
                       <strong className="account-label">Employment:</strong>{' '}
                       {account.employment_type ? (
-                        <span style={{ 
-                          padding: '2px 6px', 
+                        <span style={{
+                          padding: '2px 6px',
                           borderRadius: '3px',
                           fontSize: '0.9em',
                           backgroundColor: account.employment_type === 'full-time' ? '#e3f2fd' : '#fff3e0',
@@ -1911,66 +1911,66 @@ export const UserManagement: React.FC<UserManagementProps> = ({}) => {
 
             <h4 className="modal-subtitle">Assigned Roles</h4>
             <table className="accounts-table user-roles-table">
-                <thead>
+              <thead>
                 <tr>
-                    <th>Role</th>
-                    <th>Office</th>
-                    <th>Start</th>
-                    <th>End</th>
-                    <th>Created At</th>
-                    <th>Status</th>
-                    <th>Actions</th>
+                  <th>Role</th>
+                  <th>Office</th>
+                  <th>Start</th>
+                  <th>End</th>
+                  <th>Created At</th>
+                  <th>Status</th>
+                  <th>Actions</th>
                 </tr>
-                </thead>
-                <tbody>
+              </thead>
+              <tbody>
                 {userRoles
-                    .filter(r => r.user === selectedUserId)
-                    .map(role => (
+                  .filter(r => r.user === selectedUserId)
+                  .map(role => (
                     <tr key={role.user_role_id}>
-                        <td>{role.role_name || '-'}</td>
-                        <td>{[role.college_name, role.department_name].filter(Boolean).join(' / ') || '-'}</td>
-                        <td className="role-date start">{role.date_start?.split('T')[0] || '-'}</td>
-                        <td className="role-date end">{role.date_ended?.split('T')[0] || '-'}</td>
-                        <td>{role.created_at ? new Date(role.created_at).toLocaleString('en-US', {
-                            month: '2-digit',
-                            day: '2-digit',
-                            year: 'numeric',
-                            hour: 'numeric',
-                            minute: '2-digit',
-                            hour12: true,
-                        }) : '—'}</td>
-                        <td>
+                      <td>{role.role_name || '-'}</td>
+                      <td>{[role.college_name, role.department_name].filter(Boolean).join(' / ') || '-'}</td>
+                      <td className="role-date start">{role.date_start?.split('T')[0] || '-'}</td>
+                      <td className="role-date end">{role.date_ended?.split('T')[0] || '-'}</td>
+                      <td>{role.created_at ? new Date(role.created_at).toLocaleString('en-US', {
+                        month: '2-digit',
+                        day: '2-digit',
+                        year: 'numeric',
+                        hour: 'numeric',
+                        minute: '2-digit',
+                        hour12: true,
+                      }) : '—'}</td>
+                      <td>
                         <span className={`role-status ${role.status === 'Suspended' ? 'suspended' : 'active'}`}>
-                            {role.status || 'Active'}
+                          {role.status || 'Active'}
                         </span>
-                        </td>
-                        <td className="role-actions">
+                      </td>
+                      <td className="role-actions">
                         <button className="icon-button edit-button" onClick={() => setEditingRole(role)} title="Edit Role">
-                            <FaPen />
+                          <FaPen />
                         </button>
                         <button
-                            className={`icon-button ${role.status === 'Suspended' ? 'reactivate-button' : 'delete-button'}`}
-                            onClick={() => toggleUserRoleStatus(role.user_role_id, role.status || 'Active')}
-                            title={role.status === 'Suspended' ? 'Reactivate Role' : 'Suspend Role'}
+                          className={`icon-button ${role.status === 'Suspended' ? 'reactivate-button' : 'delete-button'}`}
+                          onClick={() => toggleUserRoleStatus(role.user_role_id, role.status || 'Active')}
+                          title={role.status === 'Suspended' ? 'Reactivate Role' : 'Suspend Role'}
                         >
-                            {role.status === 'Suspended' ? <FaLockOpen /> : <FaLock />}
+                          {role.status === 'Suspended' ? <FaLockOpen /> : <FaLock />}
                         </button>
                         <button className="icon-button delete-button" onClick={() => handleDeleteRole(role.user_role_id)} title="Delete Role">
-                            <FaTrash />
+                          <FaTrash />
                         </button>
-                        </td>
+                      </td>
                     </tr>
-                    ))}
-                </tbody>
+                  ))}
+              </tbody>
             </table>
 
             <div className="modal-footer">
-                <button className="modal-button cancel" onClick={() => setShowDetailsModal(false)}>Close</button>
-                <button className="modal-button save" onClick={() => { setNewRole({ user: selectedUserId }); setShowAddRoleModal(true); }}>Add Role</button>
+              <button className="modal-button cancel" onClick={() => setShowDetailsModal(false)}>Close</button>
+              <button className="modal-button save" onClick={() => { setNewRole({ user: selectedUserId }); setShowAddRoleModal(true); }}>Add Role</button>
             </div>
-            </div>
+          </div>
         </div>
-        )}
+      )}
 
       {/* Add/Edit Account Modal */}
       {showAccountModal && (
@@ -2034,9 +2034,9 @@ export const UserManagement: React.FC<UserManagementProps> = ({}) => {
                 <div style={{ borderTop: '2px solid #ddd', marginTop: '20px', paddingTop: '20px' }}>
                   <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '15px' }}>
                     <h4 style={{ margin: 0 }}>Roles (Required)</h4>
-                            <button
-                              type="button"
-                              className="action-button add-new with-label"
+                    <button
+                      type="button"
+                      className="action-button add-new with-label"
                       style={{ fontSize: '0.85em', padding: '5px 10px' }}
                       onClick={addNewAccountRole}
                     >
@@ -2342,14 +2342,14 @@ export const UserManagement: React.FC<UserManagementProps> = ({}) => {
             boxShadow: "0px 4px 20px rgba(0,0,0,0.15)",
             display: "flex",
             flexDirection: "column",
-            }}>
+          }}>
             <h3 style={{ textAlign: "center", marginBottom: "20px", color: "#333" }}>
-                Import Accounts from Excel
+              Import Accounts from Excel
             </h3>
 
             {/* Info Box */}
             <div
-                style={{
+              style={{
                 backgroundColor: "#f1f3f5",
                 padding: "15px",
                 borderRadius: "8px",
@@ -2357,87 +2357,87 @@ export const UserManagement: React.FC<UserManagementProps> = ({}) => {
                 fontSize: "13px",
                 lineHeight: "1.4",
                 color: "#333",
-                }}
+              }}
             >
-                <strong style={{ color: "#000" }}>Excel Format Requirements:</strong>
-                <ul style={{ marginTop: "10px", paddingLeft: "20px" }}>
+              <strong style={{ color: "#000" }}>Excel Format Requirements:</strong>
+              <ul style={{ marginTop: "10px", paddingLeft: "20px" }}>
                 <li><strong>roles:</strong> IDs separated by semicolons (e.g., "1;2;3")</li>
                 <li><strong>colleges:</strong> IDs separated by semicolons (e.g., "CITC;CAS")</li>
                 <li><strong>departments:</strong> IDs separated by semicolons (e.g., "DIT;DCIT;")</li>
                 <li><strong>date_starts/date_endeds:</strong> YYYY-MM-DD format, separated by semicolons</li>
                 <li>Blank colleges/departments allowed, but each role must have at least one</li>
                 <li>All role-related columns must have the same number of values</li>
-                </ul>
+              </ul>
             </div>
 
             {/* File Input */}
             <div style={{ marginBottom: "15px" }}>
-                <label style={{ color: "#000", fontWeight: 600, display: "block", marginBottom: "6px" }}>
+              <label style={{ color: "#000", fontWeight: 600, display: "block", marginBottom: "6px" }}>
                 Upload Excel File
-                </label>
-                <input
-                  type="file"
-                  accept=".xlsx,.xls"
-                  onChange={handleImportAccounts}
-                  disabled={importLoading}
-                  style={{
-                    width: "100%",
-                    padding: "8px",
-                    borderRadius: "6px",
-                    border: "1px solid #ccc",
-                    opacity: importLoading ? 0.5 : 1,
-                    cursor: importLoading ? 'not-allowed' : 'pointer'
-                  }}
-                />
+              </label>
+              <input
+                type="file"
+                accept=".xlsx,.xls"
+                onChange={handleImportAccounts}
+                disabled={importLoading}
+                style={{
+                  width: "100%",
+                  padding: "8px",
+                  borderRadius: "6px",
+                  border: "1px solid #ccc",
+                  opacity: importLoading ? 0.5 : 1,
+                  cursor: importLoading ? 'not-allowed' : 'pointer'
+                }}
+              />
             </div>
 
             <p style={{ fontSize: "12px", color: "#444", marginBottom: "20px" }}>
-                Default password format: <strong>LastName@UserID</strong>
+              Default password format: <strong>LastName@UserID</strong>
             </p>
 
             {/* Buttons */}
             <div style={{
-                display: "flex",
-                justifyContent: "space-between",
-                marginTop: "10px",
+              display: "flex",
+              justifyContent: "space-between",
+              marginTop: "10px",
             }}>
-                <button
+              <button
                 type="button"
                 className="modal-button download"
                 onClick={downloadAccountsTemplate}
                 style={{
-                    background: "#2d6cdf",
-                    color: "#fff",
-                    padding: "10px 15px",
-                    borderRadius: "8px",
-                    border: "none",
-                    display: "flex",
-                    alignItems: "center",
-                    gap: "6px",
-                    cursor: "pointer",
-                    fontWeight: 600,
+                  background: "#2d6cdf",
+                  color: "#fff",
+                  padding: "10px 15px",
+                  borderRadius: "8px",
+                  border: "none",
+                  display: "flex",
+                  alignItems: "center",
+                  gap: "6px",
+                  cursor: "pointer",
+                  fontWeight: 600,
                 }}
-                >
+              >
                 <FaDownload /> Download Template
-                </button>
+              </button>
 
-                <button
+              <button
                 type="button"
                 className="modal-button cancel"
                 onClick={() => setShowImportAccountsModal(false)}
                 style={{
-                    background: "#ddd",
-                    padding: "10px 15px",
-                    borderRadius: "8px",
-                    border: "none",
-                    cursor: "pointer",
-                    fontWeight: 600,
+                  background: "#ddd",
+                  padding: "10px 15px",
+                  borderRadius: "8px",
+                  border: "none",
+                  cursor: "pointer",
+                  fontWeight: 600,
                 }}
-                >
+              >
                 Close
-                </button>
+              </button>
             </div>
-            </div>
+          </div>
         </div>
       )}
 
@@ -2449,30 +2449,30 @@ export const UserManagement: React.FC<UserManagementProps> = ({}) => {
             <div style={{ backgroundColor: '#f8f9fa', padding: '15px', borderRadius: '5px', marginBottom: '15px', fontSize: '13px' }}>
               <div
                 style={{
-                backgroundColor: "#f1f3f5",
-                padding: "15px",
-                borderRadius: "8px",
-                marginBottom: "-50px",
-                fontSize: "13px",
-                lineHeight: "1.4",
-                color: "#333",
+                  backgroundColor: "#f1f3f5",
+                  padding: "15px",
+                  borderRadius: "8px",
+                  marginBottom: "-50px",
+                  fontSize: "13px",
+                  lineHeight: "1.4",
+                  color: "#333",
                 }}
-            >
+              >
                 <strong style={{ color: "#000" }}>Excel Format Requirements:</strong>
                 <ul style={{ marginTop: "1px", paddingLeft: "20px" }}>
-                    <li><strong>user:</strong> User ID (number)</li>
-                    <li><strong>role:</strong> Role ID (number)</li>
-                    <li><strong>college:</strong> College ID (can be empty if department provided)</li>
-                    <li><strong>department:</strong> Department ID (can be empty if college provided)</li>
-                    <li>Each role must have at least one: college OR department (or both)</li>
+                  <li><strong>user:</strong> User ID (number)</li>
+                  <li><strong>role:</strong> Role ID (number)</li>
+                  <li><strong>college:</strong> College ID (can be empty if department provided)</li>
+                  <li><strong>department:</strong> Department ID (can be empty if college provided)</li>
+                  <li>Each role must have at least one: college OR department (or both)</li>
                 </ul>
               </div>
             </div>
             <div className="input-group">
               <label>Upload Excel File</label>
-              <input 
-                type="file" 
-                accept=".xlsx, .xls" 
+              <input
+                type="file"
+                accept=".xlsx, .xls"
                 onChange={handleImportRoles}
                 disabled={importLoading}
                 style={{

@@ -187,18 +187,18 @@ const BayanihanModality: React.FC<UserProps> = ({ user }) => {
   // Memoize filtered courses based on program
   const filteredCourseOptions = useMemo(() => {
     if (!form.program) return [];
-    
+
     // 1. Filter the courses based on the selected program
     const filtered = courseOptions.filter(c =>
       sectionOptions.some(s => s.program_id === form.program && s.course_id === c.course_id)
     );
 
     // 2. Sort the filtered courses by course_id (A-Z or 1-10)
-    filtered.sort((a, b) => 
-        a.course_id.localeCompare(b.course_id, undefined, { 
-            numeric: true, 
-            sensitivity: 'base' 
-        })
+    filtered.sort((a, b) =>
+      a.course_id.localeCompare(b.course_id, undefined, {
+        numeric: true,
+        sensitivity: 'base'
+      })
     );
 
     return filtered;
@@ -478,9 +478,9 @@ const BayanihanModality: React.FC<UserProps> = ({ user }) => {
       const section = sectionOptions.find(
         s => s.course_id === form.course && s.section_name === sectionName
       );
-      const isNightClass = sectionName.toLowerCase().includes('night') || 
-                          sectionName.toLowerCase().includes('n-');
-      
+      const isNightClass = sectionName.toLowerCase().includes('night') ||
+        sectionName.toLowerCase().includes('n-');
+
       return {
         sectionName,
         studentCount: section?.number_of_students || 0,
@@ -561,7 +561,7 @@ const BayanihanModality: React.FC<UserProps> = ({ user }) => {
         // Last resort: force into room with most space (even if over capacity)
         if (!assigned && availableRooms.length > 0) {
           let targetAssignment = assignments.find(a => a.isNightClass === isNightClass);
-          
+
           if (!targetAssignment) {
             // Create new assignment
             const roomToUse = availableRooms[0];
@@ -585,7 +585,7 @@ const BayanihanModality: React.FC<UserProps> = ({ user }) => {
     if (daySections.length > 0) {
       assignSectionsToRooms(daySections, false);
     }
-    
+
     // Then assign night sections
     if (nightSections.length > 0) {
       assignSectionsToRooms(nightSections, true);
@@ -593,18 +593,18 @@ const BayanihanModality: React.FC<UserProps> = ({ user }) => {
 
     // ✅ NEW: Check if all sections were assigned
     const unassignedSections = form.sections.filter(s => !assignedSections.has(s));
-    
+
     // ✅ If there are unassigned sections, add warning assignment
     if (unassignedSections.length > 0) {
       // Separate unassigned day and night sections
-      const unassignedDaySections = unassignedSections.filter(s => 
+      const unassignedDaySections = unassignedSections.filter(s =>
         !s.toLowerCase().includes('night') && !s.toLowerCase().includes('n-')
       );
-      
-      const unassignedNightSections = unassignedSections.filter(s => 
+
+      const unassignedNightSections = unassignedSections.filter(s =>
         s.toLowerCase().includes('night') || s.toLowerCase().includes('n-')
       );
-      
+
       // Add unassigned day sections
       if (unassignedDaySections.length > 0) {
         assignments.push({
@@ -619,7 +619,7 @@ const BayanihanModality: React.FC<UserProps> = ({ user }) => {
           isNightClass: false
         });
       }
-      
+
       // Add unassigned night sections
       if (unassignedNightSections.length > 0) {
         assignments.push({
@@ -661,8 +661,8 @@ const BayanihanModality: React.FC<UserProps> = ({ user }) => {
       const section = sectionOptions.find(
         s => s.course_id === form.course && s.section_name === sectionName
       );
-      const isNight = sectionName.toLowerCase().includes('night') || 
-                      sectionName.toLowerCase().includes('n-');
+      const isNight = sectionName.toLowerCase().includes('night') ||
+        sectionName.toLowerCase().includes('n-');
       return sum + (isNight ? 0 : (section?.number_of_students || 0));
     }, 0);
 
@@ -670,8 +670,8 @@ const BayanihanModality: React.FC<UserProps> = ({ user }) => {
       const section = sectionOptions.find(
         s => s.course_id === form.course && s.section_name === sectionName
       );
-      const isNight = sectionName.toLowerCase().includes('night') || 
-                      sectionName.toLowerCase().includes('n-');
+      const isNight = sectionName.toLowerCase().includes('night') ||
+        sectionName.toLowerCase().includes('n-');
       return sum + (isNight ? (section?.number_of_students || 0) : 0);
     }, 0);
 
@@ -709,7 +709,7 @@ const BayanihanModality: React.FC<UserProps> = ({ user }) => {
         .filter(a => a.roomId === '⚠️ NOT ASSIGNED')
         .flatMap(a => a.sections)
         .join(', ');
-      
+
       toast.error(`Cannot submit: These sections are not assigned to any room: ${unassignedSections}. Please select more rooms.`);
       setIsSubmitting(false);
       return;
@@ -932,7 +932,7 @@ const BayanihanModality: React.FC<UserProps> = ({ user }) => {
           ) : null}
 
           <form className="availability-form" onSubmit={handleSubmit}>
-            <div className="availability-grid">    
+            <div className="availability-grid">
 
               <div className="form-group">
                 <label>Modality Type</label>
@@ -943,8 +943,8 @@ const BayanihanModality: React.FC<UserProps> = ({ user }) => {
                     { value: 'Written (Laboratory)', label: 'Written (Laboratory)' },
                   ]}
                   value={form.modality ? { value: form.modality, label: form.modality } : null}
-                  onChange={selected => setForm(prev => ({ 
-                    ...prev, 
+                  onChange={selected => setForm(prev => ({
+                    ...prev,
                     modality: selected?.value || '',
                     course: '',      // ✅ Reset course when modality changes
                     sections: [],    // ✅ Reset sections when modality changes
@@ -981,11 +981,11 @@ const BayanihanModality: React.FC<UserProps> = ({ user }) => {
                   isDisabled={!form.program}
                   options={filteredCourseOptions.map(c => {
                     // Check if this course already has a modality of the selected type
-                    const hasModalityForType = userModalities.some(m => 
-                      m.course_id === c.course_id && 
+                    const hasModalityForType = userModalities.some(m =>
+                      m.course_id === c.course_id &&
                       m.modality_type === form.modality
                     );
-                    
+
                     return {
                       value: c.course_id,
                       label: `${c.course_id} (${c.course_name})`,
@@ -999,31 +999,28 @@ const BayanihanModality: React.FC<UserProps> = ({ user }) => {
                   onChange={selected => {
                     const courseId = selected?.value || "";
 
-                    // Check if course already has this modality type
-                    if (courseId && form.modality) {
-                      const existingModality = userModalities.find(m => 
-                        m.course_id === courseId && 
-                        m.modality_type === form.modality
-                      );
-                      
-                      if (existingModality) {
-                        toast.warn(`This course already has a ${form.modality} modality submitted.`);
-                        // ✅ Don't proceed if already exists
-                        return;
-                      }
-                    }
-
-                    // Filter sections for this course
-                    const autoSections = sectionOptions
+                    // Filter out sections that already have ANY modality type for this specific course
+                    const availableSections = sectionOptions
                       .filter(s => s.course_id === courseId)
+                      .filter(s => {
+                        // Check if section already has ANY modality for this course
+                        const hasModalityForThisCourse = userModalities.some(m =>
+                          m.course_id === courseId && // Same course
+                          (
+                            (Array.isArray(m.sections) && m.sections.includes(s.section_name)) ||
+                            (typeof m.sections === 'string' && m.sections.split(',').map((sec: string) => sec.trim()).includes(s.section_name))
+                          )
+                        );
+                        return !hasModalityForThisCourse; // Exclude if section already has modality for this course
+                      })
                       .map(s => s.section_name)
                       .sort((a, b) => a.localeCompare(b));
 
                     setForm(prev => ({
                       ...prev,
                       course: courseId,
-                      sections: autoSections,  // ✅ Auto-select all sections
-                      rooms: []             
+                      sections: availableSections,  // Auto-select only available sections
+                      rooms: []
                     }));
                   }}
                   placeholder="Select course..."
@@ -1054,12 +1051,28 @@ const BayanihanModality: React.FC<UserProps> = ({ user }) => {
                 {form.course ? (
                   <Select
                     isMulti
-                    isDisabled={false}   // ✅ NOW EDITABLE
+                    isDisabled={false}
                     closeMenuOnSelect={false}
                     hideSelectedOptions={false}
 
                     options={filteredSectionOptions
-                      .map(s => ({ value: s.value, label: s.label }))
+                      .map(s => {
+                        // Check if this section already has ANY modality for this course (regardless of modality type)
+                        const hasModalityForCourse = userModalities.some(m =>
+                          m.course_id === form.course && // Check same course
+                          (
+                            // Handle both array and string formats
+                            (Array.isArray(m.sections) && m.sections.includes(s.value)) ||
+                            (typeof m.sections === 'string' && m.sections.split(',').map((sec: string) => sec.trim()).includes(s.value))
+                          )
+                        );
+
+                        return {
+                          value: s.value,
+                          label: s.label,
+                          isDisabled: hasModalityForCourse // Disable if section has ANY modality for this course
+                        };
+                      })
                       .sort((a, b) => a.label.localeCompare(b.label))
                     }
 
@@ -1068,16 +1081,15 @@ const BayanihanModality: React.FC<UserProps> = ({ user }) => {
                       .map(sec => ({ value: sec, label: sec }))
                     }
 
-                    // ✅ Allow sections to be added/removed
                     onChange={(selectedOptions) => {
-                      const selectedSections = selectedOptions 
-                        ? selectedOptions.map(opt => opt.value) 
+                      const selectedSections = selectedOptions
+                        ? selectedOptions.map(opt => opt.value)
                         : [];
-                      
+
                       setForm(prev => ({
                         ...prev,
                         sections: selectedSections,
-                        rooms: [] // Reset rooms when sections change
+                        rooms: []
                       }));
                     }}
 
@@ -1096,6 +1108,15 @@ const BayanihanModality: React.FC<UserProps> = ({ user }) => {
                         ...base,
                         maxHeight: "120px",
                         overflowY: "auto"
+                      }),
+                      option: (base, state) => ({
+                        ...base,
+                        backgroundColor: state.isDisabled ? '#f5f5f5' : state.isFocused ? '#e3f2fd' : 'white',
+                        color: state.isDisabled ? '#999' : '#333',
+                        cursor: state.isDisabled ? 'not-allowed' : 'pointer',
+                        '&:hover': {
+                          backgroundColor: state.isDisabled ? '#f5f5f5' : '#e3f2fd'
+                        }
                       })
                     }}
                   />
@@ -1106,6 +1127,12 @@ const BayanihanModality: React.FC<UserProps> = ({ user }) => {
                 {form.course && form.sections.length > 0 && (
                   <small style={{ marginTop: "4px", display: "block", color: "#666" }}>
                     {form.sections.length} section(s) selected. You can add or remove sections as needed.
+                  </small>
+                )}
+
+                {form.modality && form.course && (
+                  <small style={{ marginTop: "4px", display: "block", color: "#666" }}>
+                    Grayed out sections already have a modality submitted for this course
                   </small>
                 )}
               </div>
@@ -1341,7 +1368,7 @@ const BayanihanModality: React.FC<UserProps> = ({ user }) => {
                       </div>
                     );
                   })}
-                </div>              
+                </div>
               </div>
             )}
 
