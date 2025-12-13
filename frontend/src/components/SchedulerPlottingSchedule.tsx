@@ -1708,7 +1708,6 @@ const SchedulerPlottingSchedule: React.FC<SchedulerProps> = ({ user, onScheduleC
 
     setLoading(false);
 
-    // ✅ NOW handle unscheduled sections dialog
     if (unscheduledSections.length > 0) {
       console.log(`📋 ${unscheduledSections.length} sections need manual scheduling`);
 
@@ -1723,23 +1722,17 @@ const SchedulerPlottingSchedule: React.FC<SchedulerProps> = ({ user, onScheduleC
         .map(([conflict, count]) => `• ${conflict}: ${count} section(s)`)
         .join('\n');
 
-      const result = window.confirm(
+      // Show confirm dialog with only Cancel (the user cannot 'accept' anything)
+      window.confirm(
         `✅ Successfully scheduled ${scheduledExams.length} section(s)!\n\n` +
         `⚠️ ${unscheduledSections.length} section(s) could not be scheduled automatically:\n\n` +
         `${conflictList}\n\n` +
-        `Would you like to schedule them manually now?`
+        `Click "Cancel" to acknowledge and use "Edit Manually" in the viewer.`
       );
 
-      if (result) {
-        setUnscheduledSections(unscheduledSections);
-        setShowManualEditor(true);
-        return;
-      } else {
-        toast.info(
-          `${unscheduledSections.length} section(s) need manual scheduling. Use "Edit Manually" button later.`,
-          { autoClose: 8000 }
-        );
-      }
+      // Automatically set the sections for manual editing
+      setUnscheduledSections(unscheduledSections);
+      setShowManualEditor(true);
     }
 
     // ✅ Notify parent component

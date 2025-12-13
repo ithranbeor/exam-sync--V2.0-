@@ -562,7 +562,7 @@ const ManualScheduleEditor: React.FC<ManualScheduleEditorProps> = ({
                   </div>
                   <div className="section-conflicts">
                     {section.conflicts.map((conflict, idx) => (
-                      <span key={idx} className="conflict-badge">⚠️ {conflict}</span>
+                      <span key={idx} className="conflict-badge">{conflict}</span>
                     ))}
                   </div>
                   {/* ✅ Show attempted assignment if available */}
@@ -587,7 +587,8 @@ const ManualScheduleEditor: React.FC<ManualScheduleEditorProps> = ({
                 padding: '12px',
                 borderRadius: '8px',
                 marginBottom: '16px',
-                border: '1px solid #f59e0b'
+                border: '1px solid #f59e0b',
+                color: '#92400e'
               }}>
                 <strong>Conflicts to resolve:</strong>
                 <ul style={{ margin: '8px 0 0 0', paddingLeft: '20px' }}>
@@ -680,7 +681,7 @@ const ManualScheduleEditor: React.FC<ManualScheduleEditorProps> = ({
                             color: '#0369a1',
                             marginBottom: '8px'
                           }}>
-                            💡 The assigned proctor is busy at {selectedSection.attempted_assignment?.time
+                             The assigned proctor is busy at {selectedSection.attempted_assignment?.time
                               ? formatTo12Hour(selectedSection.attempted_assignment.time)
                               : 'the original time'}. Select a different time to find an available proctor.
                           </div>
@@ -739,7 +740,7 @@ const ManualScheduleEditor: React.FC<ManualScheduleEditorProps> = ({
                           <label>
                             Select Full-Time Proctor ({fullTimeProctors.length} available)
                             <span style={{ color: '#10b981', fontSize: '12px', marginLeft: '8px', fontWeight: 'bold' }}>
-                              ⭐ Recommended
+                              Recommended
                             </span>
                           </label>
                           <Select
@@ -811,7 +812,7 @@ const ManualScheduleEditor: React.FC<ManualScheduleEditorProps> = ({
                             marginTop: '8px',
                             border: '1px solid #fca5a5'
                           }}>
-                            ⚠️ <strong>No proctors available</strong> at this time slot. All proctors from your college/departments are already assigned to other exams at this time.
+                            <strong>No proctors available</strong> at this time slot. All proctors from your college/departments are already assigned to other exams at this time.
                           </div>
                         )}
 
@@ -825,7 +826,7 @@ const ManualScheduleEditor: React.FC<ManualScheduleEditorProps> = ({
                             marginTop: '8px',
                             border: '1px solid #fde68a'
                           }}>
-                            ℹ️ No full-time proctors available at this time. Consider selecting a part-time proctor or changing the time slot to find full-time staff.
+                            No full-time proctors available at this time. Consider selecting a part-time proctor or changing the time slot to find full-time staff.
                           </div>
                         )}
 
@@ -839,7 +840,7 @@ const ManualScheduleEditor: React.FC<ManualScheduleEditorProps> = ({
                             marginTop: '8px',
                             border: '1px solid #6ee7b7'
                           }}>
-                            ✅ <strong>{fullTimeProctors.length} full-time proctor(s)</strong> available - prioritize these for better reliability.
+                            <strong>{fullTimeProctors.length} full-time proctor(s)</strong> available - prioritize these for better reliability.
                           </div>
                         )}
                       </>
