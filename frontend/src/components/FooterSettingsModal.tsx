@@ -29,9 +29,9 @@ const FooterSettingsModal: React.FC<FooterSettingsModalProps> = ({
   onSave
 }) => {
   const [footerData, setFooterData] = useState<FooterData>({
-    prepared_by_name: '',
+    prepared_by_name: 'Loading...', // ✅ Changed from empty string
     prepared_by_title: `Dean, ${collegeName}`,
-    approved_by_name: '',
+    approved_by_name: 'Loading...', // ✅ Changed from empty string
     approved_by_title: 'VCAA, USTP-CDO',
     address_line: 'C.M Recto Avenue, Lapasan, Cagayan de Oro City 9000 Philippines',
     contact_line: 'Tel Nos. +63 (88) 856 1738; Telefax +63 (88) 856 4696 | http://www.ustp.edu.ph',
@@ -50,7 +50,7 @@ const FooterSettingsModal: React.FC<FooterSettingsModalProps> = ({
   useEffect(() => {
     const fetchRoleNames = async () => {
       if (!collegeName || collegeName === "Add schedule first") return;
-      
+
       try {
         // Fetch Dean name (role_id: 1)
         const deanResponse = await api.get('/tbl_user_role', {
@@ -60,17 +60,41 @@ const FooterSettingsModal: React.FC<FooterSettingsModalProps> = ({
           }
         });
 
-        if (deanResponse.data && deanResponse.data.length > 0) {
+        if (deanResponse.data?.length > 0) {
           const deanRole = deanResponse.data[0];
-          if (deanRole.user && deanRole.user.first_name && deanRole.user.last_name) {
-            const fullDeanName = `${deanRole.user.first_name} ${deanRole.user.last_name}`;
-            setDeanName(fullDeanName);
-            console.log(`✅ Found dean: ${fullDeanName}`);
-          } else {
-            console.warn('⚠️ Dean user data incomplete');
+
+          // ✅ Case 1: backend already expanded user (future-proof)
+          if (deanRole.user?.first_name && deanRole.user?.last_name) {
+            const fullName = `${deanRole.user.first_name} ${deanRole.user.last_name}`;
+            setDeanName(fullName);
+            console.log(`✅ Found dean (expanded): ${fullName}`);
           }
-        } else {
-          console.warn('⚠️ No dean found for college');
+
+          // ✅ Case 2: only user_id exists → fetch user manually
+          else if (deanRole.user_id) {
+            try {
+              const userRes = await api.get(`/users/${deanRole.user_id}/`);
+              const user = userRes.data;
+
+              if (user?.first_name && user?.last_name) {
+                const fullName = `${user.first_name} ${user.last_name}`;
+                setDeanName(fullName);
+                console.log(`✅ Found dean (via user_id): ${fullName}`);
+              } else {
+                setDeanName('Dean Name Not Found');
+                console.warn('⚠️ User record missing name fields', user);
+              }
+            } catch (err) {
+              console.error('❌ Failed to fetch dean user', err);
+              setDeanName('Dean Name Not Found');
+            }
+          }
+
+          // ❌ No usable data
+          else {
+            console.warn('⚠️ Dean role found but no user reference');
+            setDeanName('Dean Name Not Found');
+          }
         }
 
         // Fetch VCAA name (role_id: 2)
@@ -96,7 +120,7 @@ const FooterSettingsModal: React.FC<FooterSettingsModalProps> = ({
         console.error("Error fetching role names:", error);
       }
     };
-    
+
     fetchRoleNames();
   }, [collegeName]);
 
@@ -104,10 +128,10 @@ const FooterSettingsModal: React.FC<FooterSettingsModalProps> = ({
   useEffect(() => {
     const fetchCollegeId = async () => {
       if (!collegeName || collegeName === "Add schedule first") return;
-      
+
       try {
         const response = await api.get('/tbl_college/');
-        
+
         if (response.data && response.data.length > 0) {
           const college = response.data.find((c: any) => c.college_name === collegeName);
           if (college) {
@@ -121,42 +145,50 @@ const FooterSettingsModal: React.FC<FooterSettingsModalProps> = ({
         console.error("Error fetching college ID:", error);
       }
     };
-    
+
     fetchCollegeId();
   }, [collegeName]);
 
   // Wait for collegeId before fetching footer data
   useEffect(() => {
-    if (isOpen && collegeId) {
+    if (isOpen && collegeId && (deanName || vcaaName)) {
       fetchFooterData();
     }
-  }, [isOpen, collegeId]);
+  }, [isOpen, collegeId, deanName, vcaaName]); // ✅ Added deanName and vcaaName as dependencies
 
   const fetchFooterData = async () => {
     if (!collegeId) return;
-    
+
     setIsLoading(true);
     try {
-      console.log(`🔍 Fetching footer data for college_id: ${collegeId}`);
-      
       const response = await api.get('/tbl_schedule_footer/', {
         params: { college_id: collegeId }
       });
 
       if (response.data && response.data.length > 0) {
         const data = response.data[0];
-        console.log(`✅ Found existing footer:`, data);
-        setFooterData(data);
+        setFooterData({
+          ...data,
+          prepared_by_name:
+            data.prepared_by_name?.trim()
+              ? data.prepared_by_name
+              : deanName,
+        });
         setLogoPreview(data.logo_url);
       } else {
         console.log(`ℹ️ No existing footer found, using role names from state...`);
-        
-        // Use the dean name and VCAA name from state if available
+
+        // ✅ Use the dean name and VCAA name from state - they should be populated now
+        const preparedByName = deanName || 'Dean Name Not Found';
+        const approvedByName = vcaaName || 'VCAA Name Not Found';
+
+        console.log(`✅ Setting defaults - Prepared by: ${preparedByName}, Approved by: ${approvedByName}`);
+
         setFooterData(prev => ({
           ...prev,
-          prepared_by_name: deanName || 'Type name',
+          prepared_by_name: preparedByName,
           prepared_by_title: `Dean, ${collegeName}`,
-          approved_by_name: vcaaName || 'Type name',
+          approved_by_name: approvedByName,
           approved_by_title: 'VCAA, USTP-CDO'
         }));
       }
@@ -235,7 +267,7 @@ const FooterSettingsModal: React.FC<FooterSettingsModalProps> = ({
       // Upload logo if changed
       if (logoFile) {
         console.log(`📤 Uploading logo for college_id: ${collegeId}`);
-        
+
         const formData = new FormData();
         formData.append('logo', logoFile);
         formData.append('college_id', collegeId);
@@ -281,10 +313,10 @@ const FooterSettingsModal: React.FC<FooterSettingsModalProps> = ({
     } catch (error: any) {
       console.error("❌ Error saving footer settings:", error);
       console.error("❌ Error response data:", error?.response?.data);
-      
+
       // Better error handling
       let errorMessage = 'Failed to save footer settings';
-      
+
       if (error?.response?.data) {
         const data = error.response.data;
         if (typeof data === 'object') {
@@ -299,7 +331,7 @@ const FooterSettingsModal: React.FC<FooterSettingsModalProps> = ({
           errorMessage = data;
         }
       }
-      
+
       toast.error(errorMessage);
     } finally {
       setIsSaving(false);
@@ -317,9 +349,9 @@ const FooterSettingsModal: React.FC<FooterSettingsModalProps> = ({
       // Use dean name and VCAA name from state for reset
       const resetData = {
         college_id: collegeId,
-        prepared_by_name: (deanName || 'Type name').trim(),
+        prepared_by_name: (deanName || 'Dean Name Not Found').trim(),
         prepared_by_title: `Dean, ${collegeName}`,
-        approved_by_name: (vcaaName || 'Type name').trim(),
+        approved_by_name: (vcaaName || 'VCAA Name Not Found').trim(),
         approved_by_title: 'VCAA, USTP-CDO',
         address_line: 'C.M Recto Avenue, Lapasan, Cagayan de Oro City 9000 Philippines',
         contact_line: 'Tel Nos. +63 (88) 856 1738; Telefax +63 (88) 856 4696 | http://www.ustp.edu.ph',
@@ -350,16 +382,16 @@ const FooterSettingsModal: React.FC<FooterSettingsModalProps> = ({
 
       // Refresh the data from server
       await fetchFooterData();
-      
+
       // Trigger parent refresh
       onSave();
 
     } catch (error: any) {
       console.error("❌ Error resetting footer settings:", error);
       console.error("❌ Error response data:", error?.response?.data);
-      
+
       let errorMessage = 'Failed to reset footer settings';
-      
+
       if (error?.response?.data) {
         const data = error.response.data;
         if (typeof data === 'object') {
@@ -373,7 +405,7 @@ const FooterSettingsModal: React.FC<FooterSettingsModalProps> = ({
           errorMessage = data;
         }
       }
-      
+
       toast.error(errorMessage);
     } finally {
       setIsSaving(false);
@@ -402,7 +434,7 @@ const FooterSettingsModal: React.FC<FooterSettingsModalProps> = ({
                   {logoPreview ? (
                     <div className="logo-preview">
                       <img src={logoPreview} alt="Logo Preview" />
-                      <button 
+                      <button
                         type="button"
                         className="remove-logo-btn"
                         onClick={handleRemoveLogo}
@@ -501,26 +533,26 @@ const FooterSettingsModal: React.FC<FooterSettingsModalProps> = ({
         </div>
 
         <div className="footer-settings-actions">
-          <button 
+          <button
             type="button"
-            className="reset-btn" 
+            className="reset-btn"
             onClick={handleReset}
             disabled={isSaving}
           >
             Reset to Default
           </button>
           <div className="action-buttons">
-            <button 
+            <button
               type="button"
-              className="cancel-btn" 
+              className="cancel-btn"
               onClick={onClose}
               disabled={isSaving}
             >
               Cancel
             </button>
-            <button 
+            <button
               type="button"
-              className="save-btn" 
+              className="save-btn"
               onClick={handleSave}
               disabled={isSaving || isLoading || !collegeId}
             >

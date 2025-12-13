@@ -88,7 +88,6 @@ const SchedulerPlottingSchedule: React.FC<SchedulerProps> = ({ user, onScheduleC
   useEffect(() => {
     const fetchAll = async () => {
       if (!user?.user_id) {
-        console.warn("No user found — cannot fetch data.");
         return;
       }
 
@@ -233,7 +232,6 @@ const SchedulerPlottingSchedule: React.FC<SchedulerProps> = ({ user, onScheduleC
         // ----------------------------------------------------
 
       } catch (err: any) {
-        console.error("Failed to fetch data:", err);
         alert("Failed to fetch data");
       }
     };
@@ -267,7 +265,6 @@ const SchedulerPlottingSchedule: React.FC<SchedulerProps> = ({ user, onScheduleC
 
         setCourses(filteredCourses);
       } catch (error) {
-        console.error("Error lazy loading courses:", error);
         setCourses([]);
       }
     };
@@ -298,7 +295,6 @@ const SchedulerPlottingSchedule: React.FC<SchedulerProps> = ({ user, onScheduleC
 
         setModalities(filteredMods);
       } catch (error) {
-        console.error("Error lazy loading modalities:", error);
         setModalities([]);
       }
     };
@@ -328,10 +324,8 @@ const SchedulerPlottingSchedule: React.FC<SchedulerProps> = ({ user, onScheduleC
         setAlreadyScheduledIds(scheduled);
 
         if (scheduled.size > 0) {
-          console.log(`⚠️ ${scheduled.size} section(s) already scheduled`);
         }
       } catch (error) {
-        console.error('Error checking schedules:', error);
       } finally {
         setCheckingSchedules(false);
       }
@@ -523,6 +517,17 @@ const SchedulerPlottingSchedule: React.FC<SchedulerProps> = ({ user, onScheduleC
     const scheduledModalities = new Set<string | number>();
     const globalTimeSlotYearLevels = new Map<string, Map<string, Set<string>>>();
 
+    const dayClassSections: any[] = [];
+    const nightClassSections: any[] = [];
+
+    allModalities.forEach(section => {
+      if (section.is_night_class === "YES") {
+        nightClassSections.push(section);
+      } else {
+        dayClassSections.push(section);
+      }
+    });
+
     // Group sections by course+night status
     const sectionsByCourseType = new Map<string, any[]>();
     allModalities.forEach(section => {
@@ -547,6 +552,13 @@ const SchedulerPlottingSchedule: React.FC<SchedulerProps> = ({ user, onScheduleC
         })
         : validTimes.filter(t => !eveningTimeSlots.includes(t));
 
+      // ✅ NEW: Strongly prefer the first time in the list (which is selectedStartTime if available)
+      const preferredTime = validTimesForCourse[0];
+      const shuffledTimeList = [
+        preferredTime,
+        ...validTimesForCourse.slice(1).sort(() => Math.random() - 0.5)
+      ];
+
       const courseId = firstSection.course_id;
       let date = courseDateAssignment.get(courseId);
       if (!date || !sortedDates.includes(date)) {
@@ -556,8 +568,6 @@ const SchedulerPlottingSchedule: React.FC<SchedulerProps> = ({ user, onScheduleC
 
       // ✅ Try to find a time slot where ALL sections can fit without conflicts
       let foundTimeSlot = false;
-      const shuffledTimeList = [...validTimesForCourse].sort(() => Math.random() - 0.5);
-
       for (const candidateTime of shuffledTimeList) {
         const startMinutes = timeToMinutes(candidateTime);
         const endMinutes = startMinutes + totalDurationMinutes;
@@ -600,7 +610,9 @@ const SchedulerPlottingSchedule: React.FC<SchedulerProps> = ({ user, onScheduleC
     });
 
     // ✅ IMPROVED: Main scheduling loop with strict conflict checking
-    allModalities.forEach(section => {
+    const sortedModalities = [...dayClassSections, ...nightClassSections];
+
+    sortedModalities.forEach(section => {
       if (scheduledModalities.has(section.modality_id)) return;
       if (!modalityMap.has(section.modality_id)) return;
 
@@ -700,11 +712,7 @@ const SchedulerPlottingSchedule: React.FC<SchedulerProps> = ({ user, onScheduleC
       }
 
       // Priority 2: Find any free proctor from available list
-      // Priority 2: Find any free proctor from available list
       if (proctorId === -1) {
-        console.log(`🔍 Looking for proctor for ${section.course_id} at ${date} ${timeSlot}`);
-        console.log(`📋 Available proctors: ${shuffledProctors.length}`);
-
         let foundFreeProctor = false;
         for (const pid of shuffledProctors) {
           const key = `${date}|${pid}`;
@@ -714,13 +722,11 @@ const SchedulerPlottingSchedule: React.FC<SchedulerProps> = ({ user, onScheduleC
             proctorId = pid;
             markResourceOccupied(globalTracker.proctorOccupancy, key, startMinutes, endMinutes, Number(section.modality_id));
             foundFreeProctor = true;
-            console.log(`✅ Assigned proctor ${pid}`);
             break;
           }
         }
 
         if (!foundFreeProctor) {
-          console.error(`❌ NO FREE PROCTOR FOUND despite ${shuffledProctors.length} being available!`);
         }
       }
 
@@ -750,7 +756,6 @@ const SchedulerPlottingSchedule: React.FC<SchedulerProps> = ({ user, onScheduleC
       // This section will be caught as unscheduled
       // ✅ Final validation before adding to chromosome
       if (!roomId || proctorId === -1) {
-        console.warn(`❌ Skipping ${section.course_id} - missing room or proctor`);
         return; // Don't add this section to chromosome
       }
 
@@ -1062,8 +1067,6 @@ const SchedulerPlottingSchedule: React.FC<SchedulerProps> = ({ user, onScheduleC
       return;
     }
 
-    console.log(`📋 Using ${allCollegeUsers.length} proctors from college: ${schedulerCollegeName}`);
-
     const POPULATION_SIZE = 50;
     const GENERATIONS = 100;
     const MUTATION_RATE = 0.25;
@@ -1098,7 +1101,6 @@ const SchedulerPlottingSchedule: React.FC<SchedulerProps> = ({ user, onScheduleC
       });
       allAvailability = availResponse.data;
     } catch (error) {
-      console.error("Error fetching availability:", error);
       toast.error("Failed to fetch proctor availability");
       return;
     }
@@ -1268,6 +1270,15 @@ const SchedulerPlottingSchedule: React.FC<SchedulerProps> = ({ user, onScheduleC
 
     const validTimes = allAvailableTimeSlots.filter(t => isValidTimeSlot(t, false));
 
+    let prioritizedValidTimes = validTimes;
+    if (selectedStartTime && validTimes.includes(selectedStartTime)) {
+      // Put selected start time first, then other valid times
+      prioritizedValidTimes = [
+        selectedStartTime,
+        ...validTimes.filter(t => t !== selectedStartTime)
+      ];
+    }
+
     const modalityRoomsMap = new Map<string | number, string[]>();
     allModalities.forEach(modality => {
       const possibleRooms = modality.possible_rooms ?? [];
@@ -1353,7 +1364,6 @@ const SchedulerPlottingSchedule: React.FC<SchedulerProps> = ({ user, onScheduleC
     });
 
     if (warnings.length > 0) {
-      console.warn('⚠️ Scheduling warnings detected:', warnings);
       toast.warning(
         `${warnings.length} section(s) may have issues. Will attempt to schedule others.`,
         { autoClose: 5000 }
@@ -1375,7 +1385,6 @@ const SchedulerPlottingSchedule: React.FC<SchedulerProps> = ({ user, onScheduleC
         return;
       }
     } catch (error) {
-      console.error('Error checking for existing schedules:', error);
       toast.error('Failed to check for existing schedules');
       return;
     }
@@ -1400,8 +1409,8 @@ const SchedulerPlottingSchedule: React.FC<SchedulerProps> = ({ user, onScheduleC
       population.push(generateRandomChromosome(
         allModalities,
         sortedDates,
-        validTimes,
-        eveningTimeSlots,
+        prioritizedValidTimes,  // ✅ This already contains selectedStartTime prioritized
+        eveningTimeSlots,       // ✅ Now in correct position 4
         modalityRoomsMap,
         totalDurationMinutes,
         getAvailableProctors,
@@ -1425,7 +1434,6 @@ const SchedulerPlottingSchedule: React.FC<SchedulerProps> = ({ user, onScheduleC
         bestFitness = fitnesses[currentBestIdx];
         bestChromosome = population[currentBestIdx];
         if (generation % 20 === 0) {
-          console.log(`Generation ${generation}: Best fitness = ${bestFitness}`);
         }
       }
 
@@ -1443,9 +1451,9 @@ const SchedulerPlottingSchedule: React.FC<SchedulerProps> = ({ user, onScheduleC
         const parent1 = tournamentSelection(population, fitnesses);
         const parent2 = tournamentSelection(population, fitnesses);
         const [child1, child2] = crossover(parent1, parent2);
-        nextPopulation.push(mutate(child1, modalityMap, sortedDates, validTimes, eveningTimeSlots, modalityRoomsMap, getAvailableProctors, MUTATION_RATE));
+        nextPopulation.push(mutate(child1, modalityMap, sortedDates, prioritizedValidTimes, eveningTimeSlots, modalityRoomsMap, getAvailableProctors, MUTATION_RATE));
         if (nextPopulation.length < POPULATION_SIZE) {
-          nextPopulation.push(mutate(child2, modalityMap, sortedDates, validTimes, eveningTimeSlots, modalityRoomsMap, getAvailableProctors, MUTATION_RATE));
+          nextPopulation.push(mutate(child2, modalityMap, sortedDates, prioritizedValidTimes, eveningTimeSlots, modalityRoomsMap, getAvailableProctors, MUTATION_RATE));
         }
       }
 
@@ -1680,25 +1688,11 @@ const SchedulerPlottingSchedule: React.FC<SchedulerProps> = ({ user, onScheduleC
       });
     }
 
-    console.log(`✅ Successfully scheduled ${scheduledExams.length}/${allModalities.length} sections`);
-    console.log(`❌ Failed to schedule ${unscheduledSections.length} sections`);
-
     // ✅ SAVE TO DATABASE FIRST - BEFORE ANY DIALOGS
     if (scheduledExams.length > 0) {
       try {
-        console.log(`🔍 Attempting to save ${scheduledExams.length} exams to database`);
-        console.log('📦 Sample exam data:', scheduledExams[0]);
-
         await api.post('/tbl_examdetails', scheduledExams);
-        console.log(`✅ Successfully saved ${scheduledExams.length} section(s) to database`);
-
-        toast.success(
-          `✅ ${scheduledExams.length} section(s) scheduled successfully!`,
-          { autoClose: 3000 }
-        );
       } catch (error: any) {
-        console.error("❌ Database save error:", error);
-        console.error("❌ Error response:", error.response?.data);
         const errorMessage = error.response?.data?.error || error.message || "Unknown error";
         alert("Error saving schedule: " + errorMessage);
         setLoading(false);
@@ -1709,8 +1703,6 @@ const SchedulerPlottingSchedule: React.FC<SchedulerProps> = ({ user, onScheduleC
     setLoading(false);
 
     if (unscheduledSections.length > 0) {
-      console.log(`📋 ${unscheduledSections.length} sections need manual scheduling`);
-
       const conflictSummary = new Map<string, number>();
       unscheduledSections.forEach(section => {
         section.conflicts.forEach((conflict: string) => {
@@ -1724,7 +1716,7 @@ const SchedulerPlottingSchedule: React.FC<SchedulerProps> = ({ user, onScheduleC
 
       // Show confirm dialog with only Cancel (the user cannot 'accept' anything)
       window.confirm(
-        `✅ Successfully scheduled ${scheduledExams.length} section(s)!\n\n` +
+        `Successfully scheduled ${scheduledExams.length} section(s)!\n\n` +
         `⚠️ ${unscheduledSections.length} section(s) could not be scheduled automatically:\n\n` +
         `${conflictList}\n\n` +
         `Click "Cancel" to acknowledge and use "Edit Manually" in the viewer.`
@@ -2046,12 +2038,19 @@ const SchedulerPlottingSchedule: React.FC<SchedulerProps> = ({ user, onScheduleC
           </div>
 
           <div className="field">
-            <label className="label">Exam Start Time</label>
+            <label className="label">
+              Exam Start Time
+              {selectedStartTime && (
+                <span style={{ color: '#10b981', fontSize: '13px', marginLeft: '8px' }}>
+                  ✓ Will prioritize {selectedStartTime}
+                </span>
+              )}
+            </label>
             <CreatableSelect
               value={
                 selectedStartTime
                   ? { value: selectedStartTime, label: selectedStartTime }
-                  : { value: "07:00", label: "07:00" } // default
+                  : { value: "07:00", label: "07:00" }
               }
               onChange={(selected) =>
                 setSelectedStartTime(selected ? selected.value : "")

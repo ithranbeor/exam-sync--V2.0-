@@ -78,6 +78,7 @@ const SchedulerView: React.FC<SchedulerViewProps> = ({ user }) => {
   const [manualEditorSections, setManualEditorSections] = useState<any[]>([]);
   const [persistentUnscheduled, setPersistentUnscheduled] = useState<any[]>([]);
   const [showUnscheduledBadge, setShowUnscheduledBadge] = useState(false);
+  const [deanName, _setDeanName] = useState<string>('');
 
   const resetAllModes = () => {
     setIsModalOpen(false);
@@ -121,10 +122,8 @@ const SchedulerView: React.FC<SchedulerViewProps> = ({ user }) => {
           if (Array.isArray(parsed) && parsed.length > 0) {
             setPersistentUnscheduled(parsed);
             setShowUnscheduledBadge(true);
-            console.log(`📋 Loaded ${parsed.length} unscheduled sections from storage`);
           }
         } catch (e) {
-          console.error("Failed to parse stored unscheduled sections:", e);
         }
       }
     };
@@ -140,22 +139,24 @@ const SchedulerView: React.FC<SchedulerViewProps> = ({ user }) => {
       if (!schedulerCollegeId) return;
 
       try {
-        console.log(`🔍 Fetching footer for college_id: ${schedulerCollegeId}`);
-
         const response = await api.get('/tbl_schedule_footer/', {
           params: { college_id: schedulerCollegeId }  // ✅ Use college_id
         });
 
         if (response.data && response.data.length > 0) {
-          console.log(`✅ Found footer:`, response.data[0]);
-          setFooterData(response.data[0]);
-        } else {
-          console.log(`ℹ️ No footer found, using defaults`);
-          // Set defaults if no footer exists
+          const data = response.data[0];
           setFooterData({
-            prepared_by_name: 'Type name',
+            ...data,
+            prepared_by_name:
+              data.prepared_by_name?.trim()
+                ? data.prepared_by_name
+                : deanName,
+          });
+        } else {
+          setFooterData({
+            prepared_by_name: 'Loading...',
             prepared_by_title: `Dean, ${collegeName}`,
-            approved_by_name: 'Type name',
+            approved_by_name: 'Loading...',
             approved_by_title: 'VCAA, USTP-CDO',
             address_line: 'C.M Recto Avenue, Lapasan, Cagayan de Oro City 9000 Philippines',
             contact_line: 'Tel Nos. +63 (88) 856 1738; Telefax +63 (88) 856 4696 | http://www.ustp.edu.ph',
@@ -163,7 +164,6 @@ const SchedulerView: React.FC<SchedulerViewProps> = ({ user }) => {
           });
         }
       } catch (error) {
-        console.error("Error fetching footer data:", error);
       }
     };
 
@@ -187,7 +187,6 @@ const SchedulerView: React.FC<SchedulerViewProps> = ({ user }) => {
   useEffect(() => {
     const fetchSchedulerData = async () => {
       if (!user?.user_id) {
-        console.log('No user_id found in props');
         setIsLoadingData(false);
         return;
       }
@@ -204,7 +203,6 @@ const SchedulerView: React.FC<SchedulerViewProps> = ({ user }) => {
 
         const schedulerRoles = schedulerRolesResponse.data;
         if (!schedulerRoles || schedulerRoles.length === 0) {
-          console.error("No scheduler role found for user");
           setIsLoadingData(false);
           return;
         }
@@ -212,7 +210,6 @@ const SchedulerView: React.FC<SchedulerViewProps> = ({ user }) => {
         const schedulerCollegeId = schedulerRoles[0].college_id;
 
         setSchedulerCollegeId(schedulerCollegeId);
-        console.log(`✅ Scheduler college_id: ${schedulerCollegeId}`);
 
         const collegeResponse = await api.get(`/tbl_college/${schedulerCollegeId}/`);
         const collegeName = collegeResponse.data?.college_name;
@@ -235,7 +232,6 @@ const SchedulerView: React.FC<SchedulerViewProps> = ({ user }) => {
 
         const proctorRoles = proctorRolesResponse.data;
         if (!proctorRoles || proctorRoles.length === 0) {
-          console.log("No proctors found");
           setAllCollegeUsers([]);
           setIsLoadingData(false);
           return;
@@ -327,7 +323,6 @@ const SchedulerView: React.FC<SchedulerViewProps> = ({ user }) => {
           );
 
           if (invalidSchedules.length > 0) {
-            console.error(`❌ ${invalidSchedules.length} schedules have missing data:`, invalidSchedules);
           }
 
           setExamData(examsResponse.data);
@@ -337,7 +332,6 @@ const SchedulerView: React.FC<SchedulerViewProps> = ({ user }) => {
           setUsers(usersResponse.data);
         }
       } catch (error) {
-        console.error("Error fetching data:", error);
       }
     };
 
@@ -401,7 +395,6 @@ const SchedulerView: React.FC<SchedulerViewProps> = ({ user }) => {
           setRemarks(null);
         }
       } catch (error) {
-        console.error("Error checking approval status:", error);
         setApprovalStatus(null);
         setRemarks(null);
       }
@@ -530,7 +523,6 @@ const SchedulerView: React.FC<SchedulerViewProps> = ({ user }) => {
       setActiveProctorEdit(null);
       toast.success("Proctor updated successfully!");
     } catch (error) {
-      console.error("Error updating proctor:", error);
       toast.error("Failed to update proctor.");
     }
   };
@@ -590,7 +582,6 @@ const SchedulerView: React.FC<SchedulerViewProps> = ({ user }) => {
 
           toast.success("Schedules swapped!");
         } catch (error) {
-          console.error("Error swapping schedules:", error);
           toast.error("Failed to swap schedules!");
         }
       } else {
@@ -755,7 +746,6 @@ const SchedulerView: React.FC<SchedulerViewProps> = ({ user }) => {
           await Promise.all(deletePromises);
         }
       } catch (approvalError) {
-        console.error("Error deleting approval status:", approvalError);
       }
 
       setApprovalStatus(null);
@@ -768,7 +758,6 @@ const SchedulerView: React.FC<SchedulerViewProps> = ({ user }) => {
       toast.success(`Successfully deleted ${response.data.deleted_count} schedules for ${schedulerCollegeName}!`);
 
     } catch (error: any) {
-      console.error("Error deleting schedules:", error);
       toast.dismiss(loadingToast);
       toast.error(`Failed to delete schedules: ${error?.response?.data?.error || error?.message || 'Unknown error'}`);
     }
@@ -1366,7 +1355,6 @@ const SchedulerView: React.FC<SchedulerViewProps> = ({ user }) => {
               const groupedData: Record<string, ExamDetail[]> = {};
               dateExams.forEach((exam) => {
                 if (!exam.room_id) {
-                  console.warn('⚠️ Exam without room_id:', exam.examdetails_id);
                   return;
                 }
                 const key = `${date}-${exam.room_id}`;
@@ -1459,7 +1447,6 @@ const SchedulerView: React.FC<SchedulerViewProps> = ({ user }) => {
 
                               const exam = examsInRoom.find((e) => {
                                 if (!e.exam_start_time || !e.exam_end_time) {
-                                  console.warn('⚠️ Missing time data:', e.examdetails_id);
                                   return false;
                                 }
 
@@ -1694,7 +1681,6 @@ const SchedulerView: React.FC<SchedulerViewProps> = ({ user }) => {
               const groupedData: Record<string, ExamDetail[]> = {};
               dateExams.forEach((exam) => {
                 if (!exam.room_id) {
-                  console.warn('⚠️ Exam without room_id:', exam.examdetails_id);
                   return;
                 }
                 const key = `${date}-${exam.room_id}`;
@@ -1787,7 +1773,6 @@ const SchedulerView: React.FC<SchedulerViewProps> = ({ user }) => {
 
                               const exam = examsInRoom.find((e) => {
                                 if (!e.exam_start_time || !e.exam_end_time) {
-                                  console.warn('⚠️ Missing time data:', e.examdetails_id);
                                   return false;
                                 }
 
@@ -2016,14 +2001,12 @@ const SchedulerView: React.FC<SchedulerViewProps> = ({ user }) => {
                   setExamData(examsResponse.data);
                 }
               } catch (error) {
-                console.error("Error fetching data:", error);
               }
 
               setIsModalOpen(false);
 
               // ✅ Save unscheduled sections for later access
               if (unscheduled && unscheduled.length > 0) {
-                console.log(`📋 Received ${unscheduled.length} unscheduled sections from AddScheduleForm`);
                 saveUnscheduledSections(unscheduled); // ✅ NOW THIS WORKS
 
                 const result = window.confirm(
@@ -2090,18 +2073,15 @@ const SchedulerView: React.FC<SchedulerViewProps> = ({ user }) => {
           collegeName={collegeName}
           onSave={async () => {
             try {
-              console.log(`🔄 Refreshing footer for college_id: ${schedulerCollegeId}`);
 
               const response = await api.get('/tbl_schedule_footer/', {
                 params: { college_id: schedulerCollegeId }
               });
 
               if (response.data && response.data.length > 0) {
-                console.log(`✅ Footer refreshed:`, response.data[0]);
                 setFooterData(response.data[0]);
               }
             } catch (error) {
-              console.error("Error refreshing footer data:", error);
             }
           }}
         />
@@ -2128,7 +2108,6 @@ const SchedulerView: React.FC<SchedulerViewProps> = ({ user }) => {
                 setExamData(examsResponse.data);
               }
             } catch (error) {
-              console.error("Error fetching data:", error);
             }
 
             // ✅ Update persistent storage with remaining unscheduled

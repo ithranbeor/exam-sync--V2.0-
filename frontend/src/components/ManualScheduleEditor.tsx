@@ -54,7 +54,7 @@ const ManualScheduleEditor: React.FC<ManualScheduleEditorProps> = ({
   const [selectedDate, setSelectedDate] = useState<string>('');
   const [selectedTime, setSelectedTime] = useState<string>('');
   const [selectedRoom, setSelectedRoom] = useState<string>('');
-  const [selectedProctor, setSelectedProctor] = useState<number | null>(null);
+  const [selectedProctors, setSelectedProctors] = useState<number[]>([]); // Changed from single to array
   const [availableProctors, setAvailableProctors] = useState<any[]>([]);
   const [availableRooms, setAvailableRooms] = useState<string[]>([]);
   const [availableTimes, setAvailableTimes] = useState<string[]>([]);
@@ -88,7 +88,12 @@ const ManualScheduleEditor: React.FC<ManualScheduleEditorProps> = ({
   }, []);
 
   useEffect(() => {
-    setRemainingSections([...unscheduledSections]);
+    const sorted = [...unscheduledSections].sort((a, b) => {
+      const aIsNight = a.is_night_class === "YES" ? 1 : 0;
+      const bIsNight = b.is_night_class === "YES" ? 1 : 0;
+      return aIsNight - bIsNight; // Day classes (0) come before night classes (1)
+    });
+    setRemainingSections(sorted);
   }, [unscheduledSections]);
 
   const fetchInitialData = async () => {
@@ -103,7 +108,6 @@ const ManualScheduleEditor: React.FC<ManualScheduleEditorProps> = ({
       setBuildingsCache(buildingsResponse.data || []);
       setExistingSchedules(schedulesResponse.data || []);
     } catch (error) {
-      console.error("Error fetching initial data:", error);
       toast.error("Failed to load data");
     }
   };
@@ -119,7 +123,7 @@ const ManualScheduleEditor: React.FC<ManualScheduleEditorProps> = ({
       calculateAvailableRooms();
       calculateAvailableTimes();
     }
-  }, [selectedSection, selectedDate, existingSchedules]);
+  }, [selectedSection, selectedDate, selectedTime, existingSchedules]);
 
   const timeToMinutes = (time: string): number => {
     const [hours, minutes] = time.split(':').map(Number);
@@ -140,12 +144,11 @@ const ManualScheduleEditor: React.FC<ManualScheduleEditorProps> = ({
     const possibleRooms = selectedSection.possible_rooms || [];
 
     const available = possibleRooms.filter(roomId => {
-      // Check if room has conflicts on this date
       const roomSchedules = schedulesOnDate.filter(s => s.room_id === roomId);
 
       if (roomSchedules.length === 0) return true;
 
-      // If we have a selected time, check for time conflicts
+      // ✅ FIXED: Always check time conflicts if time is selected
       if (selectedTime) {
         const startMinutes = timeToMinutes(selectedTime);
         const endMinutes = startMinutes + totalDurationMinutes;
@@ -157,7 +160,8 @@ const ManualScheduleEditor: React.FC<ManualScheduleEditorProps> = ({
         });
       }
 
-      return true;
+      // ✅ If no time selected, don't show rooms that are busy at ANY time
+      return false; // Changed from true to false
     });
 
     setAvailableRooms(available);
@@ -224,13 +228,11 @@ const ManualScheduleEditor: React.FC<ManualScheduleEditorProps> = ({
       );
 
       if (!schedulerRole) {
-        console.error('❌ Scheduler college not found');
         setAvailableProctors([]);
         return;
       }
 
       const schedulerCollegeId = schedulerRole.college_id || schedulerRole.college?.college_id;
-      console.log(`📍 Scheduler college ID: ${schedulerCollegeId}`);
 
       // ✅ Get all users
       const usersResponse = await api.get('/users/');
@@ -263,8 +265,6 @@ const ManualScheduleEditor: React.FC<ManualScheduleEditorProps> = ({
         }
       });
 
-      console.log(`🔍 Found ${collegeProctorIds.size} proctors in college/departments`);
-
       // ✅ Calculate time range for conflict checking
       const startMinutes = timeToMinutes(selectedTime);
       const endMinutes = startMinutes + totalDurationMinutes;
@@ -295,11 +295,9 @@ const ManualScheduleEditor: React.FC<ManualScheduleEditorProps> = ({
           employment_type: user.employment_type || 'not-specified'
         }));
 
-      console.log(`✅ Found ${proctorDetails.length} available proctors (conflict-free)`);
       setAvailableProctors(proctorDetails);
 
     } catch (error) {
-      console.error("Error fetching available proctors:", error);
       toast.error("Failed to fetch available proctors");
       setAvailableProctors([]);
     }
@@ -315,6 +313,10 @@ const ManualScheduleEditor: React.FC<ManualScheduleEditorProps> = ({
     const finalTime = selectedTime || selectedSection.attempted_assignment?.time || '';
     const finalRoom = selectedRoom || selectedSection.attempted_assignment?.room || '';
 
+    // ✅ NEW: Check if we need multiple proctors
+    const needsMultipleProctors = selectedSection.sections.length > 1;
+    const requiredProctors = selectedSection.sections.length;
+
     // Validate required fields
     if (!finalDate) {
       toast.error("Date is required");
@@ -328,6 +330,12 @@ const ManualScheduleEditor: React.FC<ManualScheduleEditorProps> = ({
 
     if (needs.room && !finalRoom) {
       toast.error("Room is required to resolve conflict");
+      return;
+    }
+
+    // ✅ NEW: Validate proctor count
+    if (needsMultipleProctors && selectedProctors.length < requiredProctors) {
+      toast.error(`This section has ${requiredProctors} sub-sections and requires ${requiredProctors} proctors. You have selected ${selectedProctors.length}.`);
       return;
     }
 
@@ -370,10 +378,10 @@ const ManualScheduleEditor: React.FC<ManualScheduleEditorProps> = ({
         room_id: finalRoom,
         sections: selectedSection.sections,
         instructors: selectedSection.instructors || [],
-        proctors: selectedProctor ? [selectedProctor] : [],
+        proctors: selectedProctors, // ✅ Use array directly
         section_name: selectedSection.sections[0],
         instructor_id: selectedSection.instructors?.[0] || null,
-        proctor_id: selectedProctor,
+        proctor_id: selectedProctors[0] || null, // ✅ First proctor as canonical
         examperiod_id: matchedPeriod.examperiod_id,
         exam_date: finalDate,
         exam_start_time: startTimestamp,
@@ -391,7 +399,7 @@ const ManualScheduleEditor: React.FC<ManualScheduleEditorProps> = ({
 
       await api.post('/tbl_examdetails', scheduleData);
 
-      toast.success(`✅ Scheduled ${selectedSection.course_id} (${selectedSection.sections.join(', ')})`);
+      toast.success(`Scheduled ${selectedSection.course_id} (${selectedSection.sections.join(', ')}) with ${selectedProctors.length} proctor(s)`);
 
       // ✅ Remove from remaining sections
       const updatedRemaining = remainingSections.filter(
@@ -417,11 +425,10 @@ const ManualScheduleEditor: React.FC<ManualScheduleEditorProps> = ({
         setSelectedDate('');
         setSelectedTime('');
         setSelectedRoom('');
-        setSelectedProctor(null);
+        setSelectedProctors([]);
       }
 
     } catch (error: any) {
-      console.error("Error saving schedule:", error);
       toast.error("Failed to save schedule: " + (error?.response?.data?.error || error.message));
     } finally {
       setLoading(false);
@@ -441,7 +448,7 @@ const ManualScheduleEditor: React.FC<ManualScheduleEditorProps> = ({
       setSelectedDate('');
       setSelectedTime('');
       setSelectedRoom('');
-      setSelectedProctor(null);
+      setSelectedProctors([]);
 
       toast.info("Section skipped. Select another section to continue.");
     }
@@ -536,10 +543,20 @@ const ManualScheduleEditor: React.FC<ManualScheduleEditorProps> = ({
                   className={`section-item ${selectedSection?.modality_id === section.modality_id ? 'selected' : ''}`}
                   onClick={() => {
                     setSelectedSection(section);
-                    setSelectedDate('');
-                    setSelectedTime('');
-                    setSelectedRoom('');
-                    setSelectedProctor(null);
+
+                    // Immediately populate with attempted values
+                    const attempted = section.attempted_assignment;
+                    if (attempted) {
+                      setSelectedDate(attempted.date || '');
+                      setSelectedTime(attempted.time || '');
+                      setSelectedRoom(attempted.room || '');
+                    } else {
+                      setSelectedDate('');
+                      setSelectedTime('');
+                      setSelectedRoom('');
+                    }
+
+                    setSelectedProctors([]); // ✅ Changed from setSelectedProctor(null)
                   }}
                 >
                   <div className="section-header">
@@ -681,9 +698,7 @@ const ManualScheduleEditor: React.FC<ManualScheduleEditorProps> = ({
                             color: '#0369a1',
                             marginBottom: '8px'
                           }}>
-                             The assigned proctor is busy at {selectedSection.attempted_assignment?.time
-                              ? formatTo12Hour(selectedSection.attempted_assignment.time)
-                              : 'the original time'}. Select a different time to find an available proctor.
+                            Select a proctor below to resolve proctor conflicts. You may also assign it in a different time slot but the same timeslot is Recommended.
                           </div>
                         )}
 
@@ -734,117 +749,210 @@ const ManualScheduleEditor: React.FC<ManualScheduleEditorProps> = ({
 
                     {/* ✅ UPDATED: Show proctors if date and time are selected (regardless of needs.proctor) */}
                     {selectedDate && selectedTime && (
-                      <>
-                        {/* Full-time Proctors Dropdown */}
-                        <div className="form-group">
-                          <label>
-                            Select Full-Time Proctor ({fullTimeProctors.length} available)
-                            <span style={{ color: '#10b981', fontSize: '12px', marginLeft: '8px', fontWeight: 'bold' }}>
-                              Recommended
+                    <>
+                      {/* ✅ NEW: Show how many proctors are needed */}
+                      {selectedSection.sections.length > 1 && (
+                        <div style={{
+                          background: '#dbeafe',
+                          padding: '12px',
+                          borderRadius: '8px',
+                          marginBottom: '16px',
+                          border: '1px solid #3b82f6',
+                          color: '#1e40af'
+                        }}>
+                          <strong>📋 Multiple Sections Detected</strong>
+                          <p style={{ margin: '4px 0 0 0', fontSize: '13px' }}>
+                            This exam has <strong>{selectedSection.sections.length} sections</strong>: {selectedSection.sections.join(', ')}
+                            <br />
+                            You need to select <strong>{selectedSection.sections.length} proctors</strong> (one per section).
+                            <br />
+                            Currently selected: <strong>{selectedProctors.length}</strong> proctor(s)
+                          </p>
+                        </div>
+                      )}
+
+                      {/* Full-time Proctors - Multi-select */}
+                      <div className="form-group">
+                        <label>
+                          Select Full-Time Proctor(s) ({fullTimeProctors.length} available)
+                          <span style={{ color: '#10b981', fontSize: '12px', marginLeft: '8px', fontWeight: 'bold' }}>
+                            Recommended
+                          </span>
+                          {selectedSection.sections.length > 1 && (
+                            <span style={{ color: '#3b82f6', fontSize: '12px', marginLeft: '8px' }}>
+                              - Select {selectedSection.sections.length} proctors
                             </span>
-                          </label>
-                          <Select
-                            options={fullTimeProctors.map(p => ({
+                          )}
+                        </label>
+                        <Select
+                          isMulti
+                          options={fullTimeProctors
+                            .filter(p => !selectedProctors.includes(p.user_id)) // ✅ Hide already selected
+                            .map(p => ({
                               value: p.user_id,
                               label: `${p.first_name} ${p.last_name}`
                             }))}
-                            onChange={(selected) => setSelectedProctor(selected?.value || null)}
-                            value={selectedProctor && fullTimeProctors.some(p => p.user_id === selectedProctor) ? {
-                              value: selectedProctor,
-                              label: fullTimeProctors.find(p => p.user_id === selectedProctor)
-                                ? `${fullTimeProctors.find(p => p.user_id === selectedProctor)?.first_name} ${fullTimeProctors.find(p => p.user_id === selectedProctor)?.last_name}`
-                                : ''
-                            } : null}
-                            placeholder="Select full-time proctor"
-                            isClearable
-                            styles={{
-                              control: (base) => ({
-                                ...base,
-                                borderColor: '#10b981',
-                                borderWidth: '2px',
-                                '&:hover': { borderColor: '#059669' }
-                              })
-                            }}
-                          />
-                        </div>
+                          onChange={(selected) => {
+                            const newIds = selected ? selected.map(s => s.value) : [];
+                            setSelectedProctors([...selectedProctors.filter(id => 
+                              !fullTimeProctors.some(p => p.user_id === id)
+                            ), ...newIds]);
+                          }}
+                          value={selectedProctors
+                            .filter(id => fullTimeProctors.some(p => p.user_id === id))
+                            .map(id => {
+                              const proctor = fullTimeProctors.find(p => p.user_id === id);
+                              return {
+                                value: id,
+                                label: proctor ? `${proctor.first_name} ${proctor.last_name}` : ''
+                              };
+                            })}
+                          placeholder="Select full-time proctor(s)"
+                          styles={{
+                            control: (base) => ({
+                              ...base,
+                              borderColor: '#10b981',
+                              borderWidth: '2px',
+                              '&:hover': { borderColor: '#059669' }
+                            })
+                          }}
+                        />
+                      </div>
 
-                        {/* Part-time/Other Proctors Dropdown */}
-                        <div className="form-group">
-                          <label>
-                            Select Part-Time/Other Proctor ({otherProctors.length} available)
-                            <span style={{ color: '#f59e0b', fontSize: '12px', marginLeft: '8px' }}>
-                              (Use only if no full-time available)
-                            </span>
-                          </label>
-                          <Select
-                            options={otherProctors.map(p => ({
+                      {/* Part-time/Other Proctors - Multi-select */}
+                      <div className="form-group">
+                        <label>
+                          Select Part-Time/Other Proctor(s) ({otherProctors.length} available)
+                          <span style={{ color: '#f59e0b', fontSize: '12px', marginLeft: '8px' }}>
+                            (Use only if no full-time available)
+                          </span>
+                        </label>
+                        <Select
+                          isMulti
+                          options={otherProctors
+                            .filter(p => !selectedProctors.includes(p.user_id)) // ✅ Hide already selected
+                            .map(p => ({
                               value: p.user_id,
                               label: `${p.first_name} ${p.last_name} ${p.employment_type === 'part-time' ? '(Part-time)' : '(Type not specified)'}`
                             }))}
-                            onChange={(selected) => setSelectedProctor(selected?.value || null)}
-                            value={selectedProctor && otherProctors.some(p => p.user_id === selectedProctor) ? {
-                              value: selectedProctor,
-                              label: otherProctors.find(p => p.user_id === selectedProctor)
-                                ? `${otherProctors.find(p => p.user_id === selectedProctor)?.first_name} ${otherProctors.find(p => p.user_id === selectedProctor)?.last_name} ${otherProctors.find(p => p.user_id === selectedProctor)?.employment_type === 'part-time' ? '(Part-time)' : '(Type not specified)'}`
-                                : ''
-                            } : null}
-                            placeholder="Select part-time/other proctor"
-                            isClearable
-                            styles={{
-                              control: (base) => ({
-                                ...base,
-                                borderColor: '#f59e0b',
-                                borderWidth: '2px',
-                                '&:hover': { borderColor: '#d97706' }
-                              })
-                            }}
-                          />
+                          onChange={(selected) => {
+                            const newIds = selected ? selected.map(s => s.value) : [];
+                            setSelectedProctors([...selectedProctors.filter(id => 
+                              !otherProctors.some(p => p.user_id === id)
+                            ), ...newIds]);
+                          }}
+                          value={selectedProctors
+                            .filter(id => otherProctors.some(p => p.user_id === id))
+                            .map(id => {
+                              const proctor = otherProctors.find(p => p.user_id === id);
+                              return {
+                                value: id,
+                                label: proctor ? `${proctor.first_name} ${proctor.last_name} ${proctor.employment_type === 'part-time' ? '(Part-time)' : '(Type not specified)'}` : ''
+                              };
+                            })}
+                          placeholder="Select part-time/other proctor(s)"
+                          styles={{
+                            control: (base) => ({
+                              ...base,
+                              borderColor: '#f59e0b',
+                              borderWidth: '2px',
+                              '&:hover': { borderColor: '#d97706' }
+                            })
+                          }}
+                        />
+                      </div>
+
+                      {/* ✅ NEW: Visual list of selected proctors */}
+                      {selectedProctors.length > 0 && (
+                        <div style={{
+                          background: '#f0fdf4',
+                          padding: '12px',
+                          borderRadius: '8px',
+                          marginTop: '12px',
+                          border: '1px solid #86efac'
+                        }}>
+                          <strong style={{ color: '#166534' }}>
+                            Selected Proctors ({selectedProctors.length}/{selectedSection.sections.length}):
+                          </strong>
+                          <ul style={{ margin: '8px 0 0 0', paddingLeft: '20px' }}>
+                            {selectedProctors.map((proctorId, idx) => {
+                              const proctor = [...fullTimeProctors, ...otherProctors].find(p => p.user_id === proctorId);
+                              return (
+                                <li key={proctorId} style={{ fontSize: '13px', color: '#166534' }}>
+                                  {idx + 1}. {proctor?.first_name} {proctor?.last_name}
+                                  <span style={{ color: '#65a30d', marginLeft: '8px' }}>
+                                    ({proctor?.employment_type || 'not-specified'})
+                                  </span>
+                                </li>
+                              );
+                            })}
+                          </ul>
                         </div>
+                      )}
 
-                        {/* Info messages */}
-                        {availableProctors.length === 0 && (
-                          <div style={{
-                            background: '#fee2e2',
-                            padding: '10px',
-                            borderRadius: '6px',
-                            fontSize: '13px',
-                            color: '#dc2626',
-                            marginTop: '8px',
-                            border: '1px solid #fca5a5'
-                          }}>
-                            <strong>No proctors available</strong> at this time slot. All proctors from your college/departments are already assigned to other exams at this time.
-                          </div>
-                        )}
+                      {/* Info messages */}
+                      {availableProctors.length === 0 && (
+                        <div style={{
+                          background: '#fee2e2',
+                          padding: '10px',
+                          borderRadius: '6px',
+                          fontSize: '13px',
+                          color: '#dc2626',
+                          marginTop: '8px',
+                          border: '1px solid #fca5a5'
+                        }}>
+                          <strong>No proctors available</strong> at this time slot. All proctors from your college/departments are already assigned to other exams at this time.
+                        </div>
+                      )}
 
-                        {availableProctors.length > 0 && fullTimeProctors.length === 0 && (
-                          <div style={{
-                            background: '#fef3c7',
-                            padding: '10px',
-                            borderRadius: '6px',
-                            fontSize: '13px',
-                            color: '#92400e',
-                            marginTop: '8px',
-                            border: '1px solid #fde68a'
-                          }}>
-                            No full-time proctors available at this time. Consider selecting a part-time proctor or changing the time slot to find full-time staff.
-                          </div>
-                        )}
+                      {availableProctors.length > 0 && selectedProctors.length < selectedSection.sections.length && (
+                        <div style={{
+                          background: '#fee2e2',
+                          padding: '12px',
+                          borderRadius: '6px',
+                          fontSize: '14px', 
+                          color: '#dc2626', 
+                          marginTop: '8px',
+                          border: '2px solid #f87171', 
+                          fontWeight: '600'
+                        }}>
+                          🚫 You need to select <strong>{selectedSection.sections.length - selectedProctors.length} more proctor(s)</strong> before you can save.
+                          <br />
+                          <span style={{ fontSize: '13px', fontWeight: 'normal', marginTop: '4px', display: 'block' }}>
+                            This section requires {selectedSection.sections.length} proctors (one for each section: {selectedSection.sections.join(', ')})
+                          </span>
+                        </div>
+                      )}
 
-                        {fullTimeProctors.length > 0 && (
-                          <div style={{
-                            background: '#d1fae5',
-                            padding: '10px',
-                            borderRadius: '6px',
-                            fontSize: '13px',
-                            color: '#065f46',
-                            marginTop: '8px',
-                            border: '1px solid #6ee7b7'
-                          }}>
-                            <strong>{fullTimeProctors.length} full-time proctor(s)</strong> available - prioritize these for better reliability.
-                          </div>
-                        )}
-                      </>
-                    )}
+                      {fullTimeProctors.length > 0 && selectedProctors.length === 0 && (
+                        <div style={{
+                          background: '#d1fae5',
+                          padding: '10px',
+                          borderRadius: '6px',
+                          fontSize: '13px',
+                          color: '#065f46',
+                          marginTop: '8px',
+                          border: '1px solid #6ee7b7'
+                        }}>
+                          <strong>{fullTimeProctors.length} full-time proctor(s)</strong> available - prioritize these for better reliability.
+                        </div>
+                      )}
+
+                      {selectedProctors.length === selectedSection.sections.length && (
+                        <div style={{
+                          background: '#d1fae5',
+                          padding: '10px',
+                          borderRadius: '6px',
+                          fontSize: '13px',
+                          color: '#065f46',
+                          marginTop: '8px',
+                          border: '1px solid #86efac'
+                        }}>
+                          ✅ <strong>All {selectedSection.sections.length} proctor(s) selected!</strong> You can now save the schedule.
+                        </div>
+                      )}
+                    </>
+                  )}
 
                     {/* Auto-filled fields message */}
                     {!needsMultiple && selectedDate && !selectedTime && (
@@ -867,9 +975,30 @@ const ManualScheduleEditor: React.FC<ManualScheduleEditorProps> = ({
                 <button
                   className="btn-save"
                   onClick={handleSave}
-                  disabled={loading || !selectedDate ||
+                  disabled={
+                    loading || 
+                    !selectedDate ||
                     (analyzeConflicts(selectedSection).time && !selectedTime) ||
-                    (analyzeConflicts(selectedSection).room && !selectedRoom)}
+                    (analyzeConflicts(selectedSection).room && !selectedRoom) ||
+                    // ✅ NEW: Disable if not enough proctors selected
+                    selectedProctors.length < selectedSection.sections.length
+                  }
+                  style={{
+                    opacity: (
+                      loading || 
+                      !selectedDate ||
+                      (analyzeConflicts(selectedSection).time && !selectedTime) ||
+                      (analyzeConflicts(selectedSection).room && !selectedRoom) ||
+                      selectedProctors.length < selectedSection.sections.length
+                    ) ? 0.5 : 1,
+                    cursor: (
+                      loading || 
+                      !selectedDate ||
+                      (analyzeConflicts(selectedSection).time && !selectedTime) ||
+                      (analyzeConflicts(selectedSection).room && !selectedRoom) ||
+                      selectedProctors.length < selectedSection.sections.length
+                    ) ? 'not-allowed' : 'pointer'
+                  }}
                 >
                   {loading ? 'Saving...' : 'Save Schedule'}
                 </button>

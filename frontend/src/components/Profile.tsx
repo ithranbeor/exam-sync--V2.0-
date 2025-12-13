@@ -21,8 +21,8 @@ interface UserProfile {
 interface UserRoleInfo {
   user_role_id: number;
   role_name: string;
-  college?: string | null;
-  department?: string| null;
+  college?: { college_id: number; college_name: string } | null;
+  department?: { department_id: number; department_name: string } | null;
   status?: string | null;
 }
 
@@ -236,13 +236,13 @@ const Profile: React.FC<ProfileProps> = ({ user }) => {
 
                   {r.college && (
                     <span className="info-badge college-badges">
-                      {r.college}
+                      {typeof r.college === 'object' ? r.college.college_name : r.college}
                     </span>
                   )}
 
                   {r.department && (
                     <span className="info-badge dept-badge">
-                      {r.department}
+                      {typeof r.department === 'object' ? r.department.department_name : r.department}
                     </span>
                   )}
                 </div>

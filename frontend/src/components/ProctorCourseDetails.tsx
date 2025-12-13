@@ -37,9 +37,7 @@
 
         try {
           setLoading(true);
-          
-          console.log(`🔍 Fetching schedules for proctor user_id: ${user.user_id}`);
-          
+                    
           // Step 1: Get ONLY exam details where THIS SPECIFIC user is the proctor
           const examDetailsResponse = await api.get('/tbl_examdetails', {
             params: { 
@@ -48,28 +46,21 @@
           });
           
           if (!examDetailsResponse.data || !Array.isArray(examDetailsResponse.data)) {
-            console.log('📭 No exam details found for proctor:', user.user_id);
             setAssignments([]);
             setLoading(false);
             return;
           }
 
-          const proctorExams = examDetailsResponse.data;
-          console.log(`📋 Found ${proctorExams.length} exam(s) where user ${user.user_id} is assigned as proctor`);
-          
-          // ✅ Double-check filter to ensure only this user's assignments (safety check)
+          const proctorExams = examDetailsResponse.data;          
           const userProctorExams = proctorExams.filter(exam => {
             const isMatch = Number(exam.proctor_id) === Number(user.user_id);
             if (!isMatch) {
-              console.warn(`⚠️ Filtering out exam ${exam.examdetails_id} - proctor_id ${exam.proctor_id} doesn't match user ${user.user_id}`);
             }
             return isMatch;
           });
           
-          console.log(`✅ After filter: ${userProctorExams.length} exam(s) confirmed for this user`);
           
           if (userProctorExams.length === 0) {
-            console.log('📭 No exams assigned to this proctor');
             setAssignments([]);
             setLoading(false);
             return;
@@ -79,20 +70,16 @@
           const collegeNames = [...new Set(userProctorExams.map(exam => exam.college_name).filter(Boolean))];
           
           if (collegeNames.length === 0) {
-            console.log('⚠️ No college names found in exam details');
             setAssignments([]);
             setLoading(false);
             return;
           }
 
-          console.log(`🏛️ Checking approval status for colleges:`, collegeNames);
-
           // Step 3: Check approval status for each college
           const approvalPromises = collegeNames.map(collegeName =>
             api.get('/tbl_scheduleapproval/', {
               params: { college_name: collegeName }
-            }).catch(err => {
-              console.log(`⚠️ No approval data for ${collegeName}:`, err.message);
+            }).catch(_err => {
               return { data: [] };
             })
           );
@@ -113,23 +100,16 @@
               // Only include if status is 'approved'
               if (latestApproval.status === 'approved') {
                 approvedColleges.add(collegeNames[index]);
-                console.log(`✅ College "${collegeNames[index]}" is approved`);
               } else {
-                console.log(`⏳ College "${collegeNames[index]}" status: ${latestApproval.status}`);
               }
             } else {
-              console.log(`❌ No approval records for college: ${collegeNames[index]}`);
             }
           });
-
-          console.log(`📋 Found ${approvedColleges.size} approved college(s) out of ${collegeNames.length}`);
 
           // Step 5: Filter exams to only include those from approved colleges
           const approvedExams = userProctorExams.filter(exam => 
             approvedColleges.has(exam.college_name)
           );
-
-          console.log(`📅 Showing ${approvedExams.length} approved exam(s) for proctor ${user.user_id}`);
 
           // Step 6: Get instructor names for all exams
           const instructorIds = [...new Set(approvedExams.map(exam => exam.instructor_id).filter(Boolean))];
@@ -152,7 +132,6 @@
                 }
               });
             } catch (err) {
-              console.warn('⚠️ Could not fetch instructor names:', err);
             }
           }
 
@@ -178,12 +157,6 @@
           
           setAssignments(sorted);
         } catch (err: any) {
-          console.error('❌ Error fetching proctor assignments:', err);
-          console.error('Error details:', {
-            message: err.message,
-            response: err.response?.data,
-            status: err.response?.status
-          });
           setAssignments([]);
         } finally {
           setLoading(false);
@@ -223,7 +196,6 @@
         
         return currentTime >= startTimeMs && currentTime <= endTimeMs;
       } catch (e) {
-        console.error('Error checking if exam is ongoing:', e);
         return false;
       }
     };
