@@ -772,17 +772,8 @@ class TblExamdetailsSerializer(serializers.ModelSerializer):
             validated_data['room'] = TblRooms.objects.get(room_id=room_id)
         if modality_id:
             validated_data['modality'] = TblModality.objects.get(modality_id=modality_id)
-        
-        # ✅ FIX: Only assign proctor if valid user_id (not -1)
-        if proctor_id and proctor_id != -1:
-            try:
-                validated_data['proctor'] = TblUsers.objects.get(user_id=proctor_id)
-            except TblUsers.DoesNotExist:
-                print(f"⚠️ Warning: Proctor {proctor_id} not found, setting to None")
-                validated_data['proctor'] = None
-        else:
-            validated_data['proctor'] = None  # No proctor assigned
-            
+        if proctor_id:
+            validated_data['proctor'] = TblUsers.objects.get(user_id=proctor_id)
         if examperiod_id:
             validated_data['examperiod'] = TblExamperiod.objects.get(examperiod_id=examperiod_id)
 
@@ -798,18 +789,8 @@ class TblExamdetailsSerializer(serializers.ModelSerializer):
             instance.room = TblRooms.objects.get(room_id=room_id)
         if modality_id is not None:
             instance.modality = TblModality.objects.get(modality_id=modality_id)
-        
-        # ✅ FIX: Handle proctor_id = -1 or None
         if proctor_id is not None:
-            if proctor_id == -1:
-                instance.proctor = None
-            else:
-                try:
-                    instance.proctor = TblUsers.objects.get(user_id=proctor_id)
-                except TblUsers.DoesNotExist:
-                    print(f"⚠️ Warning: Proctor {proctor_id} not found, setting to None")
-                    instance.proctor = None
-                    
+            instance.proctor = TblUsers.objects.get(user_id=proctor_id) if proctor_id else None
         if examperiod_id is not None:
             instance.examperiod = TblExamperiod.objects.get(examperiod_id=examperiod_id)
 
