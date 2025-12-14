@@ -18,8 +18,8 @@ import { FaEdit } from 'react-icons/fa';
 
 interface ExamDetail {
   examdetails_id?: number; course_id: string; section_name?: string; sections?: string[]; room_id?: string; exam_date?: string; exam_start_time?: string; semester?: string;
-  exam_end_time?: string; instructor_id?: number; instructors?: number[]; proctor_id?: number; proctors?: number[]; proctor_timein?: string; academic_year?: string; building_name?: string;
-  proctor_timeout?: string; program_id?: string; college_name?: string; modality_id?: number; exam_period?: string; exam_category?: string;
+  exam_end_time?: string; instructor_id?: number; instructors?: number[]; proctor_id?: number; proctors?: number[]; academic_year?: string; building_name?: string;
+  examdetails_status?: string; program_id?: string; college_name?: string; modality_id?: number; exam_period?: string; exam_category?: string;
 }
 
 interface SchedulerViewProps {

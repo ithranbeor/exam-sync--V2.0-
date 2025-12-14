@@ -1703,8 +1703,6 @@ const SchedulerPlottingSchedule: React.FC<SchedulerProps> = ({ user, onScheduleC
         exam_period: periodValue,
         college_name: collegeNameForCourse,
         building_name: `${buildingName} (${buildingId})`,
-        proctor_timein: null,
-        proctor_timeout: null,
       });
     }
 

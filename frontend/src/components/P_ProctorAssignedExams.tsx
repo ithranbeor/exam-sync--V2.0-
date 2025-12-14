@@ -13,7 +13,7 @@ interface ProctorAssignment {
   room_id: string;
   building: string;
   instructor: string;
-  status: string;
+  examdetails_status: string; // ✅ FIXED: Changed from 'status' to 'examdetails_status'
 }
 
 interface ProctorCourseDetailsProps {
@@ -54,11 +54,8 @@ const ProctorCourseDetails = ({ user }: ProctorCourseDetailsProps) => {
         const proctorExams = examDetailsResponse.data;
         const userProctorExams = proctorExams.filter(exam => {
           const isMatch = Number(exam.proctor_id) === Number(user.user_id);
-          if (!isMatch) {
-          }
           return isMatch;
         });
-
 
         if (userProctorExams.length === 0) {
           setAssignments([]);
@@ -100,9 +97,7 @@ const ProctorCourseDetails = ({ user }: ProctorCourseDetailsProps) => {
             // Only include if status is 'approved'
             if (latestApproval.status === 'approved') {
               approvedColleges.add(collegeNames[index]);
-            } else {
             }
-          } else {
           }
         });
 
@@ -132,10 +127,11 @@ const ProctorCourseDetails = ({ user }: ProctorCourseDetailsProps) => {
               }
             });
           } catch (err) {
+            console.error('Error fetching instructors:', err);
           }
         }
 
-        // Step 7: Transform to match the expected format
+        // ✅ FIXED: Step 7: Transform to match the expected format
         const formattedAssignments: ProctorAssignment[] = approvedExams.map(exam => ({
           assignment_id: exam.examdetails_id,
           course_id: exam.course_id,
@@ -146,7 +142,7 @@ const ProctorCourseDetails = ({ user }: ProctorCourseDetailsProps) => {
           room_id: exam.room_id,
           building: exam.building_name || 'N/A',
           instructor: exam.instructor_id ? (instructorMap.get(exam.instructor_id) || `Instructor ${exam.instructor_id}`) : 'N/A',
-          status: 'approved'
+          examdetails_status: exam.examdetails_status || 'pending' // ✅ CHANGED: Use calculated status from backend
         }));
 
         // Sort by date
@@ -157,6 +153,7 @@ const ProctorCourseDetails = ({ user }: ProctorCourseDetailsProps) => {
 
         setAssignments(sorted);
       } catch (err: any) {
+        console.error('Error fetching proctor assignments:', err);
         setAssignments([]);
       } finally {
         setLoading(false);
@@ -202,32 +199,47 @@ const ProctorCourseDetails = ({ user }: ProctorCourseDetailsProps) => {
 
   const now = new Date();
 
+  // ✅ FIXED: Filter logic now uses examdetails_status from backend
   const filteredAssignments = assignments.filter((assign) => {
     const examStartTime = new Date(assign.exam_start_time);
+    const examEndTime = new Date(assign.exam_end_time);
     const isOngoing = isExamOngoing(assign.exam_date, assign.exam_start_time, assign.exam_end_time);
-    const isConfirmed = assign.status.toLowerCase() === 'confirmed' || assign.status.toLowerCase() === 'confirm';
+
+    // ✅ CHANGED: Check for "present", "late", or "substitute" statuses
+    const backendStatus = (assign.examdetails_status || 'pending').toLowerCase().trim();
+    const hasCheckedIn = backendStatus.includes('present') ||
+      backendStatus.includes('late') ||
+      backendStatus.includes('substitute');
 
     if (filter === 'upcoming') {
       return examStartTime > now;
     } else if (filter === 'ongoing') {
-      return isOngoing && !isConfirmed;
+      return isOngoing && !hasCheckedIn;
     } else if (filter === 'completed') {
-      const examEnd = new Date(assign.exam_end_time);
-      return isConfirmed || examEnd < now;
+      return hasCheckedIn || examEndTime < now;
     }
     return true; // 'all'
   });
 
+  // ✅ FIXED: Count calculations now use examdetails_status
   const upcomingCount = assignments.filter(a => new Date(a.exam_start_time) > now).length;
+
   const ongoingCount = assignments.filter(a => {
     const isOngoing = isExamOngoing(a.exam_date, a.exam_start_time, a.exam_end_time);
-    const isConfirmed = a.status.toLowerCase() === 'confirmed' || a.status.toLowerCase() === 'confirm';
-    return isOngoing && !isConfirmed;
+    const backendStatus = (a.examdetails_status || 'pending').toLowerCase().trim();
+    const hasCheckedIn = backendStatus.includes('present') ||
+      backendStatus.includes('late') ||
+      backendStatus.includes('substitute');
+    return isOngoing && !hasCheckedIn;
   }).length;
+
   const completedCount = assignments.filter(a => {
-    const isConfirmed = a.status.toLowerCase() === 'confirmed' || a.status.toLowerCase() === 'confirm';
-    const examEnd = new Date(a.exam_end_time);
-    return isConfirmed || examEnd < now;
+    const backendStatus = (a.examdetails_status || 'pending').toLowerCase().trim();
+    const hasCheckedIn = backendStatus.includes('present') ||
+      backendStatus.includes('late') ||
+      backendStatus.includes('substitute');
+    const examEndTime = new Date(a.exam_end_time);
+    return hasCheckedIn || examEndTime < now;
   }).length;
 
   const formatDateFull = (dateStr: string) => {
@@ -323,19 +335,42 @@ const ProctorCourseDetails = ({ user }: ProctorCourseDetailsProps) => {
         <div className="courses-list">
           {filteredAssignments.map((assign) => {
             const examStartTime = new Date(assign.exam_start_time);
+            const examEndTime = new Date(assign.exam_end_time);
             const isOngoing = isExamOngoing(assign.exam_date, assign.exam_start_time, assign.exam_end_time);
-            const isConfirmed = assign.status.toLowerCase() === 'confirmed' || assign.status.toLowerCase() === 'confirm';
+
+            // ✅ CHANGED: Use backend status to determine if checked in
+            const backendStatus = (assign.examdetails_status || 'pending').toLowerCase().trim();
+            const hasCheckedIn = backendStatus.includes('present') ||
+              backendStatus.includes('late') ||
+              backendStatus.includes('substitute');
+
             const isUpcoming = examStartTime > now;
-            const examEnd = new Date(assign.exam_end_time);
-            const isCompleted = isConfirmed || examEnd < now;
+            const isCompleted = hasCheckedIn || examEndTime < now;
             const isExpanded = expandedCard === assign.assignment_id;
             const duration = getDuration(assign.exam_start_time, assign.exam_end_time);
 
-            let displayStatus = 'upcoming';
+            // ✅ CHANGED: Display status logic based on backend status
+            let displayStatus = 'Upcoming';
             let statusClass = 'upcoming-badge';
+
             if (isCompleted) {
-              displayStatus = 'Completed';
-              statusClass = 'completed-badge';
+              // Show the specific completion status
+              if (backendStatus.includes('present')) {
+                displayStatus = 'Present';
+                statusClass = 'completed-badge';
+              } else if (backendStatus.includes('late')) {
+                displayStatus = 'Late';
+                statusClass = 'late-badge';
+              } else if (backendStatus.includes('substitute')) {
+                displayStatus = 'Substitute';
+                statusClass = 'substitute-badge';
+              } else if (backendStatus.includes('absent')) {
+                displayStatus = 'Absent';
+                statusClass = 'absent-badge';
+              } else {
+                displayStatus = 'Completed';
+                statusClass = 'completed-badge';
+              }
             } else if (isOngoing) {
               displayStatus = 'On-going';
               statusClass = 'ongoing-badge';
