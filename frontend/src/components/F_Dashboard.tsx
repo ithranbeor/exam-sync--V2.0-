@@ -97,7 +97,6 @@ const DashboardFaculty = () => {
           avatar_url: data.avatar_url || '/images/default-pp.jpg',
         });
       } catch (err) {
-        console.error('Error loading user info:', err);
         setUser({
           ...stored,
           full_name: `${stored.first_name} ${stored.middle_name ?? ''} ${stored.last_name}`.trim(),

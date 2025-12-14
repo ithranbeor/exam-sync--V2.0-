@@ -64,7 +64,6 @@ const ProctorViewExam: React.FC<ProctorViewExamProps> = ({ user }) => {
   useEffect(() => {
     const fetchProctorData = async () => {
       if (!user?.user_id) {
-        console.log('No user_id found in props');
         setIsLoadingData(false);
         return;
       }

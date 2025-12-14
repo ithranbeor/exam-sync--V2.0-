@@ -58,7 +58,6 @@ const EmailSender: React.FC<EmailSenderProps> = ({
         if (!user?.user_id) return;
 
         if (approvalStatus === 'approved' && examData && examData.length > 0) {
-          console.log("✅ Loading proctors from APPROVED schedule for college:", collegeName);
           
           // 🔒 CRITICAL: Filter exam data by scheduler's college FIRST
           const collegeExamData = examData.filter(
@@ -67,7 +66,6 @@ const EmailSender: React.FC<EmailSenderProps> = ({
 
 
           if (collegeExamData.length === 0) {
-            console.warn("⚠️ No exams found for this college in approved schedule");
             toast.warn(`No exams found for ${collegeName} in the approved schedule`);
             setUsers([]);
             return;
@@ -119,7 +117,6 @@ const EmailSender: React.FC<EmailSenderProps> = ({
           setProctorSchedules(scheduleMap);
 
         } else {
-          console.log("⚠️ Using fallback: Loading all proctors from college");
           const schedulerRolesResponse = await api.get('/tbl_user_role', {
             params: {
               user_id: user.user_id,
@@ -160,7 +157,6 @@ const EmailSender: React.FC<EmailSenderProps> = ({
           setUsers(proctorUsers || []);
         }
       } catch (err) {
-        console.error("Error loading users:", err);
         toast.error("Failed to load users");
       }
     };
@@ -247,10 +243,6 @@ const EmailSender: React.FC<EmailSenderProps> = ({
       const emailsData = selectedUsers.map((proctor) => {
         const personalizedBody = generateProctorEmailBody(proctor);
 
-        console.log(`Preparing email for ${proctor.first_name} ${proctor.last_name}`);
-        console.log(`   Email: ${proctor.email_address}`);
-        console.log(`   Schedules: ${proctorSchedules[proctor.user_id]?.length || 0}`);
-
         return {
           user_id: proctor.user_id,
           email: proctor.email_address,
@@ -259,9 +251,6 @@ const EmailSender: React.FC<EmailSenderProps> = ({
           message: personalizedBody
         };
       });
-
-      // 📧 Send real Gmail emails via backend
-      console.log(`📬 Sending ${emailsData.length} real Gmail emails...`);
       
       const response = await api.post('/send-proctor-emails/', {
         emails: emailsData,
@@ -272,16 +261,12 @@ const EmailSender: React.FC<EmailSenderProps> = ({
 
       if (sent_count > 0) {
         toast.success(`Successfully sent ${sent_count} email(s) to Gmail!`);
-        console.log(`✅ Successfully sent ${sent_count} Gmail emails`);
       }
 
       if (failed_emails && failed_emails.length > 0) {
-        console.error("❌ Failed emails:", failed_emails);
         
         // Show detailed error messages
-        failed_emails.forEach((fail: any) => {
-          console.error(`   - ${fail.name} (${fail.email}): ${fail.reason}`);
-          
+        failed_emails.forEach((fail: any) => {          
           // Show specific error toast
           if (fail.reason.includes('authentication')) {
             toast.error(`Gmail authentication failed. Contact system admin.`, { 
@@ -321,7 +306,6 @@ const EmailSender: React.FC<EmailSenderProps> = ({
         );
         
         if (smtpConfig) {
-          console.error('SMTP Configuration:', smtpConfig);
           toast.info(
             'Contact administrator to check email settings (Gmail app password may have expired)',
             { autoClose: 7000 }
@@ -332,7 +316,6 @@ const EmailSender: React.FC<EmailSenderProps> = ({
           'Gmail authentication failed. The Gmail app password needs to be regenerated.',
           { autoClose: 7000 }
         );
-        console.error('Authentication error - check EMAIL_HOST_PASSWORD in backend');
       } else if (errorMessage?.toLowerCase().includes('timeout')) {
         toast.error(
           'Connection timeout. Email server may be unreachable or slow.',
@@ -346,8 +329,6 @@ const EmailSender: React.FC<EmailSenderProps> = ({
         );
       }
       
-      // Log full error for debugging
-      console.error('Full error response:', err?.response?.data);
     } finally {
       setLoading(false);
     }

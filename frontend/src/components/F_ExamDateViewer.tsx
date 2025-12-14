@@ -59,23 +59,17 @@ const ProctorExamDate = () => {
 
         const realUserId = storedUser.user_id;
 
-        // 1️⃣ Fetch all user roles
         const { data: roles } = await api.get(`/tbl_user_role`, {
           params: { user_id: realUserId }
         });
-        console.log("User roles fetched:", roles);
 
-        // 2️⃣ Find scheduler role (role_id = 3)
         const schedulerRole = roles.find((r: any) => r.role === 3 || r.role_id === 3);
         if (!schedulerRole) return;
 
-        // 3️⃣ Scheduler detected
         setIsScheduler(true);
 
-        // 4️⃣ Try to use college from user role
         let college = schedulerRole.college ?? schedulerRole.college_id ?? null;
 
-        // 5️⃣ If still missing, fetch from tbl_users
         if (!college) {
           const { data: userData } = await api.get(`/tbl_users/${realUserId}`);
           college = userData?.college_id ?? null;
@@ -131,9 +125,6 @@ const ProctorExamDate = () => {
         (ep) => new Date(ep.start_date).toDateString() === date.toDateString()
       );
 
-      console.log("Existing periods on this date:", existingPeriods);
-      console.log("My scheduler college ID:", schedulerCollege);
-
       // Get unique assigned college IDs for this day (excluding nulls)
       const uniqueCollegeIds = Array.from(
         new Set(
@@ -143,17 +134,11 @@ const ProctorExamDate = () => {
         )
       );
 
-      console.log("Unique college IDs assigned:", uniqueCollegeIds);
-
       // Check if YOUR college is already assigned on this day
       const isMyCollegeAssigned = uniqueCollegeIds.includes(schedulerCollege!);
 
-      console.log("Is my college assigned?", isMyCollegeAssigned);
-
       // If your college is already assigned, remove only your college
       if (isMyCollegeAssigned) {
-        console.log("Removing my college ID:", schedulerCollege);
-
         const payload = {
           updates: [
             {
@@ -167,8 +152,6 @@ const ProctorExamDate = () => {
       } else {
         // Adding your college: enforce max 2 colleges per day
         const otherCollegesCount = uniqueCollegeIds.length;
-
-        console.log("Other colleges count:", otherCollegesCount);
 
         if (otherCollegesCount >= 2) {
           alert("Cannot assign more than 2 colleges on the same day.");
@@ -185,7 +168,6 @@ const ProctorExamDate = () => {
           ],
         };
 
-        console.log("Adding my college ID:", schedulerCollege);
         await api.put("/tbl_examperiod/bulk_update/", payload);
       }
 

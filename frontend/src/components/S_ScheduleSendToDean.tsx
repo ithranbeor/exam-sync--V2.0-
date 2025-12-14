@@ -38,9 +38,6 @@ const DeanSender: React.FC<DeanSenderProps> = ({
       if (!user?.user_id) return;
 
       try {
-        console.log("🔍 Fetching dean for user:", user.user_id);
-
-        // Get scheduler's college using tbl_user_role
         const userRoleResponse = await api.get('/tbl_user_role', {
           params: {
             user_id: user.user_id,
@@ -48,16 +45,12 @@ const DeanSender: React.FC<DeanSenderProps> = ({
           }
         });
 
-        console.log("📋 Scheduler roles:", userRoleResponse.data);
-
         if (!userRoleResponse.data || userRoleResponse.data.length === 0) {
-          console.error("❌ No scheduler role found");
           setDeanName("No College Assigned");
           return;
         }
 
         const schedulerCollegeId = userRoleResponse.data[0].college_id;
-        console.log("🏛️ Scheduler's college ID:", schedulerCollegeId);
 
         // Get dean's role using the same college
         const deanRoleResponse = await api.get('/tbl_user_role', {
@@ -67,10 +60,7 @@ const DeanSender: React.FC<DeanSenderProps> = ({
           }
         });
 
-        console.log("👔 Dean roles:", deanRoleResponse.data);
-
         if (!deanRoleResponse.data || deanRoleResponse.data.length === 0) {
-          console.error("❌ No dean found for college");
           setDeanName("No Dean Assigned");
           return;
         }
@@ -80,13 +70,11 @@ const DeanSender: React.FC<DeanSenderProps> = ({
 
         // Fetch dean's user information
         const deanUserResponse = await api.get(`/users/${deanRole.user_id}/`);
-        console.log("👤 Dean user data:", deanUserResponse.data);
 
         const deanData = deanUserResponse.data;
         setDeanName(`${deanData.first_name} ${deanData.last_name}`);
 
       } catch (err) {
-        console.error("❌ Error fetching dean info:", err);
         setDeanName("Error Loading Dean");
       }
     };
@@ -175,17 +163,8 @@ const DeanSender: React.FC<DeanSenderProps> = ({
         })),
       };
 
-      console.log("📦 Payload:", {
-        user_id: scheduleData.user_id,
-        college_name: scheduleData.college_name,
-        total_schedules: scheduleData.schedules.length,
-        first_schedule: scheduleData.schedules[0]
-      });
-
       // ✅ Send to backend
       const response = await api.post('/send_schedule_to_dean/', scheduleData);
-
-      console.log("✅ Response:", response.data);
 
       toast.success(
         `Schedule sent successfully! (${validSchedules.length} exams sent to ${response.data.dean_name || 'dean'})`
@@ -197,11 +176,6 @@ const DeanSender: React.FC<DeanSenderProps> = ({
       }, 1500);
       
     } catch (err: any) {
-      console.error("❌ Error sending to dean:", err);
-      console.error("❌ Error response:", err.response?.data);
-      console.error("❌ Error status:", err.response?.status);
-      
-      // ✅ Better error messages
       let errorMessage = "Failed to send to dean";
       
       if (err.response?.status === 401) {

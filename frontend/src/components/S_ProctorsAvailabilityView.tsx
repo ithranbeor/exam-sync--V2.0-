@@ -179,7 +179,6 @@ const SchedulerAvailability: React.FC<ProctorSetAvailabilityProps> = ({ user }) 
               const { data } = await api.get(`/users/${userId}/`);
               return { userId, data };
             } catch (err) {
-              console.warn(`Failed to fetch user ${userId}`);
               return { userId, data: null };
             }
           })
@@ -193,7 +192,6 @@ const SchedulerAvailability: React.FC<ProctorSetAvailabilityProps> = ({ user }) 
               });
               return Array.isArray(data) ? data : [];
             } catch (err) {
-              console.warn(`Failed to fetch availability for user ${userId}`);
               return [];
             }
           })
@@ -358,7 +356,6 @@ const SchedulerAvailability: React.FC<ProctorSetAvailabilityProps> = ({ user }) 
 
       setEntries(mappedAvailability);
     } catch (error) {
-      console.error('Error fetching availability:', error);
     } finally {
       setLoading(false); // ✅ stop loading
     }
@@ -535,7 +532,6 @@ const SchedulerAvailability: React.FC<ProctorSetAvailabilityProps> = ({ user }) 
       setShowModal(false);
       fetchAvailability(); // Async, doesn't block
     } catch (error: any) {
-      console.error('API error:', error);
       toast.error(`Failed to process: ${error?.message || 'Unknown error'}`);
     } finally {
       setIsSubmitting(false);

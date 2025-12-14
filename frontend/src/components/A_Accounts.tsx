@@ -53,7 +53,6 @@ export const Accounts: React.FC<AccountsProps> = () => {
       const response = await api.get<UserAccount[]>('/accounts/');
       setAccounts(response.data);
     } catch (err: any) {
-      console.error(err);
       toast.error('Error fetching accounts');
     } finally {
       setLoading(false); // stop loading
@@ -107,7 +106,6 @@ export const Accounts: React.FC<AccountsProps> = () => {
       setShowModal(false);
       fetchAccounts();
     } catch (err: any) {
-      console.error(err);
       toast.error(err.response?.data?.detail || 'Error saving account');
     }
   };
@@ -123,7 +121,6 @@ export const Accounts: React.FC<AccountsProps> = () => {
       toast.success('Account deleted');
       fetchAccounts();
     } catch (err: any) {
-      console.error(err);
       toast.error('Error deleting account');
     }
   };
@@ -156,7 +153,6 @@ export const Accounts: React.FC<AccountsProps> = () => {
           const status = String(row.status ?? 'Active');
 
           if (!user_id || !first_name || !last_name || !email_address || !contact_number) {
-            console.warn('Skipping invalid row:', row);
             errorCount++;
             continue;
           }
@@ -179,7 +175,6 @@ export const Accounts: React.FC<AccountsProps> = () => {
           await api.post('/create-account/', payload);
           successCount++;
         } catch (err: any) {
-          console.error('Error importing row:', err.response?.data || err.message);
           errorCount++;
         }
       }

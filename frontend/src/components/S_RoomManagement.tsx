@@ -113,7 +113,6 @@ const RoomManagement: React.FC<UserProps> = ({ user }) => {
           await fetchSelectedRooms();
         }
       } catch (error) {
-        console.error('Error fetching data:', error);
         toast.error('Failed to load room data');
       } finally {
         setIsLoading(false);   // <-- STOP LOADING
@@ -222,8 +221,6 @@ const RoomManagement: React.FC<UserProps> = ({ user }) => {
       // Delete all available rooms for this college
       const availableRoomsResponse = await api.get(`/tbl_available_rooms/?college_id=${userCollegeId}`);
 
-      console.log('Available rooms to delete:', availableRoomsResponse.data);
-
       let deletedCount = 0;
       let errorCount = 0;
 
@@ -237,20 +234,14 @@ const RoomManagement: React.FC<UserProps> = ({ user }) => {
           roomId = roomData.room_id;
         }
 
-        console.log('Room data:', roomData);
-        console.log('Attempting to delete room:', roomId, 'for college:', userCollegeId);
-
         if (roomId) {
           try {
             await api.delete(`/tbl_available_rooms/${roomId}/${userCollegeId}/`);
             deletedCount++;
-            console.log('Successfully deleted:', roomId);
           } catch (deleteError: any) {
             errorCount++;
-            console.error('Failed to delete room:', roomId, deleteError.response?.data || deleteError);
           }
         } else {
-          console.error('Could not extract room_id from:', roomData);
           errorCount++;
         }
       }
@@ -326,7 +317,6 @@ const RoomManagement: React.FC<UserProps> = ({ user }) => {
           successCount++;
         } catch (postError: any) {
           errorCount++;
-          console.error('Error posting room:', roomId, postError.response?.data);
         }
       }
 

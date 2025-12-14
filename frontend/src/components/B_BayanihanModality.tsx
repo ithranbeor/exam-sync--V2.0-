@@ -65,9 +65,7 @@ const BayanihanModality: React.FC<UserProps> = ({ user }) => {
       });
 
       setUserModalities(data || []);
-      console.log('User modalities loaded:', data?.length || 0);
     } catch (error) {
-      console.error('Error fetching user modalities:', error);
       toast.error('Failed to load your modalities');
     }
   }, [user]);
@@ -269,7 +267,6 @@ const BayanihanModality: React.FC<UserProps> = ({ user }) => {
             })) ?? []
           );
 
-          console.log('Admin access: All rooms available');
           setLoadingRooms(false);
           return;
         }
@@ -285,9 +282,6 @@ const BayanihanModality: React.FC<UserProps> = ({ user }) => {
           return;
         }
 
-        console.log('=== BAYANIHAN LEADER DEBUG ===');
-        console.log('User ID:', user.user_id);
-
         // ✅ FIXED: Fetch user courses as Bayanihan Leader
         const { data: userCourses } = await api.get('/tbl_course_users/', {
           params: {
@@ -296,15 +290,11 @@ const BayanihanModality: React.FC<UserProps> = ({ user }) => {
           }
         });
 
-        console.log('🔍 Raw API response:', userCourses);
-
         // ✅ FIXED: Extract course IDs where user is Bayanihan Leader
         const courseIds = userCourses
           .filter((c: any) => c.is_bayanihan_leader === true)  // ✅ Double-check the flag
           .map((c: any) => c.course?.course_id || c.course_id)
           .filter((id: any) => id !== null && id !== undefined);
-
-        console.log('✅ Bayanihan Leader Course IDs:', courseIds);
 
         if (courseIds.length === 0) {
           toast.warn('No courses assigned to you as Bayanihan Leader.');
@@ -317,8 +307,6 @@ const BayanihanModality: React.FC<UserProps> = ({ user }) => {
           courseIds.includes(c.course_id)
         );
         setCourseOptions(coursesWithNames);
-
-        console.log('Filtered Courses:', coursesWithNames.length);
 
         // Filter sections
         const sectionsData = Array.isArray(sectionCourses) ? sectionCourses : [];
@@ -340,8 +328,6 @@ const BayanihanModality: React.FC<UserProps> = ({ user }) => {
         );
 
         setSectionOptions(filteredSections);
-
-        console.log("Filtered Sections:", filteredSections.length);
 
         const programIdsFromSections = Array.from(
           new Set(filteredSections.map((s: any) => s.program_id))
@@ -378,9 +364,6 @@ const BayanihanModality: React.FC<UserProps> = ({ user }) => {
 
         const deptNames = departments.map((d: any) => d.department_name).filter(Boolean);
 
-        console.log('Leader Department IDs:', leaderDepartmentIds);
-        console.log('College ID Strings:', collegeIdStrings);
-
         // Filter programs
         const programs = allPrograms.filter((p: any) => {
           if (!programIdsFromSections.includes(p.program_id)) {
@@ -400,7 +383,6 @@ const BayanihanModality: React.FC<UserProps> = ({ user }) => {
           return deptMatch || collegeMatch;
         });
 
-        console.log('Filtered Programs:', programs.length);
         setProgramOptions(programs);
 
         // Fetch available rooms
@@ -434,9 +416,7 @@ const BayanihanModality: React.FC<UserProps> = ({ user }) => {
           })) ?? []
         );
 
-        console.log('==============================');
       } catch (error: any) {
-        console.error('Unexpected error fetching data:', error);
         toast.error('An unexpected error occurred while loading data');
       } finally {
         setLoadingRooms(false);

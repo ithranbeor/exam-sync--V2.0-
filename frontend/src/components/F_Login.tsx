@@ -137,7 +137,6 @@ const LoginFaculty: React.FC = () => {
         navigate(dashboard);
       } catch (err: any) {
         console.error("Login error:", err);
-        // Display a more user-friendly error message for the current role
         const roleText = isFacultyLogin ? "Employee" : "Admin";
         setError(err.response?.data?.message || `Invalid ${roleText} ID or password.`);
       } finally {

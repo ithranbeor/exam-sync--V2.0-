@@ -70,7 +70,6 @@ const ProctorAttendance: React.FC<UserProps> = ({ user }) => {
         now.getDate() === examDateObj.getDate();
 
       if (!isSameDay) {
-        console.log('Not same day');
         return false;
       }
 

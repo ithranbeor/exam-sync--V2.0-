@@ -62,12 +62,9 @@ const DeanRequests: React.FC<SchedulerViewProps> = ({ user }) => {
   useEffect(() => {
     const fetchCollege = async () => {
       if (!user?.user_id) {
-        console.log("❌ No user_id provided");
         return;
       }
-
       try {
-
         const userRoleResponse = await api.get('/tbl_user_role', {
           params: {
             user_id: user.user_id,
@@ -244,7 +241,6 @@ const DeanRequests: React.FC<SchedulerViewProps> = ({ user }) => {
 
       await api.post('/notifications/create/', notificationData);
     } catch (error) {
-      console.error('❌ Failed to send notification to scheduler:', error);
     }
   };
 

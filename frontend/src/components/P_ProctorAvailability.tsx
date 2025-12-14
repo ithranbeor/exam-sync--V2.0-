@@ -94,13 +94,11 @@ const ProctorSetAvailability: React.FC<ProctorSetAvailabilityProps> = ({ user })
           setDayToTimeSlots(daySlotMap);
           setAvailableDays(Object.keys(daySlotMap));
         } else {
-          console.error('Unexpected API response format:', data);
           setAvailabilityList([]);
           setAvailableDays([]);
           setDayToTimeSlots({});
         }
       } catch (err) {
-        console.error('Error fetching availability:', err);
       } finally {
         setLoadingAvailability(false);
       }
@@ -128,10 +126,8 @@ const ProctorSetAvailability: React.FC<ProctorSetAvailabilityProps> = ({ user })
           params: { user_id: user.user_id }
         });
 
-        console.log('User roles fetched:', roles);
 
         if (!Array.isArray(roles) || roles.length === 0) {
-          console.error('No roles found for user');
           setCollegeId(null);
           setAllowedDates([]);
           return;
@@ -140,13 +136,10 @@ const ProctorSetAvailability: React.FC<ProctorSetAvailabilityProps> = ({ user })
         // 2️⃣ Check if user is a proctor (role_id = 5)
         const proctorRole = roles.find((r: any) => r.role === 5 || r.role_id === 5);
         if (!proctorRole) {
-          console.warn('User is not a proctor');
           setCollegeId(null);
           setAllowedDates([]);
           return;
         }
-
-        console.log('Proctor role found:', proctorRole);
 
         // 3️⃣ Get college from role or user record
         let college_id = proctorRole.college ?? proctorRole.college_id ?? null;
@@ -158,34 +151,26 @@ const ProctorSetAvailability: React.FC<ProctorSetAvailabilityProps> = ({ user })
         }
 
         if (!college_id) {
-          console.warn('College not found for proctor');
           setCollegeId(null);
           setAllowedDates([]);
           return;
         }
 
         setCollegeId(college_id);
-        console.log('Proctor college ID:', college_id);
 
         // 4️⃣ Fetch exam periods
         const { data: allPeriods } = await api.get(`/tbl_examperiod`);
         if (!Array.isArray(allPeriods)) {
-          console.error('Unexpected examperiod response:', allPeriods);
           setAllowedDates([]);
           return;
         }
-
-        console.log('All exam periods:', allPeriods);
 
         // ✅ Filter by the correct college_id
         const collegePeriods = allPeriods.filter(
           (period: any) => String(period.college_id) === String(college_id)
         );
 
-        console.log('Filtered exam periods for college:', collegePeriods);
-
         if (collegePeriods.length === 0) {
-          console.warn(`No exam periods found for college_id=${college_id}`);
           setAllowedDates([]);
           return;
         }
@@ -203,9 +188,7 @@ const ProctorSetAvailability: React.FC<ProctorSetAvailabilityProps> = ({ user })
 
         generatedDates.sort();
         setAllowedDates(generatedDates);
-        console.log('Allowed dates for proctor:', generatedDates);
       } catch (err) {
-        console.error('Error fetching user role or exam schedule:', err);
         setAllowedDates([]);
       } finally {
         setLoadingAllowedDates(false);
@@ -228,7 +211,6 @@ const ProctorSetAvailability: React.FC<ProctorSetAvailabilityProps> = ({ user })
         const { data: collegeData } = await api.get(`/tbl_college/${_collegeId}/`);
 
         if (!collegeData?.college_name) {
-          console.error('Could not fetch college name');
           setHasApprovedSchedule(false);
           return;
         }
@@ -379,7 +361,6 @@ const ProctorSetAvailability: React.FC<ProctorSetAvailabilityProps> = ({ user })
         toast.error(`Failed to submit availability: ${response.data?.message || 'Unknown error'}`);
       }
     } catch (err: any) {
-      console.error('API error:', err);
       toast.error(`Failed to process availability: ${err?.message || 'Unknown error'}`);
     }
 
