@@ -82,6 +82,12 @@ const SchedulerView: React.FC<SchedulerViewProps> = ({ user }) => {
     return stored ? JSON.parse(stored) : false;
   });
 
+  const [deleteProgress, setDeleteProgress] = useState<{
+    isDeleting: boolean;
+    progress: number;
+    message: string;
+  } | null>(null);
+
   const resetAllModes = () => {
     setIsModalOpen(false);
     setActiveProctorEdit(null);
@@ -740,23 +746,41 @@ const SchedulerView: React.FC<SchedulerViewProps> = ({ user }) => {
     );
     if (!confirmStep2) return;
 
-    const loadingToast = toast.info("Deleting schedules...", { autoClose: false });
-
     try {
       const examsToDelete = examData.filter(e => e.college_name === schedulerCollegeName);
 
       if (examsToDelete.length === 0) {
-        toast.dismiss(loadingToast);
         toast.warn(`No schedules found for ${schedulerCollegeName}`);
         return;
       }
 
+      // Initialize progress
+      setDeleteProgress({
+        isDeleting: true,
+        progress: 0,
+        message: 'Preparing to delete schedules...'
+      });
+
+      // Simulate progress steps
+      await new Promise(resolve => setTimeout(resolve, 500));
+      setDeleteProgress({
+        isDeleting: true,
+        progress: 25,
+        message: `Deleting ${examsToDelete.length} schedule(s)...`
+      });
+
+      // Delete schedules
       const response = await api.post('/tbl_examdetails/batch-delete/', {
         college_name: schedulerCollegeName
       });
 
-      toast.dismiss(loadingToast);
+      setDeleteProgress({
+        isDeleting: true,
+        progress: 60,
+        message: 'Removing approval records...'
+      });
 
+      // Delete approval records
       try {
         const approvalResponse = await api.get('/tbl_scheduleapproval/', {
           params: { college_name: schedulerCollegeName }
@@ -769,19 +793,38 @@ const SchedulerView: React.FC<SchedulerViewProps> = ({ user }) => {
           await Promise.all(deletePromises);
         }
       } catch (approvalError) {
+        // Continue even if approval deletion fails
       }
 
+      setDeleteProgress({
+        isDeleting: true,
+        progress: 85,
+        message: 'Cleaning up data...'
+      });
+
+      await new Promise(resolve => setTimeout(resolve, 300));
+
+      // Clear states
       setApprovalStatus(null);
       setRemarks(null);
       setExamData([]);
-
-      // ✅ Clear unscheduled sections storage
       saveUnscheduledSections([]);
+
+      setDeleteProgress({
+        isDeleting: true,
+        progress: 100,
+        message: 'Delete complete!'
+      });
+
+      await new Promise(resolve => setTimeout(resolve, 500));
+
+      // Close progress modal
+      setDeleteProgress(null);
 
       toast.success(`Successfully deleted ${response.data.deleted_count} schedules for ${schedulerCollegeName}!`);
 
     } catch (error: any) {
-      toast.dismiss(loadingToast);
+      setDeleteProgress(null);
       toast.error(`Failed to delete schedules: ${error?.response?.data?.error || error?.message || 'Unknown error'}`);
     }
   };
@@ -919,24 +962,9 @@ const SchedulerView: React.FC<SchedulerViewProps> = ({ user }) => {
       key: "Edit Manually",
       icon: (
         <div style={{ position: 'relative', display: 'inline-block' }}>
-          <FaEdit style={{ fontSize: "20px", color: "#10b981" }} />
+          <FaEdit style={{ fontSize: "20px" }} />
           {showUnscheduledBadge && (
-            <span style={{
-              position: 'absolute',
-              top: '-8px',
-              right: '-8px',
-              background: '#ef4444',
-              color: 'white',
-              borderRadius: '50%',
-              width: '18px',
-              height: '18px',
-              fontSize: '11px',
-              display: 'flex',
-              alignItems: 'center',
-              justifyContent: 'center',
-              fontWeight: 'bold',
-              border: '2px solid white'
-            }}>
+            <span>
               {persistentUnscheduled.length}
             </span>
           )}
@@ -1125,7 +1153,7 @@ const SchedulerView: React.FC<SchedulerViewProps> = ({ user }) => {
               ? "active"
               : ""
               }`}
-            style={{ 
+            style={{
               position: key === "Send Messages" ? "relative" : undefined,
               flexDirection: showIconLabels ? 'column' : 'row',
               gap: showIconLabels ? '4px' : '0'
@@ -1277,8 +1305,8 @@ const SchedulerView: React.FC<SchedulerViewProps> = ({ user }) => {
           position: 'fixed',
           bottom: '30px',
           right: '30px',
-          backgroundColor: '#092C4C',
-          color: 'white',
+          backgroundColor: '#ffffffff',
+          color: '#092C4C',
           border: 'none',
           borderRadius: '50px',
           padding: '12px 24px',
@@ -2286,6 +2314,118 @@ const SchedulerView: React.FC<SchedulerViewProps> = ({ user }) => {
           duration={{ hours: 1, minutes: 30 }}
         />
       </Modal>
+
+      {/* Delete Progress Modal */}
+      {deleteProgress && (
+        <div style={{
+          position: 'fixed',
+          top: 0,
+          left: 0,
+          right: 0,
+          bottom: 0,
+          backgroundColor: 'rgba(0, 0, 0, 0.7)',
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'center',
+          zIndex: 10000,
+          animation: 'fadeIn 0.3s ease'
+        }}>
+          <div style={{
+            backgroundColor: 'white',
+            borderRadius: '16px',
+            padding: '40px',
+            maxWidth: '500px',
+            width: '90%',
+            boxShadow: '0 10px 40px rgba(0, 0, 0, 0.3)',
+            animation: 'slideUp 0.3s ease'
+          }}>
+            {/* Icon */}
+            <div style={{
+              textAlign: 'center',
+              marginBottom: '20px'
+            }}>
+              <div style={{
+                width: '80px',
+                height: '80px',
+                margin: '0 auto',
+                borderRadius: '50%',
+                backgroundColor: deleteProgress.progress === 100 ? '#10b981' : '#ef4444',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                animation: 'pulse 2s infinite'
+              }}>
+                {deleteProgress.progress === 100 ? (
+                  <span style={{ fontSize: '40px' }}>✓</span>
+                ) : (
+                  <FaTrash style={{ fontSize: '32px', color: 'white' }} />
+                )}
+              </div>
+            </div>
+
+            {/* Message */}
+            <h3 style={{
+              textAlign: 'center',
+              color: '#092C4C',
+              marginBottom: '10px',
+              fontSize: '20px',
+              fontWeight: 'bold'
+            }}>
+              {deleteProgress.progress === 100 ? 'Deletion Complete!' : 'Deleting Schedules...'}
+            </h3>
+
+            <p style={{
+              textAlign: 'center',
+              color: '#666',
+              marginBottom: '25px',
+              fontSize: '14px'
+            }}>
+              {deleteProgress.message}
+            </p>
+
+            {/* Progress Bar */}
+            <div style={{
+              width: '100%',
+              height: '12px',
+              backgroundColor: '#e5e7eb',
+              borderRadius: '6px',
+              overflow: 'hidden',
+              marginBottom: '15px'
+            }}>
+              <div style={{
+                width: `${deleteProgress.progress}%`,
+                height: '100%',
+                backgroundColor: deleteProgress.progress === 100 ? '#10b981' : '#ef4444',
+                transition: 'width 0.5s ease',
+                borderRadius: '6px'
+              }} />
+            </div>
+
+            {/* Percentage */}
+            <p style={{
+              textAlign: 'center',
+              color: '#092C4C',
+              fontWeight: 'bold',
+              fontSize: '16px'
+            }}>
+              {deleteProgress.progress}%
+            </p>
+
+            {/* Warning Text */}
+            {deleteProgress.progress < 100 && (
+              <p style={{
+                textAlign: 'center',
+                color: '#ef4444',
+                fontSize: '12px',
+                marginTop: '20px',
+                fontWeight: '500'
+              }}>
+                ⚠️ Please do not close this window
+              </p>
+            )}
+          </div>
+        </div>
+      )}
 
       <ToastContainer position="top-right" autoClose={1500} />
     </div>

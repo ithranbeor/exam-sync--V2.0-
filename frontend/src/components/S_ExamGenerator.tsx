@@ -2177,10 +2177,10 @@ const SchedulerPlottingSchedule: React.FC<SchedulerProps> = ({ user, onScheduleC
               onClick={async () => {
                 const count = alreadyScheduledIds.size;
                 setIsRemoving(true);
-                
+
                 // Simulate async operation (replace with actual delete logic if needed)
                 await new Promise(resolve => setTimeout(resolve, 500));
-                
+
                 setFormData(prev => ({
                   ...prev,
                   selectedModalities: prev.selectedModalities.filter(
@@ -2243,8 +2243,8 @@ const SchedulerPlottingSchedule: React.FC<SchedulerProps> = ({ user, onScheduleC
           {isGenerating ? (
             <div className="loading-progress">
               <div className="progress-bar-container">
-                <div 
-                  className="progress-bar-fill" 
+                <div
+                  className="progress-bar-fill"
                   style={{ width: `${generationProgress}%` }}
                 />
               </div>

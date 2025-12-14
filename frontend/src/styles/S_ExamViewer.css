@@ -651,13 +651,67 @@
     font-size: 14px !important;
   }
 }
+
 /* Icon labels responsive */
 @media (max-width: 768px) {
   .scheduler-icon[style*="flex-direction: column"] {
     padding: 6px 10px !important;
   }
-  
+
   .scheduler-icon[style*="flex-direction: column"] span {
     font-size: 9px !important;
+  }
+}
+
+/* Delete Progress Animations */
+@keyframes fadeIn {
+  from {
+    opacity: 0;
+  }
+
+  to {
+    opacity: 1;
+  }
+}
+
+@keyframes slideUp {
+  from {
+    opacity: 0;
+    transform: translateY(30px);
+  }
+
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+@keyframes pulse {
+
+  0%,
+  100% {
+    transform: scale(1);
+    opacity: 1;
+  }
+
+  50% {
+    transform: scale(1.05);
+    opacity: 0.9;
+  }
+}
+
+/* Responsive adjustments for progress modal */
+@media (max-width: 768px) {
+  div[style*="maxWidth: '500px'"] {
+    padding: 30px 20px !important;
+  }
+
+  div[style*="width: '80px'"] {
+    width: 60px !important;
+    height: 60px !important;
+  }
+
+  h3[style*="fontSize: '20px'"] {
+    font-size: 18px !important;
   }
 }
