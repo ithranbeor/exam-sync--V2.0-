@@ -333,20 +333,14 @@
   box-shadow: 0 6px 16px rgba(0, 0, 0, 0.2);
 }
 
-.scheduler-nav-button-left:hover {
-  transform: translateX(-50%) scale(1.1);
-}
-
+.scheduler-nav-button-left:hover,
 .scheduler-nav-button-right:hover {
-  transform: translateX(-50%) scale(1.1);
+  transform: scale(1.1);
 }
 
-.scheduler-nav-button-left:active {
-  transform: translateX(-50%) scale(0.95);
-}
-
+.scheduler-nav-button-left:active,
 .scheduler-nav-button-right:active {
-  transform: translateX(-50%) scale(0.95);
+  transform: scale(0.95);
 }
 
 .scheduler-nav-button svg {
@@ -360,32 +354,32 @@
 }
 
 .scheduler-nav-button-left {
-  left: 50%;
-  top: 85%;
-  transform: translateX(-50%);
+  left: calc(50% - 50px);
+  top: 90%;
+  transform: none;
   right: auto;
 }
 
 .scheduler-nav-button-right {
-  left: 50%;
-  top: 92%;
-  transform: translateX(-50%);
+  left: calc(50% + 50px);
+  top: 90%;
+  transform: none;
   right: auto;
 }
 
 /* ======================= DESKTOP (min-width: 1025px) ======================= */
 @media (min-width: 1025px) {
   .scheduler-nav-button-left {
-    left: 50%;
-    top: 85%;
-    transform: translateX(-50%);
+    left: calc(50% - 60px);
+    top: 90%;
+    transform: none;
     right: auto;
   }
 
   .scheduler-nav-button-right {
-    left: 50%;
-    top: 92%;
-    transform: translateX(-50%);
+    left: calc(50% + 60px);
+    top: 90%;
+    transform: none;
     right: auto;
   }
 
