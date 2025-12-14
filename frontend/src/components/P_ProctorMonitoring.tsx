@@ -23,6 +23,7 @@ interface UserProps {
   } | null;
 }
 
+// ✅ FIXED: Made status optional since we use examdetails_status as primary
 interface MonitoringSchedule {
   id: number;
   course_id: string;
@@ -37,8 +38,8 @@ interface MonitoringSchedule {
   instructor_name: string;
   department: string;
   college: string;
-  status: string;
-  examdetails_status?: string;
+  examdetails_status: string;  // ✅ Primary status field from backend
+  status?: string;  // ✅ Optional legacy field for compatibility
   code_entry_time: string | null;
   otp_code: string | null;
   approval_status?: string;
@@ -67,7 +68,8 @@ const ProctorMonitoring: React.FC<UserProps> = ({ }) => {
       const examEnd = new Date(`${s.exam_date}T${s.exam_end_time}`);
       const hasTimeIn = Boolean(s.code_entry_time);
 
-      const currentStatus = (s.examdetails_status || s.status || '').toLowerCase();
+      // ✅ Use examdetails_status as primary
+      const currentStatus = (s.examdetails_status || '').toLowerCase();
 
       if (now > examEnd && !hasTimeIn && currentStatus === 'pending') {
         try {
@@ -105,7 +107,7 @@ const ProctorMonitoring: React.FC<UserProps> = ({ }) => {
         approvalResponse.data.map((approval: any) => approval.college_name),
       );
 
-      // Map schedules with instant approval check (no more API calls in loop)
+      // ✅ FIXED: Map schedules with examdetails_status as primary
       const schedulesWithApproval = examData.map((schedule: any) => {
         const isApproved = approvedColleges.has(schedule.college);
 
@@ -123,8 +125,8 @@ const ProctorMonitoring: React.FC<UserProps> = ({ }) => {
           instructor_name: schedule.instructor_name || '',
           department: schedule.department || '',
           college: schedule.college || '',
-          status: schedule.status || 'pending',
-          examdetails_status: schedule.examdetails_status,
+          examdetails_status: schedule.examdetails_status || schedule.status || 'pending',  // ✅ Primary status
+          status: schedule.status,  // ✅ Keep for compatibility
           code_entry_time: schedule.code_entry_time || null,
           otp_code: schedule.otp_code || null,
           approval_status: isApproved ? 'approved' : 'pending',
@@ -286,6 +288,16 @@ const ProctorMonitoring: React.FC<UserProps> = ({ }) => {
       }
     };
 
+    // ✅ FIXED: Get display status for PDF
+    const getStatusDisplay = (status: string) => {
+      const normalized = status.toLowerCase().trim();
+      if (normalized.includes('late')) return 'LATE';
+      if (normalized.includes('confirm') || normalized.includes('present')) return 'PRESENT';
+      if (normalized.includes('absent')) return 'ABSENT';
+      if (normalized.includes('sub')) return 'SUBSTITUTE';
+      return 'PENDING';
+    };
+
     const doc = new jsPDF('landscape', 'mm', 'a4');
 
     // Title
@@ -309,7 +321,7 @@ const ProctorMonitoring: React.FC<UserProps> = ({ }) => {
       { align: 'center' },
     );
 
-    // Prepare table data
+    // ✅ FIXED: Prepare table data using examdetails_status
     const tableData = sortedSchedules.map((schedule, index) => [
       (index + 1).toString(),
       schedule.course_id,
@@ -321,7 +333,7 @@ const ProctorMonitoring: React.FC<UserProps> = ({ }) => {
       schedule.proctor_name,
       schedule.otp_code || 'N/A',
       formatTimeIn(schedule.code_entry_time),
-      schedule.status.toUpperCase(),
+      getStatusDisplay(schedule.examdetails_status),  // ✅ Use examdetails_status
     ]);
 
     // Add table using autoTable function directly
@@ -425,6 +437,7 @@ const ProctorMonitoring: React.FC<UserProps> = ({ }) => {
   const sortedSchedules = useMemo(() => {
     let data = approvedSchedules;
 
+    // ✅ FIXED: Search using examdetails_status
     if (searchTerm && searchTerm.trim()) {
       const term = searchTerm.toLowerCase();
       data = data.filter((schedule) => {
@@ -439,7 +452,7 @@ const ProctorMonitoring: React.FC<UserProps> = ({ }) => {
           schedule.room_id,
           schedule.proctor_name,
           schedule.instructor_name,
-          schedule.status,
+          schedule.examdetails_status,  // ✅ Use examdetails_status
         ]
           .filter(Boolean)
           .join(' ')
@@ -449,13 +462,10 @@ const ProctorMonitoring: React.FC<UserProps> = ({ }) => {
       });
     }
 
-    if (sortBy === 'none') {
-      return data;
-    }
-    // Apply status filter if set
+    // ✅ FIXED: Apply status filter using examdetails_status
     if (statusFilter && statusFilter !== 'all') {
       data = data.filter((schedule) => {
-        const status = (schedule.examdetails_status || schedule.status || '').toLowerCase();
+        const status = (schedule.examdetails_status || '').toLowerCase();
         if (statusFilter === 'present') {
           return status.includes('confirm') || status.includes('present');
         }
@@ -466,6 +476,11 @@ const ProctorMonitoring: React.FC<UserProps> = ({ }) => {
       });
     }
 
+    if (sortBy === 'none') {
+      return data;
+    }
+
+    // ✅ FIXED: Sort using examdetails_status
     return [...data].sort((a, b) => {
       switch (sortBy) {
         case 'course_id':
@@ -487,7 +502,7 @@ const ProctorMonitoring: React.FC<UserProps> = ({ }) => {
         case 'instructor_name':
           return smartSort(a.instructor_name.toLowerCase(), b.instructor_name.toLowerCase());
         case 'status':
-          return smartSort(a.status.toLowerCase(), b.status.toLowerCase());
+          return smartSort(a.examdetails_status.toLowerCase(), b.examdetails_status.toLowerCase());  // ✅ Use examdetails_status
         default:
           return 0;
       }
@@ -688,8 +703,8 @@ const ProctorMonitoring: React.FC<UserProps> = ({ }) => {
               <tbody>
                 {sortedSchedules.length > 0 ? (
                   sortedSchedules.map((schedule, index) => {
-                    // ✅ FIXED: Use backend status directly
-                    const backendStatus = schedule.examdetails_status || 'pending';
+                    // ✅ FIXED: Use examdetails_status directly
+                    const backendStatus = schedule.examdetails_status;
 
                     const getStatusDisplay = (status: string) => {
                       const normalized = status.toLowerCase().trim();
@@ -733,7 +748,7 @@ const ProctorMonitoring: React.FC<UserProps> = ({ }) => {
                       }
                     };
 
-                    const codeEntryTime = schedule.code_entry_time || (schedule as any).proctor_timein;
+                    const codeEntryTime = schedule.code_entry_time;
 
                     return (
                       <tr key={schedule.id}>
@@ -769,7 +784,7 @@ const ProctorMonitoring: React.FC<UserProps> = ({ }) => {
                           {formatTimeIn(codeEntryTime)}
                         </td>
                         <td>
-                          {/* ✅ FIXED: Display statusDisplay.text instead of schedule.status */}
+                          {/* ✅ FIXED: Display statusDisplay.text from examdetails_status */}
                           <span className={`status-badge ${statusDisplay.className}`}>
                             {statusDisplay.text}
                           </span>

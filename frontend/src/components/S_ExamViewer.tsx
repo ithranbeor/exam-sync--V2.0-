@@ -1054,8 +1054,25 @@ const SchedulerView: React.FC<SchedulerViewProps> = ({ user }) => {
         <div style={{ position: 'relative', display: 'inline-block' }}>
           <FaEdit style={{ fontSize: "20px" }} />
           {showUnscheduledBadge && (
-            <span>
-              {persistentUnscheduled.length}
+            <span style={{
+              position: 'absolute',
+              top: '-4px',
+              right: '-4px',
+              backgroundColor: '#dc3545',
+              color: 'white',
+              borderRadius: '50%',
+              minWidth: '18px',
+              height: '18px',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              fontSize: '11px',
+              fontWeight: 'bold',
+              padding: '2px',
+              boxShadow: '0 2px 4px rgba(0, 0, 0, 0.2)',
+              zIndex: 1
+            }}>
+              {persistentUnscheduled.length > 99 ? '99+' : persistentUnscheduled.length}
             </span>
           )}
         </div>
