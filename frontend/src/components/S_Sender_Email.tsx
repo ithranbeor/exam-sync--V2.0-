@@ -38,9 +38,9 @@ interface EmailSenderProps extends UserProps {
   examData?: any[];
 }
 
-const EmailSender: React.FC<EmailSenderProps> = ({ 
-  onClose, 
-  collegeName, 
+const EmailSender: React.FC<EmailSenderProps> = ({
+  onClose,
+  collegeName,
   user,
   approvalStatus,
   examData = []
@@ -58,7 +58,7 @@ const EmailSender: React.FC<EmailSenderProps> = ({
         if (!user?.user_id) return;
 
         if (approvalStatus === 'approved' && examData && examData.length > 0) {
-          
+
           // 🔒 CRITICAL: Filter exam data by scheduler's college FIRST
           const collegeExamData = examData.filter(
             exam => exam.college_name === collegeName
@@ -87,8 +87,8 @@ const EmailSender: React.FC<EmailSenderProps> = ({
 
           const usersResponse = await api.get('/users/');
           const allUsers = usersResponse.data;
-          
-          const proctorUsers = allUsers.filter((u: User) => 
+
+          const proctorUsers = allUsers.filter((u: User) =>
             proctorIds.includes(u.user_id)
           );
 
@@ -96,7 +96,7 @@ const EmailSender: React.FC<EmailSenderProps> = ({
           setUsers(proctorUsers);
 
           const scheduleMap: Record<number, ProctorSchedule[]> = {};
-          
+
           proctorUsers.forEach((proctor: User) => {
             const proctorExams = collegeExamData.filter(
               exam => exam.proctor_id === proctor.user_id
@@ -150,7 +150,7 @@ const EmailSender: React.FC<EmailSenderProps> = ({
           }
 
           const usersResponse = await api.get('/users/');
-          const proctorUsers = usersResponse.data.filter((u: User) => 
+          const proctorUsers = usersResponse.data.filter((u: User) =>
             proctorIds.includes(u.user_id)
           );
 
@@ -189,14 +189,14 @@ const EmailSender: React.FC<EmailSenderProps> = ({
       : "Scheduler";
 
     const schedulerEmail = user?.email_address || "";
-    
+
     if (schedules.length === 0) {
       return `Dear ${proctor.first_name} ${proctor.last_name},\n\nYou have been assigned as a proctor for ${collegeName}.\n\n${body}`;
     }
 
     let emailBody = `Dear ${proctor.first_name} ${proctor.last_name},\n\n`;
     emailBody += `You have been assigned as a proctor for the following examination schedule(s) at ${collegeName}:\n\n`;
-    
+
     schedules.forEach((schedule, index) => {
       emailBody += `${index + 1}. ${schedule.course_id} - ${schedule.section_name}\n`;
       emailBody += `   Date: ${formatDate(schedule.exam_date)}\n`;
@@ -231,9 +231,9 @@ const EmailSender: React.FC<EmailSenderProps> = ({
       return;
     }
 
-    const emailSubject = subject.trim() || 
-      (approvalStatus === 'approved' 
-        ? `Proctoring Assignment - ${collegeName}` 
+    const emailSubject = subject.trim() ||
+      (approvalStatus === 'approved'
+        ? `Proctoring Assignment - ${collegeName}`
         : "Notification from Scheduler");
 
     setLoading(true);
@@ -251,7 +251,7 @@ const EmailSender: React.FC<EmailSenderProps> = ({
           message: personalizedBody
         };
       });
-      
+
       const response = await api.post('/send-proctor-emails/', {
         emails: emailsData,
         sender_id: user?.user_id
@@ -264,21 +264,21 @@ const EmailSender: React.FC<EmailSenderProps> = ({
       }
 
       if (failed_emails && failed_emails.length > 0) {
-        
+
         // Show detailed error messages
-        failed_emails.forEach((fail: any) => {          
+        failed_emails.forEach((fail: any) => {
           // Show specific error toast
           if (fail.reason.includes('authentication')) {
-            toast.error(`Gmail authentication failed. Contact system admin.`, { 
-              autoClose: 5000 
+            toast.error(`Gmail authentication failed. Contact system admin.`, {
+              autoClose: 5000
             });
           } else if (fail.reason.includes('timeout')) {
-            toast.warn(`Email to ${fail.name} timed out. Server may be busy.`, { 
-              autoClose: 4000 
+            toast.warn(`Email to ${fail.name} timed out. Server may be busy.`, {
+              autoClose: 4000
             });
           } else {
-            toast.warn(`Failed to send to ${fail.name}: ${fail.reason}`, { 
-              autoClose: 4000 
+            toast.warn(`Failed to send to ${fail.name}: ${fail.reason}`, {
+              autoClose: 4000
             });
           }
         });
@@ -290,13 +290,13 @@ const EmailSender: React.FC<EmailSenderProps> = ({
 
     } catch (err: any) {
       console.error("❌ Error sending emails:", err);
-      
+
       // Extract detailed error information
       const status = err?.response?.status;
       const errorDetail = err?.response?.data?.detail;
       const errorMessage = err?.response?.data?.error;
       const smtpConfig = err?.response?.data?.smtp_config;
-      
+
       // Show specific error messages based on status code
       if (status === 503) {
         // Service unavailable - SMTP connection failed
@@ -304,7 +304,7 @@ const EmailSender: React.FC<EmailSenderProps> = ({
           `Email service unavailable: ${errorDetail || 'Cannot connect to Gmail SMTP server'}`,
           { autoClose: 7000 }
         );
-        
+
         if (smtpConfig) {
           toast.info(
             'Contact administrator to check email settings (Gmail app password may have expired)',
@@ -328,7 +328,7 @@ const EmailSender: React.FC<EmailSenderProps> = ({
           { autoClose: 5000 }
         );
       }
-      
+
     } finally {
       setLoading(false);
     }
@@ -336,11 +336,10 @@ const EmailSender: React.FC<EmailSenderProps> = ({
 
   const options = users.map(u => ({
     value: u.user_id,
-    label: `${u.first_name} ${u.last_name}${u.email_address ? ` - ${u.email_address}` : " (No email)"}${
-      proctorSchedules[u.user_id] 
-        ? ` (${proctorSchedules[u.user_id].length} exam${proctorSchedules[u.user_id].length > 1 ? 's' : ''})` 
-        : ''
-    }`,
+    label: `${u.first_name} ${u.last_name}${u.email_address ? ` - ${u.email_address}` : " (No email)"}${proctorSchedules[u.user_id]
+      ? ` (${proctorSchedules[u.user_id].length} exam${proctorSchedules[u.user_id].length > 1 ? 's' : ''})`
+      : ''
+      }`,
     user: u
   }));
 
@@ -348,8 +347,8 @@ const EmailSender: React.FC<EmailSenderProps> = ({
     <div className="message-sender-container">
       <div className="message-sender-header">
         <h3>
-          {approvalStatus === 'approved' 
-            ? `Send Approved Schedule to Proctors` 
+          {approvalStatus === 'approved'
+            ? `Send Approved Schedule to Proctors`
             : `Send Email to Proctors`}
         </h3>
         {approvalStatus === 'approved' && (
@@ -396,13 +395,11 @@ const EmailSender: React.FC<EmailSenderProps> = ({
                 : []),
               ...selectedUsers.map(u => ({
                 value: u.user_id,
-                label: `${u.first_name} ${u.last_name}${
-                  u.email_address ? ` - ${u.email_address}` : " (No email)"
-                }${
-                  proctorSchedules[u.user_id] 
-                    ? ` (${proctorSchedules[u.user_id].length} exam${proctorSchedules[u.user_id].length > 1 ? 's' : ''})` 
+                label: `${u.first_name} ${u.last_name}${u.email_address ? ` - ${u.email_address}` : " (No email)"
+                  }${proctorSchedules[u.user_id]
+                    ? ` (${proctorSchedules[u.user_id].length} exam${proctorSchedules[u.user_id].length > 1 ? 's' : ''})`
                     : ''
-                }`,
+                  }`,
                 user: u,
               })),
             ]}
@@ -442,7 +439,7 @@ const EmailSender: React.FC<EmailSenderProps> = ({
             rows={6}
           />
           <div className="char-count">{body.length} characters</div>
-          
+
           {approvalStatus === 'approved' && (
             <p style={{ fontSize: '11px', color: '#666', marginTop: '5px' }}>
               Note: Real Gmail emails will be sent with personalized exam schedules
@@ -461,8 +458,8 @@ const EmailSender: React.FC<EmailSenderProps> = ({
           className="btn-send"
           disabled={loading || selectedUsers.length === 0}
         >
-          {loading 
-            ? "Sending to Gmail..." 
+          {loading
+            ? "Sending to Gmail..."
             : `Send to ${selectedUsers.length} Gmail address(es)`
           }
         </button>

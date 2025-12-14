@@ -2,7 +2,7 @@ import React, { useEffect, useMemo, useState } from "react";
 import { api } from '../lib/apiClient.ts';
 import "../styles/S_ExamGenerator.css";
 import Select, { components } from "react-select";
-import { FaPlay, FaSpinner } from "react-icons/fa";
+import { FaPlay } from "react-icons/fa";
 import { ToastContainer, toast } from 'react-toastify';
 import 'react-toastify/dist/ReactToastify.css';
 import CreatableSelect from "react-select/creatable"
@@ -74,6 +74,11 @@ const SchedulerPlottingSchedule: React.FC<SchedulerProps> = ({ user, onScheduleC
   const [academicYear, setAcademicYear] = useState<string>("");
   const [semester, setSemester] = useState<string>("");
   const [examPeriod, setExamPeriod] = useState<string>("");
+
+  const [generationProgress, setGenerationProgress] = useState(0);
+  const [isGenerating, setIsGenerating] = useState(false);
+
+  const [isRemoving, setIsRemoving] = useState(false);
 
   const times = [
     "07:00", "07:30", "08:00", "08:30", "09:00", "09:30", "10:00", "10:30", "11:00", "11:30",
@@ -1418,7 +1423,14 @@ const SchedulerPlottingSchedule: React.FC<SchedulerProps> = ({ user, onScheduleC
     let bestChromosome: Chromosome | null = null;
     let bestFitness = -Infinity;
 
+    setIsGenerating(true);
+    setGenerationProgress(0);
+
     for (let generation = 0; generation < GENERATIONS; generation++) {
+      // Update progress
+      const progress = Math.round((generation / GENERATIONS) * 100);
+      setGenerationProgress(progress);
+
       if (generation % YIELD_EVERY_N_GENERATIONS === 0) {
         await new Promise(resolve => setTimeout(resolve, 0));
       }
@@ -1429,8 +1441,6 @@ const SchedulerPlottingSchedule: React.FC<SchedulerProps> = ({ user, onScheduleC
       if (fitnesses[currentBestIdx] > bestFitness) {
         bestFitness = fitnesses[currentBestIdx];
         bestChromosome = population[currentBestIdx];
-        if (generation % 20 === 0) {
-        }
       }
 
       const nextPopulation: Chromosome[] = [];
@@ -1455,6 +1465,9 @@ const SchedulerPlottingSchedule: React.FC<SchedulerProps> = ({ user, onScheduleC
 
       population = nextPopulation;
     }
+
+    setGenerationProgress(100);
+    setIsGenerating(false);
 
     if (!bestChromosome) {
       alert("Could not find a valid schedule.");
@@ -1743,12 +1756,17 @@ const SchedulerPlottingSchedule: React.FC<SchedulerProps> = ({ user, onScheduleC
   };
 
   const handleSaveClick = async () => {
+    // Validation checks
     if (!formData.selectedPrograms.length || !formData.selectedCourses.length || !formData.selectedModalities.length) {
-      alert("Please complete program, course, and modality selection.");
+      toast.error("Please complete program, course, and modality selection.");
       return;
     }
     if (!formData.selectedExamDates.length) {
-      alert("Please select at least one exam date.");
+      toast.error("Please select at least one exam date.");
+      return;
+    }
+    if (alreadyScheduledIds.size > 0) {
+      toast.warning(`Please remove ${alreadyScheduledIds.size} already scheduled section${alreadyScheduledIds.size > 1 ? 's' : ''} first.`);
       return;
     }
 
@@ -1790,9 +1808,15 @@ const SchedulerPlottingSchedule: React.FC<SchedulerProps> = ({ user, onScheduleC
 
   return (
     <div className="scheduler-container">
-      <h2 className="scheduler-header">Generate Schedule</h2>
-      <div className="main-content-layout">
-        <div className="form-column">
+      <h2 className="scheduler-header">Exam Schedule Generator</h2>
+      <p className="scheduler-subheader">
+        Configure exam schedules using intelligent genetic algorithm optimization
+      </p>
+
+      {/* Academic Configuration Section */}
+      <div className="configuration-section">
+        <div className="section-title">Academic Configuration</div>
+        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(240px, 1fr))', gap: '16px' }}>
           <div className="field">
             <label className="label">Academic Year & Semester</label>
             <CreatableSelect
@@ -1820,7 +1844,6 @@ const SchedulerPlottingSchedule: React.FC<SchedulerProps> = ({ user, onScheduleC
             />
           </div>
 
-          {/* Exam Term */}
           <div className="field">
             <label className="label">Exam Term</label>
             <CreatableSelect
@@ -1849,170 +1872,8 @@ const SchedulerPlottingSchedule: React.FC<SchedulerProps> = ({ user, onScheduleC
           </div>
 
           <div className="field">
-            <label className="label">Select Exam Dates</label>
-            <Select
-              options={addSelectAllOption(examDateOptions.map(d => ({ value: d.iso, label: d.label })))}
-              isMulti
-              closeMenuOnSelect={false}
-              hideSelectedOptions={false}
-              components={{ Option: CheckboxOption }}
-              onChange={(selected) => {
-                let selectedValues = (selected as any[]).map(s => s.value);
-                if (selectedValues.includes("__all__")) {
-                  selectedValues = [...examDateOptions.map(d => d.iso)];
-                }
-                setFormData(prev => ({
-                  ...prev,
-                  selectedExamDates: selectedValues.filter(v => v !== "__all__"),
-                }));
-              }}
-              value={formData.selectedExamDates.map(d => {
-                const opt = examDateOptions.find(o => o.iso === d);
-                return { value: d, label: opt?.label ?? d };
-              })}
-            />
-          </div>
-
-          <div className="field">
-            <label className="label">Program</label>
-            <Select
-              options={addSelectAllOption(
-                sortedPrograms.map(p => ({
-                  value: p.program_id,
-                  label: `${p.program_id} | ${p.program_name}`
-                }))
-              )}
-              isMulti
-              closeMenuOnSelect={false}
-              hideSelectedOptions={false}
-              components={{ Option: CheckboxOption }}
-              onChange={(selected) => {
-                let selectedValues = (selected as any[]).map(s => s.value);
-                if (selectedValues.includes("__all__")) {
-                  selectedValues = [...sortedPrograms.map(p => p.program_id)];
-                }
-                setFormData(prev => ({
-                  ...prev,
-                  selectedPrograms: selectedValues.filter(v => v !== "__all__"),
-                  selectedCourses: [],
-                  selectedModalities: [],
-                }));
-              }}
-              value={formData.selectedPrograms.map(p => {
-                const prog = sortedPrograms.find(f => f.program_id === p);
-                return { value: p, label: prog ? `${prog.program_id} | ${prog.program_name}` : p };
-              })}
-            />
-          </div>
-
-          <div className="field">
-            <label className="label">Course</label>
-            <Select
-              options={addSelectAllOption(
-                sortedCourses.map(c => ({
-                  value: c.course_id,
-                  label: `${c.course_id} | ${c.course_name}`
-                }))
-              )}
-              isMulti
-              closeMenuOnSelect={false}
-              hideSelectedOptions={false}
-              components={{ Option: CheckboxOption }}
-              onChange={(selected) => {
-                let selectedValues = (selected as any[]).map(s => s.value);
-                if (selectedValues.includes("__all__")) {
-                  selectedValues = [...sortedCourses.map(c => c.course_id)];
-                }
-                setFormData(prev => ({
-                  ...prev,
-                  selectedCourses: selectedValues.filter(v => v !== "__all__"),
-                  selectedModalities: [],
-                }));
-              }}
-              value={formData.selectedCourses.map(c => {
-                const course = sortedCourses.find(f => f.course_id === c);
-                return { value: c, label: course ? `${course.course_id} | ${course.course_name}` : c };
-              })}
-              styles={{
-                valueContainer: (provided) => ({
-                  ...provided,
-                  maxHeight: "120px",
-                  overflowY: "auto"
-                })
-              }}
-            />
-          </div>
-
-          <div className="field">
-            <label className="label">Modality (Auto-selects all available)</label>
-
-            <Select
-              isMulti
-              isDisabled={true}
-              closeMenuOnSelect={false}
-              hideSelectedOptions={true}
-
-              options={(() => {
-                const labelMap = new Map<string, number[]>();
-
-                filteredModalitiesBySelection.forEach((m) => {
-                  const baseLabel = `${m.modality_type}${m.section_name ? ` – ${m.section_name}` : ""}`;
-                  if (!labelMap.has(baseLabel)) labelMap.set(baseLabel, []);
-                  labelMap.get(baseLabel)!.push(m.modality_id);
-                });
-
-                return Array.from(labelMap.entries()).map(([baseLabel, ids]) => ({
-                  value: ids,
-                  label: `${baseLabel} (${ids.length})`,
-                }));
-              })()}
-
-              value={(() => {
-                const labelMap = new Map<string, number[]>();
-
-                formData.selectedModalities.forEach((id) => {
-                  const m = filteredModalitiesBySelection.find(f => f.modality_id === id);
-                  if (!m) return;
-
-                  const baseLabel = `${m.modality_type}${m.section_name ? ` – ${m.section_name}` : ""}`;
-                  if (!labelMap.has(baseLabel)) labelMap.set(baseLabel, []);
-                  labelMap.get(baseLabel)!.push(id);
-                });
-
-                return Array.from(labelMap.entries()).map(([baseLabel, ids]) => ({
-                  value: ids,
-                  label: `${baseLabel} (${ids.length})`,
-                }));
-              })()}
-
-              styles={{
-                multiValue: (base) => ({
-                  ...base,
-                  backgroundColor: "#e0f2fe",
-                  borderRadius: "6px",
-                  padding: "2px 4px"
-                }),
-                multiValueRemove: () => ({
-                  display: "none"
-                }),
-                control: (base) => ({
-                  ...base,
-                  cursor: "not-allowed",
-                  backgroundColor: "#f8fafc"
-                }),
-                valueContainer: (base) => ({
-                  ...base,
-                  maxHeight: "120px",
-                  overflowY: "auto"
-                })
-              }}
-            />
-          </div>
-
-          <div className="field">
             <label className="label">Exam Duration</label>
             <div style={{ display: "flex", gap: "10px" }}>
-              {/* Hours Dropdown + Typing */}
               <CreatableSelect
                 value={duration.hours ? { value: duration.hours, label: `${duration.hours} hr` } : null}
                 onChange={(selected) =>
@@ -2027,7 +1888,6 @@ const SchedulerPlottingSchedule: React.FC<SchedulerProps> = ({ user, onScheduleC
                 isClearable
               />
 
-              {/* Minutes Dropdown + Typing */}
               <CreatableSelect
                 value={duration.minutes ? { value: duration.minutes, label: `${duration.minutes} min` } : null}
                 onChange={(selected) =>
@@ -2048,8 +1908,8 @@ const SchedulerPlottingSchedule: React.FC<SchedulerProps> = ({ user, onScheduleC
             <label className="label">
               Exam Start Time
               {selectedStartTime && (
-                <span style={{ color: '#10b981', fontSize: '13px', marginLeft: '8px' }}>
-                  ✓ Will prioritize {selectedStartTime}
+                <span style={{ color: '#10b981', fontSize: '11px', marginLeft: '6px', fontWeight: 'normal' }}>
+                  ✓ Prioritized
                 </span>
               )}
             </label>
@@ -2073,136 +1933,281 @@ const SchedulerPlottingSchedule: React.FC<SchedulerProps> = ({ user, onScheduleC
             />
           </div>
         </div>
-
-        <div className="preview-column">
-          <h3 className="preview-header">
-            Selected Modality Preview ({formData.selectedModalities.length})
-            {alreadyScheduledIds.size > 0 && (
-              <span style={{
-                color: '#f59e0b',
-                fontSize: '14px',
-                marginLeft: '10px',
-                fontWeight: 'normal'
-              }}>
-                ⚠️ {alreadyScheduledIds.size} already scheduled
-              </span>
-            )}
-          </h3>
-          <input
-            type="text"
-            placeholder="Search within selected modalities"
-            value={modalityPreviewSearchTerm}
-            onChange={(e) => setModalityPreviewSearchTerm(e.target.value)}
-            className="input preview-search-input"
-          />
-          {formData.selectedModalities.length > 0 ? (
-            <div className="modality-list">
-              {formData.selectedModalities
-                .map(modalityId => {
-                  const modality = filteredModalitiesBySelection.find(m => m.modality_id === modalityId);
-                  const course = filteredCoursesByPrograms.find(c => c.course_id === modality?.course_id);
-                  const isScheduled = alreadyScheduledIds.has(modalityId);
-
-                  // ✅ Handle sections as array
-                  const sectionsDisplay = Array.isArray(modality?.sections)
-                    ? modality.sections.join(', ')
-                    : modality?.section_name || 'N/A';
-
-                  const searchString = [
-                    course?.course_id,
-                    sectionsDisplay,
-                    modality?.modality_type
-                  ].join(' ').toLowerCase();
-
-                  return { modality, course, searchString, modalityId, isScheduled, sectionsDisplay };
-                })
-                .filter(item => !modalityPreviewSearchTerm || item.searchString.includes(modalityPreviewSearchTerm.toLowerCase()))
-                .map(({ modality, course, modalityId, isScheduled, sectionsDisplay }) => (
-                  <div
-                    key={modalityId}
-                    className="modality-item"
-                    style={{
-                      backgroundColor: isScheduled ? '#fef3c7' : 'transparent',
-                      border: isScheduled ? '2px solid #f59e0b' : '1px solid #e5e7eb',
-                      position: 'relative'
-                    }}
-                  >
-                    {isScheduled && (
-                      <div style={{
-                        position: 'absolute',
-                        top: '8px',
-                        right: '8px',
-                        background: '#f59e0b',
-                        color: 'white',
-                        padding: '4px 8px',
-                        borderRadius: '4px',
-                        fontSize: '12px',
-                        fontWeight: 'bold'
-                      }}>
-                        ⚠️ ALREADY SCHEDULED
-                      </div>
-                    )}
-                    <p className="modality-detail">Course: {course ? course.course_id : 'N/A'}</p>
-                    <p className="modality-detail">
-                      Section(s): {sectionsDisplay}
-                      {modality?.total_students && (
-                        <span style={{ color: '#666', fontSize: '13px', marginLeft: '8px' }}>
-                          ({modality.total_students} students)
-                        </span>
-                      )}
-                    </p>
-                    <p className="modality-detail">Modality Type: {modality?.modality_type ?? 'N/A'}</p>
-                    <p className="modality-detail">
-                      Room(s): {modality?.possible_rooms?.join(', ') ?? 'N/A'}
-                    </p>
-                    <p className="modality-detail">Remarks: {modality?.modality_remarks ?? 'N/A'}</p>
-                    {isScheduled && (
-                      <p style={{
-                        color: '#f59e0b',
-                        fontSize: '13px',
-                        marginTop: '8px',
-                        fontWeight: '500'
-                      }}>
-                        ⚠️ This modality group already has an exam schedule
-                      </p>
-                    )}
-                    <hr className="modality-divider" />
-                  </div>
-                ))}
-            </div>
-          ) : (
-            <p className="helper">Select one or more modalities to see a preview.</p>
-          )}
-        </div>
       </div>
 
-      {alreadyScheduledIds.size > 0 && (
-        <button
-          onClick={() => {
-            setFormData(prev => ({
-              ...prev,
-              selectedModalities: prev.selectedModalities.filter(
-                id => !alreadyScheduledIds.has(id)
-              )
-            }));
-            toast.success(`Removed ${alreadyScheduledIds.size} already scheduled section(s)`);
-          }}
-          style={{
-            marginLeft: '10px',
-            padding: '6px 12px',
-            background: '#f59e0b',
-            color: 'white',
-            border: 'none',
-            borderRadius: '4px',
-            cursor: 'pointer',
-            fontSize: '13px',
-            fontWeight: '500'
-          }}
-        >
-          Remove Already Scheduled ({alreadyScheduledIds.size})
-        </button>
-      )}
+      {/* Selection Criteria Section */}
+      <div className="configuration-section">
+        <div className="section-title">Selection Criteria</div>
+        <div className="main-content-layout">
+          <div className="form-column">
+            <div className="field">
+              <label className="label">Select Exam Dates</label>
+              <Select
+                options={addSelectAllOption(examDateOptions.map(d => ({ value: d.iso, label: d.label })))}
+                isMulti
+                closeMenuOnSelect={false}
+                hideSelectedOptions={false}
+                components={{ Option: CheckboxOption }}
+                onChange={(selected) => {
+                  let selectedValues = (selected as any[]).map(s => s.value);
+                  if (selectedValues.includes("__all__")) {
+                    selectedValues = [...examDateOptions.map(d => d.iso)];
+                  }
+                  setFormData(prev => ({
+                    ...prev,
+                    selectedExamDates: selectedValues.filter(v => v !== "__all__"),
+                  }));
+                }}
+                value={formData.selectedExamDates.map(d => {
+                  const opt = examDateOptions.find(o => o.iso === d);
+                  return { value: d, label: opt?.label ?? d };
+                })}
+                classNamePrefix="select"
+              />
+            </div>
 
+            <div className="field">
+              <label className="label">Program</label>
+              <Select
+                options={addSelectAllOption(
+                  sortedPrograms.map(p => ({
+                    value: p.program_id,
+                    label: `${p.program_id} | ${p.program_name}`
+                  }))
+                )}
+                isMulti
+                closeMenuOnSelect={false}
+                hideSelectedOptions={false}
+                components={{ Option: CheckboxOption }}
+                onChange={(selected) => {
+                  let selectedValues = (selected as any[]).map(s => s.value);
+                  if (selectedValues.includes("__all__")) {
+                    selectedValues = [...sortedPrograms.map(p => p.program_id)];
+                  }
+                  setFormData(prev => ({
+                    ...prev,
+                    selectedPrograms: selectedValues.filter(v => v !== "__all__"),
+                    selectedCourses: [],
+                    selectedModalities: [],
+                  }));
+                }}
+                value={formData.selectedPrograms.map(p => {
+                  const prog = sortedPrograms.find(f => f.program_id === p);
+                  return { value: p, label: prog ? `${prog.program_id} | ${prog.program_name}` : p };
+                })}
+                classNamePrefix="select"
+              />
+            </div>
+
+            <div className="field">
+              <label className="label">Course</label>
+              <Select
+                options={addSelectAllOption(
+                  sortedCourses.map(c => ({
+                    value: c.course_id,
+                    label: `${c.course_id} | ${c.course_name}`
+                  }))
+                )}
+                isMulti
+                closeMenuOnSelect={false}
+                hideSelectedOptions={false}
+                components={{ Option: CheckboxOption }}
+                onChange={(selected) => {
+                  let selectedValues = (selected as any[]).map(s => s.value);
+                  if (selectedValues.includes("__all__")) {
+                    selectedValues = [...sortedCourses.map(c => c.course_id)];
+                  }
+                  setFormData(prev => ({
+                    ...prev,
+                    selectedCourses: selectedValues.filter(v => v !== "__all__"),
+                    selectedModalities: [],
+                  }));
+                }}
+                value={formData.selectedCourses.map(c => {
+                  const course = sortedCourses.find(f => f.course_id === c);
+                  return { value: c, label: course ? `${course.course_id} | ${course.course_name}` : c };
+                })}
+                styles={{
+                  valueContainer: (provided) => ({
+                    ...provided,
+                    maxHeight: "120px",
+                    overflowY: "auto"
+                  })
+                }}
+                classNamePrefix="select"
+              />
+            </div>
+
+            <div className="field">
+              <label className="label">Modality (Auto-selected)</label>
+              <Select
+                isMulti
+                isDisabled={true}
+                closeMenuOnSelect={false}
+                hideSelectedOptions={true}
+                options={(() => {
+                  const labelMap = new Map<string, number[]>();
+                  filteredModalitiesBySelection.forEach((m) => {
+                    const baseLabel = `${m.modality_type}${m.section_name ? ` – ${m.section_name}` : ""}`;
+                    if (!labelMap.has(baseLabel)) labelMap.set(baseLabel, []);
+                    labelMap.get(baseLabel)!.push(m.modality_id);
+                  });
+                  return Array.from(labelMap.entries()).map(([baseLabel, ids]) => ({
+                    value: ids,
+                    label: `${baseLabel} (${ids.length})`,
+                  }));
+                })()}
+                value={(() => {
+                  const labelMap = new Map<string, number[]>();
+                  formData.selectedModalities.forEach((id) => {
+                    const m = filteredModalitiesBySelection.find(f => f.modality_id === id);
+                    if (!m) return;
+                    const baseLabel = `${m.modality_type}${m.section_name ? ` – ${m.section_name}` : ""}`;
+                    if (!labelMap.has(baseLabel)) labelMap.set(baseLabel, []);
+                    labelMap.get(baseLabel)!.push(id);
+                  });
+                  return Array.from(labelMap.entries()).map(([baseLabel, ids]) => ({
+                    value: ids,
+                    label: `${baseLabel} (${ids.length})`,
+                  }));
+                })()}
+                styles={{
+                  multiValue: (base) => ({
+                    ...base,
+                    backgroundColor: "#e0f2fe",
+                    borderRadius: "6px",
+                    padding: "2px 4px"
+                  }),
+                  multiValueRemove: () => ({
+                    display: "none"
+                  }),
+                  control: (base) => ({
+                    ...base,
+                    cursor: "not-allowed",
+                    backgroundColor: "#f8fafc"
+                  }),
+                  valueContainer: (base) => ({
+                    ...base,
+                    maxHeight: "120px",
+                    overflowY: "auto"
+                  })
+                }}
+                classNamePrefix="select"
+              />
+            </div>
+          </div>
+
+          <div className="preview-column">
+            <div className="preview-header">
+              <span>Selected Sections</span>
+              <span className="preview-count">{formData.selectedModalities.length}</span>
+            </div>
+            {/* Inside preview-column, after preview-header */}
+            {alreadyScheduledIds.size > 0 && (
+              <div className="warning-badge">
+                <span>⚠️</span>
+                <span>{alreadyScheduledIds.size} section{alreadyScheduledIds.size > 1 ? 's' : ''} already scheduled</span>
+              </div>
+            )}
+            <input
+              type="text"
+              placeholder="Search sections..."
+              value={modalityPreviewSearchTerm}
+              onChange={(e) => setModalityPreviewSearchTerm(e.target.value)}
+              className="preview-search-input"
+            />
+            {formData.selectedModalities.length > 0 ? (
+              <div className="modality-list">
+                {formData.selectedModalities
+                  .map(modalityId => {
+                    const modality = filteredModalitiesBySelection.find(m => m.modality_id === modalityId);
+                    const course = filteredCoursesByPrograms.find(c => c.course_id === modality?.course_id);
+                    const isScheduled = alreadyScheduledIds.has(modalityId);
+                    const sectionsDisplay = Array.isArray(modality?.sections)
+                      ? modality.sections.join(', ')
+                      : modality?.section_name || 'N/A';
+                    const searchString = [
+                      course?.course_id,
+                      sectionsDisplay,
+                      modality?.modality_type
+                    ].join(' ').toLowerCase();
+                    return { modality, course, searchString, modalityId, isScheduled, sectionsDisplay };
+                  })
+                  .filter(item => !modalityPreviewSearchTerm || item.searchString.includes(modalityPreviewSearchTerm.toLowerCase()))
+                  .map(({ modality, course, modalityId, isScheduled, sectionsDisplay }) => (
+                    <div
+                      key={modalityId}
+                      className={`modality-item ${isScheduled ? 'scheduled' : ''}`}
+                    >
+                      {isScheduled && (
+                        <div className="scheduled-badge">
+                          SCHEDULED
+                        </div>
+                      )}
+                      <p className="modality-detail"><strong>Course:</strong> {course ? course.course_id : 'N/A'}</p>
+                      <p className="modality-detail">
+                        <strong>Section(s):</strong> {sectionsDisplay}
+                        {modality?.total_students && (
+                          <span className="student-count">
+                            ({modality.total_students} students)
+                          </span>
+                        )}
+                      </p>
+                      <p className="modality-detail"><strong>Type:</strong> {modality?.modality_type ?? 'N/A'}</p>
+                      <p className="modality-detail"><strong>Room(s):</strong> {modality?.possible_rooms?.join(', ') ?? 'N/A'}</p>
+                      {modality?.modality_remarks && (
+                        <p className="modality-detail"><strong>Remarks:</strong> {modality.modality_remarks}</p>
+                      )}
+                    </div>
+                  ))}
+              </div>
+            ) : (
+              <div className="empty-state">
+                <p>No sections selected</p>
+                <span>Select programs and courses to view sections</span>
+              </div>
+            )}
+          </div>
+        </div>
+
+        {/* Inside configuration-section, after main-content-layout */}
+        {alreadyScheduledIds.size > 0 && (
+          <div className="action-row">
+            <button
+              onClick={async () => {
+                const count = alreadyScheduledIds.size;
+                setIsRemoving(true);
+                
+                // Simulate async operation (replace with actual delete logic if needed)
+                await new Promise(resolve => setTimeout(resolve, 500));
+                
+                setFormData(prev => ({
+                  ...prev,
+                  selectedModalities: prev.selectedModalities.filter(
+                    id => !alreadyScheduledIds.has(id)
+                  )
+                }));
+                setAlreadyScheduledIds(new Set()); // Clear the set
+                setIsRemoving(false);
+                toast.success(`Removed ${count} already scheduled section${count > 1 ? 's' : ''}`);
+              }}
+              className="btn-remove-scheduled"
+              disabled={isRemoving}
+            >
+              {isRemoving ? (
+                <>
+                  <span className="mini-spinner"></span>
+                  <span>Removing...</span>
+                </>
+              ) : (
+                <>Remove {alreadyScheduledIds.size} Already Scheduled Section{alreadyScheduledIds.size > 1 ? 's' : ''}</>
+              )}
+            </button>
+          </div>
+        )}
+      </div>
+
+      {/* Manual Editor Modal */}
       {showManualEditor && unscheduledSections.length > 0 && (
         <ManualScheduleEditor
           unscheduledSections={unscheduledSections}
@@ -2227,39 +2232,41 @@ const SchedulerPlottingSchedule: React.FC<SchedulerProps> = ({ user, onScheduleC
         />
       )}
 
+      {/* Generate Button */}
       <div className="save-button-wrapper">
         <button
           type="button"
           onClick={handleSaveClick}
-          className="btn-saves"
-          disabled={loading || alreadyScheduledIds.size > 0}
-          style={{
-            display: "flex",
-            alignItems: "center",
-            justifyContent: "center",
-            gap: "8px",
-            fontSize: "20px",
-            width: "45px",
-            opacity: alreadyScheduledIds.size > 0 ? 0.5 : 1,
-            cursor: alreadyScheduledIds.size > 0 ? 'not-allowed' : 'pointer'
-          }}
-          title={alreadyScheduledIds.size > 0
-            ? 'Cannot generate - some sections are already scheduled'
-            : 'Generate schedule'}
+          className={`btn-saves ${isGenerating ? 'generating' : ''}`}
+          disabled={loading || alreadyScheduledIds.size > 0 || isGenerating}
         >
-          {loading ? <FaSpinner className="spin" /> : <FaPlay />}
+          {isGenerating ? (
+            <div className="loading-progress">
+              <div className="progress-bar-container">
+                <div 
+                  className="progress-bar-fill" 
+                  style={{ width: `${generationProgress}%` }}
+                />
+              </div>
+              <div className="progress-info">
+                <span className="progress-number">{generationProgress}%</span>
+                <span className="progress-text">Generating optimal schedule...</span>
+              </div>
+            </div>
+          ) : (
+            <>
+              <FaPlay className="icon-play" style={{ fontSize: '16px' }} />
+              <span>Generate Schedule</span>
+            </>
+          )}
         </button>
-        {alreadyScheduledIds.size > 0 && (
-          <p style={{
-            color: '#f59e0b',
-            fontSize: '14px',
-            marginTop: '8px',
-            textAlign: 'center'
-          }}>
-            Remove already scheduled sections to proceed
+        {alreadyScheduledIds.size > 0 && !isGenerating && (
+          <p className="button-warning">
+            ⚠️ Remove {alreadyScheduledIds.size} already scheduled section{alreadyScheduledIds.size > 1 ? 's' : ''} to proceed
           </p>
         )}
       </div>
+
       <ToastContainer position="top-center" autoClose={3000} />
     </div>
   );

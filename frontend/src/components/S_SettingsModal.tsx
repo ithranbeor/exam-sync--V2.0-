@@ -74,7 +74,6 @@ const FooterSettingsModal: React.FC<FooterSettingsModalProps> = ({
           if (deanRole.user?.first_name && deanRole.user?.last_name) {
             const fullName = `${deanRole.user.first_name} ${deanRole.user.last_name}`;
             setDeanName(fullName);
-            console.log(`✅ Found dean (expanded): ${fullName}`);
           }
 
           // ✅ Case 2: only user_id exists → fetch user manually
@@ -86,20 +85,14 @@ const FooterSettingsModal: React.FC<FooterSettingsModalProps> = ({
               if (user?.first_name && user?.last_name) {
                 const fullName = `${user.first_name} ${user.last_name}`;
                 setDeanName(fullName);
-                console.log(`✅ Found dean (via user_id): ${fullName}`);
               } else {
-                setDeanName('Dean Name Not Found');
-                console.warn('⚠️ User record missing name fields', user);
               }
             } catch (err) {
-              console.error('❌ Failed to fetch dean user', err);
-              setDeanName('Dean Name Not Found');
             }
           }
 
           // ❌ No usable data
           else {
-            console.warn('⚠️ Dean role found but no user reference');
             setDeanName('Dean Name Not Found');
           }
         }
@@ -116,15 +109,11 @@ const FooterSettingsModal: React.FC<FooterSettingsModalProps> = ({
           if (vcaaRole.user && vcaaRole.user.first_name && vcaaRole.user.last_name) {
             const fullVcaaName = `${vcaaRole.user.first_name} ${vcaaRole.user.last_name}`;
             setVcaaName(fullVcaaName);
-            console.log(`✅ Found VCAA: ${fullVcaaName}`);
           } else {
-            console.warn('⚠️ VCAA user data incomplete');
           }
         } else {
-          console.warn('⚠️ No VCAA found');
         }
       } catch (error) {
-        console.error("Error fetching role names:", error);
       }
     };
 
@@ -158,13 +147,10 @@ const FooterSettingsModal: React.FC<FooterSettingsModalProps> = ({
         });
         setLogoPreview(data.logo_url);
       } else {
-        console.log(`ℹ️ No existing footer found, using role names from state...`);
 
         // ✅ Use the dean name and VCAA name from state - they should be populated now
         const preparedByName = deanName || 'Dean Name Not Found';
         const approvedByName = vcaaName || 'VCAA Name Not Found';
-
-        console.log(`✅ Setting defaults - Prepared by: ${preparedByName}, Approved by: ${approvedByName}`);
 
         setFooterData(prev => ({
           ...prev,
@@ -175,7 +161,6 @@ const FooterSettingsModal: React.FC<FooterSettingsModalProps> = ({
         }));
       }
     } catch (error) {
-      console.error("Error fetching footer data:", error);
       toast.error("Failed to load footer settings");
     } finally {
       setIsLoading(false);
@@ -248,8 +233,6 @@ const FooterSettingsModal: React.FC<FooterSettingsModalProps> = ({
 
       // Upload logo if changed
       if (logoFile) {
-        console.log(`📤 Uploading logo for college_id: ${collegeId}`);
-
         const formData = new FormData();
         formData.append('logo', logoFile);
         formData.append('college_id', collegeId);
@@ -261,7 +244,6 @@ const FooterSettingsModal: React.FC<FooterSettingsModalProps> = ({
         });
 
         logoUrl = uploadResponse.data.logo_url;
-        console.log(`✅ Logo uploaded successfully`);
       }
 
       // Clean data before sending
@@ -276,26 +258,19 @@ const FooterSettingsModal: React.FC<FooterSettingsModalProps> = ({
         logo_url: logoUrl
       };
 
-      console.log(`💾 Saving footer data:`, JSON.stringify(dataToSave, null, 2));
-
       if (footerData.footer_id) {
         // Update existing
         await api.put(`/tbl_schedule_footer/${footerData.footer_id}/`, dataToSave);
         toast.success('Footer settings updated successfully!');
-        console.log(`✅ Footer updated: ${footerData.footer_id}`);
       } else {
         // Create new
         await api.post('/tbl_schedule_footer/', dataToSave);
         toast.success('Footer settings saved successfully!');
-        console.log(`✅ New footer created`);
       }
 
       onSave();
       onClose();
     } catch (error: any) {
-      console.error("❌ Error saving footer settings:", error);
-      console.error("❌ Error response data:", error?.response?.data);
-
       // Better error handling
       let errorMessage = 'Failed to save footer settings';
 
@@ -340,18 +315,14 @@ const FooterSettingsModal: React.FC<FooterSettingsModalProps> = ({
         logo_url: null
       };
 
-      console.log(`🔄 Resetting footer data to defaults:`, JSON.stringify(resetData, null, 2));
-
       if (footerData.footer_id) {
         // Update existing
         await api.put(`/tbl_schedule_footer/${footerData.footer_id}/`, resetData);
         toast.success('Footer settings reset to default values!');
-        console.log(`✅ Footer reset: ${footerData.footer_id}`);
       } else {
         // Create new with default values
         await api.post('/tbl_schedule_footer/', resetData);
         toast.success('Footer settings reset to default values!');
-        console.log(`✅ New footer created with defaults`);
       }
 
       // Update local state to match saved data
@@ -369,9 +340,6 @@ const FooterSettingsModal: React.FC<FooterSettingsModalProps> = ({
       onSave();
 
     } catch (error: any) {
-      console.error("❌ Error resetting footer settings:", error);
-      console.error("❌ Error response data:", error?.response?.data);
-
       let errorMessage = 'Failed to reset footer settings';
 
       if (error?.response?.data) {
