@@ -20,10 +20,8 @@ interface ExamDetail {
   instructors?: number[];
   proctor_id?: number;
   proctors?: number[];
-  proctor_timein?: string;
   academic_year?: string;
   building_name?: string;
-  proctor_timeout?: string;
   program_id?: string;
   college_name?: string;
   modality_id?: number;

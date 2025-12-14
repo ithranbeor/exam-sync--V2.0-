@@ -393,8 +393,6 @@ const ManualScheduleEditor: React.FC<ManualScheduleEditorProps> = ({
         exam_period: examPeriod,
         college_name: schedulerCollegeName,
         building_name: buildingName,
-        proctor_timein: null,
-        proctor_timeout: null,
       };
 
       await api.post('/tbl_examdetails', scheduleData);

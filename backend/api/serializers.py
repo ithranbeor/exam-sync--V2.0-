@@ -746,8 +746,6 @@ class TblExamdetailsSerializer(serializers.ModelSerializer):
             'exam_duration',
             'exam_start_time',
             'exam_end_time',
-            'proctor_timein',
-            'proctor_timeout',
             'sections',
             'instructors',
             'proctors',
