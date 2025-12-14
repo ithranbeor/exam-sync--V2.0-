@@ -1,0 +1,301 @@
+// DashboardAdmin.tsx
+import React, { useEffect, useState } from 'react';
+import { useNavigate } from 'react-router-dom';
+import { api } from '../lib/apiClient.ts';
+import {
+  FaHome, FaUsers, FaBuilding, FaBook, FaCalendarAlt,
+  FaUser, FaSignOutAlt, FaPenAlt, FaBars, FaTimes
+} from 'react-icons/fa';
+import { PiBuildingApartmentFill, PiBuildingsFill } from "react-icons/pi";
+import { FaBookAtlas, FaBookJournalWhills } from "react-icons/fa6";
+import '../styles/F_Dashboard.css';
+import { BiSolidBuildings } from "react-icons/bi";
+import { IoCalendarSharp } from "react-icons/io5";
+
+
+import Colleges from './A_Colleges.tsx';
+import Departments from './A_Departments.tsx';
+import Programs from './A_Programs.tsx';
+import Courses from './A_Courses.tsx';
+import SectionCourses from './A_SectionCourses.tsx';
+import Terms from './A_Terms.tsx';
+import Buildings from './A_Buildings.tsx';
+import Rooms from './A_Rooms.tsx';
+import ExamPeriod from './A_ExamPeriod.tsx';
+import UserManagement from './A_UserManagement.tsx';
+import Profile from './A_Profile.tsx';
+import ProctorViewExam from "./F_ExamViewer.tsx";
+import BayanihanModality from "./B_BayanihanModality.tsx";
+import MiniExamDateCalendar from "./F_MiniExamDateCalendar.tsx";
+
+const iconStyle = { className: 'icon', size: 25 };
+
+// Sidebar menu
+const adminSidebarItems = [
+  { key: 'dashboard', label: 'Dashboard', icon: <FaHome {...iconStyle} /> },
+  { key: 'colleges', label: 'Colleges', icon: <PiBuildingApartmentFill  {...iconStyle} /> },
+  { key: 'departments', label: 'Departments', icon: <FaBuilding {...iconStyle} /> },
+  { key: 'programs', label: 'Programs', icon: <FaBook {...iconStyle} /> },
+  { key: 'courses', label: 'Courses', icon: <FaBookAtlas {...iconStyle} /> },
+  { key: 'section-courses', label: 'Section Courses', icon: <FaBookJournalWhills {...iconStyle} /> },
+  { key: 'terms', label: 'Terms', icon: <FaCalendarAlt {...iconStyle} /> },
+  { key: 'buildings', label: 'Buildings', icon: <PiBuildingsFill {...iconStyle} /> },
+  { key: 'rooms', label: 'Rooms', icon: <BiSolidBuildings {...iconStyle} /> },
+  { key: 'exam-period', label: 'Exam Period', icon: <IoCalendarSharp {...iconStyle} /> },
+  { key: 'set-Modality', label: 'Set Modality', icon: <FaPenAlt {...iconStyle} /> },
+  { key: 'User Management', label: 'User Management', icon: <FaUsers {...iconStyle} /> },
+  { key: 'profile', label: 'Profile', icon: <FaUser {...iconStyle} /> },
+];
+
+const DashboardAdmin: React.FC = () => {
+  const [user, setUser] = useState<any>(null);
+  const [activeMenu, setActiveMenu] = useState('dashboard');
+  const [isSidebarOpen, setIsSidebarOpen] = useState(false);
+  const [currentDateTime, setCurrentDateTime] = useState(new Date());
+  const [showLogoutModal, setShowLogoutModal] = useState(false);
+  const [isMobile, setIsMobile] = useState(window.innerWidth <= 1024);
+  const navigate = useNavigate();
+
+  // Load logged-in user
+  useEffect(() => {
+    const loadUser = async () => {
+      const stored = JSON.parse(localStorage.getItem('user') || 'null') ||
+        JSON.parse(sessionStorage.getItem('user') || 'null');
+      if (!stored) return navigate('/admin-login');
+
+      try {
+        const res = await api.get(`/users/${stored.user_id}/`);
+        const data = res.data;
+        setUser({
+          ...data,
+          full_name: `${data.first_name} ${data.middle_name ?? ''} ${data.last_name}`.trim(),
+          avatar_url: data.avatar_url || '/images/default-pp.jpg',
+        });
+      } catch (err) {
+        console.error(err);
+        setUser({
+          ...stored,
+          full_name: `${stored.first_name} ${stored.middle_name ?? ''} ${stored.last_name}`.trim(),
+          avatar_url: stored.avatar_url || '/images/default-pp.jpg',
+        });
+      }
+    };
+    loadUser();
+  }, [navigate]);
+
+  // Clock
+  useEffect(() => {
+    const timer = setInterval(() => setCurrentDateTime(new Date()), 1000);
+    return () => clearInterval(timer);
+  }, []);
+
+  /** 📱 Handle window resize for responsive behavior */
+  useEffect(() => {
+    let resizeTimer: NodeJS.Timeout;
+
+    const handleResize = () => {
+      // Debounce resize events for better performance
+      clearTimeout(resizeTimer);
+      resizeTimer = setTimeout(() => {
+        const nowMobile = window.innerWidth <= 1024;
+
+        setIsMobile(prevMobile => {
+          // When switching between mobile and desktop: reset sidebar state
+          if (prevMobile !== nowMobile) {
+            setIsSidebarOpen(false);
+          }
+          return nowMobile;
+        });
+      }, 150); // 150ms debounce
+    };
+
+    // Initial check
+    const initialMobile = window.innerWidth <= 1024;
+    setIsMobile(initialMobile);
+
+    window.addEventListener('resize', handleResize);
+    return () => {
+      clearTimeout(resizeTimer);
+      window.removeEventListener('resize', handleResize);
+    };
+  }, []); // Empty dependency array - only run on mount/unmount
+
+  const handleLogout = () => {
+    localStorage.removeItem('user');
+    sessionStorage.removeItem('user');
+    navigate('/');
+  };
+
+  /** 🍔 Toggle sidebar (for mobile/tablet) */
+  const toggleSidebar = () => {
+    setIsSidebarOpen(!isSidebarOpen);
+  };
+
+  /** 📱 Handle menu item click - close sidebar on mobile/tablet */
+  const handleMenuClick = (menuKey: string) => {
+    setActiveMenu(menuKey);
+    if (isMobile) {
+      setIsSidebarOpen(false);
+    }
+  };
+
+  /** 🖱️ Handle sidebar hover (desktop only) */
+  const handleSidebarHover = (isEntering: boolean) => {
+    if (!isMobile) {
+      setIsSidebarOpen(isEntering);
+    }
+  };
+
+  const formattedTime = currentDateTime.toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit', hour12: true });
+  const [hour, minute, ampm] = formattedTime.split(/:| /);
+  const dateStr = currentDateTime.toLocaleDateString('en-US', { weekday: 'long', month: 'long', day: 'numeric' });
+
+  if (!user) return <div style={{ color: "black" }}>Please Wait...</div>;
+
+  const renderContent = () => {
+    switch (activeMenu) {
+      case 'colleges': return <Colleges />;
+      case 'departments': return <Departments />;
+      case 'programs': return <Programs user={user} />;
+      case 'courses': return <Courses />;
+      case 'section-courses': return <SectionCourses />;
+      case 'terms': return <Terms />;
+      case 'buildings': return <Buildings />;
+      case 'rooms': return <Rooms />;
+      case 'exam-period': return <ExamPeriod />;
+      case 'User Management': return <UserManagement user={user} />;
+      case 'set-Modality': return <BayanihanModality user={user} />;
+      case 'profile': return <Profile user={user} />;
+      case 'dashboard':
+      default:
+        return (
+          activeMenu === 'dashboard' && (
+            <div className="dashboard-grid">
+              <div className="card welcome-card">
+                <h3>Welcome, <span className="robert-name">{user.first_name}!</span></h3>
+                <p>Organize your work and improve your performance here</p>
+              </div>
+
+              <div className="card datetime-card">
+                <div className="date-display-simple">{dateStr}</div>
+                <div className="time-display">
+                  <span>{hour}:</span><span>{minute}</span><span className="ampm">{ampm}</span>
+                </div>
+              </div>
+
+              <div className="card faculty-info-card">
+                <img src={user.avatar_url} alt="Avatar" className="faculty-avatar" />
+                <h4>{user.full_name}</h4>
+                <p>Admin</p>
+              </div>
+
+              <div className="full-width-section">
+                <h2>Shortcut</h2>
+                <div className="try-things-grid">
+                  <div className="try-thing-card"><MiniExamDateCalendar user={user} /></div>
+                  <div className="try-thing-card"><ProctorViewExam user={user} /></div>
+                </div>
+              </div>
+            </div>
+          )
+        );
+    }
+  };
+
+  return (
+    <div className="app-container">
+      <div className="main-content-wrapper">
+        {/* Hamburger Menu Button (Mobile/Tablet) */}
+        {isMobile && (
+          <button
+            type="button"
+            className="menu-toggle-btn"
+            onClick={toggleSidebar}
+            aria-label="Toggle menu"
+          >
+            {isSidebarOpen ? <FaTimes /> : <FaBars />}
+          </button>
+        )}
+
+        {/* Sidebar Backdrop (Mobile/Tablet) */}
+        {isMobile && (
+          <div
+            className={`sidebar-backdrop ${isSidebarOpen ? 'active' : ''}`}
+            onClick={() => setIsSidebarOpen(false)}
+          />
+        )}
+
+        <aside
+          className={`sidebar ${isSidebarOpen ? 'open' : 'closed'}`}
+          onMouseEnter={() => handleSidebarHover(true)}
+          onMouseLeave={() => handleSidebarHover(false)}
+        >
+          <div className="sidebar-header">
+            <button
+              type="button"
+              className="sidebar-logo-button"
+              onClick={() => setActiveMenu('dashboard')}
+              style={{
+                background: 'none',
+                border: 'none',
+                cursor: 'pointer',
+                display: 'flex',
+                alignItems: 'center',
+                gap: '10px',
+                padding: 0,
+                width: '100%'
+              }}
+            >
+              <img src="/logo/Exam.png" alt="Logo" className="logo-img" />
+              {isSidebarOpen && <span className="logo-text">ExamSync</span>}
+            </button>
+          </div>
+          <nav className="sidebar-nav">
+            <ul>
+              {adminSidebarItems.map(({ key, label, icon }) => (
+                <li key={key} className={activeMenu === key ? 'active' : ''}>
+                  <button type="button" onClick={() => handleMenuClick(key)}>
+                    {icon} {isSidebarOpen && <span>{label}</span>}
+                  </button>
+                </li>
+              ))}
+              <li>
+                <button type="button" onClick={() => {
+                  setShowLogoutModal(true);
+                  if (isMobile) setIsSidebarOpen(false);
+                }}>
+                  <FaSignOutAlt /> {isSidebarOpen && <span>Logout</span>}
+                </button>
+              </li>
+            </ul>
+          </nav>
+        </aside>
+
+        <main className={`main-content ${isSidebarOpen ? 'sidebar-open' : 'sidebar-closed'}`}>
+          <div className="content-header">
+            <h1>
+              {['colleges', 'departments', 'programs', 'courses', 'section-courses', 'terms', 'buildings', 'rooms', 'exam-period'].includes(activeMenu)
+                ? `Manage ${activeMenu.charAt(0).toUpperCase() + activeMenu.slice(1).replace(/-/g, ' ')}`
+                : activeMenu.charAt(0).toUpperCase() + activeMenu.slice(1).replace(/-/g, ' ')}
+            </h1>
+          </div>
+          {renderContent()}
+        </main>
+      </div>
+
+      {showLogoutModal && (
+        <div className="myModal-overlay" onClick={() => setShowLogoutModal(false)}>
+          <div className="myModal-box" onClick={(e) => e.stopPropagation()}>
+            <h3 className="myModal-title">Are you sure you want to logout?</h3>
+            <div className="myModal-actions">
+              <button type='button' className="myModal-btn myModal-btn-confirm" onClick={handleLogout}>Logout</button>
+              <button type='button' className="myModal-btn myModal-btn-cancel" onClick={() => setShowLogoutModal(false)}>Cancel</button>
+            </div>
+          </div>
+        </div>
+      )}
+    </div>
+  );
+};
+
+export default DashboardAdmin;

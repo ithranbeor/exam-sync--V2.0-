@@ -1,0 +1,399 @@
+/* SchedulerPlottingSchedule.css */
+
+/* Container / card */
+.scheduler-container {
+    max-width: 1000px;
+    /* Increased max-width for two columns */
+    margin: 24px auto;
+    padding: 20px;
+    background: #ffffff;
+    border-radius: 10px;
+    box-shadow: 0 6px 18px rgba(0, 0, 0, 0.06);
+    font-family: Inter, system-ui, -apple-system, "Segoe UI", Roboto, "Helvetica Neue", Arial;
+    color: #0f172a;
+}
+
+/* Header/title */
+.scheduler-header {
+    font-size: 24px;
+    /* Slightly larger header */
+    font-weight: 700;
+    margin-bottom: 20px;
+    letter-spacing: -0.2px;
+    color: #0d3b66;
+    /* Use the button color for the header */
+}
+
+/* === NEW: Two-Column Layout Container === */
+.main-content-layout {
+    display: flex;
+    gap: 30px;
+    /* Space between the form and the preview */
+    margin-bottom: 20px;
+    /* Space above the Save button */
+}
+
+/* Form Column (Left) */
+.form-column {
+    flex: 1;
+    /* Takes up available space */
+    max-width: 600px;
+    /* Max width for form readability */
+}
+
+/* Preview Column (Right) */
+.preview-column {
+    width: 300px;
+    /* Fixed width for the preview */
+    background: #f8fafc;
+    /* Light background for contrast */
+    padding: 15px;
+    border-radius: 8px;
+    border: 1px solid #e2e8f0;
+    align-self: flex-start;
+    /* Aligns to the top */
+    min-height: 400px;
+    /* Ensure it has a good height */
+    position: sticky;
+    /* Keep it visible if the form is long */
+    top: 20px;
+    /* Distance from the top of the viewport */
+}
+
+.preview-header {
+    font-size: 16px;
+    font-weight: 700;
+    color: #0d3b66;
+    margin-bottom: 15px;
+    border-bottom: 1px solid #e2e8f0;
+    padding-bottom: 8px;
+}
+
+.modality-list {
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+    max-height: 400px;
+    /* Limit height and allow scroll */
+    overflow-y: auto;
+}
+
+.modality-item {
+    padding: 8px 0;
+}
+
+.modality-detail {
+    font-size: 13px;
+    margin: 4px 0;
+    line-height: 1.4;
+    color: #333;
+}
+
+.modality-divider {
+    border: none;
+    height: 1px;
+    background: #e2e8f0;
+    margin: 10px 0;
+}
+
+/* Save Button Wrapper (to make the button full width below the columns) */
+.save-button-wrapper {
+    width: 100%;
+    margin-top: 20px;
+    /* Spacing from the columns */
+}
+
+/* --- Existing Styles (Adjusted for consistency) --- */
+
+/* Row / field wrapper */
+.field {
+    display: block;
+    margin-bottom: 16px;
+    /* Slightly more vertical space */
+}
+
+/* Label (optional) */
+.label {
+    display: block;
+    margin-bottom: 6px;
+    font-size: 13px;
+    color: #374151;
+    font-weight: 600;
+    /* Bolded label */
+}
+
+/* Inputs and selects */
+.input,
+.select,
+.textarea {
+    width: 100%;
+    box-sizing: border-box;
+    padding: 10px 12px;
+    border: 1px solid #d1d5db;
+    border-radius: 8px;
+    font-size: 14px;
+    outline: none;
+    transition: border-color 0.12s ease, box-shadow 0.12s ease;
+    background: #fff;
+    color: inherit;
+}
+
+.input:focus,
+.select:focus,
+.textarea:focus {
+    border-color: #0d3b66;
+    /* Match new button color */
+    box-shadow: 0 0 0 3px rgba(13, 59, 102, 0.1);
+}
+
+/* Button */
+.btn-saves {
+    width: 100%;
+    padding: 12px 14px;
+    border-radius: 40px;
+    border: none;
+    background: #092c4c;
+    /* Darker blue color */
+    color: #fff;
+    font-weight: 600;
+    font-size: 15px;
+    cursor: pointer;
+    transition: background 0.2s ease, transform 0.08s ease;
+}
+
+.btn-saves:hover {
+    background: #0d3b66;
+    transform: translateY(-1px);
+    box-shadow: 0 4px 12px rgba(9, 44, 76, 0.15);
+}
+
+.btn-saves:active {
+    transform: translateY(0);
+    box-shadow: none;
+}
+
+/* ======================= TABLET RESPONSIVENESS (769px - 1024px) ======================= */
+@media (min-width: 769px) and (max-width: 1024px) {
+    .scheduler-container {
+        max-width: 95%;
+        padding: 18px;
+        margin: 16px auto;
+    }
+
+    .scheduler-header {
+        font-size: 22px;
+        margin-bottom: 18px;
+    }
+
+    .main-content-layout {
+        gap: 24px;
+    }
+
+    .form-column {
+        max-width: 100%;
+    }
+
+    .preview-column {
+        width: 280px;
+        padding: 14px;
+    }
+
+    .field {
+        margin-bottom: 14px;
+    }
+
+    .label {
+        font-size: 12px;
+    }
+
+    .input,
+    .select,
+    .textarea {
+        padding: 9px 11px;
+        font-size: 13px;
+    }
+
+    .btn-saves {
+        padding: 11px 13px;
+        font-size: 14px;
+    }
+}
+
+/* ======================= SMALL TABLET / LARGE MOBILE (600px - 768px) ======================= */
+@media (min-width: 600px) and (max-width: 768px) {
+    .scheduler-container {
+        max-width: 98%;
+        padding: 16px;
+        margin: 12px auto;
+    }
+
+    .scheduler-header {
+        font-size: 20px;
+        margin-bottom: 16px;
+    }
+
+    .main-content-layout {
+        flex-direction: column;
+        gap: 18px;
+    }
+
+    .form-column {
+        max-width: 100%;
+    }
+
+    .preview-column {
+        width: 100%;
+        position: static;
+        min-height: auto;
+        padding: 12px;
+    }
+
+    .preview-header {
+        font-size: 15px;
+    }
+
+    .modality-list {
+        max-height: 350px;
+    }
+
+    .field {
+        margin-bottom: 14px;
+    }
+
+    .label {
+        font-size: 12px;
+    }
+
+    .input,
+    .select,
+    .textarea {
+        padding: 9px 11px;
+        font-size: 13px;
+    }
+
+    .btn-saves {
+        padding: 11px 13px;
+        font-size: 14px;
+    }
+}
+
+/* ======================= MOBILE RESPONSIVENESS (max-width: 599px) ======================= */
+@media (max-width: 599px) {
+    .scheduler-container {
+        max-width: 100%;
+        padding: 12px;
+        margin: 8px auto;
+        border-radius: 8px;
+    }
+
+    .scheduler-header {
+        font-size: 18px;
+        margin-bottom: 14px;
+        text-align: center;
+    }
+
+    .main-content-layout {
+        flex-direction: column;
+        gap: 16px;
+    }
+
+    .form-column {
+        max-width: 100%;
+    }
+
+    .preview-column {
+        width: 100%;
+        position: static;
+        min-height: auto;
+        padding: 12px;
+        border-radius: 6px;
+    }
+
+    .preview-header {
+        font-size: 14px;
+        margin-bottom: 12px;
+    }
+
+    .modality-list {
+        max-height: 300px;
+        gap: 8px;
+    }
+
+    .modality-item {
+        padding: 6px 0;
+    }
+
+    .modality-detail {
+        font-size: 12px;
+        margin: 3px 0;
+    }
+
+    .preview-search-input {
+        font-size: 13px;
+        padding: 8px 10px;
+    }
+
+    .field {
+        margin-bottom: 12px;
+    }
+
+    .label {
+        font-size: 11px;
+        margin-bottom: 5px;
+    }
+
+    .input,
+    .select,
+    .textarea {
+        padding: 8px 10px;
+        font-size: 13px;
+        border-radius: 6px;
+    }
+
+    .btn-saves {
+        padding: 10px 12px;
+        font-size: 14px;
+        border-radius: 30px;
+    }
+
+    .save-button-wrapper {
+        margin-top: 16px;
+    }
+
+    /* React Select responsive adjustments */
+    .select__control {
+        min-height: 38px !important;
+    }
+
+    .select__value-container {
+        padding: 4px 8px !important;
+    }
+
+    .select__input {
+        font-size: 13px !important;
+    }
+
+    .select__menu {
+        font-size: 13px !important;
+    }
+
+    /* Duration and time selectors */
+    .field>div[style*="display: flex"] {
+        flex-direction: column;
+        gap: 8px;
+    }
+
+    .field>div[style*="display: flex"]>* {
+        width: 100% !important;
+    }
+}
+
+.spin {
+    animation: spin 1s linear infinite;
+}
+
+@keyframes spin {
+    100% {
+        transform: rotate(360deg);
+    }
+}

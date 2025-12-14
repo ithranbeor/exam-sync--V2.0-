@@ -1,0 +1,565 @@
+/* Container */
+.rm-container {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 24px;
+  padding: 24px;
+  background-color: #f5f7fa;
+  min-height: 100vh;
+}
+
+/* Card */
+.rm-card {
+  flex: 1;
+  min-width: 300px;
+  background-color: #ffffff;
+  border-radius: 12px;
+  padding: 24px;
+  box-shadow: 0 8px 20px rgba(0, 0, 0, 0.08);
+  transition: transform 0.2s, box-shadow 0.2s;
+}
+
+.rm-card:hover {
+  transform: translateY(-4px);
+  box-shadow: 0 12px 24px rgba(0, 0, 0, 0.12);
+}
+
+/* Title */
+.rm-title {
+  font-size: 1.25rem;
+  font-weight: 600;
+  color: #333;
+  margin-bottom: 16px;
+  border-bottom: 1px solid #eee;
+  padding-bottom: 8px;
+}
+
+/* Fields */
+.rm-field {
+  margin-bottom: 20px;
+}
+
+.rm-field label {
+  display: block;
+  margin-bottom: 8px;
+  font-weight: 500;
+  color: #092C4C;
+}
+
+/* Rooms grid */
+.rm-room-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(100px, 1fr));
+  gap: 12px;
+}
+
+.rm-room-box {
+  padding: 12px;
+  border-radius: 8px;
+  background-color: #f0f2f5;
+  text-align: center;
+  cursor: pointer;
+  transition: background-color 0.2s, transform 0.2s;
+  font-weight: 500;
+  color: #092C4C;
+}
+
+.rm-room-box:hover {
+  background-color: #e0e4eb;
+  transform: translateY(-2px);
+}
+
+.rm-room-box.selected {
+  background-color: #4f8ef7;
+  color: #fff;
+  font-weight: 600;
+}
+
+.rm-room-type {
+  display: block;
+  font-size: 0.75rem;
+  color: #888;
+  margin-top: 4px;
+}
+
+/* Selected rooms */
+.rm-selected {
+  margin-top: 16px;
+  font-size: 0.9rem;
+  color: #444;
+}
+
+/* Timeslot list */
+.rm-timeslots {
+  margin-top: 12px;
+  max-height: 300px;
+  overflow-y: auto;
+  border-top: 1px solid #eee;
+}
+
+.rm-timeslot {
+  display: flex;
+  justify-content: space-between;
+  padding: 6px 8px;
+  border-bottom: 1px solid #f0f0f0;
+  font-size: 0.9rem;
+}
+
+.rm-timeslot.occupied {
+  background-color: #ffe6e6;
+  color: #b00000;
+}
+
+.rm-timeslot.vacant {
+  background-color: #e6f7ff;
+  color: #007acc;
+}
+
+.status {
+  font-weight: 500;
+}
+
+/* Vacancy Modal */
+.rm-modal-overlay {
+  position: fixed;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  background: rgba(0, 0, 0, 0.4);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 1000;
+}
+
+.rm-modal-content {
+  background: #fff;
+  padding: 24px;
+  border-radius: 12px;
+  width: 400px;
+  max-width: 90%;
+  max-height: 80%;
+  overflow-y: auto;
+  box-shadow: 0 10px 30px rgba(0, 0, 0, 0.2);
+}
+
+.rm-close-btn {
+  margin-top: 16px;
+  padding: 8px 16px;
+  background: #092C4C;
+  color: #fff;
+  border: none;
+  border-radius: 6px;
+  cursor: pointer;
+  font-weight: 500;
+}
+
+.rm-close-btn:hover {
+  background: #3a6edb;
+}
+
+/* View Vacancy button */
+.rm-vacancy-btn {
+  margin-top: 6px;
+  padding: 4px 8px;
+  background: #092C4C;
+  color: white;
+  font-size: 0.75rem;
+  border: none;
+  border-radius: 4px;
+  cursor: pointer;
+}
+
+.rm-vacancy-btn:hover {
+  background: #005ea2;
+}
+
+.rm-loading-container {
+  width: 100%;
+  height: 80vh;
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  align-items: center;
+}
+
+.rm-spinner {
+  width: 45px;
+  height: 45px;
+  border: 5px solid #ddd;
+  border-top-color: #092C4C;
+  border-radius: 50%;
+  animation: spin 0.9s linear infinite;
+}
+
+@keyframes spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+/* ======================= DESKTOP STYLES (min-width: 1025px) - DEFAULT ======================= */
+/* Desktop styles are already defined above, no changes needed */
+
+/* ======================= TABLET RESPONSIVENESS (769px - 1024px) ======================= */
+@media (min-width: 769px) and (max-width: 1024px) {
+  .rm-container {
+    flex-direction: column;
+    gap: 20px;
+    padding: 20px;
+  }
+
+  .rm-card {
+    min-width: 100%;
+    width: 100%;
+    padding: 20px;
+  }
+
+  .rm-title {
+    font-size: 1.15rem;
+    margin-bottom: 14px;
+  }
+
+  .rm-field {
+    margin-bottom: 18px;
+  }
+
+  .rm-field label {
+    font-size: 0.95rem;
+    margin-bottom: 6px;
+  }
+
+  .rm-room-grid {
+    grid-template-columns: repeat(auto-fill, minmax(90px, 1fr));
+    gap: 10px;
+  }
+
+  .rm-room-box {
+    padding: 10px;
+    font-size: 0.9rem;
+  }
+
+  .rm-room-type {
+    font-size: 0.7rem;
+  }
+
+  .rm-vacancy-btn {
+    font-size: 0.7rem;
+    padding: 3px 6px;
+    margin-top: 4px;
+  }
+
+  /* Table responsive for tablet */
+  .rm-room-table {
+    overflow-x: auto;
+    margin-top: 10px;
+  }
+
+  .rm-room-table table {
+    font-size: 0.9rem;
+    min-width: 100%;
+  }
+
+  .rm-room-table th,
+  .rm-room-table td {
+    padding: 6px;
+    font-size: 0.9rem;
+  }
+
+  .rm-room-table input[type="number"] {
+    width: 55px;
+    padding: 3px;
+    font-size: 0.9rem;
+  }
+
+  /* Title row buttons */
+  .rm-title-row {
+    flex-wrap: wrap;
+    gap: 10px;
+  }
+
+  .rm-title-row button {
+    font-size: 0.85rem;
+    padding: 5px 10px;
+  }
+
+  /* Modal adjustments */
+  .rm-modal-content {
+    width: 90%;
+    max-width: 500px;
+    padding: 20px;
+  }
+
+  .rm-timeslots {
+    max-height: 250px;
+  }
+
+  .rm-timeslot {
+    font-size: 0.85rem;
+    padding: 5px 6px;
+  }
+
+  /* React Select responsive adjustments for tablet */
+  .rm-field .css-1s2u09g-control,
+  .rm-field .css-1pahdxg-control {
+    min-height: 38px;
+    font-size: 0.9rem;
+  }
+}
+
+/* ======================= MOBILE RESPONSIVENESS (max-width: 768px) ======================= */
+@media (max-width: 768px) {
+  .rm-container {
+    flex-direction: column;
+    gap: 16px;
+    padding: 16px;
+    min-height: auto;
+  }
+
+  .rm-card {
+    min-width: 100%;
+    width: 100%;
+    padding: 16px;
+    border-radius: 10px;
+  }
+
+  .rm-card:hover {
+    transform: none;
+    /* Disable hover transform on mobile */
+  }
+
+  .rm-title {
+    font-size: 1.1rem;
+    margin-bottom: 12px;
+    padding-bottom: 6px;
+  }
+
+  .rm-field {
+    margin-bottom: 16px;
+  }
+
+  .rm-field label {
+    font-size: 0.9rem;
+    margin-bottom: 6px;
+  }
+
+  /* Title row - stack buttons on mobile */
+  .rm-title-row {
+    flex-direction: column;
+    align-items: flex-start !important;
+    gap: 10px;
+  }
+
+  .rm-title-row h3 {
+    width: 100%;
+  }
+
+  .rm-title-row>div {
+    width: 100%;
+    display: flex;
+    gap: 8px;
+  }
+
+  .rm-title-row button {
+    flex: 1;
+    font-size: 0.85rem;
+    padding: 8px 12px;
+  }
+
+  /* Room grid - fewer columns on mobile */
+  .rm-room-grid {
+    grid-template-columns: repeat(auto-fill, minmax(80px, 1fr));
+    gap: 8px;
+  }
+
+  .rm-room-box {
+    padding: 8px;
+    font-size: 0.85rem;
+    border-radius: 6px;
+  }
+
+  .rm-room-box:hover {
+    transform: none;
+    /* Disable hover transform on mobile */
+  }
+
+  .rm-room-type {
+    font-size: 0.65rem;
+    margin-top: 2px;
+  }
+
+  .rm-vacancy-btn {
+    font-size: 0.65rem;
+    padding: 3px 6px;
+    margin-top: 4px;
+    width: 100%;
+  }
+
+  /* Table responsive for mobile - convert to card layout */
+  .rm-room-table {
+    overflow-x: auto;
+    margin-top: 10px;
+    -webkit-overflow-scrolling: touch;
+  }
+
+  .rm-room-table table {
+    width: 100%;
+    font-size: 0.85rem;
+    border-collapse: collapse;
+    display: block;
+  }
+
+  .rm-room-table thead {
+    display: none;
+    /* Hide table header on mobile */
+  }
+
+  .rm-room-table tbody {
+    display: block;
+  }
+
+  .rm-room-table tbody tr {
+    display: block;
+    margin-bottom: 12px;
+    border: 1px solid #ddd;
+    border-radius: 8px;
+    padding: 12px;
+    background-color: #f9f9f9;
+    box-shadow: 0 2px 4px rgba(0, 0, 0, 0.05);
+  }
+
+  .rm-room-table tbody td {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 8px 0;
+    border-bottom: 1px solid #eee;
+    color: #333;
+    text-align: left;
+  }
+
+  .rm-room-table tbody td:last-child {
+    border-bottom: none;
+  }
+
+  /* Add labels for mobile table cells */
+  .rm-room-table tbody td:nth-child(1)::before {
+    content: "Room #:";
+    font-weight: 600;
+    color: #092C4C;
+    margin-right: 10px;
+    flex-shrink: 0;
+  }
+
+  .rm-room-table tbody td:nth-child(2)::before {
+    content: "Room Name:";
+    font-weight: 600;
+    color: #092C4C;
+    margin-right: 10px;
+    flex-shrink: 0;
+  }
+
+  .rm-room-table tbody td:nth-child(3)::before {
+    content: "Type:";
+    font-weight: 600;
+    color: #092C4C;
+    margin-right: 10px;
+    flex-shrink: 0;
+  }
+
+  .rm-room-table tbody td:nth-child(4)::before {
+    content: "Capacity:";
+    font-weight: 600;
+    color: #092C4C;
+    margin-right: 10px;
+    flex-shrink: 0;
+  }
+
+  .rm-room-table input[type="number"] {
+    width: 70px;
+    padding: 6px;
+    font-size: 0.85rem;
+    min-height: 32px;
+    /* Better touch target */
+  }
+
+  /* Modal adjustments for mobile */
+  .rm-modal-overlay {
+    padding: 10px;
+  }
+
+  .rm-modal-content {
+    width: 95%;
+    max-width: 100%;
+    padding: 16px;
+    max-height: 85vh;
+    overflow-y: auto;
+  }
+
+  .rm-modal-content h3 {
+    font-size: 1.1rem;
+    margin-bottom: 12px;
+  }
+
+  .rm-close-btn {
+    width: 100%;
+    padding: 10px;
+    font-size: 0.9rem;
+    margin-top: 12px;
+  }
+
+  .rm-timeslots {
+    max-height: 200px;
+    margin-top: 10px;
+  }
+
+  .rm-timeslot {
+    font-size: 0.8rem;
+    padding: 6px 8px;
+    flex-wrap: wrap;
+  }
+
+  .rm-timeslot span {
+    width: 100%;
+    margin-bottom: 2px;
+  }
+
+  /* Loading container */
+  .rm-loading-container {
+    height: 60vh;
+    padding: 20px;
+  }
+
+  .rm-spinner {
+    width: 40px;
+    height: 40px;
+    border-width: 4px;
+  }
+
+  /* Selected rooms text */
+  .rm-selected {
+    font-size: 0.85rem;
+    margin-top: 12px;
+  }
+
+  /* React Select responsive adjustments */
+  .rm-field .css-1s2u09g-control,
+  .rm-field .css-1pahdxg-control {
+    min-height: 40px;
+    /* Better touch target */
+    font-size: 0.9rem;
+  }
+
+  .rm-field .css-1okebmr-indicatorSeparator {
+    display: none;
+    /* Hide separator on mobile for more space */
+  }
+
+  /* Ensure buttons have good touch targets */
+  .rm-save-btn,
+  .rm-reset-btn {
+    min-height: 40px;
+    min-width: 80px;
+  }
+}
