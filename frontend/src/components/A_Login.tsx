@@ -3,7 +3,7 @@ import React, { useState, useCallback, useRef } from "react";
 import { useNavigate } from "react-router-dom";
 import { api } from "../lib/apiClient.ts";
 import { FaEye, FaEyeSlash } from "react-icons/fa";
-import "../styles/loginAdmin.css";
+import "../styles/A_Login.css";
 
 const getGreeting = () => {
   const hour = new Date().getHours();
@@ -29,7 +29,7 @@ const LoginAdmin: React.FC = () => {
 
   const togglePassword = useCallback(() => {
     showPasswordRef.current = !showPasswordRef.current;
-    forceRerender((x) => !x); 
+    forceRerender((x) => !x);
   }, []);
 
   const handleLogin = useCallback(

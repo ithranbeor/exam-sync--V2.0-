@@ -77,6 +77,10 @@ const SchedulerView: React.FC<SchedulerViewProps> = ({ user }) => {
   const [persistentUnscheduled, setPersistentUnscheduled] = useState<any[]>([]);
   const [showUnscheduledBadge, setShowUnscheduledBadge] = useState(false);
   const [deanName, _setDeanName] = useState<string>('');
+  const [showIconLabels, setShowIconLabels] = useState<boolean>(() => {
+    const stored = localStorage.getItem('showIconLabels');
+    return stored ? JSON.parse(stored) : false;
+  });
 
   const resetAllModes = () => {
     setIsModalOpen(false);
@@ -1121,7 +1125,11 @@ const SchedulerView: React.FC<SchedulerViewProps> = ({ user }) => {
               ? "active"
               : ""
               }`}
-            style={{ position: key === "Send Messages" ? "relative" : undefined }}
+            style={{ 
+              position: key === "Send Messages" ? "relative" : undefined,
+              flexDirection: showIconLabels ? 'column' : 'row',
+              gap: showIconLabels ? '4px' : '0'
+            }}
             onClick={() => {
               if (action) {
                 action();
@@ -1131,9 +1139,21 @@ const SchedulerView: React.FC<SchedulerViewProps> = ({ user }) => {
             }}
           >
             {icon}
-            <span className="tooltip-text">
-              {key.charAt(0).toUpperCase() + key.slice(1)}
-            </span>
+            {showIconLabels ? (
+              <span style={{
+                fontSize: '10px',
+                color: '#092C4C',
+                fontWeight: '500',
+                whiteSpace: 'nowrap',
+                marginTop: '2px'
+              }}>
+                {key}
+              </span>
+            ) : (
+              <span className="tooltip-text">
+                {key.charAt(0).toUpperCase() + key.slice(1)}
+              </span>
+            )}
 
             {key === "Send Messages" && showEnvelopeDropdown && (
               <div className="envelope-dropdown">
@@ -2200,9 +2220,14 @@ const SchedulerView: React.FC<SchedulerViewProps> = ({ user }) => {
           isOpen={showFooterSettings}
           onClose={() => setShowFooterSettings(false)}
           collegeName={collegeName}
+          collegeId={schedulerCollegeId}
+          showIconLabels={showIconLabels}
+          onIconLabelsChange={(show) => {
+            setShowIconLabels(show);
+            localStorage.setItem('showIconLabels', JSON.stringify(show));
+          }}
           onSave={async () => {
             try {
-
               const response = await api.get('/tbl_schedule_footer/', {
                 params: { college_id: schedulerCollegeId }
               });

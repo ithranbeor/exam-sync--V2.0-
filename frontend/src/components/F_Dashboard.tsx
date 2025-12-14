@@ -10,7 +10,7 @@ import {
 import { BsFillSendPlusFill } from "react-icons/bs";
 import '../styles/F_Dashboard.css';
 
-import Profile from './A_Profile.tsx';
+import Profile from './F_Profile.tsx';
 import ProctorExamDate from "./F_ExamDateViewer.tsx";
 import ProctorSetAvailability from "./P_ProctorAvailability.tsx";
 import ProctorViewExam from "./F_ExamViewer.tsx";

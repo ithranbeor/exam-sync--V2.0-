@@ -2,10 +2,10 @@
 import React, { useState, useEffect } from 'react';
 import { api } from '../lib/apiClient.ts';
 import { ToastContainer, toast } from 'react-toastify';
-import { FaSearch, FaTrash, FaDownload, FaPen, FaCalendarAlt, FaLock, FaLockOpen} from 'react-icons/fa';
+import { FaSearch, FaTrash, FaDownload, FaPen, FaCalendarAlt, FaLock, FaLockOpen } from 'react-icons/fa';
 import * as XLSX from 'xlsx';
 import 'react-toastify/dist/ReactToastify.css';
-import '../styles/userroles.css';
+import '../styles/A_UserRoles.css';
 
 interface Role {
   role_id: number;
@@ -31,21 +31,21 @@ interface Department {
 type UserRole = {
   user_role_id: number;
 
-  user: number;             
-  user_id?: number;          
-  user_full_name?: string;   
+  user: number;
+  user_id?: number;
+  user_full_name?: string;
 
   role: number;
   role_id?: number;
   role_name?: string;
 
-  college: string | null;        
-  college_id?: string | null;    
-  college_name?: string | null; 
+  college: string | null;
+  college_id?: string | null;
+  college_name?: string | null;
 
-  department: string | null;         
-  department_id?: string | null;     
-  department_name?: string | null;   
+  department: string | null;
+  department_id?: string | null;
+  department_name?: string | null;
 
   created_at: string | null;
   date_start: string | null;
@@ -349,9 +349,8 @@ const UserRoles = () => {
                               const createdAt = role.created_at
                                 ? new Date(role.created_at).toLocaleDateString()
                                 : '—';
-                              return `${role.role_name}${
-                                office ? ` - ${office}` : ''
-                              } (added: ${createdAt})`;
+                              return `${role.role_name}${office ? ` - ${office}` : ''
+                                } (added: ${createdAt})`;
                             })
                             .join('\n')}
                         </pre>
@@ -441,13 +440,13 @@ const UserRoles = () => {
                       <td>
                         {role.created_at
                           ? new Date(role.created_at).toLocaleString('en-US', {
-                              month: '2-digit',
-                              day: '2-digit',
-                              year: 'numeric',
-                              hour: 'numeric',
-                              minute: '2-digit',
-                              hour12: true,
-                            })
+                            month: '2-digit',
+                            day: '2-digit',
+                            year: 'numeric',
+                            hour: 'numeric',
+                            minute: '2-digit',
+                            hour12: true,
+                          })
                           : '—'}
                       </td>
 
@@ -476,11 +475,10 @@ const UserRoles = () => {
                         </button>
 
                         <button
-                          className={`icon-button ${
-                            role.status === 'Suspended'
+                          className={`icon-button ${role.status === 'Suspended'
                               ? 'reactivate-button'
                               : 'delete-button'
-                          }`}
+                            }`}
                           onClick={() =>
                             toggleUserRoleStatus(
                               role.user_role_id,
@@ -576,34 +574,34 @@ const UserRoles = () => {
               </select>
             </div>
             {getAllowedFields(newRole.role_id).college && (
-            <div className="input-group">
-              <label>College</label>
-              <select
-                value={newRole.college_id || ''}
-                onChange={e => setNewRole(prev => ({ ...prev, college_id: e.target.value || null }))}
-              >
-                <option value="">None</option>
-                {colleges.map(c => (
-                  <option key={c.college_id} value={c.college_id}>{c.college_name}</option>
-                ))}
-              </select>
-            </div>
-          )}
+              <div className="input-group">
+                <label>College</label>
+                <select
+                  value={newRole.college_id || ''}
+                  onChange={e => setNewRole(prev => ({ ...prev, college_id: e.target.value || null }))}
+                >
+                  <option value="">None</option>
+                  {colleges.map(c => (
+                    <option key={c.college_id} value={c.college_id}>{c.college_name}</option>
+                  ))}
+                </select>
+              </div>
+            )}
 
-          {getAllowedFields(newRole.role_id).department && (
-            <div className="input-group">
-              <label>Department</label>
-              <select
-                value={newRole.department_id || ''}
-                onChange={e => setNewRole(prev => ({ ...prev, department_id: e.target.value || null }))}
-              >
-                <option value="">None</option>
-                {departments.map(d => (
-                  <option key={d.department_id} value={d.department_id}>({d.department_id}) {d.department_name}</option>
-                ))}
-              </select>
-            </div>
-          )}
+            {getAllowedFields(newRole.role_id).department && (
+              <div className="input-group">
+                <label>Department</label>
+                <select
+                  value={newRole.department_id || ''}
+                  onChange={e => setNewRole(prev => ({ ...prev, department_id: e.target.value || null }))}
+                >
+                  <option value="">None</option>
+                  {departments.map(d => (
+                    <option key={d.department_id} value={d.department_id}>({d.department_id}) {d.department_name}</option>
+                  ))}
+                </select>
+              </div>
+            )}
             <div className="input-group">
               <label>Start Date</label>
               <div className="date-input-wrapper">
@@ -660,34 +658,34 @@ const UserRoles = () => {
               </select>
             </div>
             {getAllowedFields(editingRole?.role_id).college && (
-            <div className="input-group">
-              <label>College</label>
-              <select
-                value={editingRole?.college_id || ''}
-                onChange={e => setEditingRole(prev => prev && { ...prev, college_id: e.target.value || null })}
-              >
-                <option value="">None</option>
-                {colleges.map(c => (
-                  <option key={c.college_id} value={c.college_id}>{c.college_name}</option>
-                ))}
-              </select>
-            </div>
-          )}
+              <div className="input-group">
+                <label>College</label>
+                <select
+                  value={editingRole?.college_id || ''}
+                  onChange={e => setEditingRole(prev => prev && { ...prev, college_id: e.target.value || null })}
+                >
+                  <option value="">None</option>
+                  {colleges.map(c => (
+                    <option key={c.college_id} value={c.college_id}>{c.college_name}</option>
+                  ))}
+                </select>
+              </div>
+            )}
 
-          {getAllowedFields(editingRole?.role_id).department && (
-            <div className="input-group">
-              <label>Department</label>
-              <select
-                value={editingRole?.department_id || ''}
-                onChange={e => setEditingRole(prev => prev && { ...prev, department_id: e.target.value || null })}
-              >
-                <option value="">None</option>
-                {departments.map(d => (
-                  <option key={d.department_id} value={d.department_id}>{d.department_name}</option>
-                ))}
-              </select>
-            </div>
-          )}
+            {getAllowedFields(editingRole?.role_id).department && (
+              <div className="input-group">
+                <label>Department</label>
+                <select
+                  value={editingRole?.department_id || ''}
+                  onChange={e => setEditingRole(prev => prev && { ...prev, department_id: e.target.value || null })}
+                >
+                  <option value="">None</option>
+                  {departments.map(d => (
+                    <option key={d.department_id} value={d.department_id}>{d.department_name}</option>
+                  ))}
+                </select>
+              </div>
+            )}
             <div className="input-group">
               <label>Start Date</label>
               <div className="date-input-wrapper">
@@ -745,18 +743,18 @@ const UserRoles = () => {
 
       {showImportModal && (
         <div className="modal-overlay">
-            <div className="modal-contents import-modal">
-              <h4 style={{ textAlign: 'center' }}>Import Roles from Excel</h4>
-              <div className="input-group">
-                <label>Upload Excel File</label>
-                <input type="file" accept=".xlsx, .xls" onChange={handleImportFile} />
-              </div>
-              <div className="modal-buttons">
-                <button type="button" className="modal-button download" onClick={downloadTemplate}><FaDownload /> Download Template</button>
-                <button type="button" className="modal-button save" onClick={() => setShowImportModal(false)}>Done</button>
-                <button type="button" className="modal-button cancel" onClick={() => setShowImportModal(false)}>Cancel</button>
-              </div>
+          <div className="modal-contents import-modal">
+            <h4 style={{ textAlign: 'center' }}>Import Roles from Excel</h4>
+            <div className="input-group">
+              <label>Upload Excel File</label>
+              <input type="file" accept=".xlsx, .xls" onChange={handleImportFile} />
             </div>
+            <div className="modal-buttons">
+              <button type="button" className="modal-button download" onClick={downloadTemplate}><FaDownload /> Download Template</button>
+              <button type="button" className="modal-button save" onClick={() => setShowImportModal(false)}>Done</button>
+              <button type="button" className="modal-button cancel" onClick={() => setShowImportModal(false)}>Cancel</button>
+            </div>
+          </div>
         </div>
       )}
 

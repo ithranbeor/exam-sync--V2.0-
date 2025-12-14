@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useRef, useMemo } from 'react';
 import '../styles/P_ProctorAvailability.css';
-import '../styles/A_Colleges.css';
+import '../styles/colleges.css';
 import { FaChevronLeft, FaChevronRight, FaEye, FaTrash, FaPenAlt, FaPlus, FaSearch, FaSort, FaChevronDown } from 'react-icons/fa';
 import { api } from '../lib/apiClient.ts';
 import { ToastContainer, toast } from 'react-toastify';

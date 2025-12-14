@@ -2,11 +2,15 @@ import React, { useState, useEffect } from 'react';
 import { api } from '../lib/apiClient';
 import { toast } from 'react-toastify';
 import '../styles/S_SettingsModal.css';
+import { FaImage, FaEye, FaFileSignature } from 'react-icons/fa';
 
 interface FooterSettingsModalProps {
   isOpen: boolean;
   onClose: () => void;
   collegeName: string;
+  collegeId: string;
+  showIconLabels: boolean;
+  onIconLabelsChange: (show: boolean) => void;
   onSave: () => void;
 }
 
@@ -26,6 +30,9 @@ const FooterSettingsModal: React.FC<FooterSettingsModalProps> = ({
   isOpen,
   onClose,
   collegeName,
+  collegeId,
+  showIconLabels,
+  onIconLabelsChange,
   onSave
 }) => {
   const [footerData, setFooterData] = useState<FooterData>({
@@ -42,9 +49,9 @@ const FooterSettingsModal: React.FC<FooterSettingsModalProps> = ({
   const [logoPreview, setLogoPreview] = useState<string | null>(null);
   const [isLoading, setIsLoading] = useState(false);
   const [isSaving, setIsSaving] = useState(false);
-  const [collegeId, setCollegeId] = useState<string | null>(null);
   const [deanName, setDeanName] = useState<string>('');
   const [vcaaName, setVcaaName] = useState<string>('');
+  const [activeTab, setActiveTab] = useState<'appearance' | 'display' | 'footer' | 'about'>('appearance');
 
   // Fetch dean name and VCAA name
   useEffect(() => {
@@ -122,31 +129,6 @@ const FooterSettingsModal: React.FC<FooterSettingsModalProps> = ({
     };
 
     fetchRoleNames();
-  }, [collegeName]);
-
-  // Fetch college_id from college_name
-  useEffect(() => {
-    const fetchCollegeId = async () => {
-      if (!collegeName || collegeName === "Add schedule first") return;
-
-      try {
-        const response = await api.get('/tbl_college/');
-
-        if (response.data && response.data.length > 0) {
-          const college = response.data.find((c: any) => c.college_name === collegeName);
-          if (college) {
-            setCollegeId(college.college_id);
-            console.log(`✅ Found college_id: ${college.college_id} for ${collegeName}`);
-          } else {
-            console.error(`❌ College not found: ${collegeName}`);
-          }
-        }
-      } catch (error) {
-        console.error("Error fetching college ID:", error);
-      }
-    };
-
-    fetchCollegeId();
   }, [collegeName]);
 
   // Wait for collegeId before fetching footer data
@@ -418,118 +400,198 @@ const FooterSettingsModal: React.FC<FooterSettingsModalProps> = ({
     <div className="footer-settings-overlay">
       <div className="footer-settings-modal">
         <div className="footer-settings-header">
-          <h2>Schedule Footer Settings</h2>
+          <h2>Settings</h2>
           <button type="button" className="close-button" onClick={onClose}>&times;</button>
         </div>
 
-        <div className="footer-settings-content">
-          {isLoading ? (
-            <div className="loading-spinner">Loading...</div>
-          ) : (
-            <>
-              {/* Logo Section */}
-              <div className="settings-section">
-                <h3>Logo</h3>
-                <div className="logo-upload-section">
-                  {logoPreview ? (
-                    <div className="logo-preview">
-                      <img src={logoPreview} alt="Logo Preview" />
-                      <button
-                        type="button"
-                        className="remove-logo-btn"
-                        onClick={handleRemoveLogo}
-                      >
-                        Remove Logo
-                      </button>
+        <div className="settings-body">
+          {/* Sidebar Navigation */}
+          <div className="settings-sidebar">
+            <div
+              className={`settings-nav-item ${activeTab === 'appearance' ? 'active' : ''}`}
+              onClick={() => setActiveTab('appearance')}
+            >
+              <FaImage />
+              <span>Appearance</span>
+            </div>
+            <div
+              className={`settings-nav-item ${activeTab === 'display' ? 'active' : ''}`}
+              onClick={() => setActiveTab('display')}
+            >
+              <FaEye />
+              <span>Display</span>
+            </div>
+            <div
+              className={`settings-nav-item ${activeTab === 'footer' ? 'active' : ''}`}
+              onClick={() => setActiveTab('footer')}
+            >
+              <FaFileSignature />
+              <span>Footer Settings</span>
+            </div>
+          </div>
+
+          {/* Main Content */}
+          <div className="settings-main-content">
+            {isLoading ? (
+              <div className="loading-spinner">Loading...</div>
+            ) : (
+              <>
+                {/* Appearance Tab */}
+                {activeTab === 'appearance' && (
+                  <>
+                    <div className="settings-section">
+                      <h3>Logo</h3>
+                      <p className="section-description">
+                        Upload your institution's logo to appear on all schedule documents
+                      </p>
+                      <div className="logo-upload-section">
+                        <div className="logo-preview-container">
+                          {logoPreview ? (
+                            <div className="logo-preview">
+                              <img src={logoPreview} alt="Logo Preview" />
+                            </div>
+                          ) : (
+                            <div className="logo-upload-placeholder">
+                              <p>No logo<br />uploaded</p>
+                            </div>
+                          )}
+                          <div className="logo-actions">
+                            <input
+                              type="file"
+                              accept="image/jpeg,image/jpg,image/png,image/gif,image/webp"
+                              onChange={handleLogoChange}
+                              id="logo-upload"
+                              style={{ display: 'none' }}
+                            />
+                            <label htmlFor="logo-upload" className="upload-logo-btn">
+                              {logoPreview ? 'Change Logo' : 'Upload Logo'}
+                            </label>
+                            {logoPreview && (
+                              <button
+                                type="button"
+                                className="remove-logo-btn"
+                                onClick={handleRemoveLogo}
+                              >
+                                Remove Logo
+                              </button>
+                            )}
+                          </div>
+                        </div>
+                      </div>
                     </div>
-                  ) : (
-                    <div className="logo-upload-placeholder">
-                      <p>No logo uploaded</p>
+                  </>
+                )}
+
+                {/* Display Tab */}
+                {activeTab === 'display' && (
+                  <>
+                    <div className="settings-section">
+                      <h3>Toolbar Display</h3>
+                      <p className="section-description">
+                        Customize how the toolbar icons appear in the schedule view
+                      </p>
+                      <div className="toggle-container">
+                        <label className="toggle-switch">
+                          <input
+                            type="checkbox"
+                            checked={showIconLabels}
+                            onChange={(e) => onIconLabelsChange(e.target.checked)}
+                          />
+                          <span className="toggle-slider"></span>
+                        </label>
+                        <div className="toggle-label">
+                          <div className="toggle-label-text">Show icon labels</div>
+                          <div className="toggle-label-description">
+                            Display text labels below toolbar icons instead of tooltips
+                          </div>
+                        </div>
+                      </div>
                     </div>
-                  )}
-                  <input
-                    type="file"
-                    accept="image/jpeg,image/jpg,image/png,image/gif,image/webp"
-                    onChange={handleLogoChange}
-                    id="logo-upload"
-                    style={{ display: 'none' }}
-                  />
-                  <label htmlFor="logo-upload" className="upload-logo-btn">
-                    {logoPreview ? 'Change Logo' : 'Upload Logo'}
-                  </label>
-                </div>
-              </div>
+                  </>
+                )}
 
-              {/* Prepared By Section */}
-              <div className="settings-section">
-                <h3>Prepared By (Left Side)</h3>
-                <div className="form-group">
-                  <label>Name:</label>
-                  <input
-                    type="text"
-                    value={footerData.prepared_by_name}
-                    onChange={(e) => handleInputChange('prepared_by_name', e.target.value)}
-                    placeholder="Type name"
-                  />
-                </div>
-                <div className="form-group">
-                  <label>Title:</label>
-                  <input
-                    type="text"
-                    value={footerData.prepared_by_title}
-                    onChange={(e) => handleInputChange('prepared_by_title', e.target.value)}
-                    placeholder={`Dean, ${collegeName}`}
-                  />
-                </div>
-              </div>
+                {/* Footer Settings Tab */}
+                {activeTab === 'footer' && (
+                  <>
+                    <div className="settings-section">
+                      <h3>Prepared By (Left Side)</h3>
+                      <p className="section-description">
+                        Information for the person who prepared the schedule
+                      </p>
+                      <div className="form-group">
+                        <label>Name:</label>
+                        <input
+                          type="text"
+                          value={footerData.prepared_by_name}
+                          onChange={(e) => handleInputChange('prepared_by_name', e.target.value)}
+                          placeholder="Type name"
+                        />
+                      </div>
+                      <div className="form-group">
+                        <label>Title:</label>
+                        <input
+                          type="text"
+                          value={footerData.prepared_by_title}
+                          onChange={(e) => handleInputChange('prepared_by_title', e.target.value)}
+                          placeholder={`Dean, ${collegeName}`}
+                        />
+                      </div>
+                    </div>
 
-              {/* Approved By Section */}
-              <div className="settings-section">
-                <h3>Approved By (Right Side)</h3>
-                <div className="form-group">
-                  <label>Name:</label>
-                  <input
-                    type="text"
-                    value={footerData.approved_by_name}
-                    onChange={(e) => handleInputChange('approved_by_name', e.target.value)}
-                    placeholder="Type name"
-                  />
-                </div>
-                <div className="form-group">
-                  <label>Title:</label>
-                  <input
-                    type="text"
-                    value={footerData.approved_by_title}
-                    onChange={(e) => handleInputChange('approved_by_title', e.target.value)}
-                    placeholder="VCAA, USTP-CDO"
-                  />
-                </div>
-              </div>
+                    <div className="settings-section">
+                      <h3>Approved By (Right Side)</h3>
+                      <p className="section-description">
+                        Information for the person who approves the schedule
+                      </p>
+                      <div className="form-group">
+                        <label>Name:</label>
+                        <input
+                          type="text"
+                          value={footerData.approved_by_name}
+                          onChange={(e) => handleInputChange('approved_by_name', e.target.value)}
+                          placeholder="Type name"
+                        />
+                      </div>
+                      <div className="form-group">
+                        <label>Title:</label>
+                        <input
+                          type="text"
+                          value={footerData.approved_by_title}
+                          onChange={(e) => handleInputChange('approved_by_title', e.target.value)}
+                          placeholder="VCAA, USTP-CDO"
+                        />
+                      </div>
+                    </div>
 
-              {/* Address Section */}
-              <div className="settings-section">
-                <h3>Address & Contact (Center)</h3>
-                <div className="form-group">
-                  <label>Address:</label>
-                  <input
-                    type="text"
-                    value={footerData.address_line}
-                    onChange={(e) => handleInputChange('address_line', e.target.value)}
-                    placeholder="C.M Recto Avenue, Lapasan, Cagayan de Oro City 9000 Philippines"
-                  />
-                </div>
-                <div className="form-group">
-                  <label>Contact Info:</label>
-                  <input
-                    type="text"
-                    value={footerData.contact_line}
-                    onChange={(e) => handleInputChange('contact_line', e.target.value)}
-                    placeholder="Tel Nos. +63 (88) 856 1738; Telefax +63 (88) 856 4696 | http://www.ustp.edu.ph"
-                  />
-                </div>
-              </div>
-            </>
-          )}
+                    <div className="settings-section">
+                      <h3>Contact Information</h3>
+                      <p className="section-description">
+                        Address and contact details shown at the bottom of schedules
+                      </p>
+                      <div className="form-group">
+                        <label>Address:</label>
+                        <input
+                          type="text"
+                          value={footerData.address_line}
+                          onChange={(e) => handleInputChange('address_line', e.target.value)}
+                          placeholder="C.M Recto Avenue, Lapasan, Cagayan de Oro City 9000 Philippines"
+                        />
+                      </div>
+                      <div className="form-group">
+                        <label>Contact Info:</label>
+                        <input
+                          type="text"
+                          value={footerData.contact_line}
+                          onChange={(e) => handleInputChange('contact_line', e.target.value)}
+                          placeholder="Tel Nos. +63 (88) 856 1738; Telefax +63 (88) 856 4696 | http://www.ustp.edu.ph"
+                        />
+                      </div>
+                    </div>
+                  </>
+                )}
+              </>
+            )}
+          </div>
         </div>
 
         <div className="footer-settings-actions">

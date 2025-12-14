@@ -23,7 +23,7 @@ import Buildings from './A_Buildings.tsx';
 import Rooms from './A_Rooms.tsx';
 import ExamPeriod from './A_ExamPeriod.tsx';
 import UserManagement from './A_UserManagement.tsx';
-import Profile from './A_Profile.tsx';
+import Profile from './F_Profile.tsx';
 import ProctorViewExam from "./F_ExamViewer.tsx";
 import BayanihanModality from "./B_BayanihanModality.tsx";
 import MiniExamDateCalendar from "./F_MiniExamDateCalendar.tsx";

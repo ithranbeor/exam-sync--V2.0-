@@ -651,3 +651,13 @@
     font-size: 14px !important;
   }
 }
+/* Icon labels responsive */
+@media (max-width: 768px) {
+  .scheduler-icon[style*="flex-direction: column"] {
+    padding: 6px 10px !important;
+  }
+  
+  .scheduler-icon[style*="flex-direction: column"] span {
+    font-size: 9px !important;
+  }
+}

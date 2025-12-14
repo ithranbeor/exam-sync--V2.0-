@@ -5,7 +5,7 @@ import { ToastContainer, toast } from 'react-toastify';
 import * as XLSX from 'xlsx';
 import 'react-toastify/dist/ReactToastify.css';
 import '../styles/A_Accounts.css';
-import '../styles/A_Colleges.css';
+import '../styles/colleges.css';
 import { useEscapeKey } from '../hooks/useEscapeKey.ts';
 
 interface UserAccount {

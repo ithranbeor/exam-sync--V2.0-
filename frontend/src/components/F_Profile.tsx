@@ -1,7 +1,7 @@
 // deno-lint-ignore-file no-explicit-any
 import React, { useState, useEffect, useCallback } from 'react';
 import { api } from '../lib/apiClient.ts';
-import '../styles/profile.css';
+import '../styles/F_Profile.css';
 import { MdEdit } from 'react-icons/md';
 import { FaTrash } from 'react-icons/fa';
 import { ToastContainer, toast } from 'react-toastify';
@@ -215,9 +215,9 @@ const Profile: React.FC<ProfileProps> = ({ user }) => {
           <div className="profile-full-name">
             {profile.first_name} {profile.middle_name} {profile.last_name}
             {profile.employment_type && (
-              <span style={{ 
+              <span style={{
                 marginLeft: '12px',
-                padding: '4px 10px', 
+                padding: '4px 10px',
                 borderRadius: '10px',
                 fontSize: '15px',
                 fontWeight: 500,
