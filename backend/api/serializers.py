@@ -682,29 +682,44 @@ class TblExamdetailsSerializer(serializers.ModelSerializer):
         return None
     
     def get_examdetails_status(self, obj):
-        """
-        Determine proctor attendance status based on TblProctorAttendance.
-        """
-
-        attendance = obj.attendance_records.first()  # because of unique_together
-
-        # No attendance record
+        attendance = obj.attendance_records.first()
+        
+        # No attendance = absent or pending
         if not attendance:
-            # Exam already finished → mark absent/late
             if obj.exam_end_time and timezone.now() > obj.exam_end_time:
-                return "late"  # or "absent" depending on your rule
+                return "absent"
             return "pending"
-
-        # Substitute proctor
+        
+        # Substitute takes priority
         if attendance.is_substitute:
             return "substitute"
-
-        # OTP used = present
-        if attendance.otp_used and attendance.time_in:
-            return "present"
-
-        # Has record but no OTP = late
-        return "late"
+        
+        # ✅ CRITICAL FIX: Check if late (>7 minutes after start)
+        if obj.exam_start_time and obj.exam_date and attendance.time_in:
+            from datetime import datetime, timedelta
+            
+            exam_date_obj = datetime.strptime(obj.exam_date, '%Y-%m-%d').date()
+            
+            # Extract time from exam_start_time
+            if isinstance(obj.exam_start_time, datetime):
+                exam_start_time = obj.exam_start_time.time()
+            else:
+                exam_start_time = obj.exam_start_time
+            
+            # Create datetime for scheduled start
+            exam_start_datetime = timezone.make_aware(
+                datetime.combine(exam_date_obj, exam_start_time)
+            )
+            
+            # Calculate difference
+            time_diff = (attendance.time_in - exam_start_datetime).total_seconds() / 60
+            
+            # >7 minutes = late
+            if time_diff > 7:
+                return "late"
+        
+        # On time
+        return "present"
     
     def to_representation(self, instance):
         representation = super().to_representation(instance)

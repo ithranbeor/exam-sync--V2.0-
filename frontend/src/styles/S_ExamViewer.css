@@ -313,12 +313,11 @@
 .scheduler-nav-button {
   position: fixed;
   z-index: 1000;
-  background: rgba(255, 255, 255, 0.9);
-  border: 2px solid #092C4C;
+  background: rgba(255, 255, 255, 1);
   border-radius: 50%;
   cursor: pointer;
   padding: 0.75rem;
-  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+  box-shadow: 0 2px 12px rgba(0, 0, 0, 0.15);
   transition: all 0.3s ease;
   display: flex;
   align-items: center;
@@ -344,7 +343,6 @@
 
 .scheduler-nav-button svg {
   color: #092C4C;
-  opacity: 0.8;
   transition: opacity 0.2s ease;
 }
 
@@ -707,4 +705,19 @@
   h3[style*="fontSize: '20px'"] {
     font-size: 18px !important;
   }
+}
+
+.exam-table td>div {
+  min-height: 80px;
+  max-height: 200px;
+  overflow-y: auto;
+  display: flex;
+  flex-direction: column;
+  justify-content: flex-start;
+}
+
+.exam-table td>div p {
+  margin: 2px 0;
+  font-size: 12px;
+  line-height: 1.3;
 }

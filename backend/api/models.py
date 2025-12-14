@@ -130,7 +130,7 @@ class TblAvailability(models.Model):
     time_slots = ArrayField(models.CharField(max_length=50), blank=False)  # array of time slots
     status = models.CharField(max_length=20)
     remarks = models.TextField(blank=True, null=True)
-    user = models.ForeignKey('TblUsers', on_delete=models.CASCADE)  # ✅ fixed
+    user = models.ForeignKey('TblUsers', on_delete=models.CASCADE)
 
     class Meta:
         managed = True
@@ -219,6 +219,7 @@ class TblDepartment(models.Model):
         ]
 
 
+# ✅ UPDATED: Removed proctor_timein, proctor_timeout, and status fields
 class TblExamdetails(models.Model):
     examdetails_id = models.AutoField(primary_key=True)
     course_id = models.CharField(max_length=50)
@@ -230,22 +231,6 @@ class TblExamdetails(models.Model):
     exam_duration = models.DurationField(blank=True, null=True)
     exam_start_time = models.DateTimeField(blank=True, null=True)
     exam_end_time = models.DateTimeField(blank=True, null=True)
-    proctor_timein = models.DateTimeField(blank=True, null=True)
-    proctor_timeout = models.DateTimeField(blank=True, null=True)
-
-    status = models.CharField(
-        max_length=20,
-        blank=True,
-        null=True,
-        default='pending',
-        choices=[
-            ('pending', 'Pending'),
-            ('confirmed', 'Confirmed'),
-            ('late', 'Late'),
-            ('absent', 'Absent'),
-            ('substitute', 'Substitute'),
-        ]
-    )
     
     # ✅ NEW: Changed to ArrayField for multiple sections
     sections = ArrayField(
@@ -298,8 +283,8 @@ class TblExamperiod(models.Model):
     examperiod_id = models.AutoField(primary_key=True)
     start_date = models.DateTimeField()
     end_date = models.DateTimeField()
-    academic_year = models.TextField()  # This field type is a guess.
-    exam_category = models.TextField()  # This field type is a guess.
+    academic_year = models.TextField()
+    exam_category = models.TextField()
     term = models.ForeignKey('TblTerm', models.DO_NOTHING)
     department = models.ForeignKey(TblDepartment, models.DO_NOTHING, blank=True, null=True)
     college = models.ForeignKey(TblCollege, models.DO_NOTHING, blank=True, null=True)
@@ -325,7 +310,6 @@ class TblModality(models.Model):
     user = models.ForeignKey('TblUsers', models.DO_NOTHING)
     created_at = models.DateTimeField(blank=True, null=True)
     
-    # ✅ NEW: Changed to ArrayField for multiple sections
     sections = ArrayField(
         models.CharField(max_length=100),
         blank=True,
@@ -333,10 +317,8 @@ class TblModality(models.Model):
         default=list
     )
     
-    # ✅ NEW: Store total student count across all sections
     total_students = models.IntegerField(default=0, blank=True, null=True)
     
-    # Keep possible_rooms as is
     possible_rooms = ArrayField(
         models.CharField(max_length=50),
         blank=True,
@@ -350,10 +332,10 @@ class TblModality(models.Model):
 
 class TblNotification(models.Model):
     notification_id = models.AutoField(primary_key=True)
-    user = models.ForeignKey('TblUsers', on_delete=models.CASCADE)  # ✅ fixed
+    user = models.ForeignKey('TblUsers', on_delete=models.CASCADE)
     sender = models.ForeignKey(
         'TblUsers',
-        on_delete=models.SET_NULL,  # allow null sender
+        on_delete=models.SET_NULL,
         related_name='tblnotification_sender_set',
         blank=True,
         null=True
@@ -420,7 +402,7 @@ class TblRooms(models.Model):
 class TblScheduleapproval(models.Model):
     dean_user_id = models.IntegerField()
     submitted_at = models.DateTimeField(blank=True, null=True)
-    status = models.TextField(blank=True, null=True)  # This field type is a guess.
+    status = models.TextField(blank=True, null=True)
     remarks = models.TextField(blank=True, null=True)
     created_at = models.DateTimeField()
     request_id = models.UUIDField(primary_key=True)
@@ -438,7 +420,7 @@ class TblSectioncourse(models.Model):
     program = models.ForeignKey(TblProgram, models.DO_NOTHING)
     section_name = models.CharField(max_length=50)
     number_of_students = models.IntegerField()
-    year_level = models.TextField()  # This field type is a guess.
+    year_level = models.TextField()
     term = models.ForeignKey('TblTerm', models.DO_NOTHING)
     user = models.ForeignKey('TblUsers', models.DO_NOTHING, blank=True, null=True)
     is_night_class = models.TextField(blank=True, null=True)
@@ -455,7 +437,7 @@ class TblSectioncourse(models.Model):
 
 class TblTerm(models.Model):
     term_id = models.AutoField(primary_key=True)
-    term_name = models.TextField()  # This field type is a guess.
+    term_name = models.TextField()
 
     class Meta:
         managed = True
@@ -471,7 +453,7 @@ class TblUserRole(models.Model):
     created_at = models.DateTimeField(blank=True, null=True)
     date_start = models.DateTimeField(blank=True, null=True)
     date_ended = models.DateTimeField(blank=True, null=True)
-    status = models.TextField(blank=True, null=True)  # This field type is a guess.
+    status = models.TextField(blank=True, null=True)
 
     class Meta:
         managed = True
@@ -515,7 +497,6 @@ class TblUsers(models.Model):
     user_uuid = models.UUIDField(blank=True, null=True)
     password = models.CharField(max_length=128)
     
-    # ✅ NEW: Employment type field
     employment_type = models.CharField(
         max_length=20,
         blank=True,
@@ -549,7 +530,7 @@ class TblExamOtp(models.Model):
     )
     otp_code = models.CharField(max_length=50, unique=True)
     created_at = models.DateTimeField(auto_now_add=True)
-    expires_at = models.DateTimeField()  # Based on exam end time
+    expires_at = models.DateTimeField()
 
     class Meta:
         managed = True
@@ -589,7 +570,6 @@ class TblProctorAttendance(models.Model):
             models.Index(fields=['proctor']),
             models.Index(fields=['time_in']),
         ]
-        # Prevent duplicate attendance for same proctor-exam combination
         unique_together = [['examdetails', 'proctor']]
     
     def __str__(self):
@@ -649,7 +629,7 @@ class TblScheduleFooter(models.Model):
     contact_line = models.TextField(default='Tel Nos. +63 (88) 856 1738; Telefax +63 (88) 856 4696 | http://www.ustp.edu.ph')
     
     # Logo
-    logo_url = models.TextField(blank=True, null=True)  # Base64 or URL
+    logo_url = models.TextField(blank=True, null=True)
     
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)

@@ -689,16 +689,12 @@ const ProctorMonitoring: React.FC<UserProps> = ({ }) => {
                 {sortedSchedules.length > 0 ? (
                   sortedSchedules.map((schedule, index) => {
                     // ✅ FIXED: Use backend status directly
-                    const backendStatus = schedule.examdetails_status || schedule.status || 'pending';
+                    const backendStatus = schedule.examdetails_status || 'pending';
 
-                    const getStatusDisplay = (status: string | null | undefined) => {
-                      if (!status) {
-                        return { text: 'Pending', className: 'status-pending' };
-                      }
-
+                    const getStatusDisplay = (status: string) => {
                       const normalized = status.toLowerCase().trim();
 
-                      // ✅ FIXED: Check "late" BEFORE "confirm" to prevent misclassification
+                      // Check "late" BEFORE "confirm"
                       if (normalized.includes('late')) {
                         return { text: 'Late', className: 'status-late' };
                       }

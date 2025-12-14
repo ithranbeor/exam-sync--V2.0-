@@ -1,5 +1,5 @@
 /// <reference types="react" />
-import React, { useEffect, useState, useRef } from "react";
+import React, { useEffect, useState, useRef, useMemo } from "react";
 import Select from "react-select";
 import { api } from '../lib/apiClient.ts';
 import "../styles/S_ExamViewer.css";
@@ -702,25 +702,115 @@ const SchedulerView: React.FC<SchedulerViewProps> = ({ user }) => {
     label: `${formatTo12Hour(t)} - ${formatTo12Hour(rawTimes[i + 1])}`,
   }));
 
-  const generateCourseColors = (courses: string[]) => {
-    const colors = [
-      "#79b4f2", "#f27f79", "#79f2b4", "#f2e279", "#b479f2", "#f279d6",
-      "#79d6f2", "#d6f279", "#f29979", "#a3f279", "#f279a3", "#79a3f2",
-      "#f2c879", "#79f2e2", "#f2a879", "#b4f279", "#f27979", "#79f279",
-      "#79f2d6", "#f279f2", "#79f2f2", "#f2b479", "#c879f2", "#79f2a8",
-      "#f2d679", "#a879f2", "#79f2c8", "#f279b4", "#f2f279", "#79b4f2"
-    ];
+  const generateCourseColors = (exams: ExamDetail[]) => {
+    // Define color schemes for each year level
+    const yearColors = {
+      1: ['#EF4444', '#F59E0B', '#10B981', '#06B6D4', '#3B82F6', '#8B5CF6', '#EC4899', '#F97316', '#14B8A6', '#84CC16'], // Red, Amber, Green, Cyan, Blue, Purple, Pink, Orange, Teal, Lime
+      2: ['#DC2626', '#D97706', '#059669', '#0891B2', '#2563EB', '#7C3AED', '#DB2777', '#EA580C', '#0D9488', '#65A30D'], // Different tones
+      3: ['#B91C1C', '#CA8A04', '#047857', '#0E7490', '#1D4ED8', '#6366F1', '#BE123C', '#C2410C', '#0F766E', '#4D7C0F'], // More different tones
+      4: ['#991B1B', '#92400E', '#065F46', '#164E63', '#1E3A8A', '#4C1D95', '#9F1239', '#9A3412', '#115E59', '#365314']  // Even more different
+    };
 
     const courseColorMap: Record<string, string> = {};
-    courses.forEach((course, idx) => {
-      courseColorMap[course] = colors[idx % colors.length];
+    const programYearMap: Record<string, number> = {}; // Track color index per program-year
+
+    exams.forEach((exam) => {
+      if (!exam.course_id) return;
+
+      // Skip if already assigned
+      if (courseColorMap[exam.course_id]) return;
+
+      // Try to extract year level from sections
+      let yearLevel: number | null = null;
+      let program = '';
+
+      if (exam.sections && exam.sections.length > 0) {
+        for (const section of exam.sections) {
+          const sectionStr = String(section).trim();
+
+          // Try multiple patterns:
+          // Pattern 1: "BSIT1A", "BSCS2B", etc.
+          let match = sectionStr.match(/^([A-Za-z]+)(\d)([A-Za-z]*)$/);
+
+          // Pattern 2: "BSIT 1A", "BSCS 2B" (with space)
+          if (!match) {
+            match = sectionStr.match(/^([A-Za-z]+)\s+(\d)([A-Za-z]*)$/);
+          }
+
+          // Pattern 3: "BSIT-1A", "BSCS-2B" (with dash)
+          if (!match) {
+            match = sectionStr.match(/^([A-Za-z]+)-(\d)([A-Za-z]*)$/);
+          }
+
+          // Pattern 4: Just look for any digit in the string
+          if (!match) {
+            const digitMatch = sectionStr.match(/(\d)/);
+            const letterMatch = sectionStr.match(/^([A-Za-z]+)/);
+            if (digitMatch && letterMatch) {
+              program = letterMatch[1];
+              yearLevel = parseInt(digitMatch[1]);
+              break;
+            }
+          }
+
+          if (match) {
+            program = match[1]; // e.g., "BSIT", "BSCS"
+            yearLevel = parseInt(match[2]); // e.g., 1, 2, 3, 4
+            break; // Found valid pattern, stop looking
+          }
+        }
+      }
+
+      // Fallback: Try section_name if sections array didn't work
+      if (!yearLevel && exam.section_name) {
+        const sectionStr = String(exam.section_name).trim();
+
+        let match = sectionStr.match(/^([A-Za-z]+)(\d)([A-Za-z]*)$/);
+        if (!match) match = sectionStr.match(/^([A-Za-z]+)\s+(\d)([A-Za-z]*)$/);
+        if (!match) match = sectionStr.match(/^([A-Za-z]+)-(\d)([A-Za-z]*)$/);
+
+        if (!match) {
+          const digitMatch = sectionStr.match(/(\d)/);
+          const letterMatch = sectionStr.match(/^([A-Za-z]+)/);
+          if (digitMatch && letterMatch) {
+            program = letterMatch[1];
+            yearLevel = parseInt(digitMatch[1]);
+          }
+        } else {
+          program = match[1];
+          yearLevel = parseInt(match[2]);
+        }
+      }
+
+      // Assign color based on year level
+      if (yearLevel && yearLevel >= 1 && yearLevel <= 4) {
+        const programYearKey = `${program}-${yearLevel}`;
+
+        // Get available colors for this year level
+        const availableColors = yearColors[yearLevel as keyof typeof yearColors];
+
+        // Get next color index for this program-year combo
+        if (!programYearMap[programYearKey]) {
+          programYearMap[programYearKey] = 0;
+        }
+
+        const colorIndex = programYearMap[programYearKey] % availableColors.length;
+        courseColorMap[exam.course_id] = availableColors[colorIndex];
+
+        // Increment for next course in same program-year
+        programYearMap[programYearKey]++;
+      } else {
+        // Fallback: assign a neutral color if year level couldn't be determined
+        courseColorMap[exam.course_id] = '#9CA3AF'; // Gray for unmatched
+      }
     });
+
     return courseColorMap;
   };
 
-  const courseColorMap = generateCourseColors(
-    Array.from(new Set(searchFilteredData.map(e => e.course_id).filter(Boolean)))
-  );
+  const courseColorMap = useMemo(() => {
+    return generateCourseColors(examData);
+  }, [examData]); // Only recalculate when examData changes, NOT when filter changes
 
   const hasData = searchFilteredData.length > 0;
 
@@ -1577,11 +1667,17 @@ const SchedulerView: React.FC<SchedulerViewProps> = ({ user }) => {
                                     onClick={() => handleScheduleClick(exam)}
                                     style={{
                                       backgroundColor: courseColorMap[exam.course_id || ""] || "#ccc",
-                                      color: "black",
-                                      padding: 4,
-                                      borderRadius: 4,
-                                      fontSize: 12,
+                                      color: "white",
+                                      padding: "8px",
+                                      borderRadius: "6px",
+                                      fontSize: "12px",
+                                      minHeight: "80px",
+                                      maxHeight: "200px",
+                                      overflowY: "auto",
                                       cursor: swapMode ? "pointer" : "default",
+                                      display: "flex",
+                                      flexDirection: "column",
+                                      justifyContent: "flex-start",
                                       outline: selectedSwap?.examdetails_id === exam.examdetails_id
                                         ? "10px solid blue"
                                         : searchTerm && (
@@ -1599,7 +1695,8 @@ const SchedulerView: React.FC<SchedulerViewProps> = ({ user }) => {
                                         exam.room_id?.toLowerCase().includes(searchTerm.toLowerCase()) ||
                                         getInstructorDisplay(exam).toLowerCase().includes(searchTerm.toLowerCase()) ||
                                         getProctorDisplay(exam).toLowerCase().includes(searchTerm.toLowerCase())
-                                      ) ? "0 0 15px 3px rgba(255, 255, 0, 0.8)" : "none"
+                                      ) ? "0 0 15px 3px rgba(255, 255, 0, 0.8)"
+                                        : "none"
                                     }}
                                   >
                                     <p><strong>{exam.course_id}</strong></p>
@@ -1956,11 +2053,17 @@ const SchedulerView: React.FC<SchedulerViewProps> = ({ user }) => {
                                     onClick={() => handleScheduleClick(exam)}
                                     style={{
                                       backgroundColor: courseColorMap[exam.course_id || ""] || "#ccc",
-                                      color: "black",
-                                      padding: 4,
-                                      borderRadius: 4,
-                                      fontSize: 12,
+                                      color: "white",
+                                      padding: "8px",
+                                      borderRadius: "6px",
+                                      fontSize: "12px",
+                                      minHeight: "80px",
+                                      maxHeight: "200px",
+                                      overflowY: "auto",
                                       cursor: swapMode ? "pointer" : "default",
+                                      display: "flex",
+                                      flexDirection: "column",
+                                      justifyContent: "flex-start",
                                       outline: selectedSwap?.examdetails_id === exam.examdetails_id
                                         ? "10px solid blue"
                                         : searchTerm && (
@@ -1978,7 +2081,8 @@ const SchedulerView: React.FC<SchedulerViewProps> = ({ user }) => {
                                         exam.room_id?.toLowerCase().includes(searchTerm.toLowerCase()) ||
                                         getInstructorDisplay(exam).toLowerCase().includes(searchTerm.toLowerCase()) ||
                                         getProctorDisplay(exam).toLowerCase().includes(searchTerm.toLowerCase())
-                                      ) ? "0 0 15px 3px rgba(255, 255, 0, 0.8)" : "none"
+                                      ) ? "0 0 15px 3px rgba(255, 255, 0, 0.8)"
+                                        : "none"
                                     }}
                                   >
                                     <p><strong>{exam.course_id}</strong></p>
