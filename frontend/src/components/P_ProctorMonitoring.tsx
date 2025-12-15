@@ -71,6 +71,7 @@ const ProctorMonitoring: React.FC<UserProps> = ({ }) => {
   const [selectedYear, setSelectedYear] = useState<string>('all');
   const [selectedMonth, setSelectedMonth] = useState<string>('all');
   const [showHistoryFilters, setShowHistoryFilters] = useState(false);
+  const [historySortOrder, setHistorySortOrder] = useState<'newest' | 'oldest'>('newest');
 
   // Generate year options (last 5 years)
   const currentYear = new Date().getFullYear();
@@ -207,16 +208,31 @@ const ProctorMonitoring: React.FC<UserProps> = ({ }) => {
       if (showSortDropdown && !target.closest('[data-sort-dropdown]')) {
         setShowSortDropdown(false);
       }
+      if (showHistoryFilters && !target.closest('[data-history-dropdown]')) {
+        setShowHistoryFilters(false);
+      }
+      if (showStatusDropdown && !target.closest('[data-status-dropdown]')) {
+        setShowStatusDropdown(false);
+      }
     };
 
-    if (showSortDropdown) {
+    if (showSortDropdown || showHistoryFilters || showStatusDropdown) {
       document.addEventListener('mousedown', handleClickOutside);
     }
 
     return () => {
       document.removeEventListener('mousedown', handleClickOutside);
     };
-  }, [showSortDropdown]);
+  }, [showSortDropdown, showHistoryFilters, showStatusDropdown]);
+
+  const clearHistoryFilters = () => {
+    setSelectedYear('all');
+    setSelectedMonth('all');
+    setHistorySortOrder('newest');
+    setShowHistoryFilters(false);
+  };
+
+  const isViewingHistory = selectedYear !== 'all' || selectedMonth !== 'all';
 
   const handleGenerateOtpCodes = async () => {
     setGeneratingOtp(true);
@@ -590,12 +606,32 @@ const ProctorMonitoring: React.FC<UserProps> = ({ }) => {
 
     let groupedData = Array.from(groupedMap.values());
 
+    // Default sorting: If viewing history, sort by date (newest/oldest first)
+    // Otherwise, use the selected sort option
     if (sortBy === 'none') {
+      // If viewing history and no explicit sort, use date-based sorting
+      if (isViewingHistory) {
+        return [...groupedData].sort((a, b) => {
+          const dateA = new Date(a.exam_date).getTime();
+          const dateB = new Date(b.exam_date).getTime();
+          // If same date, sort by time
+          if (dateA === dateB) {
+            const timeA = a.exam_start_time || '';
+            const timeB = b.exam_start_time || '';
+            return historySortOrder === 'newest' 
+              ? timeB.localeCompare(timeA)
+              : timeA.localeCompare(timeB);
+          }
+          return historySortOrder === 'newest' 
+            ? dateB - dateA 
+            : dateA - dateB;
+        });
+      }
       return groupedData;
     }
 
-    // Sort
-    return [...groupedData].sort((a, b) => {
+    // Sort based on selected option
+    const sorted = [...groupedData].sort((a, b) => {
       switch (sortBy) {
         case 'course_id':
           return smartSort(a.course_id.toLowerCase(), b.course_id.toLowerCase());
@@ -604,7 +640,19 @@ const ProctorMonitoring: React.FC<UserProps> = ({ }) => {
         case 'section_name':
           return smartSort(a.section_name.toLowerCase(), b.section_name.toLowerCase());
         case 'exam_date':
-          return a.exam_date.localeCompare(b.exam_date);
+          // For date sorting, respect history sort order when viewing history
+          const dateA = new Date(a.exam_date).getTime();
+          const dateB = new Date(b.exam_date).getTime();
+          if (dateA === dateB) {
+            const timeA = a.exam_start_time || '';
+            const timeB = b.exam_start_time || '';
+            return isViewingHistory && historySortOrder === 'newest'
+              ? timeB.localeCompare(timeA)
+              : timeA.localeCompare(timeB);
+          }
+          return isViewingHistory && historySortOrder === 'newest'
+            ? dateB - dateA
+            : dateA - dateB;
         case 'exam_start_time':
           return (a.exam_start_time || '').localeCompare(b.exam_start_time || '');
         case 'building_name':
@@ -619,7 +667,9 @@ const ProctorMonitoring: React.FC<UserProps> = ({ }) => {
           return 0;
       }
     });
-  }, [approvedSchedules, sortBy, searchTerm, statusFilter]);
+
+    return sorted;
+  }, [approvedSchedules, sortBy, searchTerm, statusFilter, selectedYear, selectedMonth, historySortOrder]);
 
   return (
     <div className="proctor-monitoring-container">
@@ -648,43 +698,81 @@ const ProctorMonitoring: React.FC<UserProps> = ({ }) => {
               <span>Sort by</span>
             </button>
 
-            <button
-              type='button'
-              className={`pm-control-button pm-history-button ${showHistoryFilters ? 'active' : ''}`}
-              onClick={() => setShowHistoryFilters(!showHistoryFilters)}
-              title="History Filters"
-            >
-              <FaFilter />
-              <span>History</span>
-            </button>
+            <div className="pm-status-wrapper" data-history-dropdown>
+              <button
+                type='button'
+                className={`pm-control-button pm-history-button ${showHistoryFilters ? 'active' : ''} ${isViewingHistory ? 'history-active' : ''}`}
+                onClick={() => setShowHistoryFilters(!showHistoryFilters)}
+                title="View Historical Records"
+              >
+                <FaFilter />
+                <span>History</span>
+                {isViewingHistory && <span className="history-indicator">●</span>}
+              </button>
 
-            {showHistoryFilters && (
-              <div className="pm-history-dropdown">
-                <div>
-                  <label>YEAR:</label>
-                  <select
-                    value={selectedYear}
-                    onChange={(e) => setSelectedYear(e.target.value)}
-                  >
-                    <option value="all">All Years</option>
-                    {yearOptions.map(year => (
-                      <option key={year} value={year}>{year}</option>
-                    ))}
-                  </select>
+              {showHistoryFilters && (
+                <div className="pm-history-dropdown">
+                  <div className="pm-history-header">
+                    <h4>Filter Historical Records</h4>
+                    {isViewingHistory && (
+                      <button
+                        type="button"
+                        className="pm-clear-history-btn"
+                        onClick={clearHistoryFilters}
+                        title="Clear filters and view current records"
+                      >
+                        Clear Filters
+                      </button>
+                    )}
+                  </div>
+                  
+                  <div className="pm-history-filters">
+                    <div className="pm-filter-group">
+                      <label>YEAR:</label>
+                      <select
+                        value={selectedYear}
+                        onChange={(e) => setSelectedYear(e.target.value)}
+                      >
+                        <option value="all">All Years</option>
+                        {yearOptions.map(year => (
+                          <option key={year} value={year}>{year}</option>
+                        ))}
+                      </select>
+                    </div>
 
-                  <label>MONTH:</label>
-                  <select
-                    value={selectedMonth}
-                    onChange={(e) => setSelectedMonth(e.target.value)}
-                  >
-                    <option value="all">All Months</option>
-                    {monthOptions.map(month => (
-                      <option key={month.value} value={month.value}>{month.label}</option>
-                    ))}
-                  </select>
+                    <div className="pm-filter-group">
+                      <label>MONTH:</label>
+                      <select
+                        value={selectedMonth}
+                        onChange={(e) => setSelectedMonth(e.target.value)}
+                      >
+                        <option value="all">All Months</option>
+                        {monthOptions.map(month => (
+                          <option key={month.value} value={month.value}>{month.label}</option>
+                        ))}
+                      </select>
+                    </div>
+
+                    <div className="pm-filter-group">
+                      <label>SORT BY DATE:</label>
+                      <select
+                        value={historySortOrder}
+                        onChange={(e) => setHistorySortOrder(e.target.value as 'newest' | 'oldest')}
+                      >
+                        <option value="newest">Newest First</option>
+                        <option value="oldest">Oldest First</option>
+                      </select>
+                    </div>
+                  </div>
+
+                  {isViewingHistory && (
+                    <div className="pm-history-info">
+                      <p>Viewing: {selectedYear !== 'all' ? selectedYear : 'All Years'} - {selectedMonth !== 'all' ? monthOptions.find(m => m.value === selectedMonth)?.label : 'All Months'}</p>
+                    </div>
+                  )}
                 </div>
-              </div>
-            )}
+              )}
+            </div>
             {/* Status filter button - same design as Sort by button */}
             <div className="pm-status-wrapper" data-status-dropdown>
               <button type='button' className="pm-control-button pm-status-button" onClick={() => setShowStatusDropdown(!showStatusDropdown)} title="Filter by status">
@@ -708,56 +796,29 @@ const ProctorMonitoring: React.FC<UserProps> = ({ }) => {
               )}
             </div>
             {showSortDropdown && (
-              <div
-                style={{
-                  position: 'absolute',
-                  top: '100%',
-                  left: 0,
-                  marginTop: '4px',
-                  backgroundColor: 'white',
-                  border: '1px solid #ddd',
-                  borderRadius: '8px',
-                  boxShadow: '0 2px 8px rgba(0,0,0,0.15)',
-                  zIndex: 1000,
-                  minWidth: '150px'
-                }}
-              >
-                {['none', 'course_id', 'subject', 'section_name', 'exam_date', 'exam_start_time', 'building_name', 'room_id', 'instructor_name', 'status'].map((sortOption) => (
+              <div className="pm-dropdown">
+                {[
+                  { value: 'none', label: 'No Sorting' },
+                  { value: 'exam_date', label: '📅 Exam Date' },
+                  { value: 'course_id', label: '📚 Course Code' },
+                  { value: 'subject', label: '📖 Subject' },
+                  { value: 'section_name', label: '👥 Section' },
+                  { value: 'exam_start_time', label: '⏰ Time' },
+                  { value: 'building_name', label: '🏢 Building' },
+                  { value: 'room_id', label: '🚪 Room' },
+                  { value: 'instructor_name', label: '👨‍🏫 Instructor' },
+                  { value: 'status', label: '✅ Status' },
+                ].map((sortOption) => (
                   <button
-                    key={sortOption}
+                    key={sortOption.value}
                     type="button"
                     onClick={() => {
-                      setSortBy(sortOption);
+                      setSortBy(sortOption.value);
                       setShowSortDropdown(false);
                     }}
-                    style={{
-                      width: '100%',
-                      padding: '8px 12px',
-                      textAlign: 'left',
-                      border: 'none',
-                      backgroundColor: sortBy === sortOption ? '#f0f0f0' : 'white',
-                      color: '#000',
-                      cursor: 'pointer',
-                      fontSize: '14px',
-                      borderTop: sortOption !== 'none' ? '1px solid #eee' : 'none'
-                    }}
-                    onMouseEnter={(e) => {
-                      if (sortBy !== sortOption) e.currentTarget.style.backgroundColor = '#f5f5f5';
-                    }}
-                    onMouseLeave={(e) => {
-                      if (sortBy !== sortOption) e.currentTarget.style.backgroundColor = 'white';
-                    }}
+                    className={`pm-dropdown-item ${sortBy === sortOption.value ? 'active' : ''}`}
                   >
-                    {sortOption === 'none' ? 'None' :
-                      sortOption === 'course_id' ? 'Course Code' :
-                        sortOption === 'section_name' ? 'Section' :
-                          sortOption === 'exam_date' ? 'Date' :
-                            sortOption === 'exam_start_time' ? 'Time' :
-                              sortOption === 'building_name' ? 'Building' :
-                                sortOption === 'room_id' ? 'Room' :
-                                  sortOption === 'instructor_name' ? 'Instructor' :
-                                    sortOption === 'status' ? 'Status' :
-                                      sortOption.charAt(0).toUpperCase() + sortOption.slice(1)}
+                    {sortOption.label}
                   </button>
                 ))}
               </div>
