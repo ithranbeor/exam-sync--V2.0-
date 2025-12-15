@@ -28,10 +28,10 @@ interface ProctorDetail {
   proctor_name: string;
   status: string;
   time_in: string | null;
-  is_assigned?: boolean;           // ✅ ADD THIS
-  is_substitute?: boolean;          // ✅ ADD THIS
-  substituted_for?: string;         // ✅ ADD THIS
-  substitution_remarks?: string;    // ✅ ADD THIS
+  is_assigned?: boolean;
+  is_substitute?: boolean;
+  substituted_for?: string;
+  substitution_remarks?: string;
 }
 
 interface MonitoringSchedule {
@@ -68,6 +68,28 @@ const ProctorMonitoring: React.FC<UserProps> = ({ }) => {
   const [statusFilter, setStatusFilter] = useState<'all' | 'present' | 'absent' | 'substitute' | 'pending'>('all');
   const [selectedSchedule, setSelectedSchedule] = useState<MonitoringSchedule | null>(null);
   const [showProctorModal, setShowProctorModal] = useState(false);
+  const [selectedYear, setSelectedYear] = useState<string>('all');
+  const [selectedMonth, setSelectedMonth] = useState<string>('all');
+  const [showHistoryFilters, setShowHistoryFilters] = useState(false);
+
+  // Generate year options (last 5 years)
+  const currentYear = new Date().getFullYear();
+  const yearOptions = Array.from({ length: 5 }, (_, i) => currentYear - i);
+
+  const monthOptions = [
+    { value: '01', label: 'January' },
+    { value: '02', label: 'February' },
+    { value: '03', label: 'March' },
+    { value: '04', label: 'April' },
+    { value: '05', label: 'May' },
+    { value: '06', label: 'June' },
+    { value: '07', label: 'July' },
+    { value: '08', label: 'August' },
+    { value: '09', label: 'September' },
+    { value: '10', label: 'October' },
+    { value: '11', label: 'November' },
+    { value: '12', label: 'December' },
+  ];
 
   useEffect(() => {
     if (approvedSchedules.length === 0) return;
@@ -109,8 +131,14 @@ const ProctorMonitoring: React.FC<UserProps> = ({ }) => {
       if (collegeFilter) {
         params.college_name = collegeFilter;
       }
+      // ✅ Add year/month filters
+      if (selectedYear !== 'all') {
+        params.year = selectedYear;
+      }
+      if (selectedMonth !== 'all') {
+        params.month = selectedMonth;
+      }
 
-      // ✅ Get ALL exam details (not filtered by proctor yet)
       const { data: examData } = await api.get('/proctor-monitoring/', { params });
 
       // ✅ PERFORMANCE FIX: Fetch ALL approvals in ONE request
@@ -167,7 +195,7 @@ const ProctorMonitoring: React.FC<UserProps> = ({ }) => {
     } finally {
       setLoading(false);
     }
-  }, [collegeFilter]);
+  }, [collegeFilter, selectedYear, selectedMonth]);
 
   useEffect(() => {
     fetchMonitoringData();
@@ -614,6 +642,46 @@ const ProctorMonitoring: React.FC<UserProps> = ({ }) => {
               <FaSort />
               <span>Sort by</span>
             </button>
+
+            <button
+              type='button'
+              className="pm-control-button pm-history-button"
+              onClick={() => setShowHistoryFilters(!showHistoryFilters)}
+              title="History Filters"
+            >
+              <FaFilter />
+              <span>📅 History</span>
+            </button>
+
+            {showHistoryFilters && (
+              <div className="pm-history-dropdown">
+                <div style={{ padding: '10px' }}>
+                  <label style={{ display: 'block', marginBottom: '5px', fontWeight: 'bold' }}>Year:</label>
+                  <select
+                    value={selectedYear}
+                    onChange={(e) => setSelectedYear(e.target.value)}
+                    style={{ width: '100%', padding: '5px', marginBottom: '10px' }}
+                  >
+                    <option value="all">All Years</option>
+                    {yearOptions.map(year => (
+                      <option key={year} value={year}>{year}</option>
+                    ))}
+                  </select>
+
+                  <label style={{ display: 'block', marginBottom: '5px', fontWeight: 'bold' }}>Month:</label>
+                  <select
+                    value={selectedMonth}
+                    onChange={(e) => setSelectedMonth(e.target.value)}
+                    style={{ width: '100%', padding: '5px' }}
+                  >
+                    <option value="all">All Months</option>
+                    {monthOptions.map(month => (
+                      <option key={month.value} value={month.value}>{month.label}</option>
+                    ))}
+                  </select>
+                </div>
+              </div>
+            )}
             {/* Status filter button - same design as Sort by button */}
             <div className="pm-status-wrapper" data-status-dropdown>
               <button type='button' className="pm-control-button pm-status-button" onClick={() => setShowStatusDropdown(!showStatusDropdown)} title="Filter by status">
@@ -949,7 +1017,7 @@ const ProctorMonitoring: React.FC<UserProps> = ({ }) => {
                     >
                       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '10px' }}>
                         <h5 style={{ margin: 0, color: '#333', fontSize: '16px' }}>
-                          {proctor.is_substitute ? '🔄 ' : ''}
+                          {proctor.is_substitute ? ' ' : ''}
                           {proctor.proctor_name}
                           {proctor.is_assigned ? ' (Assigned)' : ' (Substitute)'}
                         </h5>
@@ -957,11 +1025,11 @@ const ProctorMonitoring: React.FC<UserProps> = ({ }) => {
                           {statusDisplay.text}
                         </span>
                       </div>
-                      
+
                       <p style={{ margin: '5px 0', color: '#666', fontSize: '14px' }}>
                         <strong>Time In:</strong> {formatTimeIn(proctor.time_in)}
                       </p>
-                      
+
                       {/* ✅ Show substitution info */}
                       {proctor.is_substitute && (
                         <>
