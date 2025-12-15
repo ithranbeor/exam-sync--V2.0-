@@ -645,22 +645,21 @@ const ProctorMonitoring: React.FC<UserProps> = ({ }) => {
 
             <button
               type='button'
-              className="pm-control-button pm-history-button"
+              className={`pm-control-button pm-history-button ${showHistoryFilters ? 'active' : ''}`}
               onClick={() => setShowHistoryFilters(!showHistoryFilters)}
               title="History Filters"
             >
               <FaFilter />
-              <span>📅 History</span>
+              <span>History</span>
             </button>
 
             {showHistoryFilters && (
               <div className="pm-history-dropdown">
-                <div style={{ padding: '10px' }}>
-                  <label style={{ display: 'block', marginBottom: '5px', fontWeight: 'bold' }}>Year:</label>
+                <div>
+                  <label>YEAR:</label>
                   <select
                     value={selectedYear}
                     onChange={(e) => setSelectedYear(e.target.value)}
-                    style={{ width: '100%', padding: '5px', marginBottom: '10px' }}
                   >
                     <option value="all">All Years</option>
                     {yearOptions.map(year => (
@@ -668,11 +667,10 @@ const ProctorMonitoring: React.FC<UserProps> = ({ }) => {
                     ))}
                   </select>
 
-                  <label style={{ display: 'block', marginBottom: '5px', fontWeight: 'bold' }}>Month:</label>
+                  <label>MONTH:</label>
                   <select
                     value={selectedMonth}
                     onChange={(e) => setSelectedMonth(e.target.value)}
-                    style={{ width: '100%', padding: '5px' }}
                   >
                     <option value="all">All Months</option>
                     {monthOptions.map(month => (
