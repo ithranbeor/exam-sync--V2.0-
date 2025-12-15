@@ -535,43 +535,35 @@ def proctor_assigned_exams(request, user_id):
         completed = []
         
         for exam in exams:
-            # ✅ FIX: Parse exam date and times properly
-            from datetime import datetime
-            
             try:
-                exam_date_obj = datetime.strptime(exam.exam_date, '%Y-%m-%d').date()
-            except Exception as e:
-                print(f"⚠️ Error parsing exam_date {exam.exam_date}: {e}")
-                continue
-            
-            # ✅ FIX: Handle both datetime and time objects
-            try:
+                # ✅ FIX: Handle exam_start_time and exam_end_time properly
+                # These are already full datetime objects from the database
                 if isinstance(exam.exam_start_time, datetime):
-                    start_time = exam.exam_start_time.time()
-                elif hasattr(exam.exam_start_time, 'hour'):  # It's a time object
-                    start_time = exam.exam_start_time
+                    exam_start_datetime = exam.exam_start_time
+                    if timezone.is_naive(exam_start_datetime):
+                        exam_start_datetime = timezone.make_aware(exam_start_datetime)
                 else:
-                    print(f"⚠️ Invalid exam_start_time type: {type(exam.exam_start_time)}")
-                    continue
+                    # Fallback: combine with exam_date if it's just a time object
+                    exam_date_obj = datetime.strptime(exam.exam_date, '%Y-%m-%d').date()
+                    exam_start_datetime = timezone.make_aware(
+                        datetime.combine(exam_date_obj, exam.exam_start_time)
+                    )
                 
                 if isinstance(exam.exam_end_time, datetime):
-                    end_time = exam.exam_end_time.time()
-                elif hasattr(exam.exam_end_time, 'hour'):  # It's a time object
-                    end_time = exam.exam_end_time
+                    exam_end_datetime = exam.exam_end_time
+                    if timezone.is_naive(exam_end_datetime):
+                        exam_end_datetime = timezone.make_aware(exam_end_datetime)
                 else:
-                    print(f"⚠️ Invalid exam_end_time type: {type(exam.exam_end_time)}")
-                    continue
-                
-                # ✅ Create timezone-aware datetime objects
-                exam_start_datetime = timezone.make_aware(
-                    datetime.combine(exam_date_obj, start_time)
-                )
-                exam_end_datetime = timezone.make_aware(
-                    datetime.combine(exam_date_obj, end_time)
-                )
+                    # Fallback: combine with exam_date if it's just a time object
+                    exam_date_obj = datetime.strptime(exam.exam_date, '%Y-%m-%d').date()
+                    exam_end_datetime = timezone.make_aware(
+                        datetime.combine(exam_date_obj, exam.exam_end_time)
+                    )
                 
             except Exception as e:
                 print(f"⚠️ Error processing exam times for exam {exam.examdetails_id}: {e}")
+                import traceback
+                traceback.print_exc()
                 continue
             
             # Check user's attendance
@@ -623,7 +615,7 @@ def proctor_assigned_exams(request, user_id):
                 'status': exam_status
             }
             
-            # ✅ FIX: Correct categorization with debug logging
+            # ✅ FIX: Correct categorization with better logging
             print(f"\n📅 Exam {exam.examdetails_id} - {exam.course_id}")
             print(f"   Current time: {now}")
             print(f"   Exam start: {exam_start_datetime}")
