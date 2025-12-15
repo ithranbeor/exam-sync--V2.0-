@@ -9,7 +9,7 @@ from rest_framework import status
 from rest_framework import status as http_status
 from django.views.decorators.cache import cache_page
 from django.db.models import Q
-from .models import TblUsers, TblScheduleapproval, TblScheduleFooter, TblProctorSubstitution, TblProctorAttendance, TblExamOtp, TblAvailableRooms, TblNotification, TblUserRole, TblExamdetails, TblModality, TblAvailability, TblCourseUsers, TblSectioncourse, TblUserRoleHistory, TblRoles, TblBuildings, TblRooms, TblCourse, TblExamperiod, TblProgram, TblTerm, TblCollege, TblDepartment
+from .models import TblUsers, TblScheduleapproval, TblProctorAttendanceHistory, TblScheduleFooter, TblProctorSubstitution, TblProctorAttendance, TblExamOtp, TblAvailableRooms, TblNotification, TblUserRole, TblExamdetails, TblModality, TblAvailability, TblCourseUsers, TblSectioncourse, TblUserRoleHistory, TblRoles, TblBuildings, TblRooms, TblCourse, TblExamperiod, TblProgram, TblTerm, TblCollege, TblDepartment
 from .serializers import (
     UserSerializer,
     UserRoleSerializer,
@@ -537,13 +537,11 @@ def proctor_assigned_exams(request, user_id):
         for exam in exams:
             try:
                 # ✅ FIX: Handle exam_start_time and exam_end_time properly
-                # These are already full datetime objects from the database
                 if isinstance(exam.exam_start_time, datetime):
                     exam_start_datetime = exam.exam_start_time
                     if timezone.is_naive(exam_start_datetime):
                         exam_start_datetime = timezone.make_aware(exam_start_datetime)
                 else:
-                    # Fallback: combine with exam_date if it's just a time object
                     exam_date_obj = datetime.strptime(exam.exam_date, '%Y-%m-%d').date()
                     exam_start_datetime = timezone.make_aware(
                         datetime.combine(exam_date_obj, exam.exam_start_time)
@@ -554,7 +552,6 @@ def proctor_assigned_exams(request, user_id):
                     if timezone.is_naive(exam_end_datetime):
                         exam_end_datetime = timezone.make_aware(exam_end_datetime)
                 else:
-                    # Fallback: combine with exam_date if it's just a time object
                     exam_date_obj = datetime.strptime(exam.exam_date, '%Y-%m-%d').date()
                     exam_end_datetime = timezone.make_aware(
                         datetime.combine(exam_date_obj, exam.exam_end_time)
@@ -615,26 +612,33 @@ def proctor_assigned_exams(request, user_id):
                 'status': exam_status
             }
             
-            # ✅ FIX: Correct categorization with better logging
-            print(f"\n📅 Exam {exam.examdetails_id} - {exam.course_id}")
-            print(f"   Current time: {now}")
-            print(f"   Exam start: {exam_start_datetime}")
-            print(f"   Exam end: {exam_end_datetime}")
-            print(f"   Now >= start? {now >= exam_start_datetime}")
-            print(f"   Now <= end? {now <= exam_end_datetime}")
-            
+            # Categorization
             if now >= exam_start_datetime and now <= exam_end_datetime:
-                # Currently happening right now
-                print(f"   ✅ ONGOING")
                 ongoing.append(exam_data)
             elif now < exam_start_datetime:
-                # Future exam
-                print(f"   📅 UPCOMING")
                 upcoming.append(exam_data)
             else:
-                # Past exam (now > exam_end_datetime)
-                print(f"   ✓ COMPLETED")
                 completed.append(exam_data)
+        
+        # ✅ FIXED: Query history records ONCE, OUTSIDE the loop
+        history_records = TblProctorAttendanceHistory.objects.filter(
+            proctor_id=user_id
+        ).order_by('-exam_date', '-exam_start_time')
+        
+        for record in history_records:
+            completed.append({
+                'id': record.examdetails_id,
+                'course_id': record.course_id,
+                'subject': record.course_id,
+                'section_name': record.section_name,
+                'exam_date': record.exam_date,
+                'exam_start_time': record.exam_start_time.isoformat() if record.exam_start_time else None,
+                'exam_end_time': record.exam_end_time.isoformat() if record.exam_end_time else None,
+                'building_name': record.building_name,
+                'room_id': record.room_id,
+                'instructor_name': record.instructor_name,
+                'status': record.status
+            })
         
         print(f"\n📊 CATEGORIZATION RESULTS:")
         print(f"   Ongoing: {len(ongoing)}")
@@ -655,6 +659,86 @@ def proctor_assigned_exams(request, user_id):
             'error': str(e),
             'detail': 'Failed to fetch assigned exams'
         }, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+    
+def archive_completed_attendances():
+    """
+    Move completed exam attendances to history table
+    """
+    from datetime import datetime
+    
+    now = timezone.now()
+    
+    # Get all attendance records where exam has ended
+    completed_attendances = TblProctorAttendance.objects.select_related(
+        'examdetails',
+        'proctor'
+    ).filter(
+        examdetails__exam_end_time__lt=now
+    )
+    
+    archived_count = 0
+    
+    with transaction.atomic():
+        for attendance in completed_attendances:
+            exam = attendance.examdetails
+            
+            # Determine status
+            if attendance.is_substitute:
+                status = 'substitute'
+            elif attendance.time_in:
+                # Check if late
+                exam_start_datetime = exam.exam_start_time
+                if isinstance(exam.exam_start_time, datetime):
+                    if timezone.is_naive(exam_start_datetime):
+                        exam_start_datetime = timezone.make_aware(exam_start_datetime)
+                else:
+                    exam_date_obj = datetime.strptime(exam.exam_date, '%Y-%m-%d').date()
+                    exam_start_datetime = timezone.make_aware(
+                        datetime.combine(exam_date_obj, exam.exam_start_time)
+                    )
+                
+                time_diff = (attendance.time_in - exam_start_datetime).total_seconds() / 60
+                status = 'late' if time_diff > 7 else 'confirmed'
+            else:
+                status = 'absent'
+            
+            # Get instructor name
+            instructor_name = None
+            if exam.instructor_id:
+                try:
+                    instructor = TblUsers.objects.get(user_id=exam.instructor_id)
+                    instructor_name = f"{instructor.first_name} {instructor.last_name}"
+                except TblUsers.DoesNotExist:
+                    pass
+            
+            # Create history record
+            TblProctorAttendanceHistory.objects.create(
+                attendance_id=attendance.attendance_id,
+                examdetails_id=exam.examdetails_id,
+                proctor_id=attendance.proctor_id,
+                proctor_name=f"{attendance.proctor.first_name} {attendance.proctor.last_name}",
+                course_id=exam.course_id,
+                section_name=', '.join(exam.sections) if exam.sections else exam.section_name,
+                exam_date=exam.exam_date,
+                exam_start_time=exam.exam_start_time,
+                exam_end_time=exam.exam_end_time,
+                building_name=exam.building_name,
+                room_id=exam.room.room_id if exam.room else None,
+                instructor_name=instructor_name,
+                is_substitute=attendance.is_substitute,
+                remarks=attendance.remarks,
+                time_in=attendance.time_in,
+                time_out=attendance.time_out,
+                otp_used=attendance.otp_used,
+                status=status
+            )
+            
+            archived_count += 1
+        
+        # Delete original attendance records
+        completed_attendances.delete()
+    
+    return archived_count
 
 # ============================================================
 # ALL EXAMS FOR SUBSTITUTION
@@ -764,6 +848,7 @@ def proctor_monitoring_dashboard(request):
     ✅ FIXED: Handles empty proctor arrays and prevents index errors
     """
     try:
+        archive_completed_attendances()
         college_name = request.GET.get('college_name')
         exam_date = request.GET.get('exam_date')
         
@@ -916,6 +1001,43 @@ def proctor_monitoring_dashboard(request):
                 'code_entry_time': first_time_in,
                 'otp_code': otp_code
             })
+        
+        if not exam_date or True:  # Adjust logic as needed
+            history_records = TblProctorAttendanceHistory.objects.all()
+            
+            if college_name:
+                # Filter by college if needed (you might need to add college field to history)
+                pass
+            
+            if exam_date:
+                history_records = history_records.filter(exam_date=exam_date)
+            
+            for record in history_records:
+                result.append({
+                    'id': record.examdetails_id,
+                    'course_id': record.course_id,
+                    'subject': record.course_id,
+                    'section_name': record.section_name,
+                    'exam_date': record.exam_date,
+                    'exam_start_time': record.exam_start_time.isoformat() if record.exam_start_time else None,
+                    'exam_end_time': record.exam_end_time.isoformat() if record.exam_end_time else None,
+                    'building_name': record.building_name,
+                    'room_id': record.room_id,
+                    'proctor_name': record.proctor_name,
+                    'proctor_details': [{
+                        'proctor_id': record.proctor_id,
+                        'proctor_name': record.proctor_name,
+                        'status': record.status,
+                        'time_in': record.time_in.isoformat() if record.time_in else None
+                    }],
+                    'instructor_name': record.instructor_name,
+                    'department': '',  # Add if you have this in history
+                    'college': '',  # Add if you have this in history
+                    'examdetails_status': record.status,
+                    'status': record.status,
+                    'code_entry_time': record.time_in.isoformat() if record.time_in else None,
+                    'otp_code': record.otp_used
+                })
         
         return Response(result, status=http_status.HTTP_200_OK)
         
