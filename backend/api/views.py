@@ -687,7 +687,7 @@ def all_exams_for_substitution(request):
 # PROCTOR MONITORING DASHBOARD
 # ============================================================
 
-@@api_view(['GET'])
+@api_view(['GET'])
 @permission_classes([AllowAny])
 def proctor_monitoring_dashboard(request):
     """
