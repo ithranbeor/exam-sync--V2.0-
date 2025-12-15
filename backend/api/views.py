@@ -277,40 +277,46 @@ def verify_otp(request):
         
         exam_schedule = otp_record.examdetails
   
+        # ✅ FIX: Handle datetime objects directly
         if exam_schedule.exam_start_time and exam_schedule.exam_end_time:
-            from datetime import datetime as dt
-            
-            # Parse exam date
-            if exam_schedule.exam_date:
-                try:
-                    exam_date_obj = dt.strptime(exam_schedule.exam_date, '%Y-%m-%d').date()
-                    
-                    # Combine date with start and end times
+            try:
+                # Check if already datetime objects
+                if isinstance(exam_schedule.exam_start_time, datetime):
+                    exam_start_datetime = timezone.make_aware(exam_schedule.exam_start_time) if timezone.is_naive(exam_schedule.exam_start_time) else exam_schedule.exam_start_time
+                else:
+                    # It's a time object, need to combine with date
+                    exam_date_obj = datetime.strptime(exam_schedule.exam_date, '%Y-%m-%d').date()
                     exam_start_datetime = timezone.make_aware(
-                        dt.combine(exam_date_obj, exam_schedule.exam_start_time)
+                        datetime.combine(exam_date_obj, exam_schedule.exam_start_time)
                     )
+                
+                if isinstance(exam_schedule.exam_end_time, datetime):
+                    exam_end_datetime = timezone.make_aware(exam_schedule.exam_end_time) if timezone.is_naive(exam_schedule.exam_end_time) else exam_schedule.exam_end_time
+                else:
+                    # It's a time object, need to combine with date
+                    exam_date_obj = datetime.strptime(exam_schedule.exam_date, '%Y-%m-%d').date()
                     exam_end_datetime = timezone.make_aware(
-                        dt.combine(exam_date_obj, exam_schedule.exam_end_time)
+                        datetime.combine(exam_date_obj, exam_schedule.exam_end_time)
                     )
-                    
-                    # Allow entry 30 minutes before start
-                    early_entry_window = exam_start_datetime - timedelta(minutes=30)
-                    
-                    if now < early_entry_window:
-                        return Response({
-                            'valid': False,
-                            'message': 'Too early to verify. You can verify 30 minutes before the exam starts.'
-                        }, status=status.HTTP_200_OK)
-                    
-                    if now > exam_end_datetime:
-                        return Response({
-                            'valid': False,
-                            'message': 'Exam has already ended. Attendance recording is closed.'
-                        }, status=status.HTTP_200_OK)
-                    
-                except Exception as e:
-                    print(f"⚠️ Error parsing exam times: {str(e)}")
-                    # Continue anyway
+                
+                # Allow entry 30 minutes before start
+                early_entry_window = exam_start_datetime - timedelta(minutes=30)
+                
+                if now < early_entry_window:
+                    return Response({
+                        'valid': False,
+                        'message': 'Too early to verify. You can verify 30 minutes before the exam starts.'
+                    }, status=status.HTTP_200_OK)
+                
+                if now > exam_end_datetime:
+                    return Response({
+                        'valid': False,
+                        'message': 'Exam has already ended. Attendance recording is closed.'
+                    }, status=status.HTTP_200_OK)
+                
+            except Exception as e:
+                print(f"⚠️ Error parsing exam times: {str(e)}")
+                # Continue anyway
         
         # Check if user is the assigned proctor
         is_assigned = False
@@ -367,7 +373,6 @@ def verify_otp(request):
             'error': str(e),
             'detail': 'Failed to verify OTP'
         }, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
-
 
 # ============================================================
 # ATTENDANCE SUBMISSION
