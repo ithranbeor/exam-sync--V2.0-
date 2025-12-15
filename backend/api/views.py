@@ -535,27 +535,44 @@ def proctor_assigned_exams(request, user_id):
         completed = []
         
         for exam in exams:
-            # Parse exam times
+            # ✅ FIX: Parse exam date and times properly
             from datetime import datetime
-            exam_date_obj = datetime.strptime(exam.exam_date, '%Y-%m-%d').date()
             
-            # Handle exam times properly
-            if isinstance(exam.exam_start_time, datetime):
-                start_time = exam.exam_start_time.time()
-            else:
-                start_time = exam.exam_start_time
+            try:
+                exam_date_obj = datetime.strptime(exam.exam_date, '%Y-%m-%d').date()
+            except Exception as e:
+                print(f"⚠️ Error parsing exam_date {exam.exam_date}: {e}")
+                continue
             
-            if isinstance(exam.exam_end_time, datetime):
-                end_time = exam.exam_end_time.time()
-            else:
-                end_time = exam.exam_end_time
-            
-            exam_start_datetime = timezone.make_aware(
-                datetime.combine(exam_date_obj, start_time)
-            )
-            exam_end_datetime = timezone.make_aware(
-                datetime.combine(exam_date_obj, end_time)
-            )
+            # ✅ FIX: Handle both datetime and time objects
+            try:
+                if isinstance(exam.exam_start_time, datetime):
+                    start_time = exam.exam_start_time.time()
+                elif hasattr(exam.exam_start_time, 'hour'):  # It's a time object
+                    start_time = exam.exam_start_time
+                else:
+                    print(f"⚠️ Invalid exam_start_time type: {type(exam.exam_start_time)}")
+                    continue
+                
+                if isinstance(exam.exam_end_time, datetime):
+                    end_time = exam.exam_end_time.time()
+                elif hasattr(exam.exam_end_time, 'hour'):  # It's a time object
+                    end_time = exam.exam_end_time
+                else:
+                    print(f"⚠️ Invalid exam_end_time type: {type(exam.exam_end_time)}")
+                    continue
+                
+                # ✅ Create timezone-aware datetime objects
+                exam_start_datetime = timezone.make_aware(
+                    datetime.combine(exam_date_obj, start_time)
+                )
+                exam_end_datetime = timezone.make_aware(
+                    datetime.combine(exam_date_obj, end_time)
+                )
+                
+            except Exception as e:
+                print(f"⚠️ Error processing exam times for exam {exam.examdetails_id}: {e}")
+                continue
             
             # Check user's attendance
             attendance = exam.attendance_records.filter(proctor_id=user_id).first()
@@ -606,16 +623,31 @@ def proctor_assigned_exams(request, user_id):
                 'status': exam_status
             }
             
-            # ✅ FIX: Correct categorization logic
+            # ✅ FIX: Correct categorization with debug logging
+            print(f"\n📅 Exam {exam.examdetails_id} - {exam.course_id}")
+            print(f"   Current time: {now}")
+            print(f"   Exam start: {exam_start_datetime}")
+            print(f"   Exam end: {exam_end_datetime}")
+            print(f"   Now >= start? {now >= exam_start_datetime}")
+            print(f"   Now <= end? {now <= exam_end_datetime}")
+            
             if now >= exam_start_datetime and now <= exam_end_datetime:
                 # Currently happening right now
+                print(f"   ✅ ONGOING")
                 ongoing.append(exam_data)
             elif now < exam_start_datetime:
                 # Future exam
+                print(f"   📅 UPCOMING")
                 upcoming.append(exam_data)
             else:
                 # Past exam (now > exam_end_datetime)
+                print(f"   ✓ COMPLETED")
                 completed.append(exam_data)
+        
+        print(f"\n📊 CATEGORIZATION RESULTS:")
+        print(f"   Ongoing: {len(ongoing)}")
+        print(f"   Upcoming: {len(upcoming)}")
+        print(f"   Completed: {len(completed)}")
         
         return Response({
             'ongoing': ongoing,

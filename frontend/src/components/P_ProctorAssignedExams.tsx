@@ -52,14 +52,14 @@ const ProctorCourseDetails = ({ user }: ProctorCourseDetailsProps) => {
         }
 
         const proctorExams = examDetailsResponse.data;
-        
+
         // Filter to only exams where this user is actually assigned
         const userProctorExams = proctorExams.filter(exam => {
           const isSingleProctor = Number(exam.proctor_id) === Number(user.user_id);
-          const isInProctorsArray = exam.proctors && 
-            Array.isArray(exam.proctors) && 
+          const isInProctorsArray = exam.proctors &&
+            Array.isArray(exam.proctors) &&
             exam.proctors.some((pid: number) => Number(pid) === Number(user.user_id));
-          
+
           return isSingleProctor || isInProctorsArray;
         });
 
