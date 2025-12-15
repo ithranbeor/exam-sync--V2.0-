@@ -423,16 +423,17 @@ def submit_proctor_attendance(request):
         
         exam_schedule = otp_record.examdetails
         
-        # Check if attendance already exists
+        # ✅ FIXED: Check if THIS USER already has attendance for THIS EXAM
+        # This prevents duplicate check-ins by the same person for the same exam
         existing_attendance = TblProctorAttendance.objects.filter(
             examdetails=exam_schedule,
             proctor_id=user_id
         ).first()
         
         if existing_attendance:
-            print(f"⚠️ Attendance already exists for user {user_id}")
+            print(f"⚠️ User {user_id} already has attendance for exam {exam_schedule.examdetails_id}")
             return Response({
-                'error': 'Attendance already recorded for this exam'
+                'error': 'You have already recorded attendance for this exam'
             }, status=status.HTTP_400_BAD_REQUEST)
         
         print(f"\n💾 Creating attendance record...")
@@ -448,7 +449,7 @@ def submit_proctor_attendance(request):
                     'error': f'User {user_id} not found'
                 }, status=status.HTTP_400_BAD_REQUEST)
             
-            # ✅ FIXED: Create attendance record ONLY - no status updates!
+            # ✅ Create NEW attendance record (doesn't update existing ones)
             current_time = timezone.now()
             attendance = TblProctorAttendance.objects.create(
                 examdetails=exam_schedule,
@@ -462,23 +463,29 @@ def submit_proctor_attendance(request):
             print(f"✅ Created attendance record:")
             print(f"   - Attendance ID: {attendance.attendance_id}")
             print(f"   - Proctor ID: {attendance.proctor_id}")
+            print(f"   - Exam ID: {exam_schedule.examdetails_id}")
             print(f"   - Is substitute: {attendance.is_substitute}")
             print(f"   - Time in: {attendance.time_in}")
             
-            # ✅ NO MORE STATUS UPDATES - Serializer handles it!
-            # The backend will automatically calculate status from attendance.time_in
-            
             # If substitute, create substitution record
             if role == 'sub':
+                # ✅ Record who was substituted
+                original_proctor_name = None
+                if exam_schedule.proctor:
+                    original_proctor_name = f"{exam_schedule.proctor.first_name} {exam_schedule.proctor.last_name}"
+                
                 substitution = TblProctorSubstitution.objects.create(
                     examdetails=exam_schedule,
                     original_proctor_id=exam_schedule.proctor_id,
                     substitute_proctor=proctor_user,
-                    justification=remarks
+                    justification=remarks,
+                    substitution_time=current_time
                 )
                 print(f"✅ Created substitution record: {substitution.substitution_id}")
+                print(f"   - Original proctor: {exam_schedule.proctor_id} ({original_proctor_name})")
+                print(f"   - Substitute: {user_id} ({proctor_user.first_name} {proctor_user.last_name})")
         
-        # ✅ FIXED: Get status from serializer
+        # ✅ Get status from serializer
         from .serializers import TblExamdetailsSerializer
         serializer = TblExamdetailsSerializer(exam_schedule)
         calculated_status = serializer.data.get('examdetails_status', 'pending')
@@ -492,7 +499,7 @@ def submit_proctor_attendance(request):
             'message': 'Attendance recorded successfully',
             'attendance_id': attendance.attendance_id,
             'time_in': attendance.time_in.isoformat(),
-            'status': calculated_status,  # ✅ Return calculated status
+            'status': calculated_status,
             'role': 'substitute' if attendance.is_substitute else 'assigned',
             'proctor_name': f"{proctor_user.first_name} {proctor_user.last_name}"
         }, status=status.HTTP_201_CREATED)
@@ -875,13 +882,12 @@ def all_exams_for_substitution(request):
 # ============================================================
 # PROCTOR MONITORING DASHBOARD
 # ============================================================
-
 @api_view(['GET'])
 @permission_classes([AllowAny])
 def proctor_monitoring_dashboard(request):
     """
     Get monitoring data - shows WHO checked in for each exam
-    ✅ FIXED: Handles empty proctor arrays and prevents index errors
+    ✅ FIXED: Shows substitution information
     """
     try:
         archive_completed_attendances()
@@ -895,7 +901,9 @@ def proctor_monitoring_dashboard(request):
             'modality'
         ).prefetch_related(
             'attendance_records',
-            'attendance_records__proctor'
+            'attendance_records__proctor',
+            'substitutions',  # ✅ Add substitution info
+            'substitutions__substitute_proctor'
         )
         
         if college_name:
@@ -922,8 +930,10 @@ def proctor_monitoring_dashboard(request):
             else:
                 assigned_proctor_ids = []
             
-            # ✅ Check each proctor's status
+            # ✅ Check each proctor's status + substitutions
             proctor_statuses = []
+            
+            # First, add all assigned proctors
             for proctor_id in assigned_proctor_ids:
                 try:
                     proctor = TblUsers.objects.get(user_id=proctor_id)
@@ -965,7 +975,9 @@ def proctor_monitoring_dashboard(request):
                         'proctor_id': proctor_id,
                         'proctor_name': proctor_name,
                         'status': status,
-                        'time_in': time_in.isoformat() if time_in else None
+                        'time_in': time_in.isoformat() if time_in else None,
+                        'is_assigned': True,
+                        'is_substitute': False
                     })
                     
                 except TblUsers.DoesNotExist:
@@ -975,21 +987,48 @@ def proctor_monitoring_dashboard(request):
                     print(f"⚠️ Error processing proctor {proctor_id}: {str(e)}")
                     continue
             
-            # ✅ Format proctor names with status indicators (handle empty list)
+            # ✅ Then, add any substitutes who checked in
+            for attendance in exam.attendance_records.filter(is_substitute=True):
+                # Check if this substitute is not already in the list (shouldn't happen, but safety check)
+                if not any(p['proctor_id'] == attendance.proctor_id for p in proctor_statuses):
+                    proctor_name = f"{attendance.proctor.first_name} {attendance.proctor.last_name}"
+                    
+                    # Get original proctor info
+                    original_proctor_name = None
+                    if exam.proctor:
+                        original_proctor_name = f"{exam.proctor.first_name} {exam.proctor.last_name}"
+                    
+                    proctor_statuses.append({
+                        'proctor_id': attendance.proctor_id,
+                        'proctor_name': proctor_name,
+                        'status': 'substitute',
+                        'time_in': attendance.time_in.isoformat() if attendance.time_in else None,
+                        'is_assigned': False,
+                        'is_substitute': True,
+                        'substituted_for': original_proctor_name,
+                        'substitution_remarks': attendance.remarks
+                    })
+            
+            # ✅ Format proctor display with substitution info
             if proctor_statuses:
                 proctor_parts = []
                 for p in proctor_statuses:
-                    status_icon = '✓' if p['status'] in ['confirmed', 'late', 'substitute'] else '✗'
-                    proctor_parts.append(f"{p['proctor_name']} ({status_icon})")
+                    if p.get('is_substitute'):
+                        # Show: "John Doe (SUB for Jane Smith)"
+                        status_icon = '🔄'
+                        proctor_parts.append(f"{p['proctor_name']} ({status_icon} SUB for {p.get('substituted_for', 'N/A')})")
+                    else:
+                        status_icon = '✓' if p['status'] in ['confirmed', 'late'] else '✗'
+                        proctor_parts.append(f"{p['proctor_name']} ({status_icon})")
                 proctor_display = ', '.join(proctor_parts)
             else:
                 proctor_display = 'No proctor assigned'
             
-            # Overall exam status (if ANY proctor checked in, show confirmed)
+            # Overall exam status
             has_any_attendance = any(p['status'] in ['confirmed', 'late', 'substitute'] for p in proctor_statuses)
             overall_status = 'confirmed' if has_any_attendance else 'pending'
             
-            # ✅ Get first time_in (handle empty list)
+            # ✅ Get first time_in
             first_time_in = None
             if proctor_statuses:
                 for p in proctor_statuses:
@@ -1014,7 +1053,6 @@ def proctor_monitoring_dashboard(request):
                     pass
             
             instructor_name = ', '.join(instructor_names) if instructor_names else None
-            
             sections_display = ', '.join(exam.sections) if exam.sections else exam.section_name
             
             result.append({
@@ -1027,22 +1065,22 @@ def proctor_monitoring_dashboard(request):
                 'exam_end_time': exam.exam_end_time.isoformat() if exam.exam_end_time else None,
                 'building_name': exam.building_name,
                 'room_id': exam.room.room_id if exam.room else None,
-                'proctor_name': proctor_display,  
-                'proctor_details': proctor_statuses, 
+                'proctor_name': proctor_display,
+                'proctor_details': proctor_statuses,
                 'instructor_name': instructor_name,
                 'department': exam.college_name,
                 'college': exam.college_name,
-                'examdetails_status': overall_status,  
-                'status': overall_status, 
+                'examdetails_status': overall_status,
+                'status': overall_status,
                 'code_entry_time': first_time_in,
                 'otp_code': otp_code
             })
         
-        if not exam_date or True:  # Adjust logic as needed
+        # Add history records
+        if not exam_date or True:
             history_records = TblProctorAttendanceHistory.objects.all()
             
             if college_name:
-                # Filter by college if needed (you might need to add college field to history)
                 pass
             
             if exam_date:
@@ -1064,11 +1102,14 @@ def proctor_monitoring_dashboard(request):
                         'proctor_id': record.proctor_id,
                         'proctor_name': record.proctor_name,
                         'status': record.status,
-                        'time_in': record.time_in.isoformat() if record.time_in else None
+                        'time_in': record.time_in.isoformat() if record.time_in else None,
+                        'is_assigned': not record.is_substitute,
+                        'is_substitute': record.is_substitute,
+                        'substitution_remarks': record.remarks if record.is_substitute else None
                     }],
                     'instructor_name': record.instructor_name,
-                    'department': '',  # Add if you have this in history
-                    'college': '',  # Add if you have this in history
+                    'department': '',
+                    'college': '',
                     'examdetails_status': record.status,
                     'status': record.status,
                     'code_entry_time': record.time_in.isoformat() if record.time_in else None,

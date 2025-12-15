@@ -893,7 +893,7 @@ const ProctorMonitoring: React.FC<UserProps> = ({ }) => {
             </div>
 
             <h4 style={{ color: '#333', marginBottom: '15px' }}>
-              Assigned Proctors ({selectedSchedule.proctor_details.length})
+              Proctors ({selectedSchedule.proctor_details.length})
             </h4>
 
             {selectedSchedule.proctor_details.length > 0 ? (
@@ -940,20 +940,37 @@ const ProctorMonitoring: React.FC<UserProps> = ({ }) => {
                         padding: '15px',
                         border: '1px solid #ddd',
                         borderRadius: '8px',
-                        backgroundColor: '#f9f9f9'
+                        backgroundColor: proctor.is_substitute ? '#fff3cd' : '#f9f9f9'
                       }}
                     >
                       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '10px' }}>
                         <h5 style={{ margin: 0, color: '#333', fontSize: '16px' }}>
-                          Proctor {index + 1}: {proctor.proctor_name}
+                          {proctor.is_substitute ? '🔄 ' : ''}
+                          {proctor.proctor_name}
+                          {proctor.is_assigned ? ' (Assigned)' : ' (Substitute)'}
                         </h5>
                         <span className={`status-badge ${statusDisplay.className}`}>
                           {statusDisplay.text}
                         </span>
                       </div>
+                      
                       <p style={{ margin: '5px 0', color: '#666', fontSize: '14px' }}>
                         <strong>Time In:</strong> {formatTimeIn(proctor.time_in)}
                       </p>
+                      
+                      {/* ✅ Show substitution info */}
+                      {proctor.is_substitute && (
+                        <>
+                          <p style={{ margin: '5px 0', color: '#856404', fontSize: '14px', fontWeight: 'bold' }}>
+                            <strong>Substituted for:</strong> {proctor.substituted_for || 'N/A'}
+                          </p>
+                          {proctor.substitution_remarks && (
+                            <p style={{ margin: '5px 0', color: '#666', fontSize: '13px', fontStyle: 'italic' }}>
+                              <strong>Reason:</strong> {proctor.substitution_remarks}
+                            </p>
+                          )}
+                        </>
+                      )}
                     </div>
                   );
                 })}
