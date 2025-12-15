@@ -515,6 +515,14 @@ def proctor_assigned_exams(request, user_id):
     ✅ Categorized by: ongoing, upcoming, completed (history)
     """
     try:
+        # ✅ Archive completed exams first
+        try:
+            archived = archive_completed_attendances()
+            if archived > 0:
+                print(f"📦 Archived {archived} completed attendance(s)")
+        except Exception as e:
+            print(f"⚠️ Archive failed: {e}")
+        
         now = timezone.now()
         
         # Get all assigned exams
@@ -536,7 +544,7 @@ def proctor_assigned_exams(request, user_id):
         
         for exam in exams:
             try:
-                # ✅ FIX: Handle exam_start_time and exam_end_time properly
+                # Handle exam_start_time and exam_end_time properly
                 if isinstance(exam.exam_start_time, datetime):
                     exam_start_datetime = exam.exam_start_time
                     if timezone.is_naive(exam_start_datetime):
@@ -559,8 +567,6 @@ def proctor_assigned_exams(request, user_id):
                 
             except Exception as e:
                 print(f"⚠️ Error processing exam times for exam {exam.examdetails_id}: {e}")
-                import traceback
-                traceback.print_exc()
                 continue
             
             # Check user's attendance
@@ -618,9 +624,10 @@ def proctor_assigned_exams(request, user_id):
             elif now < exam_start_datetime:
                 upcoming.append(exam_data)
             else:
+                # Only add to completed if NOT already in history
                 completed.append(exam_data)
         
-        # ✅ FIXED: Query history records ONCE, OUTSIDE the loop
+        # ✅ Fetch history records (ONCE, outside loop)
         history_records = TblProctorAttendanceHistory.objects.filter(
             proctor_id=user_id
         ).order_by('-exam_date', '-exam_start_time')
@@ -643,7 +650,7 @@ def proctor_assigned_exams(request, user_id):
         print(f"\n📊 CATEGORIZATION RESULTS:")
         print(f"   Ongoing: {len(ongoing)}")
         print(f"   Upcoming: {len(upcoming)}")
-        print(f"   Completed: {len(completed)}")
+        print(f"   Completed (including history): {len(completed)}")
         
         return Response({
             'ongoing': ongoing,
@@ -664,13 +671,12 @@ def archive_completed_attendances():
     """
     Move completed exam attendances to history table
     """
-    from datetime import datetime
-    
     now = timezone.now()
     
     # Get all attendance records where exam has ended
     completed_attendances = TblProctorAttendance.objects.select_related(
         'examdetails',
+        'examdetails__room',
         'proctor'
     ).filter(
         examdetails__exam_end_time__lt=now
@@ -704,12 +710,27 @@ def archive_completed_attendances():
             
             # Get instructor name
             instructor_name = None
-            if exam.instructor_id:
+            if exam.instructors:
+                instructor_names = []
+                for instructor_id in exam.instructors:
+                    try:
+                        instructor = TblUsers.objects.get(user_id=instructor_id)
+                        instructor_names.append(f"{instructor.first_name} {instructor.last_name}")
+                    except TblUsers.DoesNotExist:
+                        pass
+                instructor_name = ', '.join(instructor_names) if instructor_names else None
+            elif exam.instructor_id:
                 try:
                     instructor = TblUsers.objects.get(user_id=exam.instructor_id)
                     instructor_name = f"{instructor.first_name} {instructor.last_name}"
                 except TblUsers.DoesNotExist:
                     pass
+            
+            # Check if already in history
+            if TblProctorAttendanceHistory.objects.filter(
+                attendance_id=attendance.attendance_id
+            ).exists():
+                continue
             
             # Create history record
             TblProctorAttendanceHistory.objects.create(
@@ -734,9 +755,12 @@ def archive_completed_attendances():
             )
             
             archived_count += 1
+            print(f"✅ Archived attendance {attendance.attendance_id} to history")
         
-        # Delete original attendance records
-        completed_attendances.delete()
+        # Delete original attendance records that were archived
+        if archived_count > 0:
+            completed_attendances.delete()
+            print(f"✅ Deleted {archived_count} attendance records from active table")
     
     return archived_count
 
