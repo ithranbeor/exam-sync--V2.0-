@@ -474,10 +474,9 @@ def submit_proctor_attendance(request):
                 
                 substitution = TblProctorSubstitution.objects.create(
                     examdetails=exam_schedule,
-                    original_proctor_id=exam_schedule.proctor_id,
+                    original_proctor=exam_schedule.proctor,  # ✅ CHANGED: Pass the user object, not ID
                     substitute_proctor=proctor_user,
-                    justification=remarks,
-                    substitution_time=current_time
+                    justification=remarks
                 )
                 print(f"✅ Created substitution record: {substitution.substitution_id}")
                 print(f"   - Original proctor: {exam_schedule.proctor_id} ({original_proctor_name})")
