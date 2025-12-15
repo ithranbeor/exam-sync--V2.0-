@@ -28,6 +28,10 @@ interface ProctorDetail {
   proctor_name: string;
   status: string;
   time_in: string | null;
+  is_assigned?: boolean;           // ✅ ADD THIS
+  is_substitute?: boolean;          // ✅ ADD THIS
+  substituted_for?: string;         // ✅ ADD THIS
+  substitution_remarks?: string;    // ✅ ADD THIS
 }
 
 interface MonitoringSchedule {
@@ -898,7 +902,7 @@ const ProctorMonitoring: React.FC<UserProps> = ({ }) => {
 
             {selectedSchedule.proctor_details.length > 0 ? (
               <div style={{ display: 'flex', flexDirection: 'column', gap: '15px' }}>
-                {selectedSchedule.proctor_details.map((proctor, index) => {
+                {selectedSchedule.proctor_details.map((proctor) => {
                   const getStatusDisplay = (status: string) => {
                     const normalized = status.toLowerCase().trim();
                     if (normalized.includes('late')) {
