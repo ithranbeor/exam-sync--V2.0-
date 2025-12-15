@@ -634,17 +634,60 @@ const SchedulerView: React.FC<SchedulerViewProps> = ({ user }) => {
 
   // Helper function to check if exam matches search term
   const examMatchesSearch = (exam: ExamDetail, searchLower: string): boolean => {
+    // Section matching
     const sectionMatch =
       (exam.sections && exam.sections.some(s => s.toLowerCase().includes(searchLower))) ||
       (exam.section_name?.toLowerCase().includes(searchLower) ?? false);
 
+    // Instructor matching
     const instructorMatch =
       (exam.instructors && exam.instructors.some(id => getUserName(id).toLowerCase().includes(searchLower))) ||
       getUserName(exam.instructor_id).toLowerCase().includes(searchLower);
 
+    // Proctor matching
     const proctorMatch =
       (exam.proctors && exam.proctors.some(id => getUserName(id).toLowerCase().includes(searchLower))) ||
       getUserName(exam.proctor_id).toLowerCase().includes(searchLower);
+
+    // Time matching - check both 24-hour format and 12-hour format
+    let timeMatch = false;
+    if (exam.exam_start_time && exam.exam_end_time) {
+      const start24 = exam.exam_start_time.slice(11, 16); // HH:MM format
+      const end24 = exam.exam_end_time.slice(11, 16);
+      
+      // Convert to 12-hour format for matching
+      const formatTo12Hour = (time24: string) => {
+        const [hourStr, minute] = time24.split(":");
+        let hour = Number(hourStr);
+        const ampm = hour >= 12 ? "PM" : "AM";
+        hour = hour % 12 || 12;
+        return `${hour}:${minute} ${ampm}`;
+      };
+      
+      const start12 = formatTo12Hour(start24);
+      const end12 = formatTo12Hour(end24);
+      
+      timeMatch = 
+        start24.includes(searchTerm) ||
+        end24.includes(searchTerm) ||
+        start12.toLowerCase().includes(searchLower) ||
+        end12.toLowerCase().includes(searchLower) ||
+        `${start12} - ${end12}`.toLowerCase().includes(searchLower) ||
+        (searchLower.includes('am') && (start12.toLowerCase().includes('am') || end12.toLowerCase().includes('am'))) ||
+        (searchLower.includes('pm') && (start12.toLowerCase().includes('pm') || end12.toLowerCase().includes('pm')));
+    }
+
+    // Date matching (case-insensitive)
+    const dateMatch = exam.exam_date?.toLowerCase().includes(searchLower) ?? false;
+
+    // Header fields matching (semester, academic year, exam period, exam category, building, college)
+    const headerFieldsMatch =
+      (exam.semester?.toLowerCase().includes(searchLower) ?? false) ||
+      (exam.academic_year?.toLowerCase().includes(searchLower) ?? false) ||
+      (exam.exam_period?.toLowerCase().includes(searchLower) ?? false) ||
+      (exam.exam_category?.toLowerCase().includes(searchLower) ?? false) ||
+      (exam.building_name?.toLowerCase().includes(searchLower) ?? false) ||
+      (exam.college_name?.toLowerCase().includes(searchLower) ?? false);
 
     return (
       (exam.course_id?.toLowerCase().includes(searchLower) ?? false) ||
@@ -652,9 +695,9 @@ const SchedulerView: React.FC<SchedulerViewProps> = ({ user }) => {
       (exam.room_id?.toLowerCase().includes(searchLower) ?? false) ||
       instructorMatch ||
       proctorMatch ||
-      (exam.exam_date?.includes(searchTerm) ?? false) ||
-      (exam.exam_start_time?.includes(searchTerm) ?? false) ||
-      (exam.exam_end_time?.includes(searchTerm) ?? false)
+      dateMatch ||
+      timeMatch ||
+      headerFieldsMatch
     );
   };
 
