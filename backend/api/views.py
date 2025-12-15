@@ -787,10 +787,11 @@ def proctor_monitoring_dashboard(request):
             
             # ✅ Format proctor names with status indicators (handle empty list)
             if proctor_statuses:
-                proctor_display = ', '.join([
-                    f"{p['proctor_name']} ({'✓' if p['status'] in ['confirmed', 'late'] else '✗'})"
-                    for p in proctor_statuses
-                ])
+                proctor_parts = []
+                for p in proctor_statuses:
+                    status_icon = '✓' if p['status'] in ['confirmed', 'late', 'substitute'] else '✗'
+                    proctor_parts.append(f"{p['proctor_name']} ({status_icon})")
+                proctor_display = ', '.join(proctor_parts)
             else:
                 proctor_display = 'No proctor assigned'
             
