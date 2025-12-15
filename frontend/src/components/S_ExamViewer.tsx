@@ -59,7 +59,12 @@ const SchedulerView: React.FC<SchedulerViewProps> = ({ user }) => {
   const semesterName = examData.find(e => e.semester)?.semester ?? "-";
   const yearName = examData.find(e => e.academic_year)?.academic_year ?? "-";
   const buildingName = examData.find(e => e.building_name)?.building_name ?? "-";
+  // Add these new state variables near your other state declarations (around line ~60)
+  
   const [searchTerm, setSearchTerm] = useState<string>("");
+  const [searchMatches, setSearchMatches] = useState<ExamDetail[]>([]);
+  const [currentMatchIndex, setCurrentMatchIndex] = useState<number>(-1);
+  const searchInputRef = useRef<HTMLInputElement>(null);
 
   const maxRoomColumns = 5;
   const [_sendingToDean, _setSendingToDean] = useState(false);
@@ -627,34 +632,133 @@ const SchedulerView: React.FC<SchedulerViewProps> = ({ user }) => {
       return filterKey === selectedFilter;
     });
 
-  const searchFilteredData = searchTerm.trim() === ""
-    ? filteredExamData
-    : filteredExamData.filter(exam => {
-      const searchLower = searchTerm.toLowerCase();
+  // Helper function to check if exam matches search term
+  const examMatchesSearch = (exam: ExamDetail, searchLower: string): boolean => {
+    const sectionMatch =
+      (exam.sections && exam.sections.some(s => s.toLowerCase().includes(searchLower))) ||
+      (exam.section_name?.toLowerCase().includes(searchLower) ?? false);
 
-      const sectionMatch =
-        (exam.sections && exam.sections.some(s => s.toLowerCase().includes(searchLower))) ||
-        exam.section_name?.toLowerCase().includes(searchLower);
+    const instructorMatch =
+      (exam.instructors && exam.instructors.some(id => getUserName(id).toLowerCase().includes(searchLower))) ||
+      getUserName(exam.instructor_id).toLowerCase().includes(searchLower);
 
-      const instructorMatch =
-        (exam.instructors && exam.instructors.some(id => getUserName(id).toLowerCase().includes(searchLower))) ||
-        getUserName(exam.instructor_id).toLowerCase().includes(searchLower);
+    const proctorMatch =
+      (exam.proctors && exam.proctors.some(id => getUserName(id).toLowerCase().includes(searchLower))) ||
+      getUserName(exam.proctor_id).toLowerCase().includes(searchLower);
 
-      const proctorMatch =
-        (exam.proctors && exam.proctors.some(id => getUserName(id).toLowerCase().includes(searchLower))) ||
-        getUserName(exam.proctor_id).toLowerCase().includes(searchLower);
+    return (
+      (exam.course_id?.toLowerCase().includes(searchLower) ?? false) ||
+      sectionMatch ||
+      (exam.room_id?.toLowerCase().includes(searchLower) ?? false) ||
+      instructorMatch ||
+      proctorMatch ||
+      (exam.exam_date?.includes(searchTerm) ?? false) ||
+      (exam.exam_start_time?.includes(searchTerm) ?? false) ||
+      (exam.exam_end_time?.includes(searchTerm) ?? false)
+    );
+  };
 
-      return (
-        exam.course_id?.toLowerCase().includes(searchLower) ||
-        sectionMatch ||
-        exam.room_id?.toLowerCase().includes(searchLower) ||
-        instructorMatch ||
-        proctorMatch ||
-        exam.exam_date?.includes(searchTerm) ||
-        exam.exam_start_time?.includes(searchTerm) ||
-        exam.exam_end_time?.includes(searchTerm)
-      );
-    });
+  // Always show all data - don't filter it out, just highlight matches
+  const searchFilteredData = filteredExamData;
+
+  const handleNextMatch = () => {
+    if (searchMatches.length === 0) return;
+    const nextIndex = (currentMatchIndex + 1) % searchMatches.length;
+    setCurrentMatchIndex(nextIndex);
+    
+    // Gentle scroll to match (only when user clicks)
+    const currentMatch = searchMatches[nextIndex];
+    if (currentMatch?.examdetails_id) {
+      const examElement = document.querySelector(`[data-exam-id="${currentMatch.examdetails_id}"]`);
+      if (examElement) {
+        examElement.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+      }
+    }
+  };
+
+  const handlePreviousMatch = () => {
+    if (searchMatches.length === 0) return;
+    const prevIndex = (currentMatchIndex - 1 + searchMatches.length) % searchMatches.length;
+    setCurrentMatchIndex(prevIndex);
+    
+    // Gentle scroll to match (only when user clicks)
+    const currentMatch = searchMatches[prevIndex];
+    if (currentMatch?.examdetails_id) {
+      const examElement = document.querySelector(`[data-exam-id="${currentMatch.examdetails_id}"]`);
+      if (examElement) {
+        examElement.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+      }
+    }
+  };
+
+  // Calculate all matches when search term changes
+  useEffect(() => {
+    if (searchTerm.trim() === "") {
+      setSearchMatches([]);
+      setCurrentMatchIndex(-1);
+      return;
+    }
+
+    const searchLower = searchTerm.toLowerCase();
+    const matches = filteredExamData.filter(exam => examMatchesSearch(exam, searchLower));
+    setSearchMatches(matches);
+    
+    // Reset to first match if we have matches
+    if (matches.length > 0) {
+      setCurrentMatchIndex(0);
+    } else {
+      setCurrentMatchIndex(-1);
+    }
+  }, [searchTerm, filteredExamData, users, allCollegeUsers]);
+
+  // Handle keyboard shortcuts (Ctrl+F, Enter, Escape)
+  useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      // Ctrl+F or Cmd+F to focus search
+      if ((e.ctrlKey || e.metaKey) && e.key === 'f') {
+        e.preventDefault();
+        searchInputRef.current?.focus();
+      }
+      // Enter to go to next match (when search is focused)
+      if (e.key === 'Enter' && !e.shiftKey && document.activeElement === searchInputRef.current) {
+        e.preventDefault();
+        if (searchMatches.length > 0) {
+          const nextIndex = (currentMatchIndex + 1) % searchMatches.length;
+          setCurrentMatchIndex(nextIndex);
+          const currentMatch = searchMatches[nextIndex];
+          if (currentMatch?.examdetails_id) {
+            const examElement = document.querySelector(`[data-exam-id="${currentMatch.examdetails_id}"]`);
+            if (examElement) {
+              examElement.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+            }
+          }
+        }
+      }
+      // Shift+Enter to go to previous match
+      if (e.key === 'Enter' && e.shiftKey && document.activeElement === searchInputRef.current) {
+        e.preventDefault();
+        if (searchMatches.length > 0) {
+          const prevIndex = (currentMatchIndex - 1 + searchMatches.length) % searchMatches.length;
+          setCurrentMatchIndex(prevIndex);
+          const currentMatch = searchMatches[prevIndex];
+          if (currentMatch?.examdetails_id) {
+            const examElement = document.querySelector(`[data-exam-id="${currentMatch.examdetails_id}"]`);
+            if (examElement) {
+              examElement.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+            }
+          }
+        }
+      }
+      // Escape to clear search
+      if (e.key === 'Escape' && document.activeElement === searchInputRef.current) {
+        setSearchTerm("");
+        setCurrentMatchIndex(-1);
+      }
+    };
+
+    document.addEventListener('keydown', handleKeyDown);
+    return () => document.removeEventListener('keydown', handleKeyDown);
+  }, [searchMatches, currentMatchIndex]);
 
   const getFilterOptions = () => {
     const uniqueOptions = new Set<string>();
@@ -1361,6 +1465,7 @@ const SchedulerView: React.FC<SchedulerViewProps> = ({ user }) => {
           </select>
         </div>
         <div
+          className="search-container"
           style={{
             padding: "1px",
             fontSize: "10px",
@@ -1370,31 +1475,126 @@ const SchedulerView: React.FC<SchedulerViewProps> = ({ user }) => {
             cursor: "pointer",
             minWidth: "250px",
             color: "#092C4C",
-            height: "40%"
+            height: "40%",
+            display: "flex",
+            alignItems: "center",
+            gap: "4px",
+            paddingRight: "8px"
           }}
         >
           <span style={{ color: "#092C4C", fontSize: "16px" }}></span>
           <input
+            ref={searchInputRef}
             type="text"
             value={searchTerm}
             onChange={(e) => {
               setSearchTerm(e.target.value);
               setPage(0);
             }}
-            placeholder="Search schedules..."
+            placeholder="Search schedules... (Ctrl+F)"
             style={{
               border: "none",
               outline: "none",
               fontSize: "14px",
               color: "#092C4C",
               backgroundColor: "transparent",
+              flex: 1,
+              minWidth: 0
             }}
           />
           {searchTerm && (
-            <button type="button"
+            <>
+              {searchMatches.length > 0 ? (
+                <>
+                  <span style={{
+                    fontSize: "12px",
+                    color: "#666",
+                    whiteSpace: "nowrap",
+                    marginRight: "4px"
+                  }}>
+                    {currentMatchIndex + 1}/{searchMatches.length}
+                  </span>
+                  <button
+                    type="button"
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      handlePreviousMatch();
+                    }}
+                    className="search-nav-button"
+                    title="Previous match"
+                    style={{
+                      background: "none",
+                      border: "none",
+                      color: "#092C4C",
+                      cursor: "pointer",
+                      fontSize: "14px",
+                      padding: "4px 6px",
+                      display: "flex",
+                      alignItems: "center",
+                      justifyContent: "center",
+                      borderRadius: "4px",
+                      transition: "background 0.2s"
+                    }}
+                    onMouseEnter={(e) => {
+                      e.currentTarget.style.background = "#f0f0f0";
+                    }}
+                    onMouseLeave={(e) => {
+                      e.currentTarget.style.background = "none";
+                    }}
+                  >
+                    <FaChevronLeft />
+                  </button>
+                  <button
+                    type="button"
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      handleNextMatch();
+                    }}
+                    className="search-nav-button"
+                    title="Next match"
+                    style={{
+                      background: "none",
+                      border: "none",
+                      color: "#092C4C",
+                      cursor: "pointer",
+                      fontSize: "14px",
+                      padding: "4px 6px",
+                      display: "flex",
+                      alignItems: "center",
+                      justifyContent: "center",
+                      borderRadius: "4px",
+                      transition: "background 0.2s"
+                    }}
+                    onMouseEnter={(e) => {
+                      e.currentTarget.style.background = "#f0f0f0";
+                    }}
+                    onMouseLeave={(e) => {
+                      e.currentTarget.style.background = "none";
+                    }}
+                  >
+                    <FaChevronRight />
+                  </button>
+                </>
+              ) : (
+                <span style={{
+                  fontSize: "12px",
+                  color: "#999",
+                  whiteSpace: "nowrap",
+                  marginRight: "4px",
+                  fontStyle: "italic"
+                }}>
+                  No results
+                </span>
+              )}
+            </>
+          )}
+          {searchTerm && (
+            <button
+              type="button"
               onClick={() => {
                 setSearchTerm("");
                 setPage(0);
+                setCurrentMatchIndex(-1);
               }}
               style={{
                 background: "none",
@@ -1402,9 +1602,20 @@ const SchedulerView: React.FC<SchedulerViewProps> = ({ user }) => {
                 color: "#092C4C",
                 cursor: "pointer",
                 fontSize: "18px",
-                padding: "0",
-                marginLeft: "23px",
+                padding: "0 4px",
+                display: "flex",
+                alignItems: "center",
+                justifyContent: "center",
+                borderRadius: "4px",
+                transition: "background 0.2s"
               }}
+              onMouseEnter={(e) => {
+                e.currentTarget.style.background = "#f0f0f0";
+              }}
+              onMouseLeave={(e) => {
+                e.currentTarget.style.background = "none";
+              }}
+              title="Clear search (Esc)"
             >
               ✕
             </button>
@@ -1707,22 +1918,17 @@ const SchedulerView: React.FC<SchedulerViewProps> = ({ user }) => {
                                       justifyContent: "flex-start",
                                       outline: selectedSwap?.examdetails_id === exam.examdetails_id
                                         ? "10px solid blue"
-                                        : searchTerm && (
-                                          exam.course_id?.toLowerCase().includes(searchTerm.toLowerCase()) ||
-                                          getSectionDisplay(exam).toLowerCase().includes(searchTerm.toLowerCase()) ||
-                                          exam.room_id?.toLowerCase().includes(searchTerm.toLowerCase()) ||
-                                          getInstructorDisplay(exam).toLowerCase().includes(searchTerm.toLowerCase()) ||
-                                          getProctorDisplay(exam).toLowerCase().includes(searchTerm.toLowerCase())
-                                        )
-                                          ? "3px solid yellow"
+                                        : searchTerm && examMatchesSearch(exam, searchTerm.toLowerCase())
+                                          ? currentMatchIndex >= 0 && 
+                                            searchMatches[currentMatchIndex]?.examdetails_id === exam.examdetails_id
+                                            ? "3px solid #2563eb"
+                                            : "2px solid #fbbf24"
                                           : "none",
-                                      boxShadow: searchTerm && (
-                                        exam.course_id?.toLowerCase().includes(searchTerm.toLowerCase()) ||
-                                        getSectionDisplay(exam).toLowerCase().includes(searchTerm.toLowerCase()) ||
-                                        exam.room_id?.toLowerCase().includes(searchTerm.toLowerCase()) ||
-                                        getInstructorDisplay(exam).toLowerCase().includes(searchTerm.toLowerCase()) ||
-                                        getProctorDisplay(exam).toLowerCase().includes(searchTerm.toLowerCase())
-                                      ) ? "0 0 15px 3px rgba(255, 255, 0, 0.8)"
+                                      boxShadow: searchTerm && examMatchesSearch(exam, searchTerm.toLowerCase())
+                                        ? currentMatchIndex >= 0 && 
+                                          searchMatches[currentMatchIndex]?.examdetails_id === exam.examdetails_id
+                                          ? "0 0 8px 2px rgba(37, 99, 235, 0.5)"
+                                          : "0 0 4px 1px rgba(251, 191, 36, 0.4)"
                                         : "none"
                                     }}
                                   >
@@ -2093,22 +2299,17 @@ const SchedulerView: React.FC<SchedulerViewProps> = ({ user }) => {
                                       justifyContent: "flex-start",
                                       outline: selectedSwap?.examdetails_id === exam.examdetails_id
                                         ? "10px solid blue"
-                                        : searchTerm && (
-                                          exam.course_id?.toLowerCase().includes(searchTerm.toLowerCase()) ||
-                                          getSectionDisplay(exam).toLowerCase().includes(searchTerm.toLowerCase()) ||
-                                          exam.room_id?.toLowerCase().includes(searchTerm.toLowerCase()) ||
-                                          getInstructorDisplay(exam).toLowerCase().includes(searchTerm.toLowerCase()) ||
-                                          getProctorDisplay(exam).toLowerCase().includes(searchTerm.toLowerCase())
-                                        )
-                                          ? "3px solid yellow"
+                                        : searchTerm && examMatchesSearch(exam, searchTerm.toLowerCase())
+                                          ? currentMatchIndex >= 0 && 
+                                            searchMatches[currentMatchIndex]?.examdetails_id === exam.examdetails_id
+                                            ? "3px solid #2563eb"
+                                            : "2px solid #fbbf24"
                                           : "none",
-                                      boxShadow: searchTerm && (
-                                        exam.course_id?.toLowerCase().includes(searchTerm.toLowerCase()) ||
-                                        getSectionDisplay(exam).toLowerCase().includes(searchTerm.toLowerCase()) ||
-                                        exam.room_id?.toLowerCase().includes(searchTerm.toLowerCase()) ||
-                                        getInstructorDisplay(exam).toLowerCase().includes(searchTerm.toLowerCase()) ||
-                                        getProctorDisplay(exam).toLowerCase().includes(searchTerm.toLowerCase())
-                                      ) ? "0 0 15px 3px rgba(255, 255, 0, 0.8)"
+                                      boxShadow: searchTerm && examMatchesSearch(exam, searchTerm.toLowerCase())
+                                        ? currentMatchIndex >= 0 && 
+                                          searchMatches[currentMatchIndex]?.examdetails_id === exam.examdetails_id
+                                          ? "0 0 8px 2px rgba(37, 99, 235, 0.5)"
+                                          : "0 0 4px 1px rgba(251, 191, 36, 0.4)"
                                         : "none"
                                     }}
                                   >
