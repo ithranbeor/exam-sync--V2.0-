@@ -6,6 +6,7 @@ from rest_framework.permissions import AllowAny
 from rest_framework.response import Response
 from rest_framework.authtoken.models import Token
 from rest_framework import status
+from rest_framework import status as http_status
 from django.views.decorators.cache import cache_page
 from django.db.models import Q
 from .models import TblUsers, TblScheduleapproval, TblScheduleFooter, TblProctorSubstitution, TblProctorAttendance, TblExamOtp, TblAvailableRooms, TblNotification, TblUserRole, TblExamdetails, TblModality, TblAvailability, TblCourseUsers, TblSectioncourse, TblUserRoleHistory, TblRoles, TblBuildings, TblRooms, TblCourse, TblExamperiod, TblProgram, TblTerm, TblCollege, TblDepartment
@@ -597,7 +598,7 @@ def proctor_assigned_exams(request, user_id):
                 'status': exam_status  # ✅ THIS USER's status
             })
         
-        return Response(result, status=status.HTTP_200_OK)
+        return Response(result, status=http_status.HTTP_200_OK)
         
     except Exception as e:
         print(f"❌ Error fetching assigned exams: {str(e)}")
@@ -670,7 +671,7 @@ def all_exams_for_substitution(request):
                 'status': exam_status
             })
         
-        return Response(result, status=status.HTTP_200_OK)
+        return Response(result, status=http_status.HTTP_200_OK)
         
     except Exception as e:
         print(f"❌ Error fetching exams: {str(e)}")
@@ -846,7 +847,7 @@ def proctor_monitoring_dashboard(request):
                 'otp_code': otp_code
             })
         
-        return Response(result, status=status.HTTP_200_OK)
+        return Response(result, status=http_status.HTTP_200_OK)
         
     except Exception as e:
         print(f"❌ Error fetching monitoring data: {str(e)}")
