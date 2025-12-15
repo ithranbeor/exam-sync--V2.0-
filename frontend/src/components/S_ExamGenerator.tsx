@@ -1656,8 +1656,6 @@ const SchedulerPlottingSchedule: React.FC<SchedulerProps> = ({ user, onScheduleC
 
       for (let i = 0; i < section.sections.length; i++) {
         let sectionProctor = -1;
-
-        // ✅ FIXED: Use finalTracker instead of globalTracker
         const availableForSection = availableForAssignment.filter(pid =>
           !proctorsArray.includes(pid) &&
           isResourceFree(finalTracker.proctorOccupancy, `${date}|${pid}`, startMinutes, endMinutes)
@@ -1667,46 +1665,44 @@ const SchedulerPlottingSchedule: React.FC<SchedulerProps> = ({ user, onScheduleC
           sectionProctor = availableForSection[Math.floor(Math.random() * availableForSection.length)];
           markResourceOccupied(finalTracker.proctorOccupancy, `${date}|${sectionProctor}`, startMinutes, endMinutes, Number(section.modality_id));
         } else {
-          // Try section instructor if available
           const sectionInstructor = section.instructors[i];
           if (sectionInstructor && isResourceFree(finalTracker.proctorOccupancy, `${date}|${sectionInstructor}`, startMinutes, endMinutes)) {
             sectionProctor = sectionInstructor;
             markResourceOccupied(finalTracker.proctorOccupancy, `${date}|${sectionProctor}`, startMinutes, endMinutes, Number(section.modality_id));
           } else {
-            sectionProctor = -9999; // Mark as unassigned
+            sectionProctor = -9999;
           }
         }
-
         proctorsArray.push(sectionProctor);
       }
 
-      section.sections.forEach((sectionName: string, sectionIndex: number) => {
-        const sectionProctor = proctorsArray[sectionIndex] || proctorsArray[0] || null;
-        const sectionInstructor = section.instructors[sectionIndex] || section.instructors[0] || null;
+      const canonicalProctorId = Array.isArray(proctorsArray) && proctorsArray.length > 0
+        ? (proctorsArray[0] === -9999 ? null : proctorsArray[0])
+        : (proctorId === -1 || proctorId === -9999 ? null : proctorId);
 
-        scheduledExams.push({
-          program_id: section.program_id,
-          course_id: section.course_id,
-          modality_id: section.modality_id,
-          room_id: roomId,
-          sections: [sectionName], // ✅ Single section
-          instructors: [sectionInstructor], // ✅ Single instructor
-          proctors: [sectionProctor], // ✅ Single proctor
-          section_name: sectionName,
-          instructor_id: sectionInstructor,
-          proctor_id: sectionProctor,
-          examperiod_id: matchedPeriod.examperiod_id,
-          exam_date: date,
-          exam_start_time: startTimestamp,
-          exam_end_time: endTimestamp,
-          exam_duration: formattedDuration,
-          academic_year: yearValue,
-          semester: semValue,
-          exam_category: formData.exam_category ?? null,
-          exam_period: periodValue,
-          college_name: collegeNameForCourse,
-          building_name: `${buildingName} (${buildingId})`,
-        });
+      scheduledExams.push({
+        program_id: section.program_id,
+        course_id: section.course_id,
+        modality_id: section.modality_id,
+        room_id: roomId,
+        sections: section.sections,
+        instructors: section.instructors,
+        proctors: proctorsArray,
+        instructors_display: Array.from(new Set(section.instructors.filter(Boolean))),
+        section_name: section.sections[0],
+        instructor_id: section.instructors[0] ?? null,
+        proctor_id: canonicalProctorId,
+        examperiod_id: matchedPeriod.examperiod_id,
+        exam_date: date,
+        exam_start_time: startTimestamp,
+        exam_end_time: endTimestamp,
+        exam_duration: formattedDuration,
+        academic_year: yearValue,
+        semester: semValue,
+        exam_category: formData.exam_category ?? null,
+        exam_period: periodValue,
+        college_name: collegeNameForCourse,
+        building_name: `${buildingName} (${buildingId})`,
       });
     }
 

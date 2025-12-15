@@ -86,7 +86,7 @@ const ProctorMonitoring: React.FC<UserProps> = ({ }) => {
     });
   }, [approvedSchedules]);
 
-  // ✅ FIXED: Optimized fetch - Single approval request instead of N requests
+  // ✅ FIXED: Fetch and filter for multiple proctors
   const fetchMonitoringData = useCallback(async () => {
     setLoading(true);
     try {
@@ -95,6 +95,7 @@ const ProctorMonitoring: React.FC<UserProps> = ({ }) => {
         params.college_name = collegeFilter;
       }
 
+      // ✅ Get ALL exam details (not filtered by proctor yet)
       const { data: examData } = await api.get('/proctor-monitoring/', { params });
 
       // ✅ PERFORMANCE FIX: Fetch ALL approvals in ONE request
@@ -125,8 +126,8 @@ const ProctorMonitoring: React.FC<UserProps> = ({ }) => {
           instructor_name: schedule.instructor_name || '',
           department: schedule.department || '',
           college: schedule.college || '',
-          examdetails_status: schedule.examdetails_status || schedule.status || 'pending',  // ✅ Primary status
-          status: schedule.status,  // ✅ Keep for compatibility
+          examdetails_status: schedule.examdetails_status || schedule.status || 'pending',
+          status: schedule.status,
           code_entry_time: schedule.code_entry_time || null,
           otp_code: schedule.otp_code || null,
           approval_status: isApproved ? 'approved' : 'pending',

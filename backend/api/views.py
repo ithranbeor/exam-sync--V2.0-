@@ -512,9 +512,10 @@ def submit_proctor_attendance(request):
 def proctor_assigned_exams(request, user_id):
     """
     Get all exams assigned to a specific proctor
+    ✅ Shows exams where user is in the proctors array
     """
     try:
-        # Get exams where user is assigned as proctor
+        # ✅ Get exams where user is assigned as proctor (single OR in array)
         exams = TblExamdetails.objects.filter(
             Q(proctor_id=user_id) | Q(proctors__contains=[user_id])
         ).select_related(
@@ -527,27 +528,56 @@ def proctor_assigned_exams(request, user_id):
         
         result = []
         for exam in exams:
-            # Get instructor name
-            instructor_name = None
-            if exam.instructor_id:
+            # ✅ Check if THIS SPECIFIC USER has attendance
+            attendance = TblProctorAttendance.objects.filter(
+                examdetails=exam,
+                proctor_id=user_id  # ✅ Check for current user's attendance
+            ).first()
+            
+            # ✅ Status is based on THIS USER's attendance, not others
+            if attendance:
+                if attendance.is_substitute:
+                    exam_status = 'substitute'
+                else:
+                    # Check if late
+                    if exam.exam_start_time and exam.exam_date and attendance.time_in:
+                        from datetime import datetime, timedelta
+                        
+                        exam_date_obj = datetime.strptime(exam.exam_date, '%Y-%m-%d').date()
+                        exam_start_time = exam.exam_start_time.time() if isinstance(exam.exam_start_time, datetime) else exam.exam_start_time
+                        
+                        exam_start_datetime = timezone.make_aware(
+                            datetime.combine(exam_date_obj, exam_start_time)
+                        )
+                        
+                        time_diff = (attendance.time_in - exam_start_datetime).total_seconds() / 60
+                        exam_status = 'late' if time_diff > 7 else 'confirmed'
+                    else:
+                        exam_status = 'confirmed'
+            else:
+                # Check if exam has ended
+                if exam.exam_end_time and timezone.now() > exam.exam_end_time:
+                    exam_status = 'absent'
+                else:
+                    exam_status = 'pending'
+            
+            # Get instructor names
+            instructor_names = []
+            if exam.instructors:
+                for instructor_id in exam.instructors:
+                    try:
+                        instructor = TblUsers.objects.get(user_id=instructor_id)
+                        instructor_names.append(f"{instructor.first_name} {instructor.last_name}")
+                    except TblUsers.DoesNotExist:
+                        pass
+            elif exam.instructor_id:
                 try:
                     instructor = TblUsers.objects.get(user_id=exam.instructor_id)
-                    instructor_name = f"{instructor.first_name} {instructor.last_name}"
+                    instructor_names.append(f"{instructor.first_name} {instructor.last_name}")
                 except TblUsers.DoesNotExist:
                     pass
             
-            # Get assigned proctor name
-            assigned_proctor = None
-            if exam.proctor:
-                assigned_proctor = f"{exam.proctor.first_name} {exam.proctor.last_name}"
-            
-            # Check attendance status
-            attendance = TblProctorAttendance.objects.filter(
-                examdetails=exam,
-                proctor_id=user_id
-            ).first()
-            
-            exam_status = 'confirmed' if attendance else 'pending'
+            instructor_name = ', '.join(instructor_names) if instructor_names else None
             
             # Get sections display
             sections_display = ', '.join(exam.sections) if exam.sections else exam.section_name
@@ -555,7 +585,7 @@ def proctor_assigned_exams(request, user_id):
             result.append({
                 'id': exam.examdetails_id,
                 'course_id': exam.course_id,
-                'subject': exam.course_id,  # Can enhance with actual course name
+                'subject': exam.course_id,
                 'section_name': sections_display,
                 'exam_date': exam.exam_date,
                 'exam_start_time': exam.exam_start_time.isoformat() if exam.exam_start_time else None,
@@ -563,8 +593,8 @@ def proctor_assigned_exams(request, user_id):
                 'building_name': exam.building_name,
                 'room_id': exam.room.room_id if exam.room else None,
                 'instructor_name': instructor_name,
-                'assigned_proctor': assigned_proctor,
-                'status': exam_status
+                'assigned_proctor': None,  # Not needed for their own view
+                'status': exam_status  # ✅ THIS USER's status
             })
         
         return Response(result, status=status.HTTP_200_OK)
@@ -660,37 +690,28 @@ def all_exams_for_substitution(request):
 @permission_classes([AllowAny])
 def proctor_monitoring_dashboard(request):
     """
-    Get monitoring data for scheduler/admin dashboard
-    
-    Query params:
-    - college_name: Filter by college (optional)
-    - exam_date: Filter by date (optional)
+    Get monitoring data - shows WHO checked in for each exam
     """
     try:
         college_name = request.GET.get('college_name')
         exam_date = request.GET.get('exam_date')
-                
-        # Base query with proper prefetch
+        
         queryset = TblExamdetails.objects.select_related(
             'room',
             'room__building',
             'proctor',
             'modality'
         ).prefetch_related(
-            'attendance_records',  # ✅ Use correct related_name
-            'attendance_records__proctor'  # ✅ Also prefetch proctor info
+            'attendance_records',
+            'attendance_records__proctor'
         )
         
-        # Apply filters
         if college_name:
             queryset = queryset.filter(college_name=college_name)
         if exam_date:
             queryset = queryset.filter(exam_date=exam_date)
         
-        # Order by date and time
         queryset = queryset.order_by('exam_date', 'exam_start_time')
-        
-        print(f"📊 Found {queryset.count()} exam schedules")
         
         result = []
         for exam in queryset:
@@ -698,52 +719,97 @@ def proctor_monitoring_dashboard(request):
             try:
                 otp_record = TblExamOtp.objects.filter(examdetails=exam).first()
                 otp_code = otp_record.otp_code if otp_record else None
-            except Exception as e:
-                print(f"⚠️ Error fetching OTP for exam {exam.examdetails_id}: {str(e)}")
+            except Exception:
                 otp_code = None
             
-            # ✅ Get attendance record (use first() to get the actual attendance)
-            attendance = exam.attendance_records.first()
+            # ✅ FIXED: Check attendance for ALL assigned proctors
+            all_proctors = []
             
-            print(f"🔍 Exam {exam.examdetails_id} - Attendance: {attendance}")
-            
-            # Determine status based on attendance
-            if attendance:
-                if attendance.is_substitute:
-                    exam_status = 'substitute'
-                else:
-                    exam_status = 'confirmed'
-                code_entry_time = attendance.time_in
-                
-                # Get actual proctor who checked in
-                proctor_user = attendance.proctor
-                proctor_name = f"{proctor_user.first_name} {proctor_user.last_name}"
-                
-                print(f"✅ Exam {exam.examdetails_id} has attendance - Status: {exam_status}")
-                print(f"   - Proctor: {proctor_name}")
-                print(f"   - Time in: {code_entry_time}")
+            # Get assigned proctor IDs
+            if exam.proctors:
+                assigned_proctor_ids = exam.proctors
+            elif exam.proctor_id:
+                assigned_proctor_ids = [exam.proctor_id]
             else:
-                exam_status = 'pending'
-                code_entry_time = None
-                
-                # Show assigned proctor
-                if exam.proctor:
-                    proctor_name = f"{exam.proctor.first_name} {exam.proctor.last_name}"
-                else:
-                    proctor_name = None
-                
-                print(f"⏳ Exam {exam.examdetails_id} has no attendance - Status: pending")
+                assigned_proctor_ids = []
             
-            # Get instructor name
-            instructor_name = None
-            if exam.instructor_id:
+            # Check each proctor's status
+            proctor_statuses = []
+            for proctor_id in assigned_proctor_ids:
+                try:
+                    proctor = TblUsers.objects.get(user_id=proctor_id)
+                    proctor_name = f"{proctor.first_name} {proctor.last_name}"
+                    
+                    # Check if THIS proctor has attendance
+                    attendance = exam.attendance_records.filter(proctor_id=proctor_id).first()
+                    
+                    if attendance:
+                        if attendance.is_substitute:
+                            status = 'substitute'
+                        else:
+                            # Check if late
+                            if exam.exam_start_time and exam.exam_date and attendance.time_in:
+                                from datetime import datetime, timedelta
+                                
+                                exam_date_obj = datetime.strptime(exam.exam_date, '%Y-%m-%d').date()
+                                exam_start_time = exam.exam_start_time.time() if isinstance(exam.exam_start_time, datetime) else exam.exam_start_time
+                                
+                                exam_start_datetime = timezone.make_aware(
+                                    datetime.combine(exam_date_obj, exam_start_time)
+                                )
+                                
+                                time_diff = (attendance.time_in - exam_start_datetime).total_seconds() / 60
+                                status = 'late' if time_diff > 7 else 'confirmed'
+                            else:
+                                status = 'confirmed'
+                        
+                        time_in = attendance.time_in
+                    else:
+                        # No attendance yet
+                        if exam.exam_end_time and timezone.now() > exam.exam_end_time:
+                            status = 'absent'
+                        else:
+                            status = 'pending'
+                        time_in = None
+                    
+                    proctor_statuses.append({
+                        'proctor_id': proctor_id,
+                        'proctor_name': proctor_name,
+                        'status': status,
+                        'time_in': time_in.isoformat() if time_in else None
+                    })
+                    
+                except TblUsers.DoesNotExist:
+                    continue
+            
+            # ✅ Format proctor names with status indicators
+            proctor_display = ', '.join([
+                f"{p['proctor_name']} ({'✓' if p['status'] in ['confirmed', 'late'] else '✗'})"
+                for p in proctor_statuses
+            ])
+            
+            # Overall exam status (if ANY proctor checked in, show confirmed)
+            has_any_attendance = any(p['status'] in ['confirmed', 'late', 'substitute'] for p in proctor_statuses)
+            overall_status = 'confirmed' if has_any_attendance else 'pending'
+            
+            # Get instructor names
+            instructor_names = []
+            if exam.instructors:
+                for instructor_id in exam.instructors:
+                    try:
+                        instructor = TblUsers.objects.get(user_id=instructor_id)
+                        instructor_names.append(f"{instructor.first_name} {instructor.last_name}")
+                    except TblUsers.DoesNotExist:
+                        pass
+            elif exam.instructor_id:
                 try:
                     instructor = TblUsers.objects.get(user_id=exam.instructor_id)
-                    instructor_name = f"{instructor.first_name} {instructor.last_name}"
+                    instructor_names.append(f"{instructor.first_name} {instructor.last_name}")
                 except TblUsers.DoesNotExist:
                     pass
             
-            # Get sections display
+            instructor_name = ', '.join(instructor_names) if instructor_names else None
+            
             sections_display = ', '.join(exam.sections) if exam.sections else exam.section_name
             
             result.append({
@@ -756,16 +822,16 @@ def proctor_monitoring_dashboard(request):
                 'exam_end_time': exam.exam_end_time.isoformat() if exam.exam_end_time else None,
                 'building_name': exam.building_name,
                 'room_id': exam.room.room_id if exam.room else None,
-                'proctor_name': proctor_name,
+                'proctor_name': proctor_display,  # ✅ All proctors with status
+                'proctor_details': proctor_statuses,  # ✅ Detailed info
                 'instructor_name': instructor_name,
                 'department': exam.college_name,
                 'college': exam.college_name,
-                'status': exam_status,
-                'code_entry_time': code_entry_time.isoformat() if code_entry_time else None,
+                'status': overall_status,
+                'code_entry_time': proctor_statuses[0]['time_in'] if proctor_statuses and proctor_statuses[0]['time_in'] else None,
                 'otp_code': otp_code
             })
         
-        print(f"✅ Returning {len(result)} exam schedules")
         return Response(result, status=status.HTTP_200_OK)
         
     except Exception as e:

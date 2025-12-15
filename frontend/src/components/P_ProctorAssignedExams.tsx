@@ -53,8 +53,13 @@ const ProctorCourseDetails = ({ user }: ProctorCourseDetailsProps) => {
 
         const proctorExams = examDetailsResponse.data;
         const userProctorExams = proctorExams.filter(exam => {
-          const isMatch = Number(exam.proctor_id) === Number(user.user_id);
-          return isMatch;
+          const isSingleProctor = Number(exam.proctor_id) === Number(user.user_id);
+          
+          const isInProctorsArray = exam.proctors && 
+            Array.isArray(exam.proctors) && 
+            exam.proctors.some((pid: number) => Number(pid) === Number(user.user_id));
+          
+          return isSingleProctor || isInProctorsArray;
         });
 
         if (userProctorExams.length === 0) {

@@ -1,5 +1,5 @@
 /// <reference types="react" />
-import React, { useEffect, useState, useRef, useMemo } from "react";
+import React, { useEffect, useState, useRef } from "react";
 import Select from "react-select";
 import { api } from '../lib/apiClient.ts';
 import "../styles/S_ExamViewer.css";
@@ -632,17 +632,14 @@ const SchedulerView: React.FC<SchedulerViewProps> = ({ user }) => {
     : filteredExamData.filter(exam => {
       const searchLower = searchTerm.toLowerCase();
 
-      // Check sections (both array and legacy)
       const sectionMatch =
         (exam.sections && exam.sections.some(s => s.toLowerCase().includes(searchLower))) ||
         exam.section_name?.toLowerCase().includes(searchLower);
 
-      // Check instructors (both array and legacy)
       const instructorMatch =
         (exam.instructors && exam.instructors.some(id => getUserName(id).toLowerCase().includes(searchLower))) ||
         getUserName(exam.instructor_id).toLowerCase().includes(searchLower);
 
-      // Check proctors (both array and legacy)
       const proctorMatch =
         (exam.proctors && exam.proctors.some(id => getUserName(id).toLowerCase().includes(searchLower))) ||
         getUserName(exam.proctor_id).toLowerCase().includes(searchLower);
@@ -703,24 +700,29 @@ const SchedulerView: React.FC<SchedulerViewProps> = ({ user }) => {
   }));
 
   const generateCourseColors = (exams: ExamDetail[]) => {
-    // Define color schemes for each year level
     const yearColors = {
-      1: ['#EF4444', '#F59E0B', '#10B981', '#06B6D4', '#3B82F6', '#8B5CF6', '#EC4899', '#F97316', '#14B8A6', '#84CC16'], // Red, Amber, Green, Cyan, Blue, Purple, Pink, Orange, Teal, Lime
-      2: ['#DC2626', '#D97706', '#059669', '#0891B2', '#2563EB', '#7C3AED', '#DB2777', '#EA580C', '#0D9488', '#65A30D'], // Different tones
-      3: ['#B91C1C', '#CA8A04', '#047857', '#0E7490', '#1D4ED8', '#6366F1', '#BE123C', '#C2410C', '#0F766E', '#4D7C0F'], // More different tones
-      4: ['#991B1B', '#92400E', '#065F46', '#164E63', '#1E3A8A', '#4C1D95', '#9F1239', '#9A3412', '#115E59', '#365314']  // Even more different
+      1: [
+        '#DC2626', '#D97706', '#059669', '#0891B2', '#2563EB',
+        '#7C3AED', '#DB2777', '#EA580C', '#0D9488', '#65A30D'],
+      2: [
+        '#991B1B', '#92400E', '#065F46', '#0E7490', '#1E40AF',
+        '#5B21B6', '#9D174D', '#C2410C', '#115E59', '#3F6212'],
+      3: [
+        '#7F1D1D', '#78350F', '#064E3B', '#155E75', '#1E3A8A',
+        '#4C1D95', '#831843', '#9A3412', '#134E4A', '#365314'],
+      4: [
+        '#450A0A', '#451A03', '#022C22', '#083344', '#172554',
+        '#2E1065', '#500724', '#7C2D12', '#042F2E', '#1A2E05']
     };
 
     const courseColorMap: Record<string, string> = {};
-    const programYearMap: Record<string, number> = {}; // Track color index per program-year
+    const programYearMap: Record<string, number> = {};
 
     exams.forEach((exam) => {
       if (!exam.course_id) return;
 
-      // Skip if already assigned
       if (courseColorMap[exam.course_id]) return;
 
-      // Try to extract year level from sections
       let yearLevel: number | null = null;
       let program = '';
 
@@ -728,16 +730,11 @@ const SchedulerView: React.FC<SchedulerViewProps> = ({ user }) => {
         for (const section of exam.sections) {
           const sectionStr = String(section).trim();
 
-          // Try multiple patterns:
-          // Pattern 1: "BSIT1A", "BSCS2B", etc.
           let match = sectionStr.match(/^([A-Za-z]+)(\d)([A-Za-z]*)$/);
 
-          // Pattern 2: "BSIT 1A", "BSCS 2B" (with space)
           if (!match) {
             match = sectionStr.match(/^([A-Za-z]+)\s+(\d)([A-Za-z]*)$/);
           }
-
-          // Pattern 3: "BSIT-1A", "BSCS-2B" (with dash)
           if (!match) {
             match = sectionStr.match(/^([A-Za-z]+)-(\d)([A-Za-z]*)$/);
           }
@@ -754,14 +751,13 @@ const SchedulerView: React.FC<SchedulerViewProps> = ({ user }) => {
           }
 
           if (match) {
-            program = match[1]; // e.g., "BSIT", "BSCS"
-            yearLevel = parseInt(match[2]); // e.g., 1, 2, 3, 4
-            break; // Found valid pattern, stop looking
+            program = match[1];
+            yearLevel = parseInt(match[2]);
+            break;
           }
         }
       }
 
-      // Fallback: Try section_name if sections array didn't work
       if (!yearLevel && exam.section_name) {
         const sectionStr = String(exam.section_name).trim();
 
@@ -786,21 +782,15 @@ const SchedulerView: React.FC<SchedulerViewProps> = ({ user }) => {
       if (yearLevel && yearLevel >= 1 && yearLevel <= 4) {
         const programYearKey = `${program}-${yearLevel}`;
 
-        // Get available colors for this year level
         const availableColors = yearColors[yearLevel as keyof typeof yearColors];
-
-        // Get next color index for this program-year combo
         if (!programYearMap[programYearKey]) {
           programYearMap[programYearKey] = 0;
         }
 
         const colorIndex = programYearMap[programYearKey] % availableColors.length;
         courseColorMap[exam.course_id] = availableColors[colorIndex];
-
-        // Increment for next course in same program-year
         programYearMap[programYearKey]++;
       } else {
-        // Fallback: assign a neutral color if year level couldn't be determined
         courseColorMap[exam.course_id] = '#9CA3AF'; // Gray for unmatched
       }
     });
@@ -808,9 +798,29 @@ const SchedulerView: React.FC<SchedulerViewProps> = ({ user }) => {
     return courseColorMap;
   };
 
-  const courseColorMap = useMemo(() => {
-    return generateCourseColors(examData);
-  }, [examData]); // Only recalculate when examData changes, NOT when filter changes
+  const courseColorMapRef = useRef<Record<string, string>>({});
+
+  useEffect(() => {
+    // Only generate colors for NEW courses that don't have colors yet
+    const currentCourses = new Set(examData.map(e => e.course_id).filter(Boolean));
+    const existingCourses = new Set(Object.keys(courseColorMapRef.current));
+
+    const newCourses = Array.from(currentCourses).filter(c => !existingCourses.has(c));
+
+    if (newCourses.length > 0) {
+      // Only generate colors for new courses
+      const newExams = examData.filter(e => e.course_id && newCourses.includes(e.course_id));
+      const newColors = generateCourseColors(newExams);
+
+      // Merge with existing colors
+      courseColorMapRef.current = {
+        ...courseColorMapRef.current,
+        ...newColors
+      };
+    }
+  }, [examData.length]); // Only check when exam count changes
+
+  const courseColorMap = courseColorMapRef.current;
 
   const hasData = searchFilteredData.length > 0;
 
@@ -2314,7 +2324,7 @@ const SchedulerView: React.FC<SchedulerViewProps> = ({ user }) => {
                 const result = window.confirm(
                   `Schedule generation complete!\n\n` +
                   `${unscheduled.length} section(s) need manual scheduling.\n\n` +
-                  `Would you like to schedule them now?`
+                  `⚠️ Click 'OK' so it will be save and can be viewed later`
                 );
 
                 if (result) {
