@@ -47,7 +47,6 @@ interface MonitoringSchedule {
   examdetails_status: string;
   otp_code: string | null;
   approval_status?: string;
-  sections?: string[];
 }
 
 const ProctorMonitoring: React.FC<UserProps> = ({ }) => {
@@ -275,70 +274,64 @@ const ProctorMonitoring: React.FC<UserProps> = ({ }) => {
     if (sections.length === 0) return '';
     if (sections.length === 1) return sections[0];
 
-    // Sort sections properly
     const sorted = [...sections].sort((a, b) => {
-      // Match pattern: prefix (letters+numbers) + section number
-      const matchA = a.match(/^([A-Za-z]+\d+[A-Za-z]*)(\d+)$/);
-      const matchB = b.match(/^([A-Za-z]+\d+[A-Za-z]*)(\d+)$/);
+      const matchA = a.match(/^([A-Z]+\d+[A-Z]*)(\d+)$/);
+      const matchB = b.match(/^([A-Z]+\d+[A-Z]*)(\d+)$/);
 
       if (!matchA || !matchB) return a.localeCompare(b);
 
-      const [, prefixA, numStrA] = matchA;
-      const [, prefixB, numStrB] = matchB;
+      const [, prefixA, numA] = matchA;
+      const [, prefixB, numB] = matchB;
 
-      // First compare prefixes alphabetically
-      const prefixCompare = prefixA.localeCompare(prefixB);
-      if (prefixCompare !== 0) return prefixCompare;
-
-      // Then compare numbers numerically
-      return parseInt(numStrA) - parseInt(numStrB);
+      if (prefixA !== prefixB) return prefixA.localeCompare(prefixB);
+      return parseInt(numA) - parseInt(numB);
     });
 
-    // Group into ranges
     const ranges: string[] = [];
-    let i = 0;
+    let rangeStart = sorted[0];
+    let rangeEnd = sorted[0];
+    let lastNum = -1;
+    let currentPrefix = '';
 
-    while (i < sorted.length) {
-      const match = sorted[i].match(/^([A-Za-z]+\d+[A-Za-z]*)(\d+)$/);
-
+    sorted.forEach((section, index) => {
+      const match = section.match(/^([A-Z]+\d+[A-Z]*)(\d+)$/);
       if (!match) {
-        ranges.push(sorted[i]);
-        i++;
-        continue;
+        ranges.push(section);
+        return;
       }
 
       const [, prefix, numStr] = match;
-      const startNum = parseInt(numStr);
-      let endNum = startNum;
-      let j = i + 1;
+      const num = parseInt(numStr);
 
-      // Find consecutive numbers with same prefix
-      while (j < sorted.length) {
-        const nextMatch = sorted[j].match(/^([A-Za-z]+\d+[A-Za-z]*)(\d+)$/);
+      if (index === 0) {
+        currentPrefix = prefix;
+        lastNum = num;
+        return;
+      }
 
-        if (!nextMatch) break;
-
-        const [, nextPrefix, nextNumStr] = nextMatch;
-        const nextNum = parseInt(nextNumStr);
-
-        // Check if same prefix and consecutive number
-        if (nextPrefix === prefix && nextNum === endNum + 1) {
-          endNum = nextNum;
-          j++;
+      if (prefix === currentPrefix && num === lastNum + 1) {
+        rangeEnd = section;
+        lastNum = num;
+      } else {
+        if (rangeStart === rangeEnd) {
+          ranges.push(rangeStart);
         } else {
-          break;
+          ranges.push(`${rangeStart} - ${rangeEnd}`);
+        }
+        rangeStart = section;
+        rangeEnd = section;
+        currentPrefix = prefix;
+        lastNum = num;
+      }
+
+      if (index === sorted.length - 1) {
+        if (rangeStart === rangeEnd) {
+          ranges.push(rangeStart);
+        } else {
+          ranges.push(`${rangeStart} - ${rangeEnd}`);
         }
       }
-
-      // Create range or single value
-      if (endNum === startNum) {
-        ranges.push(sorted[i]);
-      } else {
-        ranges.push(`${sorted[i]} - ${sorted[j - 1]}`);
-      }
-
-      i = j;
-    }
+    });
 
     return ranges.join(', ');
   };
@@ -878,7 +871,7 @@ const ProctorMonitoring: React.FC<UserProps> = ({ }) => {
             onClick={(e) => e.stopPropagation()}
           >
             <h3 style={{ marginTop: 0, color: '#0A3765', borderBottom: '2px solid #0A3765', paddingBottom: '10px' }}>
-              Schedule Details
+              Proctor Details
             </h3>
 
             <div style={{ marginBottom: '20px' }}>
@@ -886,7 +879,7 @@ const ProctorMonitoring: React.FC<UserProps> = ({ }) => {
                 <strong>Course:</strong> {selectedSchedule.course_id} - {selectedSchedule.subject}
               </p>
               <p style={{ margin: '5px 0', color: '#666' }}>
-                <strong>Section/s:</strong> {formatSectionRanges(selectedSchedule.sections || [selectedSchedule.section_name])}
+                <strong>Section:</strong> {selectedSchedule.section_name}
               </p>
               <p style={{ margin: '5px 0', color: '#666' }}>
                 <strong>Date:</strong> {selectedSchedule.exam_date}
@@ -896,12 +889,6 @@ const ProctorMonitoring: React.FC<UserProps> = ({ }) => {
               </p>
               <p style={{ margin: '5px 0', color: '#666' }}>
                 <strong>Location:</strong> {selectedSchedule.building_name}, Room {selectedSchedule.room_id}
-              </p>
-              <p style={{ margin: '5px 0', color: '#666' }}>
-                <strong>Instructor:</strong> {selectedSchedule.instructor_name}
-              </p>
-              <p style={{ margin: '5px 0', color: '#666' }}>
-                <strong>Exam Code:</strong> <span style={{ fontFamily: 'monospace', fontWeight: 'bold' }}>{selectedSchedule.otp_code || 'Not generated'}</span>
               </p>
             </div>
 
