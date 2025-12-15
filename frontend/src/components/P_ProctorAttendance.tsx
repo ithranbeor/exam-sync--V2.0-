@@ -290,7 +290,7 @@ const ProctorAttendance: React.FC<UserProps> = ({ user }) => {
                               <span className="proctor-attendance-schedule-code">{exam.course_id}</span>
                               {exam.status === 'confirmed' && <span className="confirmed-badge">✓ CONFIRMED</span>}
                               {exam.status === 'late' && <span className="late-badge">⚠ LATE</span>}
-                              {exam.status === 'substitute' && <span className="substitute-badge">🔄 SUBSTITUTE</span>}
+                              {exam.status === 'substitute' && <span className="substitute-badge"> SUBSTITUTE</span>}
                               {exam.status === 'pending' && <span className="ongoing-badge">ONGOING</span>}
                             </div>
                           </div>
@@ -500,10 +500,10 @@ const ProctorAttendance: React.FC<UserProps> = ({ user }) => {
                           </h3>
                           <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
                             <span className="proctor-attendance-schedule-code">{exam.course_id}</span>
-                            {exam.status === 'confirmed' && <span className="confirmed-badge">✓ ATTENDED</span>}
-                            {exam.status === 'late' && <span className="late-badge">⚠ LATE</span>}
-                            {exam.status === 'substitute' && <span className="substitute-badge">🔄 SUBSTITUTE</span>}
-                            {exam.status === 'absent' && <span className="absent-badge">✗ ABSENT</span>}
+                            {exam.status === 'confirmed' && <span className="confirmed-badge">ATTENDED</span>}
+                            {exam.status === 'late' && <span className="late-badge">LATE</span>}
+                            {exam.status === 'substitute' && <span className="substitute-badge">SUBSTITUTE</span>}
+                            {exam.status === 'absent' && <span className="absent-badge">ABSENT</span>}
                           </div>
                         </div>
 

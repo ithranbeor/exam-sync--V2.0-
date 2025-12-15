@@ -924,7 +924,8 @@ def proctor_monitoring_dashboard(request):
             'attendance_records',
             'attendance_records__proctor',
             'substitutions',
-            'substitutions__substitute_proctor'
+            'substitutions__substitute_proctor',
+            'substitutions__original_proctor'  # ✅ ADD THIS
         )
         
         if college_name:
@@ -971,11 +972,11 @@ def proctor_monitoring_dashboard(request):
                         proctor_statuses.append({
                             'proctor_id': proctor_id,
                             'proctor_name': proctor_name,
-                            'status': history_record.status,  # ✅ Use preserved status
+                            'status': history_record.status,
                             'time_in': history_record.time_in.isoformat() if history_record.time_in else None,
                             'is_assigned': not history_record.is_substitute,
                             'is_substitute': history_record.is_substitute,
-                            'substituted_for': history_record.substituted_for_name,  # ✅ From history
+                            'substituted_for': history_record.substituted_for_name,
                             'substitution_remarks': history_record.remarks if history_record.is_substitute else None
                         })
                         continue 
@@ -984,8 +985,24 @@ def proctor_monitoring_dashboard(request):
                     attendance = exam.attendance_records.filter(proctor_id=proctor_id).first()
                     
                     if attendance:
+                        # ✅ NEW: Get substitution info if this is a substitute
+                        substituted_for = None
+                        substitution_remarks = None
+                        
                         if attendance.is_substitute:
                             status = 'substitute'
+                            # Get substitution details
+                            try:
+                                substitution = TblProctorSubstitution.objects.filter(
+                                    examdetails=exam,
+                                    substitute_proctor_id=proctor_id
+                                ).first()
+                                
+                                if substitution and substitution.original_proctor:
+                                    substituted_for = f"{substitution.original_proctor.first_name} {substitution.original_proctor.last_name}"
+                                    substitution_remarks = substitution.justification
+                            except Exception as e:
+                                print(f"⚠️ Error getting substitution info for assigned proctor: {str(e)}")
                         else:
                             # Check if late
                             if exam.exam_start_time and exam.exam_date and attendance.time_in:
@@ -1004,6 +1021,17 @@ def proctor_monitoring_dashboard(request):
                                 status = 'confirmed'
                         
                         time_in = attendance.time_in
+                        
+                        proctor_statuses.append({
+                            'proctor_id': proctor_id,
+                            'proctor_name': proctor_name,
+                            'status': status,
+                            'time_in': time_in.isoformat() if time_in else None,
+                            'is_assigned': True,
+                            'is_substitute': attendance.is_substitute,
+                            'substituted_for': substituted_for,  # ✅ NEW
+                            'substitution_remarks': substitution_remarks or attendance.remarks  # ✅ NEW
+                        })
                     else:
                         # No attendance yet
                         if exam.exam_end_time and timezone.now() > exam.exam_end_time:
@@ -1011,15 +1039,15 @@ def proctor_monitoring_dashboard(request):
                         else:
                             status = 'pending'
                         time_in = None
-                    
-                    proctor_statuses.append({
-                        'proctor_id': proctor_id,
-                        'proctor_name': proctor_name,
-                        'status': status,
-                        'time_in': time_in.isoformat() if time_in else None,
-                        'is_assigned': True,
-                        'is_substitute': False
-                    })
+                        
+                        proctor_statuses.append({
+                            'proctor_id': proctor_id,
+                            'proctor_name': proctor_name,
+                            'status': status,
+                            'time_in': None,
+                            'is_assigned': True,
+                            'is_substitute': False
+                        })
                     
                 except TblUsers.DoesNotExist:
                     print(f"⚠️ Warning: Proctor {proctor_id} not found")
@@ -1028,14 +1056,23 @@ def proctor_monitoring_dashboard(request):
                     print(f"⚠️ Error processing proctor {proctor_id}: {str(e)}")
                     continue
             
-            # ✅ Then, add any substitutes who checked in
+            # ✅ Then, add any substitutes who checked in (NOT in assigned list)
             for attendance in exam.attendance_records.filter(is_substitute=True):
                 if not any(p['proctor_id'] == attendance.proctor_id for p in proctor_statuses):
                     proctor_name = f"{attendance.proctor.first_name} {attendance.proctor.last_name}"
                     
+                    # ✅ Get the original proctor from the substitution record
                     original_proctor_name = None
-                    if exam.proctor:
-                        original_proctor_name = f"{exam.proctor.first_name} {exam.proctor.last_name}"
+                    try:
+                        substitution = TblProctorSubstitution.objects.filter(
+                            examdetails=exam,
+                            substitute_proctor_id=attendance.proctor_id
+                        ).first()
+                        
+                        if substitution and substitution.original_proctor:
+                            original_proctor_name = f"{substitution.original_proctor.first_name} {substitution.original_proctor.last_name}"
+                    except Exception as e:
+                        print(f"⚠️ Error getting substitution info: {str(e)}")
                     
                     proctor_statuses.append({
                         'proctor_id': attendance.proctor_id,
@@ -1161,7 +1198,7 @@ def proctor_monitoring_dashboard(request):
                     'time_in': record.time_in.isoformat() if record.time_in else None,
                     'is_assigned': not record.is_substitute,
                     'is_substitute': record.is_substitute,
-                    'substituted_for': record.substituted_for_name,  # ✅ Use from history
+                    'substituted_for': record.substituted_for_name,
                     'substitution_remarks': record.remarks if record.is_substitute else None
                 }],
                 'instructor_name': record.instructor_name,
@@ -1171,7 +1208,7 @@ def proctor_monitoring_dashboard(request):
                 'status': record.status,
                 'code_entry_time': record.time_in.isoformat() if record.time_in else None,
                 'otp_code': record.otp_used,
-                'approval_status': 'approved'  # ✅ History records are approved
+                'approval_status': 'approved'
             })
 
         return Response(result, status=http_status.HTTP_200_OK)
