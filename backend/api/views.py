@@ -1095,32 +1095,21 @@ def proctor_monitoring_dashboard(request):
         
         # ✅ Add history records with year/month filtering
         history_query = TblProctorAttendanceHistory.objects.all()
-
+        
         if college_name:
             pass  # We don't have college in history yet, but you can add it
-
+        
         if exam_date:
             history_query = history_query.filter(exam_date=exam_date)
-
+        
         # ✅ NEW: Filter by year and month
-        is_viewing_history = False  # Track if we're in history mode
-
-        if year and year != 'all':
-            is_viewing_history = True
+        if year:
             history_query = history_query.filter(exam_date__startswith=year)
-            
-        if month and month != 'all':
-            is_viewing_history = True
-            if year and year != 'all':
+        if month:
+            # Assuming exam_date format is YYYY-MM-DD
+            if year:
                 history_query = history_query.filter(exam_date__startswith=f"{year}-{month.zfill(2)}")
-            else:
-                # If only month is selected, filter across all years
-                history_query = history_query.filter(exam_date__regex=rf'^\d{{4}}-{month.zfill(2)}-')
-
-        # ✅ IMPORTANT: Only clear current data if actively filtering by history
-        if is_viewing_history:
-            result = []
-            
+        
         for record in history_query:
             result.append({
                 'id': record.examdetails_id,
@@ -1136,7 +1125,7 @@ def proctor_monitoring_dashboard(request):
                 'proctor_details': [{
                     'proctor_id': record.proctor_id,
                     'proctor_name': record.proctor_name,
-                    'status': record.status,
+                    'status': record.status,  # ✅ Preserved from history
                     'time_in': record.time_in.isoformat() if record.time_in else None,
                     'is_assigned': not record.is_substitute,
                     'is_substitute': record.is_substitute,
@@ -1146,12 +1135,11 @@ def proctor_monitoring_dashboard(request):
                 'department': '',
                 'college': '',
                 'examdetails_status': record.status,
-                'status': record.status,
+                'status': record.status,  # ✅ Preserved from history
                 'code_entry_time': record.time_in.isoformat() if record.time_in else None,
-                'otp_code': record.otp_used,
-                'approval_status': 'approved'  # ✅ ADD THIS - History records are already approved
+                'otp_code': record.otp_used
             })
-
+        
         return Response(result, status=http_status.HTTP_200_OK)
         
     except Exception as e:
