@@ -193,7 +193,7 @@ const ProctorMonitoring: React.FC<UserProps> = ({ }) => {
       toast.error('Failed to load monitoring data');
       setHasApprovedSchedules(false);
     } finally {
-      setLoading(false);
+      setLoading(false);  
     }
   }, [collegeFilter, selectedYear, selectedMonth]);
 

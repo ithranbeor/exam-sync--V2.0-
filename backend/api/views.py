@@ -884,16 +884,12 @@ def all_exams_for_substitution(request):
 def proctor_monitoring_dashboard(request):
     """
     Get monitoring data - shows WHO checked in for each exam
-    ✅ FIXED: Check history table first to preserve statuses
+    ✅ FIXED: Shows substitution information
     """
     try:
         archive_completed_attendances()
         college_name = request.GET.get('college_name')
         exam_date = request.GET.get('exam_date')
-        
-        # ✅ NEW: Get year and month filters
-        year = request.GET.get('year')
-        month = request.GET.get('month')
         
         queryset = TblExamdetails.objects.select_related(
             'room',
@@ -903,7 +899,7 @@ def proctor_monitoring_dashboard(request):
         ).prefetch_related(
             'attendance_records',
             'attendance_records__proctor',
-            'substitutions',
+            'substitutions',  # ✅ Add substitution info
             'substitutions__substitute_proctor'
         )
         
@@ -931,7 +927,7 @@ def proctor_monitoring_dashboard(request):
             else:
                 assigned_proctor_ids = []
             
-            # ✅ Check each proctor's status
+            # ✅ Check each proctor's status + substitutions
             proctor_statuses = []
             
             # First, add all assigned proctors
@@ -940,26 +936,7 @@ def proctor_monitoring_dashboard(request):
                     proctor = TblUsers.objects.get(user_id=proctor_id)
                     proctor_name = f"{proctor.first_name} {proctor.last_name}"
                     
-                    # ✅ CHECK HISTORY FIRST
-                    history_record = TblProctorAttendanceHistory.objects.filter(
-                        examdetails_id=exam.examdetails_id,
-                        proctor_id=proctor_id
-                    ).first()
-                    
-                    if history_record:
-                        # Use status from history (preserves late/confirmed/absent)
-                        proctor_statuses.append({
-                            'proctor_id': proctor_id,
-                            'proctor_name': proctor_name,
-                            'status': history_record.status,  # ✅ Use preserved status
-                            'time_in': history_record.time_in.isoformat() if history_record.time_in else None,
-                            'is_assigned': not history_record.is_substitute,
-                            'is_substitute': history_record.is_substitute,
-                            'substitution_remarks': history_record.remarks if history_record.is_substitute else None
-                        })
-                        continue  # Skip further checks for this proctor
-                    
-                    # Check if THIS proctor has attendance (current exams only)
+                    # Check if THIS proctor has attendance
                     attendance = exam.attendance_records.filter(proctor_id=proctor_id).first()
                     
                     if attendance:
@@ -1009,9 +986,11 @@ def proctor_monitoring_dashboard(request):
             
             # ✅ Then, add any substitutes who checked in
             for attendance in exam.attendance_records.filter(is_substitute=True):
+                # Check if this substitute is not already in the list (shouldn't happen, but safety check)
                 if not any(p['proctor_id'] == attendance.proctor_id for p in proctor_statuses):
                     proctor_name = f"{attendance.proctor.first_name} {attendance.proctor.last_name}"
                     
+                    # Get original proctor info
                     original_proctor_name = None
                     if exam.proctor:
                         original_proctor_name = f"{exam.proctor.first_name} {exam.proctor.last_name}"
@@ -1027,11 +1006,12 @@ def proctor_monitoring_dashboard(request):
                         'substitution_remarks': attendance.remarks
                     })
             
-            # ✅ Format proctor display
+            # ✅ Format proctor display with substitution info
             if proctor_statuses:
                 proctor_parts = []
                 for p in proctor_statuses:
                     if p.get('is_substitute'):
+                        # Show: "John Doe (SUB for Jane Smith)"
                         status_icon = '🔄'
                         proctor_parts.append(f"{p['proctor_name']} ({status_icon} SUB for {p.get('substituted_for', 'N/A')})")
                     else:
@@ -1093,52 +1073,45 @@ def proctor_monitoring_dashboard(request):
                 'otp_code': otp_code
             })
         
-        # ✅ Add history records with year/month filtering
-        history_query = TblProctorAttendanceHistory.objects.all()
-        
-        if college_name:
-            pass  # We don't have college in history yet, but you can add it
-        
-        if exam_date:
-            history_query = history_query.filter(exam_date=exam_date)
-        
-        # ✅ NEW: Filter by year and month
-        if year:
-            history_query = history_query.filter(exam_date__startswith=year)
-        if month:
-            # Assuming exam_date format is YYYY-MM-DD
-            if year:
-                history_query = history_query.filter(exam_date__startswith=f"{year}-{month.zfill(2)}")
-        
-        for record in history_query:
-            result.append({
-                'id': record.examdetails_id,
-                'course_id': record.course_id,
-                'subject': record.course_id,
-                'section_name': record.section_name,
-                'exam_date': record.exam_date,
-                'exam_start_time': record.exam_start_time.isoformat() if record.exam_start_time else None,
-                'exam_end_time': record.exam_end_time.isoformat() if record.exam_end_time else None,
-                'building_name': record.building_name,
-                'room_id': record.room_id,
-                'proctor_name': record.proctor_name,
-                'proctor_details': [{
-                    'proctor_id': record.proctor_id,
+        # Add history records
+        if not exam_date or True:
+            history_records = TblProctorAttendanceHistory.objects.all()
+            
+            if college_name:
+                pass
+            
+            if exam_date:
+                history_records = history_records.filter(exam_date=exam_date)
+            
+            for record in history_records:
+                result.append({
+                    'id': record.examdetails_id,
+                    'course_id': record.course_id,
+                    'subject': record.course_id,
+                    'section_name': record.section_name,
+                    'exam_date': record.exam_date,
+                    'exam_start_time': record.exam_start_time.isoformat() if record.exam_start_time else None,
+                    'exam_end_time': record.exam_end_time.isoformat() if record.exam_end_time else None,
+                    'building_name': record.building_name,
+                    'room_id': record.room_id,
                     'proctor_name': record.proctor_name,
-                    'status': record.status,  # ✅ Preserved from history
-                    'time_in': record.time_in.isoformat() if record.time_in else None,
-                    'is_assigned': not record.is_substitute,
-                    'is_substitute': record.is_substitute,
-                    'substitution_remarks': record.remarks if record.is_substitute else None
-                }],
-                'instructor_name': record.instructor_name,
-                'department': '',
-                'college': '',
-                'examdetails_status': record.status,
-                'status': record.status,  # ✅ Preserved from history
-                'code_entry_time': record.time_in.isoformat() if record.time_in else None,
-                'otp_code': record.otp_used
-            })
+                    'proctor_details': [{
+                        'proctor_id': record.proctor_id,
+                        'proctor_name': record.proctor_name,
+                        'status': record.status,
+                        'time_in': record.time_in.isoformat() if record.time_in else None,
+                        'is_assigned': not record.is_substitute,
+                        'is_substitute': record.is_substitute,
+                        'substitution_remarks': record.remarks if record.is_substitute else None
+                    }],
+                    'instructor_name': record.instructor_name,
+                    'department': '',
+                    'college': '',
+                    'examdetails_status': record.status,
+                    'status': record.status,
+                    'code_entry_time': record.time_in.isoformat() if record.time_in else None,
+                    'otp_code': record.otp_used
+                })
         
         return Response(result, status=http_status.HTTP_200_OK)
         
