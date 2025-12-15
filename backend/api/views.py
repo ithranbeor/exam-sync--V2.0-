@@ -983,26 +983,10 @@ def proctor_monitoring_dashboard(request):
                    
                     # Check if THIS proctor has attendance (current exams only)
                     attendance = exam.attendance_records.filter(proctor_id=proctor_id).first()
-                    
+
                     if attendance:
-                        # ✅ NEW: Get substitution info if this is a substitute
-                        substituted_for = None
-                        substitution_remarks = None
-                        
                         if attendance.is_substitute:
                             status = 'substitute'
-                            # Get substitution details
-                            try:
-                                substitution = TblProctorSubstitution.objects.filter(
-                                    examdetails=exam,
-                                    substitute_proctor_id=proctor_id
-                                ).first()
-                                
-                                if substitution and substitution.original_proctor:
-                                    substituted_for = f"{substitution.original_proctor.first_name} {substitution.original_proctor.last_name}"
-                                    substitution_remarks = substitution.justification
-                            except Exception as e:
-                                print(f"⚠️ Error getting substitution info for assigned proctor: {str(e)}")
                         else:
                             # Check if late
                             if exam.exam_start_time and exam.exam_date and attendance.time_in:
@@ -1022,6 +1006,26 @@ def proctor_monitoring_dashboard(request):
                         
                         time_in = attendance.time_in
                         
+                        # ✅ SIMPLE FIX: Get substitution info from the assigned proctors list
+                        substituted_for = None
+                        if attendance.is_substitute:
+                            try:
+                                # Get ALL assigned proctors for this exam
+                                if exam.proctors:
+                                    assigned_ids = exam.proctors
+                                elif exam.proctor_id:
+                                    assigned_ids = [exam.proctor_id]
+                                else:
+                                    assigned_ids = []
+                                
+                                # Find the first assigned proctor (the one being substituted)
+                                if assigned_ids:
+                                    original_proctor = TblUsers.objects.filter(user_id=assigned_ids[0]).first()
+                                    if original_proctor:
+                                        substituted_for = f"{original_proctor.first_name} {original_proctor.last_name}"
+                            except Exception as e:
+                                print(f"⚠️ Error getting substitution info: {str(e)}")
+                        
                         proctor_statuses.append({
                             'proctor_id': proctor_id,
                             'proctor_name': proctor_name,
@@ -1029,8 +1033,8 @@ def proctor_monitoring_dashboard(request):
                             'time_in': time_in.isoformat() if time_in else None,
                             'is_assigned': True,
                             'is_substitute': attendance.is_substitute,
-                            'substituted_for': substituted_for,  # ✅ NEW
-                            'substitution_remarks': substitution_remarks or attendance.remarks  # ✅ NEW
+                            'substituted_for': substituted_for,  # ✅ From assigned proctors list
+                            'substitution_remarks': attendance.remarks
                         })
                     else:
                         # No attendance yet
