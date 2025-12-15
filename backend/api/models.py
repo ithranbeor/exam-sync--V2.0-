@@ -600,6 +600,8 @@ class TblProctorAttendanceHistory(models.Model):
     otp_used = models.CharField(max_length=50)
     status = models.CharField(max_length=50)  # 'confirmed', 'late', 'substitute'
     archived_at = models.DateTimeField(auto_now_add=True)
+    substituted_for_id = models.IntegerField(blank=True, null=True)
+    substituted_for_name = models.CharField(max_length=255, blank=True, null=True)
 
     class Meta:
         managed = True

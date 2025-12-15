@@ -628,12 +628,17 @@ const ProctorMonitoring: React.FC<UserProps> = ({ }) => {
       <div className="proctor-monitoring-header">
         <div className="proctor-monitoring-header-left">
           <p
-            className={`proctor-monitoring-label ${hasApprovedSchedules
-              ? 'proctor-monitoring-label-approved'
-              : 'proctor-monitoring-label-waiting'
-              }`}
+            className={`proctor-monitoring-label ${
+              (selectedYear !== 'all' || selectedMonth !== 'all')
+                ? 'proctor-monitoring-label-approved'  // History mode
+                : hasApprovedSchedules
+                ? 'proctor-monitoring-label-approved'
+                : 'proctor-monitoring-label-waiting'
+            }`}
           >
-            {hasApprovedSchedules
+            {(selectedYear !== 'all' || selectedMonth !== 'all')
+              ? 'VIEWING HISTORICAL RECORDS'
+              : hasApprovedSchedules
               ? 'EXAM SCHEDULE HAS BEEN APPROVED. CLICK TO GENERATE EXAM CODES'
               : 'WAITING FOR DEAN APPROVAL'}
           </p>
