@@ -1418,6 +1418,7 @@
     margin-top: 2px;
   }
 }
+
 .ongoing-badge {
   background: linear-gradient(135deg, #4CAF50, #45a049);
   color: white;
@@ -1431,10 +1432,13 @@
 }
 
 @keyframes pulse {
-  0%, 100% {
+
+  0%,
+  100% {
     opacity: 1;
     transform: scale(1);
   }
+
   50% {
     opacity: 0.8;
     transform: scale(1.05);
@@ -1458,6 +1462,7 @@
 
 /* Mobile-specific global overrides */
 @media screen and (max-width: 768px) {
+
   .proctor-attendance-header,
   .proctor-attendance-title,
   .proctor-attendance-instruction,
@@ -1469,4 +1474,54 @@
     position: relative !important;
     z-index: 10 !important;
   }
+}
+
+/* Add to P_ProctorAttendance.css */
+
+.proctor-attendance-tabs {
+  display: flex;
+  gap: 10px;
+  margin-bottom: 20px;
+  border-bottom: 2px solid #e0e0e0;
+}
+
+.tab-button {
+  padding: 12px 24px;
+  background: none;
+  border: none;
+  border-bottom: 3px solid transparent;
+  font-size: 16px;
+  font-weight: 500;
+  color: #666;
+  cursor: pointer;
+  transition: all 0.3s ease;
+}
+
+.tab-button.active {
+  color: #0A3765;
+  border-bottom-color: #0A3765;
+  font-weight: bold;
+}
+
+.tab-button:hover {
+  color: #0A3765;
+  background: rgba(10, 55, 101, 0.05);
+}
+
+.confirmed-badge {
+  background: #4CAF50;
+  color: white;
+  padding: 4px 8px;
+  border-radius: 4px;
+  font-size: 11px;
+  font-weight: bold;
+}
+
+.late-badge {
+  background: #FF9800;
+  color: white;
+  padding: 4px 8px;
+  border-radius: 4px;
+  font-size: 11px;
+  font-weight: bold;
 }

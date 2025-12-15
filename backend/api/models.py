@@ -576,6 +576,42 @@ class TblProctorAttendance(models.Model):
         role = "Substitute" if self.is_substitute else "Assigned"
         return f"{self.proctor.first_name} {self.proctor.last_name} - {role} - {self.examdetails.course_id}"
 
+class TblProctorAttendanceHistory(models.Model):
+    """
+    Historical record of completed proctor attendances
+    """
+    history_id = models.AutoField(primary_key=True)
+    attendance_id = models.IntegerField()  # Original attendance ID
+    examdetails_id = models.IntegerField()
+    proctor_id = models.IntegerField()
+    proctor_name = models.CharField(max_length=255)
+    course_id = models.CharField(max_length=50)
+    section_name = models.CharField(max_length=255, blank=True, null=True)
+    exam_date = models.CharField(max_length=50, blank=True, null=True)
+    exam_start_time = models.DateTimeField(blank=True, null=True)
+    exam_end_time = models.DateTimeField(blank=True, null=True)
+    building_name = models.CharField(max_length=255, blank=True, null=True)
+    room_id = models.CharField(max_length=50, blank=True, null=True)
+    instructor_name = models.CharField(max_length=255, blank=True, null=True)
+    is_substitute = models.BooleanField(default=False)
+    remarks = models.TextField(blank=True, null=True)
+    time_in = models.DateTimeField()
+    time_out = models.DateTimeField(blank=True, null=True)
+    otp_used = models.CharField(max_length=50)
+    status = models.CharField(max_length=50)  # 'confirmed', 'late', 'substitute'
+    archived_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        managed = True
+        db_table = 'tbl_proctor_attendance_history'
+        indexes = [
+            models.Index(fields=['proctor_id']),
+            models.Index(fields=['exam_date']),
+            models.Index(fields=['archived_at']),
+        ]
+    
+    def __str__(self):
+        return f"History - {self.proctor_name} - {self.course_id} - {self.exam_date}"
 
 class TblProctorSubstitution(models.Model):
     """

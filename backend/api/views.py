@@ -513,10 +513,12 @@ def submit_proctor_attendance(request):
 def proctor_assigned_exams(request, user_id):
     """
     Get all exams assigned to a specific proctor
-    ✅ Shows exams where user is in the proctors array
+    ✅ Categorized by: ongoing, upcoming, completed (history)
     """
     try:
-        # ✅ Get exams where user is assigned as proctor (single OR in array)
+        now = timezone.now()
+        
+        # Get all assigned exams
         exams = TblExamdetails.objects.filter(
             Q(proctor_id=user_id) | Q(proctors__contains=[user_id])
         ).select_related(
@@ -527,37 +529,35 @@ def proctor_assigned_exams(request, user_id):
             'modality__course'
         ).order_by('exam_date', 'exam_start_time')
         
-        result = []
+        ongoing = []
+        upcoming = []
+        completed = []
+        
         for exam in exams:
-            # ✅ Check if THIS SPECIFIC USER has attendance
+            # Parse exam times
+            exam_date_obj = datetime.strptime(exam.exam_date, '%Y-%m-%d').date()
+            exam_start_datetime = timezone.make_aware(
+                datetime.combine(exam_date_obj, exam.exam_start_time.time() if isinstance(exam.exam_start_time, datetime) else exam.exam_start_time)
+            )
+            exam_end_datetime = timezone.make_aware(
+                datetime.combine(exam_date_obj, exam.exam_end_time.time() if isinstance(exam.exam_end_time, datetime) else exam.exam_end_time)
+            )
+            
+            # Check user's attendance
             attendance = TblProctorAttendance.objects.filter(
                 examdetails=exam,
-                proctor_id=user_id  # ✅ Check for current user's attendance
+                proctor_id=user_id
             ).first()
             
-            # ✅ Status is based on THIS USER's attendance, not others
+            # Determine status
             if attendance:
                 if attendance.is_substitute:
                     exam_status = 'substitute'
                 else:
-                    # Check if late
-                    if exam.exam_start_time and exam.exam_date and attendance.time_in:
-                        from datetime import datetime, timedelta
-                        
-                        exam_date_obj = datetime.strptime(exam.exam_date, '%Y-%m-%d').date()
-                        exam_start_time = exam.exam_start_time.time() if isinstance(exam.exam_start_time, datetime) else exam.exam_start_time
-                        
-                        exam_start_datetime = timezone.make_aware(
-                            datetime.combine(exam_date_obj, exam_start_time)
-                        )
-                        
-                        time_diff = (attendance.time_in - exam_start_datetime).total_seconds() / 60
-                        exam_status = 'late' if time_diff > 7 else 'confirmed'
-                    else:
-                        exam_status = 'confirmed'
+                    time_diff = (attendance.time_in - exam_start_datetime).total_seconds() / 60
+                    exam_status = 'late' if time_diff > 7 else 'confirmed'
             else:
-                # Check if exam has ended
-                if exam.exam_end_time and timezone.now() > exam.exam_end_time:
+                if now > exam_end_datetime:
                     exam_status = 'absent'
                 else:
                     exam_status = 'pending'
@@ -579,11 +579,9 @@ def proctor_assigned_exams(request, user_id):
                     pass
             
             instructor_name = ', '.join(instructor_names) if instructor_names else None
-            
-            # Get sections display
             sections_display = ', '.join(exam.sections) if exam.sections else exam.section_name
             
-            result.append({
+            exam_data = {
                 'id': exam.examdetails_id,
                 'course_id': exam.course_id,
                 'subject': exam.course_id,
@@ -594,11 +592,25 @@ def proctor_assigned_exams(request, user_id):
                 'building_name': exam.building_name,
                 'room_id': exam.room.room_id if exam.room else None,
                 'instructor_name': instructor_name,
-                'assigned_proctor': None,  # Not needed for their own view
-                'status': exam_status  # ✅ THIS USER's status
-            })
+                'status': exam_status
+            }
+            
+            # Categorize
+            if now > exam_end_datetime:
+                # Completed (past exams)
+                completed.append(exam_data)
+            elif now >= exam_start_datetime and now <= exam_end_datetime:
+                # Ongoing
+                ongoing.append(exam_data)
+            else:
+                # Upcoming
+                upcoming.append(exam_data)
         
-        return Response(result, status=http_status.HTTP_200_OK)
+        return Response({
+            'ongoing': ongoing,
+            'upcoming': upcoming,
+            'completed': completed
+        }, status=http_status.HTTP_200_OK)
         
     except Exception as e:
         print(f"❌ Error fetching assigned exams: {str(e)}")
@@ -618,14 +630,28 @@ def proctor_assigned_exams(request, user_id):
 @permission_classes([AllowAny])
 def all_exams_for_substitution(request):
     """
-    Get all upcoming exams (for substitution purposes)
+    Get all upcoming exams for substitution
+    ✅ Excludes user's own schedules and time conflicts
     """
     try:
-        # Get exams starting from today
+        user_id = request.GET.get('user_id')
+        if not user_id:
+            return Response({'error': 'user_id required'}, status=status.HTTP_400_BAD_REQUEST)
+        
+        user_id = int(user_id)
         today = timezone.now().date()
         
-        exams = TblExamdetails.objects.filter(
+        # Get user's assigned exams to check conflicts
+        user_exams = TblExamdetails.objects.filter(
+            Q(proctor_id=user_id) | Q(proctors__contains=[user_id]),
             exam_date__gte=today.isoformat()
+        ).values('exam_date', 'exam_start_time', 'exam_end_time')
+        
+        # Get all upcoming exams
+        all_exams = TblExamdetails.objects.filter(
+            exam_date__gte=today.isoformat()
+        ).exclude(
+            Q(proctor_id=user_id) | Q(proctors__contains=[user_id])
         ).select_related(
             'room',
             'room__building',
@@ -634,7 +660,20 @@ def all_exams_for_substitution(request):
         ).order_by('exam_date', 'exam_start_time')
         
         result = []
-        for exam in exams:
+        for exam in all_exams:
+            # Check time conflicts
+            has_conflict = False
+            for user_exam in user_exams:
+                if exam.exam_date == user_exam['exam_date']:
+                    # Same date, check time overlap
+                    if (exam.exam_start_time < user_exam['exam_end_time'] and 
+                        exam.exam_end_time > user_exam['exam_start_time']):
+                        has_conflict = True
+                        break
+            
+            if has_conflict:
+                continue
+            
             # Get instructor name
             instructor_name = None
             if exam.instructor_id:
@@ -649,11 +688,8 @@ def all_exams_for_substitution(request):
             if exam.proctor:
                 assigned_proctor = f"{exam.proctor.first_name} {exam.proctor.last_name}"
             
-            # Check if anyone has checked in
             has_attendance = TblProctorAttendance.objects.filter(examdetails=exam).exists()
             exam_status = 'confirmed' if has_attendance else 'pending'
-            
-            # Get sections display
             sections_display = ', '.join(exam.sections) if exam.sections else exam.section_name
             
             result.append({
@@ -681,7 +717,6 @@ def all_exams_for_substitution(request):
             'error': str(e),
             'detail': 'Failed to fetch exams'
         }, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
-
 
 # ============================================================
 # PROCTOR MONITORING DASHBOARD
