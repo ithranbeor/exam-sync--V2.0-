@@ -1103,20 +1103,22 @@ def proctor_monitoring_dashboard(request):
             history_query = history_query.filter(exam_date=exam_date)
 
         # ✅ NEW: Filter by year and month
+        is_viewing_history = False  # Track if we're in history mode
+
         if year and year != 'all':
+            is_viewing_history = True
             history_query = history_query.filter(exam_date__startswith=year)
+            
         if month and month != 'all':
-            # Assuming exam_date format is YYYY-MM-DD
+            is_viewing_history = True
             if year and year != 'all':
                 history_query = history_query.filter(exam_date__startswith=f"{year}-{month.zfill(2)}")
             else:
                 # If only month is selected, filter across all years
                 history_query = history_query.filter(exam_date__regex=rf'^\d{{4}}-{month.zfill(2)}-')
 
-        # ✅ IMPORTANT: Only return history records if year or month filter is applied
-        # Don't mix current data with history data
-        if year and year != 'all' or month and month != 'all':
-            # Clear the current data result, only show history
+        # ✅ IMPORTANT: Only clear current data if actively filtering by history
+        if is_viewing_history:
             result = []
             
         for record in history_query:
@@ -1146,7 +1148,8 @@ def proctor_monitoring_dashboard(request):
                 'examdetails_status': record.status,
                 'status': record.status,
                 'code_entry_time': record.time_in.isoformat() if record.time_in else None,
-                'otp_code': record.otp_used
+                'otp_code': record.otp_used,
+                'approval_status': 'approved'  # ✅ ADD THIS - History records are already approved
             })
 
         return Response(result, status=http_status.HTTP_200_OK)

@@ -131,6 +131,10 @@ const ProctorMonitoring: React.FC<UserProps> = ({ }) => {
       if (collegeFilter) {
         params.college_name = collegeFilter;
       }
+
+      // ✅ Track if we're viewing history
+      const isViewingHistory = (selectedYear !== 'all' || selectedMonth !== 'all');
+
       // ✅ Add year/month filters
       if (selectedYear !== 'all') {
         params.year = selectedYear;
@@ -141,17 +145,28 @@ const ProctorMonitoring: React.FC<UserProps> = ({ }) => {
 
       const { data: examData } = await api.get('/proctor-monitoring/', { params });
 
-      // ✅ PERFORMANCE FIX: Fetch ALL approvals in ONE request
+      // ✅ Skip approval check if viewing history
+      if (isViewingHistory) {
+        // History records are already approved, no need to check
+        setApprovedSchedules(examData);
+        setHasApprovedSchedules(examData.length > 0);
+
+        if (examData.length === 0) {
+          toast.info('No records found for the selected period');
+        }
+        setLoading(false);
+        return;
+      }
+
+      // ✅ Only check approvals for current data
       const approvalResponse = await api.get('/tbl_scheduleapproval/', {
         params: { status: 'approved' },
       });
 
-      // Create a Set of approved colleges for O(1) lookup
       const approvedColleges = new Set(
         approvalResponse.data.map((approval: any) => approval.college_name),
       );
 
-      // ✅ FIXED: Map schedules with proctor_details array
       const schedulesWithApproval = examData.map((schedule: any) => {
         const isApproved = approvedColleges.has(schedule.college);
 
@@ -165,7 +180,7 @@ const ProctorMonitoring: React.FC<UserProps> = ({ }) => {
           exam_end_time: schedule.exam_end_time || '',
           building_name: schedule.building_name || '',
           room_id: schedule.room_id || '',
-          proctor_details: schedule.proctor_details || [],  // ✅ Get proctor_details array from backend
+          proctor_details: schedule.proctor_details || [],
           instructor_name: schedule.instructor_name || '',
           department: schedule.department || '',
           college: schedule.college || '',
@@ -177,7 +192,6 @@ const ProctorMonitoring: React.FC<UserProps> = ({ }) => {
         return mappedSchedule;
       });
 
-      // Filter to show ONLY approved schedules
       const approvedOnly = schedulesWithApproval.filter(
         (schedule: MonitoringSchedule) => schedule.approval_status === 'approved',
       );
