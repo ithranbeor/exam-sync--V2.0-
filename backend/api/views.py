@@ -567,15 +567,16 @@ def proctor_assigned_exams(request, user_id):
         
         for exam in exams:
             try:
-                exam_start_datetime = build_exam_datetime(
-                    exam.exam_date,
-                    exam.exam_start_time
-                )
+                # ✅ FIX: Handle datetime objects directly
+                if isinstance(exam.exam_start_time, datetime):
+                    exam_start_datetime = timezone.make_aware(exam.exam_start_time) if timezone.is_naive(exam.exam_start_time) else exam.exam_start_time
+                else:
+                    exam_start_datetime = build_exam_datetime(exam.exam_date, exam.exam_start_time)
 
-                exam_end_datetime = build_exam_datetime(
-                    exam.exam_date,
-                    exam.exam_end_time
-                )
+                if isinstance(exam.exam_end_time, datetime):
+                    exam_end_datetime = timezone.make_aware(exam.exam_end_time) if timezone.is_naive(exam.exam_end_time) else exam.exam_end_time
+                else:
+                    exam_end_datetime = build_exam_datetime(exam.exam_date, exam.exam_end_time)
 
             except Exception as e:
                 print(f"⚠️ Error processing exam times for exam {exam.examdetails_id}: {e}")
@@ -636,10 +637,9 @@ def proctor_assigned_exams(request, user_id):
             elif now < exam_start_datetime:
                 upcoming.append(exam_data)
             else:
-                # Only add to completed if NOT already in history
                 completed.append(exam_data)
         
-        # ✅ Fetch history records (ONCE, outside loop)
+        # ✅ Fetch history records
         history_records = TblProctorAttendanceHistory.objects.filter(
             proctor_id=user_id
         ).order_by('-exam_date', '-exam_start_time')
