@@ -8,6 +8,7 @@ from rest_framework.authtoken.models import Token
 from rest_framework import status
 from rest_framework import status as http_status
 from django.views.decorators.cache import cache_page
+from datetime import datetime, time
 from django.db.models import Q
 from .models import TblUsers, TblScheduleapproval, TblProctorAttendanceHistory, TblScheduleFooter, TblProctorSubstitution, TblProctorAttendance, TblExamOtp, TblAvailableRooms, TblNotification, TblUserRole, TblExamdetails, TblModality, TblAvailability, TblCourseUsers, TblSectioncourse, TblUserRoleHistory, TblRoles, TblBuildings, TblRooms, TblCourse, TblExamperiod, TblProgram, TblTerm, TblCollege, TblDepartment
 from .serializers import (
@@ -507,6 +508,28 @@ def submit_proctor_attendance(request):
 # ============================================================
 # PROCTOR'S ASSIGNED EXAMS
 # ============================================================
+
+def build_exam_datetime(exam_date, exam_time):
+    """
+    Safely returns an aware datetime for an exam time
+    Handles:
+    - datetime
+    - time
+    """
+    # Case 1: already datetime
+    if isinstance(exam_time, datetime):
+        return timezone.make_aware(exam_time) if timezone.is_naive(exam_time) else exam_time
+
+    # Case 2: proper time → combine
+    if isinstance(exam_time, time):
+        if isinstance(exam_date, str):
+            exam_date = datetime.strptime(exam_date, "%Y-%m-%d").date()
+
+        dt = datetime.combine(exam_date, exam_time)
+        return timezone.make_aware(dt)
+
+    raise ValueError(f"Invalid exam_time type: {type(exam_time)}")
+
 @api_view(['GET'])
 @permission_classes([AllowAny])
 def proctor_assigned_exams(request, user_id):
@@ -544,27 +567,16 @@ def proctor_assigned_exams(request, user_id):
         
         for exam in exams:
             try:
-                # Handle exam_start_time and exam_end_time properly
-                if isinstance(exam.exam_start_time, datetime):
-                    exam_start_datetime = exam.exam_start_time
-                    if timezone.is_naive(exam_start_datetime):
-                        exam_start_datetime = timezone.make_aware(exam_start_datetime)
-                else:
-                    exam_date_obj = datetime.strptime(exam.exam_date, '%Y-%m-%d').date()
-                    exam_start_datetime = timezone.make_aware(
-                        datetime.combine(exam_date_obj, exam.exam_start_time)
-                    )
-                
-                if isinstance(exam.exam_end_time, datetime):
-                    exam_end_datetime = exam.exam_end_time
-                    if timezone.is_naive(exam_end_datetime):
-                        exam_end_datetime = timezone.make_aware(exam_end_datetime)
-                else:
-                    exam_date_obj = datetime.strptime(exam.exam_date, '%Y-%m-%d').date()
-                    exam_end_datetime = timezone.make_aware(
-                        datetime.combine(exam_date_obj, exam.exam_end_time)
-                    )
-                
+                exam_start_datetime = build_exam_datetime(
+                    exam.exam_date,
+                    exam.exam_start_time
+                )
+
+                exam_end_datetime = build_exam_datetime(
+                    exam.exam_date,
+                    exam.exam_end_time
+                )
+
             except Exception as e:
                 print(f"⚠️ Error processing exam times for exam {exam.examdetails_id}: {e}")
                 continue
@@ -693,15 +705,10 @@ def archive_completed_attendances():
                 status = 'substitute'
             elif attendance.time_in:
                 # Check if late
-                exam_start_datetime = exam.exam_start_time
-                if isinstance(exam.exam_start_time, datetime):
-                    if timezone.is_naive(exam_start_datetime):
-                        exam_start_datetime = timezone.make_aware(exam_start_datetime)
-                else:
-                    exam_date_obj = datetime.strptime(exam.exam_date, '%Y-%m-%d').date()
-                    exam_start_datetime = timezone.make_aware(
-                        datetime.combine(exam_date_obj, exam.exam_start_time)
-                    )
+                exam_start_datetime = build_exam_datetime(
+                    exam.exam_date,
+                    exam.exam_start_time
+                )
                 
                 time_diff = (attendance.time_in - exam_start_datetime).total_seconds() / 60
                 status = 'late' if time_diff > 7 else 'confirmed'
