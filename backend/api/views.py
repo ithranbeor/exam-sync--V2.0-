@@ -507,7 +507,6 @@ def submit_proctor_attendance(request):
 # ============================================================
 # PROCTOR'S ASSIGNED EXAMS
 # ============================================================
-
 @api_view(['GET'])
 @permission_classes([AllowAny])
 def proctor_assigned_exams(request, user_id):
@@ -527,6 +526,8 @@ def proctor_assigned_exams(request, user_id):
             'proctor',
             'modality',
             'modality__course'
+        ).prefetch_related(
+            'attendance_records'
         ).order_by('exam_date', 'exam_start_time')
         
         ongoing = []
@@ -535,19 +536,29 @@ def proctor_assigned_exams(request, user_id):
         
         for exam in exams:
             # Parse exam times
+            from datetime import datetime
             exam_date_obj = datetime.strptime(exam.exam_date, '%Y-%m-%d').date()
+            
+            # Handle exam times properly
+            if isinstance(exam.exam_start_time, datetime):
+                start_time = exam.exam_start_time.time()
+            else:
+                start_time = exam.exam_start_time
+            
+            if isinstance(exam.exam_end_time, datetime):
+                end_time = exam.exam_end_time.time()
+            else:
+                end_time = exam.exam_end_time
+            
             exam_start_datetime = timezone.make_aware(
-                datetime.combine(exam_date_obj, exam.exam_start_time.time() if isinstance(exam.exam_start_time, datetime) else exam.exam_start_time)
+                datetime.combine(exam_date_obj, start_time)
             )
             exam_end_datetime = timezone.make_aware(
-                datetime.combine(exam_date_obj, exam.exam_end_time.time() if isinstance(exam.exam_end_time, datetime) else exam.exam_end_time)
+                datetime.combine(exam_date_obj, end_time)
             )
             
             # Check user's attendance
-            attendance = TblProctorAttendance.objects.filter(
-                examdetails=exam,
-                proctor_id=user_id
-            ).first()
+            attendance = exam.attendance_records.filter(proctor_id=user_id).first()
             
             # Determine status
             if attendance:
@@ -595,16 +606,16 @@ def proctor_assigned_exams(request, user_id):
                 'status': exam_status
             }
             
-            # Categorize
-            if now > exam_end_datetime:
-                # Completed (past exams)
-                completed.append(exam_data)
-            elif now >= exam_start_datetime and now <= exam_end_datetime:
-                # Ongoing
+            # ✅ FIX: Correct categorization logic
+            if now >= exam_start_datetime and now <= exam_end_datetime:
+                # Currently happening right now
                 ongoing.append(exam_data)
-            else:
-                # Upcoming
+            elif now < exam_start_datetime:
+                # Future exam
                 upcoming.append(exam_data)
+            else:
+                # Past exam (now > exam_end_datetime)
+                completed.append(exam_data)
         
         return Response({
             'ongoing': ongoing,
@@ -620,7 +631,6 @@ def proctor_assigned_exams(request, user_id):
             'error': str(e),
             'detail': 'Failed to fetch assigned exams'
         }, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
-
 
 # ============================================================
 # ALL EXAMS FOR SUBSTITUTION

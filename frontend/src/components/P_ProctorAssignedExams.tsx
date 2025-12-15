@@ -38,10 +38,10 @@ const ProctorCourseDetails = ({ user }: ProctorCourseDetailsProps) => {
       try {
         setLoading(true);
 
-        // Step 1: Get ONLY exam details where THIS SPECIFIC user is the proctor
+        // ✅ FIX: Get ALL exam details where THIS user is the proctor (no filtering by approval)
         const examDetailsResponse = await api.get('/tbl_examdetails', {
           params: {
-            proctor_id: user.user_id  // ✅ This filters on backend to only this user's assignments
+            proctor_id: user.user_id
           }
         });
 
@@ -52,9 +52,10 @@ const ProctorCourseDetails = ({ user }: ProctorCourseDetailsProps) => {
         }
 
         const proctorExams = examDetailsResponse.data;
+        
+        // Filter to only exams where this user is actually assigned
         const userProctorExams = proctorExams.filter(exam => {
           const isSingleProctor = Number(exam.proctor_id) === Number(user.user_id);
-          
           const isInProctorsArray = exam.proctors && 
             Array.isArray(exam.proctors) && 
             exam.proctors.some((pid: number) => Number(pid) === Number(user.user_id));
@@ -68,60 +69,15 @@ const ProctorCourseDetails = ({ user }: ProctorCourseDetailsProps) => {
           return;
         }
 
-        // Step 2: Get unique college names from the exams
-        const collegeNames = [...new Set(userProctorExams.map(exam => exam.college_name).filter(Boolean))];
-
-        if (collegeNames.length === 0) {
-          setAssignments([]);
-          setLoading(false);
-          return;
-        }
-
-        // Step 3: Check approval status for each college
-        const approvalPromises = collegeNames.map(collegeName =>
-          api.get('/tbl_scheduleapproval/', {
-            params: { college_name: collegeName }
-          }).catch(_err => {
-            return { data: [] };
-          })
-        );
-
-        const approvalResponses = await Promise.all(approvalPromises);
-
-        // Step 4: Create a map of approved colleges
-        const approvedColleges = new Set<string>();
-        approvalResponses.forEach((response, index) => {
-          if (response.data && response.data.length > 0) {
-            // Get the most recent approval for this college
-            const sortedApprovals = response.data.sort((a: any, b: any) =>
-              new Date(b.submitted_at || b.created_at).getTime() -
-              new Date(a.submitted_at || a.created_at).getTime()
-            );
-            const latestApproval = sortedApprovals[0];
-
-            // Only include if status is 'approved'
-            if (latestApproval.status === 'approved') {
-              approvedColleges.add(collegeNames[index]);
-            }
-          }
-        });
-
-        // Step 5: Filter exams to only include those from approved colleges
-        const approvedExams = userProctorExams.filter(exam =>
-          approvedColleges.has(exam.college_name)
-        );
-
-        // Step 6: Get instructor names for all exams
-        const instructorIds = [...new Set(approvedExams.map(exam => exam.instructor_id).filter(Boolean))];
+        // Get instructor names for all exams
+        const instructorIds = [...new Set(userProctorExams.map(exam => exam.instructor_id).filter(Boolean))];
         const instructorMap = new Map<number, string>();
 
         if (instructorIds.length > 0) {
           try {
-            // ✅ FIX: Fetch ALL users from /users/ endpoint (same as SchedulerView)
             const usersResponse = await api.get('/users/');
             const allUsers = usersResponse.data;
 
-            // Map instructor IDs to their full names
             instructorIds.forEach(instructorId => {
               const instructor = allUsers.find((u: any) => u.user_id === instructorId);
               if (instructor) {
@@ -136,8 +92,8 @@ const ProctorCourseDetails = ({ user }: ProctorCourseDetailsProps) => {
           }
         }
 
-        // ✅ FIXED: Step 7: Transform to match the expected format
-        const formattedAssignments: ProctorAssignment[] = approvedExams.map(exam => ({
+        // ✅ FIX: Transform ALL assigned exams (no approval filtering)
+        const formattedAssignments: ProctorAssignment[] = userProctorExams.map(exam => ({
           assignment_id: exam.examdetails_id,
           course_id: exam.course_id,
           section: exam.section_name || 'N/A',
@@ -147,13 +103,12 @@ const ProctorCourseDetails = ({ user }: ProctorCourseDetailsProps) => {
           room_id: exam.room_id,
           building: exam.building_name || 'N/A',
           instructor: exam.instructor_id ? (instructorMap.get(exam.instructor_id) || `Instructor ${exam.instructor_id}`) : 'N/A',
-          examdetails_status: exam.examdetails_status || 'pending' // ✅ CHANGED: Use calculated status from backend
+          examdetails_status: exam.examdetails_status || 'pending'
         }));
 
-        // Sort by date
+        // Sort by date (earliest first)
         const sorted = formattedAssignments.sort(
-          (a, b) =>
-            new Date(a.exam_date).getTime() - new Date(b.exam_date).getTime()
+          (a, b) => new Date(a.exam_date).getTime() - new Date(b.exam_date).getTime()
         );
 
         setAssignments(sorted);
@@ -167,8 +122,6 @@ const ProctorCourseDetails = ({ user }: ProctorCourseDetailsProps) => {
 
     fetchProctorAssignments();
 
-    // ✅ CHANGED: Poll for updates every 30 seconds (instead of 10 seconds)
-    // Proctors don't need real-time updates like schedulers do
     const interval = setInterval(fetchProctorAssignments, 30000);
     return () => clearInterval(interval);
   }, [user?.user_id]);
@@ -325,16 +278,11 @@ const ProctorCourseDetails = ({ user }: ProctorCourseDetailsProps) => {
         <div className="empty-message">
           <p>
             {filter === 'all'
-              ? 'No approved proctoring assignments yet'
+              ? 'No proctoring assignments yet'
               : filter === 'ongoing'
                 ? 'No on-going exams'
                 : `No ${filter} proctoring assignments`}
           </p>
-          {assignments.length === 0 && (
-            <p style={{ fontSize: '14px', color: '#666', marginTop: '10px' }}>
-              Schedules will appear here once approved by the dean
-            </p>
-          )}
         </div>
       ) : (
         <div className="courses-list">
