@@ -36,13 +36,13 @@ const ProctorAttendance: React.FC<UserProps> = ({ user }) => {
   const [otpCode, setOtpCode] = useState('');
   const [remarks, setRemarks] = useState('');
   const [otpValidationStatus, setOtpValidationStatus] = useState<'idle' | 'valid-assigned' | 'valid-not-assigned' | 'invalid'>('idle');
-  
+
   // ✅ NEW: Categorized exams
   const [ongoingExams, setOngoingExams] = useState<ExamDetails[]>([]);
   const [upcomingExams, setUpcomingExams] = useState<ExamDetails[]>([]);
   const [completedExams, setCompletedExams] = useState<ExamDetails[]>([]);
   const [allExams, setAllExams] = useState<ExamDetails[]>([]);
-  
+
   const [loading, setLoading] = useState(true);
   const [verifyingOtp, setVerifyingOtp] = useState(false);
   const [submittingAttendance, setSubmittingAttendance] = useState(false);
@@ -79,7 +79,7 @@ const ProctorAttendance: React.FC<UserProps> = ({ user }) => {
       const { data } = await api.get('/all-exams-for-substitution/', {
         params: { user_id: user.user_id }
       });
-      
+
       console.log(`✅ Fetched ${data?.length || 0} exams available for substitution`);
       setAllExams(data || []);
     } catch (error: any) {
@@ -109,7 +109,8 @@ const ProctorAttendance: React.FC<UserProps> = ({ user }) => {
     setShowModal(true);
     setOtpCode('');
     setRemarks('');
-    setOtpValidationStatus('idle');
+    setOtpValidationStatus('idle'); // ✅ RESET THIS - prevents stale state
+    setShowVerificationSuccess(false); // ✅ ADD THIS TOO
   };
 
   const handleCloseModal = () => {
@@ -418,8 +419,8 @@ const ProctorAttendance: React.FC<UserProps> = ({ user }) => {
                       <div
                         key={exam.id}
                         className="proctor-attendance-schedule-card proctor-attendance-schedule-card-upcoming"
-                        style={{ 
-                          opacity: 0.6, 
+                        style={{
+                          opacity: 0.6,
                           cursor: 'not-allowed',
                           backgroundColor: '#f5f5f5'
                         }}
@@ -486,8 +487,8 @@ const ProctorAttendance: React.FC<UserProps> = ({ user }) => {
                       <div
                         key={exam.id}
                         className="proctor-attendance-schedule-card proctor-attendance-schedule-card-history"
-                        style={{ 
-                          opacity: 0.8, 
+                        style={{
+                          opacity: 0.8,
                           cursor: 'default',
                           backgroundColor: '#fafafa',
                           border: '2px solid #e0e0e0'
@@ -643,7 +644,7 @@ const ProctorAttendance: React.FC<UserProps> = ({ user }) => {
                       {verifyingOtp ? 'Verifying...' : 'Verify'}
                     </button>
                   </div>
-                  
+
                   {/* Verification Success Modal */}
                   {showVerificationSuccess && (
                     <div
@@ -747,12 +748,12 @@ const ProctorAttendance: React.FC<UserProps> = ({ user }) => {
 
                 <div className="proctor-attendance-modal-input-group">
                   <label htmlFor="remarks-input" className="proctor-attendance-modal-label">
-                    Remarks {isSubstitutionMode || otpValidationStatus === 'valid-not-assigned' ? '(Required for substitution)' : '(Optional)'}:
+                    Remarks {(isSubstitutionMode || otpValidationStatus === 'valid-not-assigned') ? '(Required for substitution)' : '(Optional)'}:
                   </label>
                   <textarea
                     id="remarks-input"
                     className={`proctor-attendance-modal-textarea ${(isSubstitutionMode || otpValidationStatus === 'valid-not-assigned') && !remarks.trim() ? 'proctor-attendance-required-field' : ''}`}
-                    placeholder={isSubstitutionMode || otpValidationStatus === 'valid-not-assigned'
+                    placeholder={(isSubstitutionMode || otpValidationStatus === 'valid-not-assigned')
                       ? "Please provide a reason for substitution (e.g., emergency leave, illness, etc.)"
                       : "Enter any remarks or notes..."}
                     rows={3}

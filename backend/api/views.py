@@ -401,11 +401,11 @@ def submit_proctor_attendance(request):
                 'error': 'OTP code and user_id are required'
             }, status=status.HTTP_400_BAD_REQUEST)
         
-        # Validate remarks for substitute
+        # ✅ ONLY validate remarks for substitute role
         if role == 'sub' and not remarks:
             print("❌ Remarks required for substitute")
             return Response({
-                'error': 'Remarks are required for substitute proctors'
+                'error': 'Remarks are required when substituting for another proctor'
             }, status=status.HTTP_400_BAD_REQUEST)
         
         # Find OTP record
@@ -423,8 +423,7 @@ def submit_proctor_attendance(request):
         
         exam_schedule = otp_record.examdetails
         
-        # ✅ FIXED: Check if THIS USER already has attendance for THIS EXAM
-        # This prevents duplicate check-ins by the same person for the same exam
+        # ✅ Check if THIS USER already has attendance for THIS EXAM
         existing_attendance = TblProctorAttendance.objects.filter(
             examdetails=exam_schedule,
             proctor_id=user_id
@@ -449,12 +448,12 @@ def submit_proctor_attendance(request):
                     'error': f'User {user_id} not found'
                 }, status=status.HTTP_400_BAD_REQUEST)
             
-            # ✅ Create NEW attendance record (doesn't update existing ones)
+            # ✅ Create NEW attendance record
             current_time = timezone.now()
             attendance = TblProctorAttendance.objects.create(
                 examdetails=exam_schedule,
                 proctor=proctor_user,
-                is_substitute=(role == 'sub'),
+                is_substitute=(role == 'sub'),  # ✅ Only TRUE if role is 'sub'
                 remarks=remarks if remarks else None,
                 otp_used=otp_code,
                 time_in=current_time
@@ -467,9 +466,8 @@ def submit_proctor_attendance(request):
             print(f"   - Is substitute: {attendance.is_substitute}")
             print(f"   - Time in: {attendance.time_in}")
             
-            # If substitute, create substitution record
+            # ✅ ONLY create substitution record if role is 'sub'
             if role == 'sub':
-                # ✅ Record who was substituted
                 original_proctor_name = None
                 if exam_schedule.proctor:
                     original_proctor_name = f"{exam_schedule.proctor.first_name} {exam_schedule.proctor.last_name}"
