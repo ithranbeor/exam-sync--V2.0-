@@ -516,3 +516,44 @@
   background-color: #6c757d;
   color: white;
 }
+
+/* Proctor columns styling */
+.proctor-monitoring-table tbody td:nth-child(n+11):nth-child(-n+15) {
+  min-width: 150px;
+  padding: 8px;
+  vertical-align: top;
+}
+
+.status-badge {
+  display: inline-block;
+  padding: 4px 10px;
+  font-size: 0.8em;
+  font-weight: 600;
+  border-radius: 12px;
+  text-transform: uppercase;
+}
+
+.status-confirmed {
+  background-color: #d4edda;
+  color: #155724;
+}
+
+.status-late {
+  background-color: #fff3cd;
+  color: #856404;
+}
+
+.status-absent {
+  background-color: #f8d7da;
+  color: #721c24;
+}
+
+.status-substitute {
+  background-color: #d1ecf1;
+  color: #0c5460;
+}
+
+.status-pending {
+  background-color: #e2e3e5;
+  color: #383d41;
+}

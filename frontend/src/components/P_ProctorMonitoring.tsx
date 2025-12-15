@@ -23,7 +23,13 @@ interface UserProps {
   } | null;
 }
 
-// ✅ FIXED: Made status optional since we use examdetails_status as primary
+interface ProctorDetail {
+  proctor_id: number;
+  proctor_name: string;
+  status: string;
+  time_in: string | null;
+}
+
 interface MonitoringSchedule {
   id: number;
   course_id: string;
@@ -34,15 +40,14 @@ interface MonitoringSchedule {
   exam_end_time: string;
   building_name: string;
   room_id: string;
-  proctor_name: string;
+  proctor_details: ProctorDetail[];
   instructor_name: string;
   department: string;
   college: string;
-  examdetails_status: string;  // ✅ Primary status field from backend
-  status?: string;  // ✅ Optional legacy field for compatibility
-  code_entry_time: string | null;
+  examdetails_status: string;
   otp_code: string | null;
   approval_status?: string;
+  sections?: string[];
 }
 
 const ProctorMonitoring: React.FC<UserProps> = ({ }) => {
@@ -58,6 +63,8 @@ const ProctorMonitoring: React.FC<UserProps> = ({ }) => {
   const [searchTerm, setSearchTerm] = useState('');
   const [showStatusDropdown, setShowStatusDropdown] = useState(false);
   const [statusFilter, setStatusFilter] = useState<'all' | 'present' | 'absent' | 'substitute' | 'pending'>('all');
+  const [selectedSchedule, setSelectedSchedule] = useState<MonitoringSchedule | null>(null);
+  const [showProctorModal, setShowProctorModal] = useState(false);
 
   useEffect(() => {
     if (approvedSchedules.length === 0) return;
@@ -66,12 +73,12 @@ const ProctorMonitoring: React.FC<UserProps> = ({ }) => {
 
     approvedSchedules.forEach(async (s) => {
       const examEnd = new Date(`${s.exam_date}T${s.exam_end_time}`);
-      const hasTimeIn = Boolean(s.code_entry_time);
 
-      // ✅ Use examdetails_status as primary
+      // ✅ Check if ANY proctor has time_in
+      const hasAnyTimeIn = s.proctor_details.some(p => p.time_in);
       const currentStatus = (s.examdetails_status || '').toLowerCase();
 
-      if (now > examEnd && !hasTimeIn && currentStatus === 'pending') {
+      if (now > examEnd && !hasAnyTimeIn && currentStatus === 'pending') {
         try {
           setTimeout(() => fetchMonitoringData(), 500);
           await api.patch(`/update-proctor-status/${s.id}/`, {
@@ -85,6 +92,11 @@ const ProctorMonitoring: React.FC<UserProps> = ({ }) => {
       }
     });
   }, [approvedSchedules]);
+
+  const handleRowClick = (schedule: MonitoringSchedule) => {
+    setSelectedSchedule(schedule);
+    setShowProctorModal(true);
+  };
 
   // ✅ FIXED: Fetch and filter for multiple proctors
   const fetchMonitoringData = useCallback(async () => {
@@ -108,7 +120,7 @@ const ProctorMonitoring: React.FC<UserProps> = ({ }) => {
         approvalResponse.data.map((approval: any) => approval.college_name),
       );
 
-      // ✅ FIXED: Map schedules with examdetails_status as primary
+      // ✅ FIXED: Map schedules with proctor_details array
       const schedulesWithApproval = examData.map((schedule: any) => {
         const isApproved = approvedColleges.has(schedule.college);
 
@@ -122,13 +134,11 @@ const ProctorMonitoring: React.FC<UserProps> = ({ }) => {
           exam_end_time: schedule.exam_end_time || '',
           building_name: schedule.building_name || '',
           room_id: schedule.room_id || '',
-          proctor_name: schedule.proctor_name || '',
+          proctor_details: schedule.proctor_details || [],  // ✅ Get proctor_details array from backend
           instructor_name: schedule.instructor_name || '',
           department: schedule.department || '',
           college: schedule.college || '',
-          examdetails_status: schedule.examdetails_status || schedule.status || 'pending',
-          status: schedule.status,
-          code_entry_time: schedule.code_entry_time || null,
+          examdetails_status: schedule.examdetails_status || 'pending',
           otp_code: schedule.otp_code || null,
           approval_status: isApproved ? 'approved' : 'pending',
         };
@@ -261,13 +271,84 @@ const ProctorMonitoring: React.FC<UserProps> = ({ }) => {
     }
   };
 
+  const formatSectionRanges = (sections: string[]): string => {
+    if (sections.length === 0) return '';
+    if (sections.length === 1) return sections[0];
+
+    // Sort sections properly
+    const sorted = [...sections].sort((a, b) => {
+      // Match pattern: prefix (letters+numbers) + section number
+      const matchA = a.match(/^([A-Za-z]+\d+[A-Za-z]*)(\d+)$/);
+      const matchB = b.match(/^([A-Za-z]+\d+[A-Za-z]*)(\d+)$/);
+
+      if (!matchA || !matchB) return a.localeCompare(b);
+
+      const [, prefixA, numStrA] = matchA;
+      const [, prefixB, numStrB] = matchB;
+
+      // First compare prefixes alphabetically
+      const prefixCompare = prefixA.localeCompare(prefixB);
+      if (prefixCompare !== 0) return prefixCompare;
+
+      // Then compare numbers numerically
+      return parseInt(numStrA) - parseInt(numStrB);
+    });
+
+    // Group into ranges
+    const ranges: string[] = [];
+    let i = 0;
+
+    while (i < sorted.length) {
+      const match = sorted[i].match(/^([A-Za-z]+\d+[A-Za-z]*)(\d+)$/);
+
+      if (!match) {
+        ranges.push(sorted[i]);
+        i++;
+        continue;
+      }
+
+      const [, prefix, numStr] = match;
+      const startNum = parseInt(numStr);
+      let endNum = startNum;
+      let j = i + 1;
+
+      // Find consecutive numbers with same prefix
+      while (j < sorted.length) {
+        const nextMatch = sorted[j].match(/^([A-Za-z]+\d+[A-Za-z]*)(\d+)$/);
+
+        if (!nextMatch) break;
+
+        const [, nextPrefix, nextNumStr] = nextMatch;
+        const nextNum = parseInt(nextNumStr);
+
+        // Check if same prefix and consecutive number
+        if (nextPrefix === prefix && nextNum === endNum + 1) {
+          endNum = nextNum;
+          j++;
+        } else {
+          break;
+        }
+      }
+
+      // Create range or single value
+      if (endNum === startNum) {
+        ranges.push(sorted[i]);
+      } else {
+        ranges.push(`${sorted[i]} - ${sorted[j - 1]}`);
+      }
+
+      i = j;
+    }
+
+    return ranges.join(', ');
+  };
+
   const handleExportPDF = () => {
     if (sortedSchedules.length === 0) {
       toast.info('No data to export');
       return;
     }
 
-    // Check if all schedules have OTP codes
     const hasAllCodes = sortedSchedules.every((s) => s.otp_code);
     if (!hasAllCodes) {
       toast.error('Cannot export: Some schedules do not have exam codes yet. Please generate codes first.');
@@ -289,7 +370,6 @@ const ProctorMonitoring: React.FC<UserProps> = ({ }) => {
       }
     };
 
-    // ✅ FIXED: Get display status for PDF
     const getStatusDisplay = (status: string) => {
       const normalized = status.toLowerCase().trim();
       if (normalized.includes('late')) return 'LATE';
@@ -301,12 +381,10 @@ const ProctorMonitoring: React.FC<UserProps> = ({ }) => {
 
     const doc = new jsPDF('landscape', 'mm', 'a4');
 
-    // Title
     doc.setFontSize(16);
     doc.setFont('helvetica', 'bold');
     doc.text('EXAM MONITORING REPORT', 148, 15, { align: 'center' });
 
-    // Date generated
     doc.setFontSize(10);
     doc.setFont('helvetica', 'normal');
     doc.text(
@@ -322,25 +400,28 @@ const ProctorMonitoring: React.FC<UserProps> = ({ }) => {
       { align: 'center' },
     );
 
-    // ✅ FIXED: Prepare table data using examdetails_status
-    const tableData = sortedSchedules.map((schedule, index) => [
-      (index + 1).toString(),
-      schedule.course_id,
-      schedule.section_name,
-      schedule.exam_date,
-      `${formatTo12Hour(schedule.exam_start_time)}\n${formatTo12Hour(schedule.exam_end_time)}`,
-      `${schedule.building_name}\nRoom ${schedule.room_id}`,
-      schedule.instructor_name,
-      schedule.proctor_name,
-      schedule.otp_code || 'N/A',
-      formatTimeIn(schedule.code_entry_time),
-      getStatusDisplay(schedule.examdetails_status),  // ✅ Use examdetails_status
-    ]);
+    // ✅ FIXED: Prepare table data with multiple proctor columns
+    const tableData = sortedSchedules.map((schedule, index) => {
+      const proctorInfo = schedule.proctor_details
+        .map((p, i) => `${i + 1}. ${p.proctor_name} (${getStatusDisplay(p.status)}) - ${formatTimeIn(p.time_in)}`)
+        .join('\n');
 
-    // Add table using autoTable function directly
+      return [
+        (index + 1).toString(),
+        schedule.course_id,
+        schedule.section_name,
+        schedule.exam_date,
+        `${formatTo12Hour(schedule.exam_start_time)}\n${formatTo12Hour(schedule.exam_end_time)}`,
+        `${schedule.building_name}\nRoom ${schedule.room_id}`,
+        schedule.instructor_name,
+        proctorInfo || 'No proctors',
+        schedule.otp_code || 'N/A',
+      ];
+    });
+
     autoTable(doc, {
       startY: 28,
-      head: [['#', 'Course', 'Section', 'Date', 'Time', 'Location', 'Instructor', 'Proctor', 'Exam Code', 'Time In', 'Status']],
+      head: [['#', 'Course', 'Section', 'Date', 'Time', 'Location', 'Instructor', 'Proctors (Status - Time In)', 'Exam Code']],
       body: tableData,
       styles: {
         fontSize: 8,
@@ -356,16 +437,14 @@ const ProctorMonitoring: React.FC<UserProps> = ({ }) => {
       },
       columnStyles: {
         0: { cellWidth: 8, halign: 'center' },
-        1: { cellWidth: 20 },
-        2: { cellWidth: 18 },
-        3: { cellWidth: 22 },
-        4: { cellWidth: 24, fontSize: 7 },
-        5: { cellWidth: 28, fontSize: 7 },
-        6: { cellWidth: 30 },
-        7: { cellWidth: 30 },
+        1: { cellWidth: 25 },
+        2: { cellWidth: 22 },
+        3: { cellWidth: 25 },
+        4: { cellWidth: 30, fontSize: 7 },
+        5: { cellWidth: 35, fontSize: 7 },
+        6: { cellWidth: 35 },
+        7: { cellWidth: 60, fontSize: 7 },  // ✅ Wider for multiple proctors
         8: { cellWidth: 22, halign: 'center', fontStyle: 'bold' },
-        9: { cellWidth: 18, halign: 'center' },
-        10: { cellWidth: 20, halign: 'center', fontStyle: 'bold' },
       },
       bodyStyles: {
         valign: 'middle',
@@ -373,29 +452,8 @@ const ProctorMonitoring: React.FC<UserProps> = ({ }) => {
       alternateRowStyles: {
         fillColor: [245, 245, 245],
       },
-      didDrawCell: (data: any) => {
-        // Color code status column
-        if (data.column.index === 10 && data.section === 'body') {
-          const status = String(data.cell.raw).toLowerCase();
-          let color: [number, number, number];
-          if (status.includes('confirm') || status.includes('present')) {
-            color = [40, 167, 69]; // Green
-          } else if (status.includes('late')) {
-            color = [255, 193, 7]; // Yellow
-          } else if (status.includes('absent')) {
-            color = [220, 53, 69]; // Red
-          } else if (status.includes('substitute')) {
-            color = [23, 162, 184]; // Cyan
-          } else {
-            color = [108, 117, 125]; // Gray
-          }
-          doc.setTextColor(color[0], color[1], color[2]);
-          doc.setFont('helvetica', 'bold');
-        }
-      },
     });
 
-    // Footer
     const pageCount = (doc as any).internal.getNumberOfPages();
     for (let i = 1; i <= pageCount; i++) {
       doc.setPage(i);
@@ -409,7 +467,6 @@ const ProctorMonitoring: React.FC<UserProps> = ({ }) => {
       );
     }
 
-    // Save PDF
     doc.save(`exam_monitoring_${new Date().toISOString().split('T')[0]}.pdf`);
     toast.success('PDF exported successfully!');
   };
@@ -438,10 +495,14 @@ const ProctorMonitoring: React.FC<UserProps> = ({ }) => {
   const sortedSchedules = useMemo(() => {
     let data = approvedSchedules;
 
-    // ✅ FIXED: Search using examdetails_status
+    // Apply search filter
     if (searchTerm && searchTerm.trim()) {
       const term = searchTerm.toLowerCase();
       data = data.filter((schedule) => {
+        const proctorNames = schedule.proctor_details
+          .map(p => p.proctor_name)
+          .join(' ');
+
         const combined = [
           schedule.course_id,
           schedule.subject,
@@ -451,9 +512,9 @@ const ProctorMonitoring: React.FC<UserProps> = ({ }) => {
           schedule.exam_end_time,
           schedule.building_name,
           schedule.room_id,
-          schedule.proctor_name,
+          proctorNames,
           schedule.instructor_name,
-          schedule.examdetails_status,  // ✅ Use examdetails_status
+          schedule.examdetails_status,
         ]
           .filter(Boolean)
           .join(' ')
@@ -463,7 +524,7 @@ const ProctorMonitoring: React.FC<UserProps> = ({ }) => {
       });
     }
 
-    // ✅ FIXED: Apply status filter using examdetails_status
+    // Apply status filter
     if (statusFilter && statusFilter !== 'all') {
       data = data.filter((schedule) => {
         const status = (schedule.examdetails_status || '').toLowerCase();
@@ -477,12 +538,39 @@ const ProctorMonitoring: React.FC<UserProps> = ({ }) => {
       });
     }
 
+    // Group schedules by course, date, time, location
+    const groupedMap = new Map<string, MonitoringSchedule & { sections: string[] }>();
+
+    data.forEach((schedule) => {
+      const key = `${schedule.course_id}|${schedule.subject}|${schedule.exam_date}|${schedule.exam_start_time}|${schedule.exam_end_time}|${schedule.building_name}|${schedule.room_id}|${schedule.instructor_name}|${schedule.otp_code}`;
+
+      if (groupedMap.has(key)) {
+        const existing = groupedMap.get(key)!;
+        existing.sections.push(schedule.section_name);
+
+        // Merge proctor_details (avoid duplicates)
+        const existingProctorIds = new Set(existing.proctor_details.map(p => p.proctor_id));
+        schedule.proctor_details.forEach(p => {
+          if (!existingProctorIds.has(p.proctor_id)) {
+            existing.proctor_details.push(p);
+          }
+        });
+      } else {
+        groupedMap.set(key, {
+          ...schedule,
+          sections: [schedule.section_name]
+        });
+      }
+    });
+
+    let groupedData = Array.from(groupedMap.values());
+
     if (sortBy === 'none') {
-      return data;
+      return groupedData;
     }
 
-    // ✅ FIXED: Sort using examdetails_status
-    return [...data].sort((a, b) => {
+    // Sort
+    return [...groupedData].sort((a, b) => {
       switch (sortBy) {
         case 'course_id':
           return smartSort(a.course_id.toLowerCase(), b.course_id.toLowerCase());
@@ -498,12 +586,10 @@ const ProctorMonitoring: React.FC<UserProps> = ({ }) => {
           return smartSort(a.building_name.toLowerCase(), b.building_name.toLowerCase());
         case 'room_id':
           return smartSort(a.room_id.toLowerCase(), b.room_id.toLowerCase());
-        case 'proctor_name':
-          return smartSort(a.proctor_name.toLowerCase(), b.proctor_name.toLowerCase());
         case 'instructor_name':
           return smartSort(a.instructor_name.toLowerCase(), b.instructor_name.toLowerCase());
         case 'status':
-          return smartSort(a.examdetails_status.toLowerCase(), b.examdetails_status.toLowerCase());  // ✅ Use examdetails_status
+          return smartSort(a.examdetails_status.toLowerCase(), b.examdetails_status.toLowerCase());
         default:
           return 0;
       }
@@ -568,7 +654,7 @@ const ProctorMonitoring: React.FC<UserProps> = ({ }) => {
                   minWidth: '150px'
                 }}
               >
-                {['none', 'course_id', 'subject', 'section_name', 'exam_date', 'exam_start_time', 'building_name', 'room_id', 'proctor_name', 'instructor_name', 'status'].map((sortOption) => (
+                {['none', 'course_id', 'subject', 'section_name', 'exam_date', 'exam_start_time', 'building_name', 'room_id', 'instructor_name', 'status'].map((sortOption) => (
                   <button
                     key={sortOption}
                     type="button"
@@ -601,10 +687,9 @@ const ProctorMonitoring: React.FC<UserProps> = ({ }) => {
                             sortOption === 'exam_start_time' ? 'Time' :
                               sortOption === 'building_name' ? 'Building' :
                                 sortOption === 'room_id' ? 'Room' :
-                                  sortOption === 'proctor_name' ? 'Proctor' :
-                                    sortOption === 'instructor_name' ? 'Instructor' :
-                                      sortOption === 'status' ? 'Status' :
-                                        sortOption.charAt(0).toUpperCase() + sortOption.slice(1)}
+                                  sortOption === 'instructor_name' ? 'Instructor' :
+                                    sortOption === 'status' ? 'Status' :
+                                      sortOption.charAt(0).toUpperCase() + sortOption.slice(1)}
                   </button>
                 ))}
               </div>
@@ -689,79 +774,33 @@ const ProctorMonitoring: React.FC<UserProps> = ({ }) => {
                   <th>#</th>
                   <th>Course Code</th>
                   <th>Subject</th>
-                  <th>Section</th>
+                  <th>Section/s</th>
                   <th>Date</th>
                   <th>Time</th>
                   <th>Building</th>
                   <th>Room</th>
-                  <th>Proctor</th>
                   <th>Instructor</th>
                   <th>Exam Code</th>
-                  <th>Time In</th>
-                  <th>Status</th>
+                  <th>Proctors</th>
                 </tr>
               </thead>
               <tbody>
                 {sortedSchedules.length > 0 ? (
                   sortedSchedules.map((schedule, index) => {
-                    // ✅ FIXED: Use examdetails_status directly
-                    const backendStatus = schedule.examdetails_status;
-
-                    const getStatusDisplay = (status: string) => {
-                      const normalized = status.toLowerCase().trim();
-
-                      // Check "late" BEFORE "confirm"
-                      if (normalized.includes('late')) {
-                        return { text: 'Late', className: 'status-late' };
-                      }
-
-                      if (normalized.includes('confirm') || normalized.includes('present')) {
-                        return { text: 'Present', className: 'status-confirmed' };
-                      }
-
-                      if (normalized.includes('absent')) {
-                        return { text: 'Absent', className: 'status-absent' };
-                      }
-
-                      if (normalized.includes('sub')) {
-                        return { text: 'Substitute', className: 'status-substitute' };
-                      }
-
-                      return { text: 'Pending', className: 'status-pending' };
-                    };
-
-                    const statusDisplay = getStatusDisplay(backendStatus);
-
-                    const formatTimeIn = (timeString: string | null | undefined) => {
-                      if (!timeString) return '-';
-                      try {
-                        const date = new Date(timeString);
-                        let hours = date.getHours();
-                        const minutes = date.getMinutes().toString().padStart(2, '0');
-
-                        const ampm = hours >= 12 ? 'PM' : 'AM';
-                        hours = hours % 12;
-                        hours = hours === 0 ? 12 : hours;
-
-                        return `${hours}:${minutes} ${ampm}`;
-                      } catch (e) {
-                        return '-';
-                      }
-                    };
-
-                    const codeEntryTime = schedule.code_entry_time;
-
                     return (
-                      <tr key={schedule.id}>
+                      <tr
+                        key={schedule.id}
+                        onClick={() => handleRowClick(schedule)}
+                        style={{ cursor: 'pointer' }}
+                      >
                         <td>{index + 1}</td>
                         <td>{schedule.course_id}</td>
                         <td>{schedule.subject}</td>
-                        <td>{schedule.section_name}</td>
+                        <td>{formatSectionRanges(schedule.sections || [schedule.section_name])}</td>
                         <td>{schedule.exam_date}</td>
                         <td>{formatTo12Hour(schedule.exam_start_time)} - {formatTo12Hour(schedule.exam_end_time)}</td>
                         <td>{schedule.building_name}</td>
                         <td>{schedule.room_id}</td>
-                        <td>{schedule.proctor_name}</td>
                         <td>{schedule.instructor_name}</td>
                         <td>
                           <div className="proctor-monitoring-otp-field">
@@ -781,13 +820,13 @@ const ProctorMonitoring: React.FC<UserProps> = ({ }) => {
                             )}
                           </div>
                         </td>
-                        <td className="proctor-monitoring-time-in">
-                          {formatTimeIn(codeEntryTime)}
-                        </td>
-                        <td>
-                          {/* ✅ FIXED: Display statusDisplay.text from examdetails_status */}
-                          <span className={`status-badge ${statusDisplay.className}`}>
-                            {statusDisplay.text}
+                        <td style={{ textAlign: 'center' }}>
+                          <span style={{
+                            color: '#0A3765',
+                            fontWeight: 'bold',
+                            fontSize: '0.9em'
+                          }}>
+                            {schedule.proctor_details.length} Proctor{schedule.proctor_details.length !== 1 ? 's' : ''}
                           </span>
                         </td>
                       </tr>
@@ -795,7 +834,7 @@ const ProctorMonitoring: React.FC<UserProps> = ({ }) => {
                   })
                 ) : (
                   <tr>
-                    <td colSpan={13} className="no-data-message">
+                    <td colSpan={11} className="no-data-message">
                       {hasApprovedSchedules
                         ? 'No approved schedules found'
                         : 'No approved schedules yet. Schedules must be approved by the dean before codes can be generated.'}
@@ -806,6 +845,154 @@ const ProctorMonitoring: React.FC<UserProps> = ({ }) => {
             </table>
           </div>
         </>
+      )}
+
+      {/* Proctor Details Modal */}
+      {showProctorModal && selectedSchedule && (
+        <div
+          style={{
+            position: 'fixed',
+            top: 0,
+            left: 0,
+            right: 0,
+            bottom: 0,
+            backgroundColor: 'rgba(0, 0, 0, 0.5)',
+            display: 'flex',
+            justifyContent: 'center',
+            alignItems: 'center',
+            zIndex: 9999
+          }}
+          onClick={() => setShowProctorModal(false)}
+        >
+          <div
+            style={{
+              backgroundColor: 'white',
+              padding: '30px',
+              borderRadius: '10px',
+              maxWidth: '700px',
+              width: '90%',
+              maxHeight: '80vh',
+              overflowY: 'auto',
+              boxShadow: '0 4px 6px rgba(0, 0, 0, 0.1)'
+            }}
+            onClick={(e) => e.stopPropagation()}
+          >
+            <h3 style={{ marginTop: 0, color: '#0A3765', borderBottom: '2px solid #0A3765', paddingBottom: '10px' }}>
+              Schedule Details
+            </h3>
+
+            <div style={{ marginBottom: '20px' }}>
+              <p style={{ margin: '5px 0', color: '#666' }}>
+                <strong>Course:</strong> {selectedSchedule.course_id} - {selectedSchedule.subject}
+              </p>
+              <p style={{ margin: '5px 0', color: '#666' }}>
+                <strong>Section/s:</strong> {formatSectionRanges(selectedSchedule.sections || [selectedSchedule.section_name])}
+              </p>
+              <p style={{ margin: '5px 0', color: '#666' }}>
+                <strong>Date:</strong> {selectedSchedule.exam_date}
+              </p>
+              <p style={{ margin: '5px 0', color: '#666' }}>
+                <strong>Time:</strong> {formatTo12Hour(selectedSchedule.exam_start_time)} - {formatTo12Hour(selectedSchedule.exam_end_time)}
+              </p>
+              <p style={{ margin: '5px 0', color: '#666' }}>
+                <strong>Location:</strong> {selectedSchedule.building_name}, Room {selectedSchedule.room_id}
+              </p>
+              <p style={{ margin: '5px 0', color: '#666' }}>
+                <strong>Instructor:</strong> {selectedSchedule.instructor_name}
+              </p>
+              <p style={{ margin: '5px 0', color: '#666' }}>
+                <strong>Exam Code:</strong> <span style={{ fontFamily: 'monospace', fontWeight: 'bold' }}>{selectedSchedule.otp_code || 'Not generated'}</span>
+              </p>
+            </div>
+
+            <h4 style={{ color: '#333', marginBottom: '15px' }}>
+              Assigned Proctors ({selectedSchedule.proctor_details.length})
+            </h4>
+
+            {selectedSchedule.proctor_details.length > 0 ? (
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '15px' }}>
+                {selectedSchedule.proctor_details.map((proctor, index) => {
+                  const getStatusDisplay = (status: string) => {
+                    const normalized = status.toLowerCase().trim();
+                    if (normalized.includes('late')) {
+                      return { text: 'Late', className: 'status-late' };
+                    }
+                    if (normalized.includes('confirm') || normalized.includes('present')) {
+                      return { text: 'Present', className: 'status-confirmed' };
+                    }
+                    if (normalized.includes('absent')) {
+                      return { text: 'Absent', className: 'status-absent' };
+                    }
+                    if (normalized.includes('sub')) {
+                      return { text: 'Substitute', className: 'status-substitute' };
+                    }
+                    return { text: 'Pending', className: 'status-pending' };
+                  };
+
+                  const formatTimeIn = (timeString: string | null | undefined) => {
+                    if (!timeString) return 'Not yet checked in';
+                    try {
+                      const date = new Date(timeString);
+                      let hours = date.getHours();
+                      const minutes = date.getMinutes().toString().padStart(2, '0');
+                      const ampm = hours >= 12 ? 'PM' : 'AM';
+                      hours = hours % 12;
+                      hours = hours === 0 ? 12 : hours;
+                      return `${hours}:${minutes} ${ampm}`;
+                    } catch (e) {
+                      return 'Invalid time';
+                    }
+                  };
+
+                  const statusDisplay = getStatusDisplay(proctor.status);
+
+                  return (
+                    <div
+                      key={proctor.proctor_id}
+                      style={{
+                        padding: '15px',
+                        border: '1px solid #ddd',
+                        borderRadius: '8px',
+                        backgroundColor: '#f9f9f9'
+                      }}
+                    >
+                      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '10px' }}>
+                        <h5 style={{ margin: 0, color: '#333', fontSize: '16px' }}>
+                          Proctor {index + 1}: {proctor.proctor_name}
+                        </h5>
+                        <span className={`status-badge ${statusDisplay.className}`}>
+                          {statusDisplay.text}
+                        </span>
+                      </div>
+                      <p style={{ margin: '5px 0', color: '#666', fontSize: '14px' }}>
+                        <strong>Time In:</strong> {formatTimeIn(proctor.time_in)}
+                      </p>
+                    </div>
+                  );
+                })}
+              </div>
+            ) : (
+              <p style={{ color: '#999', fontStyle: 'italic' }}>No proctors assigned</p>
+            )}
+
+            <div style={{ marginTop: '20px', display: 'flex', justifyContent: 'flex-end' }}>
+              <button
+                onClick={() => setShowProctorModal(false)}
+                style={{
+                  padding: '10px 20px',
+                  backgroundColor: '#0A3765',
+                  color: 'white',
+                  border: 'none',
+                  borderRadius: '5px',
+                  cursor: 'pointer',
+                  fontWeight: 'bold'
+                }}
+              >
+                Close
+              </button>
+            </div>
+          </div>
+        </div>
       )}
 
       {/* Reset Confirmation Modal */}
