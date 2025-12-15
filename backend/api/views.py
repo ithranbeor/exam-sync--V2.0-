@@ -691,6 +691,7 @@ def all_exams_for_substitution(request):
 def proctor_monitoring_dashboard(request):
     """
     Get monitoring data - shows WHO checked in for each exam
+    ✅ FIXED: Handles empty proctor arrays and prevents index errors
     """
     try:
         college_name = request.GET.get('college_name')
@@ -722,10 +723,7 @@ def proctor_monitoring_dashboard(request):
             except Exception:
                 otp_code = None
             
-            # ✅ FIXED: Check attendance for ALL assigned proctors
-            all_proctors = []
-            
-            # Get assigned proctor IDs
+            # ✅ Get assigned proctor IDs
             if exam.proctors:
                 assigned_proctor_ids = exam.proctors
             elif exam.proctor_id:
@@ -733,7 +731,7 @@ def proctor_monitoring_dashboard(request):
             else:
                 assigned_proctor_ids = []
             
-            # Check each proctor's status
+            # ✅ Check each proctor's status
             proctor_statuses = []
             for proctor_id in assigned_proctor_ids:
                 try:
@@ -780,17 +778,32 @@ def proctor_monitoring_dashboard(request):
                     })
                     
                 except TblUsers.DoesNotExist:
+                    print(f"⚠️ Warning: Proctor {proctor_id} not found")
+                    continue
+                except Exception as e:
+                    print(f"⚠️ Error processing proctor {proctor_id}: {str(e)}")
                     continue
             
-            # ✅ Format proctor names with status indicators
-            proctor_display = ', '.join([
-                f"{p['proctor_name']} ({'✓' if p['status'] in ['confirmed', 'late'] else '✗'})"
-                for p in proctor_statuses
-            ])
+            # ✅ Format proctor names with status indicators (handle empty list)
+            if proctor_statuses:
+                proctor_display = ', '.join([
+                    f"{p['proctor_name']} ({'✓' if p['status'] in ['confirmed', 'late'] else '✗'})"
+                    for p in proctor_statuses
+                ])
+            else:
+                proctor_display = 'No proctor assigned'
             
             # Overall exam status (if ANY proctor checked in, show confirmed)
             has_any_attendance = any(p['status'] in ['confirmed', 'late', 'substitute'] for p in proctor_statuses)
             overall_status = 'confirmed' if has_any_attendance else 'pending'
+            
+            # ✅ Get first time_in (handle empty list)
+            first_time_in = None
+            if proctor_statuses:
+                for p in proctor_statuses:
+                    if p['time_in']:
+                        first_time_in = p['time_in']
+                        break
             
             # Get instructor names
             instructor_names = []
@@ -827,8 +840,9 @@ def proctor_monitoring_dashboard(request):
                 'instructor_name': instructor_name,
                 'department': exam.college_name,
                 'college': exam.college_name,
-                'status': overall_status,
-                'code_entry_time': proctor_statuses[0]['time_in'] if proctor_statuses and proctor_statuses[0]['time_in'] else None,
+                'examdetails_status': overall_status,  # ✅ Use examdetails_status
+                'status': overall_status,  # ✅ Keep for compatibility
+                'code_entry_time': first_time_in,  # ✅ Fixed to handle empty list
                 'otp_code': otp_code
             })
         
