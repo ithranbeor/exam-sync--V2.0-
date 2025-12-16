@@ -34,6 +34,8 @@ const Terms: React.FC = () => {
   const [showSortDropdown, setShowSortDropdown] = useState(false);
   const [canScrollLeft, setCanScrollLeft] = useState(false);
   const [canScrollRight, setCanScrollRight] = useState(false);
+  const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
+  const [deleteCount, setDeleteCount] = useState(0);
   const tableContainerRef = useRef<HTMLDivElement>(null);
 
   // Handle ESC key to close modals
@@ -51,6 +53,12 @@ const Terms: React.FC = () => {
       setShowImport(false);
     }
   }, showImport);
+
+  useEscapeKey(() => {
+    if (showDeleteConfirm) {
+      setShowDeleteConfirm(false);
+    }
+  }, showDeleteConfirm);
 
   useEffect(() => {
     fetchTerms();
@@ -301,13 +309,19 @@ const Terms: React.FC = () => {
     }
   };
 
-  const handleBulkDelete = async () => {
+  const handleBulkDelete = () => {
     const ids = Array.from(selectedIds);
     if (ids.length === 0) {
       toast.info("No terms selected");
       return;
     }
-    if (!globalThis.confirm(`Delete ${ids.length} selected term(s)?`)) return;
+    setDeleteCount(ids.length);
+    setShowDeleteConfirm(true);
+  };
+
+  const confirmDelete = async () => {
+    const ids = Array.from(selectedIds);
+    setShowDeleteConfirm(false);
     setIsBulkDeleting(true);
     try {
       const results = await Promise.allSettled(ids.map((id) => api.delete(`/tbl_term/${id}/`)));
@@ -952,6 +966,38 @@ const Terms: React.FC = () => {
                 disabled={isImporting}
               >
                 {isImporting ? "Importing…" : "Close"}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Delete Confirmation Modal */}
+      {showDeleteConfirm && (
+        <div className="modal-overlay" onClick={() => setShowDeleteConfirm(false)}>
+          <div className="modal delete-confirm-modal" onClick={(e) => e.stopPropagation()}>
+            <h3>Are you sure to delete this Term?</h3>
+            <p className="delete-confirm-message">
+              {deleteCount === 1 
+                ? 'Delete this one term' 
+                : `Delete these ${deleteCount} terms`}
+            </p>
+            <div className="modal-actions">
+              <button 
+                type="button" 
+                className="modal-button confirm-delete"
+                onClick={confirmDelete}
+                disabled={isBulkDeleting}
+              >
+                {isBulkDeleting ? 'Deleting...' : 'Delete'}
+              </button>
+              <button 
+                type="button" 
+                className="modal-button cancel-delete"
+                onClick={() => setShowDeleteConfirm(false)}
+                disabled={isBulkDeleting}
+              >
+                Cancel
               </button>
             </div>
           </div>

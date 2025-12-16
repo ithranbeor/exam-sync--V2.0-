@@ -53,6 +53,8 @@ const Programs: React.FC<ProgramsProps> = ({ user: _user }) => {
   const [showSortDropdown, setShowSortDropdown] = useState(false);
   const [canScrollLeft, setCanScrollLeft] = useState(false);
   const [canScrollRight, setCanScrollRight] = useState(false);
+  const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
+  const [deleteCount, setDeleteCount] = useState(0);
   const tableContainerRef = useRef<HTMLDivElement>(null);
 
   // Handle ESC key to close modals
@@ -71,6 +73,12 @@ const Programs: React.FC<ProgramsProps> = ({ user: _user }) => {
       setShowImport(false);
     }
   }, showImport);
+
+  useEscapeKey(() => {
+    if (showDeleteConfirm) {
+      setShowDeleteConfirm(false);
+    }
+  }, showDeleteConfirm);
 
   useEffect(() => {
     fetchDepartments();
@@ -321,13 +329,19 @@ const Programs: React.FC<ProgramsProps> = ({ user: _user }) => {
     }
   };
 
-  const handleBulkDelete = async () => {
+  const handleBulkDelete = () => {
     const ids = Array.from(selectedIds);
     if (ids.length === 0) {
       toast.info('No programs selected');
       return;
     }
-    if (!globalThis.confirm(`Delete ${ids.length} selected program(s)?`)) return;
+    setDeleteCount(ids.length);
+    setShowDeleteConfirm(true);
+  };
+
+  const confirmDelete = async () => {
+    const ids = Array.from(selectedIds);
+    setShowDeleteConfirm(false);
     setIsBulkDeleting(true);
     try {
       const results = await Promise.allSettled(ids.map((id) => api.delete(`/programs/${id}/`)));
@@ -1073,6 +1087,38 @@ const Programs: React.FC<ProgramsProps> = ({ user: _user }) => {
                 {isImporting ? 'Importing…' : 'Done'}
               </button>
               <button type="button" onClick={() => setShowImport(false)} disabled={isImporting}>
+                Cancel
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Delete Confirmation Modal */}
+      {showDeleteConfirm && (
+        <div className="modal-overlay" onClick={() => setShowDeleteConfirm(false)}>
+          <div className="modal delete-confirm-modal" onClick={(e) => e.stopPropagation()}>
+            <h3>Are you sure to delete this Program?</h3>
+            <p className="delete-confirm-message">
+              {deleteCount === 1 
+                ? 'Delete this one program' 
+                : `Delete these ${deleteCount} programs`}
+            </p>
+            <div className="modal-actions">
+              <button 
+                type="button" 
+                className="modal-button confirm-delete"
+                onClick={confirmDelete}
+                disabled={isBulkDeleting}
+              >
+                {isBulkDeleting ? 'Deleting...' : 'Delete'}
+              </button>
+              <button 
+                type="button" 
+                className="modal-button cancel-delete"
+                onClick={() => setShowDeleteConfirm(false)}
+                disabled={isBulkDeleting}
+              >
                 Cancel
               </button>
             </div>

@@ -43,6 +43,8 @@ const Departments: React.FC = () => {
   const [showSortDropdown, setShowSortDropdown] = useState(false);
   const [canScrollLeft, setCanScrollLeft] = useState(false);
   const [canScrollRight, setCanScrollRight] = useState(false);
+  const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
+  const [deleteCount, setDeleteCount] = useState(0);
   const tableContainerRef = useRef<HTMLDivElement>(null);
 
   // Handle ESC key to close modals
@@ -61,6 +63,12 @@ const Departments: React.FC = () => {
       setShowImport(false);
     }
   }, showImport);
+
+  useEscapeKey(() => {
+    if (showDeleteConfirm) {
+      setShowDeleteConfirm(false);
+    }
+  }, showDeleteConfirm);
 
   useEffect(() => {
     fetchDepartments();
@@ -292,13 +300,19 @@ const Departments: React.FC = () => {
     }
   };
 
-  const handleBulkDelete = async () => {
+  const handleBulkDelete = () => {
     const ids = Array.from(selectedIds);
     if (ids.length === 0) {
       toast.info('No departments selected');
       return;
     }
-    if (!window.confirm(`Delete ${ids.length} selected department(s)?`)) return;
+    setDeleteCount(ids.length);
+    setShowDeleteConfirm(true);
+  };
+
+  const confirmDelete = async () => {
+    const ids = Array.from(selectedIds);
+    setShowDeleteConfirm(false);
     setIsBulkDeleting(true);
     try {
       const results = await Promise.allSettled(ids.map((id) => api.delete(`/departments/${id}/`)));
@@ -1030,6 +1044,38 @@ const Departments: React.FC = () => {
             <div className="modal-actions">
               <button type="button" onClick={() => setShowImport(false)} disabled={isImporting}>
                 {isImporting ? 'Importing...' : 'Done'}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Delete Confirmation Modal */}
+      {showDeleteConfirm && (
+        <div className="modal-overlay" onClick={() => setShowDeleteConfirm(false)}>
+          <div className="modal delete-confirm-modal" onClick={(e) => e.stopPropagation()}>
+            <h3>Are you sure to delete this Department?</h3>
+            <p className="delete-confirm-message">
+              {deleteCount === 1 
+                ? 'Delete this one department' 
+                : `Delete these ${deleteCount} departments`}
+            </p>
+            <div className="modal-actions">
+              <button 
+                type="button" 
+                className="modal-button confirm-delete"
+                onClick={confirmDelete}
+                disabled={isBulkDeleting}
+              >
+                {isBulkDeleting ? 'Deleting...' : 'Delete'}
+              </button>
+              <button 
+                type="button" 
+                className="modal-button cancel-delete"
+                onClick={() => setShowDeleteConfirm(false)}
+                disabled={isBulkDeleting}
+              >
+                Cancel
               </button>
             </div>
           </div>
