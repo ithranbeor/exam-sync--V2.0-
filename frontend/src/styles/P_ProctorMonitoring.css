@@ -567,10 +567,60 @@
   border: 1px solid #e0e0e0;
   border-radius: 12px;
   box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
-  padding: 20px;
-  min-width: 280px;
+  padding: 0;
+  min-width: 320px;
   z-index: 1000;
   animation: slideDown 0.2s ease-out;
+  overflow: hidden;
+}
+
+.pm-history-header {
+  background: linear-gradient(135deg, #0A3765 0%, #0d4a7a 100%);
+  color: white;
+  padding: 16px 20px;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  border-bottom: 2px solid #092C4C;
+}
+
+.pm-history-header h4 {
+  margin: 0;
+  font-size: 16px;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+}
+
+.pm-clear-history-btn {
+  background-color: rgba(255, 255, 255, 0.2);
+  color: white;
+  border: 1px solid rgba(255, 255, 255, 0.3);
+  padding: 6px 12px;
+  border-radius: 6px;
+  font-size: 12px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  white-space: nowrap;
+}
+
+.pm-clear-history-btn:hover {
+  background-color: rgba(255, 255, 255, 0.3);
+  border-color: rgba(255, 255, 255, 0.5);
+  transform: translateY(-1px);
+}
+
+.pm-history-filters {
+  padding: 20px;
+}
+
+.pm-filter-group {
+  margin-bottom: 16px;
+}
+
+.pm-filter-group:last-of-type {
+  margin-bottom: 0;
 }
 
 @keyframes slideDown {
@@ -628,6 +678,21 @@
   margin-bottom: 0;
 }
 
+.pm-history-info {
+  background-color: #f8f9fa;
+  border-top: 1px solid #e0e0e0;
+  padding: 12px 20px;
+  margin: 0;
+}
+
+.pm-history-info p {
+  margin: 0;
+  font-size: 13px;
+  color: #0A3765;
+  font-weight: 600;
+  text-align: center;
+}
+
 /* Dropdown arrow indicator for buttons */
 .pm-history-button::after {
   content: '▼';
@@ -638,6 +703,35 @@
 
 .pm-history-button.active::after {
   transform: rotate(180deg);
+}
+
+/* History button active state when filters are applied */
+.pm-history-button.history-active {
+  background-color: #0d4a7a;
+  box-shadow: 0 0 0 2px rgba(10, 55, 101, 0.3);
+}
+
+.pm-history-button.history-active:hover {
+  background-color: #0f5a8a;
+}
+
+.history-indicator {
+  display: inline-block;
+  width: 6px;
+  height: 6px;
+  background-color: #FAB417;
+  border-radius: 50%;
+  margin-left: 6px;
+  animation: pulse 2s infinite;
+}
+
+@keyframes pulse {
+  0%, 100% {
+    opacity: 1;
+  }
+  50% {
+    opacity: 0.6;
+  }
 }
 
 /* Improved button hover state */
