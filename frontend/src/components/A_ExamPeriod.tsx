@@ -1195,7 +1195,8 @@ const ExamPeriodComponent: React.FC = () => {
                           setSelectedDates([startDate]);
                           setActiveDate(startDate);
                           setShowModal(true);
-                        }}><FaEdit /></button>
+                        }}><FaEdit /> Edit
+                        </button>
                         <input
                           type="checkbox"
                           checked={!!e.examperiod_id && selectedExamIds.has(e.examperiod_id)}

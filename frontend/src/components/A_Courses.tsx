@@ -1135,7 +1135,7 @@ const Courses: React.FC = () => {
                       </td>
                       <td className="action-buttons" style={{ display: "flex", alignItems: "center", gap: 8 }}>
                         <button type='button' className="icon-button edit-button" onClick={() => handleEdit(c)}>
-                          <FaEdit />
+                          <FaEdit />Edit
                         </button>
                         <input
                           type="checkbox"

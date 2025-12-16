@@ -937,7 +937,7 @@ const Departments: React.FC = () => {
                           setEditingDeptId(dept.department_id);
                           setShowModal(true);
                         }}>
-                          <FaEdit />
+                          <FaEdit/> Edit
                         </button>
                         <input
                           type="checkbox"

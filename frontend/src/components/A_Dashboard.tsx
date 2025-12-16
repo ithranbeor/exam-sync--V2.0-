@@ -24,7 +24,7 @@ import Rooms from './A_Rooms.tsx';
 import ExamPeriod from './A_ExamPeriod.tsx';
 import UserManagement from './A_UserManagement.tsx';
 import Profile from './F_Profile.tsx';
-import ProctorViewExam from "./F_ExamViewer.tsx";
+import ProctorCourseDetails from './P_ProctorAssignedExams.tsx';
 import BayanihanModality from "./B_BayanihanModality.tsx";
 import MiniExamDateCalendar from "./F_MiniExamDateCalendar.tsx";
 
@@ -54,6 +54,7 @@ const DashboardAdmin: React.FC = () => {
   const [currentDateTime, setCurrentDateTime] = useState(new Date());
   const [showLogoutModal, setShowLogoutModal] = useState(false);
   const [isMobile, setIsMobile] = useState(window.innerWidth <= 1024);
+  const [roles, setRoles] = useState<string[]>([]);
   const navigate = useNavigate();
 
   // Load logged-in user
@@ -82,6 +83,22 @@ const DashboardAdmin: React.FC = () => {
     };
     loadUser();
   }, [navigate]);
+
+  useEffect(() => {
+    const fetchUserRoles = async () => {
+      if (!user?.user_id) return;
+      try {
+        const res = await api.get(`/user-roles/${user.user_id}/roles/`);
+        const roleData = res.data
+          .filter((r: any) => r.status?.toLowerCase() === 'active')
+          .map((r: any) => r.role_name.toLowerCase());
+        setRoles(roleData);
+      } catch (err) {
+        console.error('Error fetching roles:', err);
+      }
+    };
+    fetchUserRoles();
+  }, [user]);
 
   // Clock
   useEffect(() => {
@@ -192,8 +209,9 @@ const DashboardAdmin: React.FC = () => {
               <div className="full-width-section">
                 <h2>Shortcut</h2>
                 <div className="try-things-grid">
+                  {roles.includes('proctor') &&
+                    <div className="try-thing-card"><ProctorCourseDetails user={user} /></div>}
                   <div className="try-thing-card"><MiniExamDateCalendar user={user} /></div>
-                  <div className="try-thing-card"><ProctorViewExam user={user} /></div>
                 </div>
               </div>
             </div>

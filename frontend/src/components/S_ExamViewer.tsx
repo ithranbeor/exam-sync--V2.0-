@@ -2611,6 +2611,7 @@ const SchedulerView: React.FC<SchedulerViewProps> = ({ user }) => {
           semesterName={semesterName}
           yearName={yearName}
           buildingName={buildingName}
+          persistentUnscheduled={persistentUnscheduled} 
         />
       </Modal>
 

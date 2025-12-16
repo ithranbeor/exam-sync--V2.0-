@@ -45,7 +45,7 @@ const Profile: React.FC<ProfileProps> = ({ user }) => {
   const [loading, setLoading] = useState(true);
   const [isChangingPassword, setIsChangingPassword] = useState(false);
 
-  /** 🔹 Fetch user profile */
+  /** Fetch user profile */
   const fetchProfile = useCallback(async () => {
     if (!user?.user_id) return;
     setLoading(true);
@@ -96,51 +96,53 @@ const Profile: React.FC<ProfileProps> = ({ user }) => {
     fetchRoles();
   }, [fetchProfile, fetchRoles]);
 
-  /** 🔹 Handle input changes */
+  /** Handle input changes */
   const handleChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     if (!profile) return;
     setProfile({ ...profile, [e.target.name]: e.target.value });
   };
 
-  /** 🔹 Upload avatar */
-  const handleAvatarUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+  /** Upload avatar */
+  const handleAvatarPreview = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
-    if (!file || !user?.user_id) return;
+    if (!file) return;
+
+    // Create local preview URL
+    const previewUrl = URL.createObjectURL(file);
+    setPreview(previewUrl);
+
+    // Store file for later upload
+    setProfile(prev => prev && { ...prev, avatarFile: file } as any);
+  };
+
+  /** Upload avatar only when saving */
+  const uploadAvatar = async (file: File) => {
+    if (!user?.user_id) return null;
+
     try {
       const formData = new FormData();
       formData.append('avatar', file);
       const res = await api.post(`/users/${user.user_id}/avatar/`, formData, {
         headers: { 'Content-Type': 'multipart/form-data' },
       });
-      setProfile(prev => prev && { ...prev, avatar_url: res.data.avatar_url });
-      setPreview(res.data.avatar_url);
-      toast.success('Profile picture updated!');
+      return res.data.avatar_url;
     } catch (err) {
       console.error('Avatar upload failed:', err);
-      toast.error('Avatar upload failed.');
+      throw err;
     }
   };
 
-  /** 🔹 Delete avatar */
-  const handleDeleteAvatar = async () => {
-    if (!user?.user_id) return;
-    try {
-      // ✅ CHANGED: Use /delete/ endpoint instead
-      await api.delete(`/users/${user.user_id}/avatar/delete/`);
-      setProfile(prev => prev && { ...prev, avatar_url: null });
-      setPreview(null);
-      toast.success('Avatar deleted.');
-    } catch (err) {
-      console.error('Error deleting avatar:', err);
-      toast.error('Failed to delete avatar.');
-    }
-  };
-
-  /** 🔹 Save profile changes */
+  /** Save profile changes */
   const handleSave = async () => {
     if (!profile) return;
     setLoading(true);
     try {
+      // Upload avatar first if changed
+      let finalAvatarUrl = profile.avatar_url;
+      if ((profile as any).avatarFile) {
+        finalAvatarUrl = await uploadAvatar((profile as any).avatarFile);
+      }
+
       const payload = {
         first_name: profile.first_name,
         middle_name: profile.middle_name,
@@ -148,9 +150,15 @@ const Profile: React.FC<ProfileProps> = ({ user }) => {
         contact_number: profile.contact_number,
         email_address: profile.email_address,
       };
+
       const { data } = await api.patch(`/users/${profile.user_id}/`, payload);
-      setProfile(data);
-      setOriginalProfile(data);
+
+      // Update with new avatar URL if uploaded
+      const updatedData = { ...data, avatar_url: finalAvatarUrl };
+      setProfile(updatedData);
+      setOriginalProfile(updatedData);
+      setPreview(finalAvatarUrl);
+
       toast.success('Profile updated successfully!');
       setEditing(false);
     } catch (err) {
@@ -158,6 +166,38 @@ const Profile: React.FC<ProfileProps> = ({ user }) => {
       toast.error('Failed to update profile.');
     } finally {
       setLoading(false);
+    }
+  };
+
+  /** Cancel editing and restore original */
+  const handleCancel = () => {
+    setEditing(false);
+    setProfile(originalProfile);
+    setPreview(originalProfile?.avatar_url || null);
+  };
+
+  /** Delete avatar */
+  const handleDeleteAvatar = async () => {
+    if (!user?.user_id) return;
+
+    if (editing && (profile as any)?.avatarFile) {
+      setPreview(originalProfile?.avatar_url || null);
+      setProfile(prev => {
+        const { avatarFile, ...rest } = prev as any;
+        return rest;
+      });
+      return;
+    }
+
+    try {
+      await api.delete(`/users/${user.user_id}/avatar/delete/`);
+      setProfile(prev => prev && { ...prev, avatar_url: null });
+      setOriginalProfile(prev => prev && { ...prev, avatar_url: null });
+      setPreview(null);
+      toast.success('Avatar deleted.');
+    } catch (err) {
+      console.error('Error deleting avatar:', err);
+      toast.error('Failed to delete avatar.');
     }
   };
 
@@ -200,7 +240,13 @@ const Profile: React.FC<ProfileProps> = ({ user }) => {
             <>
               <label htmlFor="avatar-upload" className="profile-avatar-edit-icon">
                 <MdEdit size={24} />
-                <input id="avatar-upload" type="file" accept="image/*" onChange={handleAvatarUpload} hidden />
+                <input
+                  id="avatar-upload"
+                  type="file"
+                  accept="image/*"
+                  onChange={handleAvatarPreview}
+                  hidden
+                />
               </label>
               {preview && (
                 <button type="button" className="delete-avatar-btn" onClick={handleDeleteAvatar}>
@@ -260,7 +306,7 @@ const Profile: React.FC<ProfileProps> = ({ user }) => {
           <h3>Personal Details</h3>
           {!editing && (
             <button type="button" className="edit-details-btn" onClick={() => setEditing(true)} disabled={loading}>
-              <MdEdit />
+              <MdEdit /> Edit
             </button>
           )}
         </div>
@@ -294,7 +340,11 @@ const Profile: React.FC<ProfileProps> = ({ user }) => {
 
         {editing && (
           <div className="personal-details-actions">
-            <button type="button" className="btn cancel-personal-details" onClick={() => { setEditing(false); setProfile(originalProfile); }}>
+            <button
+              type="button"
+              className="btn cancel-personal-details"
+              onClick={handleCancel}  // ✅ Use new cancel handler
+            >
               Cancel
             </button>
             <button type="button" className="btn save-changes-global" onClick={handleSave}>Save</button>

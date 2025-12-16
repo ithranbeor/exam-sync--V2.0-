@@ -1898,17 +1898,29 @@ export const UserManagement: React.FC<UserManagementProps> = ({ }) => {
                       </td>
                       <td className="role-actions">
                         <button className="icon-button edit-button" onClick={() => setEditingRole(role)} title="Edit Role">
-                          <FaPen />
+                          <FaPen /> Edit
                         </button>
                         <button
                           className={`icon-button ${role.status === 'Suspended' ? 'reactivate-button' : 'delete-button'}`}
                           onClick={() => toggleUserRoleStatus(role.user_role_id, role.status || 'Active')}
-                          title={role.status === 'Suspended' ? 'Reactivate Role' : 'Suspend Role'}
+                          title={role.status === 'Suspended' ? 'Activate Role' : 'Deactivate Role'}
                         >
-                          {role.status === 'Suspended' ? <FaLockOpen /> : <FaLock />}
+                          {role.status === 'Suspended' ? (
+                            <>
+                              <FaLockOpen /> Activate
+                            </>
+                          ) : (
+                            <>
+                              <FaLock /> Deactivate
+                            </>
+                          )}
                         </button>
-                        <button className="icon-button delete-button" onClick={() => handleDeleteRole(role.user_role_id)} title="Delete Role">
-                          <FaTrash />
+                        <button
+                          className="icon-button delete-button"
+                          onClick={() => handleDeleteRole(role.user_role_id)}
+                          title="Delete Role"
+                        >
+                          <FaTrash /> Delete
                         </button>
                       </td>
                     </tr>

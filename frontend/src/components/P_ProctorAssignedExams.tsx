@@ -13,7 +13,8 @@ interface ProctorAssignment {
   room_id: string;
   building: string;
   instructor: string;
-  examdetails_status: string; // ✅ FIXED: Changed from 'status' to 'examdetails_status'
+  examdetails_status: string;
+  is_history?: boolean;
 }
 
 interface ProctorCourseDetailsProps {
@@ -27,6 +28,7 @@ interface ProctorCourseDetailsProps {
 
 const ProctorCourseDetails = ({ user }: ProctorCourseDetailsProps) => {
   const [assignments, setAssignments] = useState<ProctorAssignment[]>([]);
+  const [historyRecords, setHistoryRecords] = useState<ProctorAssignment[]>([]);
   const [_loading, setLoading] = useState(true);
   const [filter, setFilter] = useState<'all' | 'upcoming' | 'ongoing' | 'completed'>('upcoming');
   const [expandedCard, setExpandedCard] = useState<number | null>(null);
@@ -38,63 +40,21 @@ const ProctorCourseDetails = ({ user }: ProctorCourseDetailsProps) => {
       try {
         setLoading(true);
 
-        // ✅ FIX: Get ALL exam details where THIS user is the proctor (no filtering by approval)
-        const examDetailsResponse = await api.get('/tbl_examdetails', {
-          params: {
-            proctor_id: user.user_id
-          }
-        });
+        // ✅ SINGLE SOURCE OF TRUTH
+        const response = await api.get(`/proctor-assigned-exams/${user.user_id}/`);
 
-        if (!examDetailsResponse.data || !Array.isArray(examDetailsResponse.data)) {
-          setAssignments([]);
-          setLoading(false);
-          return;
-        }
+        const upcoming = Array.isArray(response.data?.upcoming)
+          ? response.data.upcoming
+          : [];
+        const ongoing = Array.isArray(response.data?.ongoing)
+          ? response.data.ongoing
+          : [];
+        const completed = Array.isArray(response.data?.completed)
+          ? response.data.completed
+          : [];
 
-        const proctorExams = examDetailsResponse.data;
-
-        // Filter to only exams where this user is actually assigned
-        const userProctorExams = proctorExams.filter(exam => {
-          const isSingleProctor = Number(exam.proctor_id) === Number(user.user_id);
-          const isInProctorsArray = exam.proctors &&
-            Array.isArray(exam.proctors) &&
-            exam.proctors.some((pid: number) => Number(pid) === Number(user.user_id));
-
-          return isSingleProctor || isInProctorsArray;
-        });
-
-        if (userProctorExams.length === 0) {
-          setAssignments([]);
-          setLoading(false);
-          return;
-        }
-
-        // Get instructor names for all exams
-        const instructorIds = [...new Set(userProctorExams.map(exam => exam.instructor_id).filter(Boolean))];
-        const instructorMap = new Map<number, string>();
-
-        if (instructorIds.length > 0) {
-          try {
-            const usersResponse = await api.get('/users/');
-            const allUsers = usersResponse.data;
-
-            instructorIds.forEach(instructorId => {
-              const instructor = allUsers.find((u: any) => u.user_id === instructorId);
-              if (instructor) {
-                const fullName = `${instructor.first_name || ''} ${instructor.last_name || ''}`.trim();
-                instructorMap.set(instructorId, fullName || `Instructor ${instructorId}`);
-              } else {
-                instructorMap.set(instructorId, `Instructor ${instructorId}`);
-              }
-            });
-          } catch (err) {
-            console.error('Error fetching instructors:', err);
-          }
-        }
-
-        // ✅ FIX: Transform ALL assigned exams (no approval filtering)
-        const formattedAssignments: ProctorAssignment[] = userProctorExams.map(exam => ({
-          assignment_id: exam.examdetails_id,
+        const mapExam = (exam: any, isHistory = false): ProctorAssignment => ({
+          assignment_id: exam.id,
           course_id: exam.course_id,
           section: exam.section_name || 'N/A',
           exam_date: exam.exam_date,
@@ -102,19 +62,32 @@ const ProctorCourseDetails = ({ user }: ProctorCourseDetailsProps) => {
           exam_end_time: exam.exam_end_time,
           room_id: exam.room_id,
           building: exam.building_name || 'N/A',
-          instructor: exam.instructor_id ? (instructorMap.get(exam.instructor_id) || `Instructor ${exam.instructor_id}`) : 'N/A',
-          examdetails_status: exam.examdetails_status || 'pending'
-        }));
+          instructor: exam.instructor_name || 'N/A',
+          examdetails_status: exam.status || 'pending',
+          is_history: isHistory,
+        });
 
-        // Sort by date (earliest first)
-        const sorted = formattedAssignments.sort(
-          (a, b) => new Date(a.exam_date).getTime() - new Date(b.exam_date).getTime()
-        );
+        // ✅ Combine everything safely
+        const combinedAssignments: ProctorAssignment[] = [
+          ...upcoming.map((e: any) => mapExam(e, false)),
+          ...ongoing.map((e: any) => mapExam(e, false)),
+          ...completed.map((e: any) => mapExam(e, true)),
+        ];
 
-        setAssignments(sorted);
-      } catch (err: any) {
-        console.error('Error fetching proctor assignments:', err);
+        // ✅ Sort by exam date + time
+        combinedAssignments.sort((a, b) => {
+          const dateA = new Date(`${a.exam_date} ${a.exam_start_time}`).getTime();
+          const dateB = new Date(`${b.exam_date} ${b.exam_start_time}`).getTime();
+          return dateA - dateB;
+        });
+
+        setAssignments(combinedAssignments);
+        setHistoryRecords([]); // history already merged
+
+      } catch (err) {
+        console.error('❌ Error fetching proctor assignments:', err);
         setAssignments([]);
+        setHistoryRecords([]);
       } finally {
         setLoading(false);
       }
@@ -131,7 +104,6 @@ const ProctorCourseDetails = ({ user }: ProctorCourseDetailsProps) => {
       const now = new Date();
       const examDateObj = new Date(examDate);
 
-      // Check if it's the same day
       const isSameDay =
         now.getFullYear() === examDateObj.getFullYear() &&
         now.getMonth() === examDateObj.getMonth() &&
@@ -141,7 +113,6 @@ const ProctorCourseDetails = ({ user }: ProctorCourseDetailsProps) => {
         return false;
       }
 
-      // Create Date objects for start and end times
       const examStart = new Date(startTime);
       const examEnd = new Date(endTime);
 
@@ -157,47 +128,59 @@ const ProctorCourseDetails = ({ user }: ProctorCourseDetailsProps) => {
 
   const now = new Date();
 
-  // ✅ FIXED: Filter logic now uses examdetails_status from backend
-  const filteredAssignments = assignments.filter((assign) => {
+  // ✅ Combine current assignments and history
+  const allRecords = [...assignments, ...historyRecords];
+
+  const filteredAssignments = allRecords.filter((assign) => {
     const examStartTime = new Date(assign.exam_start_time);
     const examEndTime = new Date(assign.exam_end_time);
     const isOngoing = isExamOngoing(assign.exam_date, assign.exam_start_time, assign.exam_end_time);
 
-    // ✅ CHANGED: Check for "present", "late", or "substitute" statuses
     const backendStatus = (assign.examdetails_status || 'pending').toLowerCase().trim();
     const hasCheckedIn = backendStatus.includes('present') ||
       backendStatus.includes('late') ||
-      backendStatus.includes('substitute');
+      backendStatus.includes('substitute') ||
+      backendStatus.includes('confirmed') ||
+      backendStatus.includes('absent');
+
+    const isHistoryRecord = assign.is_history === true;
 
     if (filter === 'upcoming') {
-      return examStartTime > now;
+      return examStartTime > now && !isHistoryRecord;
     } else if (filter === 'ongoing') {
-      return isOngoing && !hasCheckedIn;
+      return isOngoing && !hasCheckedIn && !isHistoryRecord;
     } else if (filter === 'completed') {
-      return hasCheckedIn || examEndTime < now;
+      return hasCheckedIn || examEndTime < now || isHistoryRecord;
     }
     return true; // 'all'
   });
 
-  // ✅ FIXED: Count calculations now use examdetails_status
-  const upcomingCount = assignments.filter(a => new Date(a.exam_start_time) > now).length;
+  // ✅ Updated count calculations
+  const upcomingCount = allRecords.filter(a => {
+    const isHistoryRecord = a.is_history === true;
+    return new Date(a.exam_start_time) > now && !isHistoryRecord;
+  }).length;
 
-  const ongoingCount = assignments.filter(a => {
+  const ongoingCount = allRecords.filter(a => {
+    const isHistoryRecord = a.is_history === true;
     const isOngoing = isExamOngoing(a.exam_date, a.exam_start_time, a.exam_end_time);
     const backendStatus = (a.examdetails_status || 'pending').toLowerCase().trim();
     const hasCheckedIn = backendStatus.includes('present') ||
       backendStatus.includes('late') ||
       backendStatus.includes('substitute');
-    return isOngoing && !hasCheckedIn;
+    return isOngoing && !hasCheckedIn && !isHistoryRecord;
   }).length;
 
-  const completedCount = assignments.filter(a => {
+  const completedCount = allRecords.filter(a => {
     const backendStatus = (a.examdetails_status || 'pending').toLowerCase().trim();
     const hasCheckedIn = backendStatus.includes('present') ||
       backendStatus.includes('late') ||
-      backendStatus.includes('substitute');
+      backendStatus.includes('substitute') ||
+      backendStatus.includes('confirmed') ||
+      backendStatus.includes('absent');
     const examEndTime = new Date(a.exam_end_time);
-    return hasCheckedIn || examEndTime < now;
+    const isHistoryRecord = a.is_history === true;
+    return hasCheckedIn || examEndTime < now || isHistoryRecord;
   }).length;
 
   const formatDateFull = (dateStr: string) => {
@@ -234,7 +217,7 @@ const ProctorCourseDetails = ({ user }: ProctorCourseDetailsProps) => {
       <div className="proctor-course-header">
         <div className="header-title">
           <h3>Assigned Proctoring</h3>
-          <p className="total-assignments">{assignments.length} total sections</p>
+          <p className="total-assignments">{allRecords.length} total sections</p>
         </div>
         <div className="filter-buttons">
           <button
@@ -269,7 +252,7 @@ const ProctorCourseDetails = ({ user }: ProctorCourseDetailsProps) => {
             className={`filter-btn ${filter === 'all' ? 'active' : ''}`}
             onClick={() => setFilter('all')}
           >
-            All ({assignments.length})
+            All ({allRecords.length})
           </button>
         </div>
       </div>
@@ -291,24 +274,23 @@ const ProctorCourseDetails = ({ user }: ProctorCourseDetailsProps) => {
             const examEndTime = new Date(assign.exam_end_time);
             const isOngoing = isExamOngoing(assign.exam_date, assign.exam_start_time, assign.exam_end_time);
 
-            // ✅ CHANGED: Use backend status to determine if checked in
             const backendStatus = (assign.examdetails_status || 'pending').toLowerCase().trim();
             const hasCheckedIn = backendStatus.includes('present') ||
               backendStatus.includes('late') ||
-              backendStatus.includes('substitute');
+              backendStatus.includes('substitute') ||
+              backendStatus.includes('confirmed') ||
+              backendStatus.includes('absent');
 
             const isUpcoming = examStartTime > now;
-            const isCompleted = hasCheckedIn || examEndTime < now;
+            const isCompleted = hasCheckedIn || examEndTime < now || assign.is_history === true;
             const isExpanded = expandedCard === assign.assignment_id;
             const duration = getDuration(assign.exam_start_time, assign.exam_end_time);
 
-            // ✅ CHANGED: Display status logic based on backend status
             let displayStatus = 'Upcoming';
             let statusClass = 'upcoming-badge';
 
             if (isCompleted) {
-              // Show the specific completion status
-              if (backendStatus.includes('present')) {
+              if (backendStatus.includes('confirmed') || backendStatus.includes('present')) {
                 displayStatus = 'Present';
                 statusClass = 'completed-badge';
               } else if (backendStatus.includes('late')) {
@@ -334,7 +316,7 @@ const ProctorCourseDetails = ({ user }: ProctorCourseDetailsProps) => {
 
             return (
               <div
-                key={assign.assignment_id}
+                key={`${assign.assignment_id}-${assign.is_history ? 'history' : 'current'}`}
                 className={`course-card ${isCompleted ? 'completed' : isOngoing ? 'ongoing' : 'upcoming'} ${isExpanded ? 'expanded' : ''}`}
               >
                 <div

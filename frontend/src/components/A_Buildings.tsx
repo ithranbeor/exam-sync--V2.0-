@@ -947,7 +947,7 @@ const Buildings: React.FC = () => {
                           title="View Rooms"
                           onClick={() => openRoomModal(b.building_id)}
                         >
-                          <FaEye />
+                          <FaEye /> View
                         </button>
                         <button
                           type="button"
@@ -958,7 +958,7 @@ const Buildings: React.FC = () => {
                             setShowModal(true);
                           }}
                         >
-                          <FaEdit />
+                          <FaEdit /> Edit
                         </button>
                         <input
                           type="checkbox"

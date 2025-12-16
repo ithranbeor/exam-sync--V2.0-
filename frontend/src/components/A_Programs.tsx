@@ -972,7 +972,7 @@ const Programs: React.FC<ProgramsProps> = ({ user: _user }) => {
                           }}
                           className="icon-button edit-button"
                         >
-                          <FaEdit />
+                          <FaEdit /> Edit
                         </button>
                         <input
                           type="checkbox"

@@ -56,24 +56,73 @@ const DeanScheduleViewer: React.FC<DeanScheduleViewerProps> = ({ scheduleData })
   }));
 
   // Generate course colors
-  const generateCourseColors = (courses: string[]) => {
-    const colors = [
-      "#79b4f2", "#f27f79", "#79f2b4", "#f2e279", "#b479f2", "#f279d6",
-      "#79d6f2", "#d6f279", "#f29979", "#a3f279", "#f279a3", "#79a3f2",
-      "#f2c879", "#79f2e2", "#f2a879", "#b4f279", "#f27979", "#79f279",
-      "#79f2d6", "#f279f2", "#79f2f2", "#f2b479", "#c879f2", "#79f2a8",
-      "#f2d679", "#a879f2", "#79f2c8", "#f279b4", "#f2f279", "#79b4f2"
-    ];
+  const generateCourseColors = (schedules: Schedule[]) => {
+    const yearColors = {
+      1: [
+        '#DC2626', '#D97706', '#059669', '#0891B2', '#2563EB',
+        '#7C3AED', '#DB2777', '#EA580C', '#0D9488', '#65A30D'],
+      2: [
+        '#991B1B', '#92400E', '#065F46', '#0E7490', '#1E40AF',
+        '#5B21B6', '#9D174D', '#C2410C', '#115E59', '#3F6212'],
+      3: [
+        '#7F1D1D', '#78350F', '#064E3B', '#155E75', '#1E3A8A',
+        '#4C1D95', '#831843', '#9A3412', '#134E4A', '#365314'],
+      4: [
+        '#450A0A', '#451A03', '#022C22', '#083344', '#172554',
+        '#2E1065', '#500724', '#7C2D12', '#042F2E', '#1A2E05']
+    };
 
     const courseColorMap: Record<string, string> = {};
-    courses.forEach((course, idx) => {
-      courseColorMap[course] = colors[idx % colors.length];
+    const programYearMap: Record<string, number> = {};
+
+    schedules.forEach((schedule) => {
+      if (!schedule.course_id) return;
+      if (courseColorMap[schedule.course_id]) return;
+
+      let yearLevel: number | null = null;
+      let program = '';
+
+      // Extract from section_name
+      if (schedule.section_name) {
+        const sectionStr = String(schedule.section_name).trim();
+        let match = sectionStr.match(/^([A-Za-z]+)(\d)([A-Za-z]*)$/);
+        if (!match) match = sectionStr.match(/^([A-Za-z]+)\s+(\d)([A-Za-z]*)$/);
+        if (!match) match = sectionStr.match(/^([A-Za-z]+)-(\d)([A-Za-z]*)$/);
+
+        if (!match) {
+          const digitMatch = sectionStr.match(/(\d)/);
+          const letterMatch = sectionStr.match(/^([A-Za-z]+)/);
+          if (digitMatch && letterMatch) {
+            program = letterMatch[1];
+            yearLevel = parseInt(digitMatch[1]);
+          }
+        } else {
+          program = match[1];
+          yearLevel = parseInt(match[2]);
+        }
+      }
+
+      // Assign color based on year level
+      if (yearLevel && yearLevel >= 1 && yearLevel <= 4) {
+        const programYearKey = `${program}-${yearLevel}`;
+        const availableColors = yearColors[yearLevel as keyof typeof yearColors];
+
+        if (!programYearMap[programYearKey]) {
+          programYearMap[programYearKey] = 0;
+        }
+
+        const colorIndex = programYearMap[programYearKey] % availableColors.length;
+        courseColorMap[schedule.course_id] = availableColors[colorIndex];
+        programYearMap[programYearKey]++;
+      } else {
+        courseColorMap[schedule.course_id] = '#9CA3AF'; // Gray for unmatched
+      }
     });
+
     return courseColorMap;
   };
 
-  const uniqueCourses = Array.from(new Set(scheduleData.schedules.map(s => s.course_id)));
-  const courseColorMap = generateCourseColors(uniqueCourses);
+  const courseColorMap = generateCourseColors(scheduleData.schedules);
 
   // Group schedules by date
   const uniqueDates = Array.from(
@@ -211,28 +260,25 @@ const DeanScheduleViewer: React.FC<DeanScheduleViewerProps> = ({ scheduleData })
                       className="dean-schedule-cell"
                       style={{
                         backgroundColor: courseColorMap[exam.course_id] || "#ccc",
-                        color: "black",
+                        color: "white",
                         padding: "4px",
                         borderRadius: "4px",
                         fontSize: "12px",
                       }}
                     >
                       <p><strong>{exam.course_id}</strong></p>
-                      {/* ✅ Adjust font size if section_name is long */}
                       <p style={{
                         fontSize: sectionDisplay && sectionDisplay.length > 30 ? '10px' : '12px',
                         lineHeight: '1.2'
                       }}>
                         {sectionDisplay}
                       </p>
-                      {/* ✅ Adjust font size if instructor is long */}
                       <p style={{
                         fontSize: exam.instructor && exam.instructor.length > 30 ? '10px' : '12px',
                         lineHeight: '1.2'
                       }}>
                         Instructor: {exam.instructor}
                       </p>
-                      {/* ✅ Adjust font size if proctor is long */}
                       <p style={{
                         fontSize: exam.proctor && exam.proctor.length > 30 ? '10px' : '12px',
                         lineHeight: '1.2'

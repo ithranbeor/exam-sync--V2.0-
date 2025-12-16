@@ -885,7 +885,7 @@ const Colleges: React.FC = () => {
                             setShowModal(true);
                           }}
                         >
-                          <FaEdit />
+                          <FaEdit /> Edit
                         </button>
                         <input
                           type="checkbox"

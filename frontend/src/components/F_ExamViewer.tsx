@@ -245,15 +245,15 @@ const ProctorViewExam: React.FC<ProctorViewExamProps> = ({ user }) => {
       if (names.length === 0) return 'Not Assigned';
       return names.join(', ');
     }
-    
+
     if (exam.proctor_id) {
       return getUserName(exam.proctor_id);
     }
-    
+
     if (exam.proctors && exam.proctors.length === 1) {
       return getUserName(exam.proctors[0]);
     }
-    
+
     return 'Not Assigned';
   };
 
@@ -270,46 +270,46 @@ const ProctorViewExam: React.FC<ProctorViewExamProps> = ({ user }) => {
   const filteredExamData = selectedFilter === "all"
     ? examData
     : examData.filter(exam => {
-        const filterKey = `${exam.semester} | ${exam.academic_year} | ${exam.exam_date}`;
-        return filterKey === selectedFilter;
-      });
+      const filterKey = `${exam.semester} | ${exam.academic_year} | ${exam.exam_date}`;
+      return filterKey === selectedFilter;
+    });
 
   // Filter based on view mode
   const viewFilteredData = viewMode === "my-schedule"
-    ? filteredExamData.filter(exam => 
-        exam.proctor_id === user?.user_id || 
-        (exam.proctors && exam.proctors.includes(user?.user_id || 0))
-      )
+    ? filteredExamData.filter(exam =>
+      exam.proctor_id === user?.user_id ||
+      (exam.proctors && exam.proctors.includes(user?.user_id || 0))
+    )
     : filteredExamData;
 
   const searchFilteredData = searchTerm.trim() === ""
     ? viewFilteredData
     : viewFilteredData.filter(exam => {
-        const searchLower = searchTerm.toLowerCase();
-        
-        const sectionMatch = 
-          (exam.sections && exam.sections.some(s => s.toLowerCase().includes(searchLower))) ||
-          exam.section_name?.toLowerCase().includes(searchLower);
-        
-        const instructorMatch = 
-          (exam.instructors && exam.instructors.some(id => getUserName(id).toLowerCase().includes(searchLower))) ||
-          getUserName(exam.instructor_id).toLowerCase().includes(searchLower);
-        
-        const proctorMatch = 
-          (exam.proctors && exam.proctors.some(id => getUserName(id).toLowerCase().includes(searchLower))) ||
-          getUserName(exam.proctor_id).toLowerCase().includes(searchLower);
-        
-        return (
-          exam.course_id?.toLowerCase().includes(searchLower) ||
-          sectionMatch ||
-          exam.room_id?.toLowerCase().includes(searchLower) ||
-          instructorMatch ||
-          proctorMatch ||
-          exam.exam_date?.includes(searchTerm) ||
-          exam.exam_start_time?.includes(searchTerm) ||
-          exam.exam_end_time?.includes(searchTerm)
-        );
-      });
+      const searchLower = searchTerm.toLowerCase();
+
+      const sectionMatch =
+        (exam.sections && exam.sections.some(s => s.toLowerCase().includes(searchLower))) ||
+        exam.section_name?.toLowerCase().includes(searchLower);
+
+      const instructorMatch =
+        (exam.instructors && exam.instructors.some(id => getUserName(id).toLowerCase().includes(searchLower))) ||
+        getUserName(exam.instructor_id).toLowerCase().includes(searchLower);
+
+      const proctorMatch =
+        (exam.proctors && exam.proctors.some(id => getUserName(id).toLowerCase().includes(searchLower))) ||
+        getUserName(exam.proctor_id).toLowerCase().includes(searchLower);
+
+      return (
+        exam.course_id?.toLowerCase().includes(searchLower) ||
+        sectionMatch ||
+        exam.room_id?.toLowerCase().includes(searchLower) ||
+        instructorMatch ||
+        proctorMatch ||
+        exam.exam_date?.includes(searchTerm) ||
+        exam.exam_start_time?.includes(searchTerm) ||
+        exam.exam_end_time?.includes(searchTerm)
+      );
+    });
 
   const getFilterOptions = () => {
     const uniqueOptions = new Set<string>();
@@ -343,25 +343,99 @@ const ProctorViewExam: React.FC<ProctorViewExamProps> = ({ user }) => {
     label: `${formatTo12Hour(t)} - ${formatTo12Hour(rawTimes[i + 1])}`,
   }));
 
-  const generateCourseColors = (courses: string[]) => {
-    const colors = [
-      "#79b4f2", "#f27f79", "#79f2b4", "#f2e279", "#b479f2", "#f279d6",
-      "#79d6f2", "#d6f279", "#f29979", "#a3f279", "#f279a3", "#79a3f2",
-      "#f2c879", "#79f2e2", "#f2a879", "#b4f279", "#f27979", "#79f279",
-      "#79f2d6", "#f279f2", "#79f2f2", "#f2b479", "#c879f2", "#79f2a8",
-      "#f2d679", "#a879f2", "#79f2c8", "#f279b4", "#f2f279", "#79b4f2"
-    ];
+  const generateCourseColors = (exams: ExamDetail[]) => {
+    const yearColors = {
+      1: [
+        '#DC2626', '#D97706', '#059669', '#0891B2', '#2563EB',
+        '#7C3AED', '#DB2777', '#EA580C', '#0D9488', '#65A30D'],
+      2: [
+        '#991B1B', '#92400E', '#065F46', '#0E7490', '#1E40AF',
+        '#5B21B6', '#9D174D', '#C2410C', '#115E59', '#3F6212'],
+      3: [
+        '#7F1D1D', '#78350F', '#064E3B', '#155E75', '#1E3A8A',
+        '#4C1D95', '#831843', '#9A3412', '#134E4A', '#365314'],
+      4: [
+        '#450A0A', '#451A03', '#022C22', '#083344', '#172554',
+        '#2E1065', '#500724', '#7C2D12', '#042F2E', '#1A2E05']
+    };
 
     const courseColorMap: Record<string, string> = {};
-    courses.forEach((course, idx) => {
-      courseColorMap[course] = colors[idx % colors.length];
+    const programYearMap: Record<string, number> = {};
+
+    exams.forEach((exam) => {
+      if (!exam.course_id) return;
+      if (courseColorMap[exam.course_id]) return;
+
+      let yearLevel: number | null = null;
+      let program = '';
+
+      // Extract year level from sections
+      if (exam.sections && exam.sections.length > 0) {
+        for (const section of exam.sections) {
+          const sectionStr = String(section).trim();
+          let match = sectionStr.match(/^([A-Za-z]+)(\d)([A-Za-z]*)$/);
+          if (!match) match = sectionStr.match(/^([A-Za-z]+)\s+(\d)([A-Za-z]*)$/);
+          if (!match) match = sectionStr.match(/^([A-Za-z]+)-(\d)([A-Za-z]*)$/);
+
+          if (!match) {
+            const digitMatch = sectionStr.match(/(\d)/);
+            const letterMatch = sectionStr.match(/^([A-Za-z]+)/);
+            if (digitMatch && letterMatch) {
+              program = letterMatch[1];
+              yearLevel = parseInt(digitMatch[1]);
+              break;
+            }
+          }
+
+          if (match) {
+            program = match[1];
+            yearLevel = parseInt(match[2]);
+            break;
+          }
+        }
+      }
+
+      // Fallback to section_name
+      if (!yearLevel && exam.section_name) {
+        const sectionStr = String(exam.section_name).trim();
+        let match = sectionStr.match(/^([A-Za-z]+)(\d)([A-Za-z]*)$/);
+        if (!match) match = sectionStr.match(/^([A-Za-z]+)\s+(\d)([A-Za-z]*)$/);
+        if (!match) match = sectionStr.match(/^([A-Za-z]+)-(\d)([A-Za-z]*)$/);
+
+        if (!match) {
+          const digitMatch = sectionStr.match(/(\d)/);
+          const letterMatch = sectionStr.match(/^([A-Za-z]+)/);
+          if (digitMatch && letterMatch) {
+            program = letterMatch[1];
+            yearLevel = parseInt(digitMatch[1]);
+          }
+        } else {
+          program = match[1];
+          yearLevel = parseInt(match[2]);
+        }
+      }
+
+      // Assign color based on year level
+      if (yearLevel && yearLevel >= 1 && yearLevel <= 4) {
+        const programYearKey = `${program}-${yearLevel}`;
+        const availableColors = yearColors[yearLevel as keyof typeof yearColors];
+
+        if (!programYearMap[programYearKey]) {
+          programYearMap[programYearKey] = 0;
+        }
+
+        const colorIndex = programYearMap[programYearKey] % availableColors.length;
+        courseColorMap[exam.course_id] = availableColors[colorIndex];
+        programYearMap[programYearKey]++;
+      } else {
+        courseColorMap[exam.course_id] = '#9CA3AF'; // Gray for unmatched
+      }
     });
+
     return courseColorMap;
   };
 
-  const courseColorMap = generateCourseColors(
-    Array.from(new Set(searchFilteredData.map(e => e.course_id).filter(Boolean)))
-  );
+  const courseColorMap = generateCourseColors(searchFilteredData);
 
   const hasData = searchFilteredData.length > 0;
 
@@ -446,11 +520,11 @@ const ProctorViewExam: React.FC<ProctorViewExamProps> = ({ user }) => {
                 margin: '0 auto'
               }}>
                 <p style={{ margin: 0, fontWeight: 'bold' }}>
-                  {approvalStatus === 'pending' 
-                    ? 'Schedule is pending approval from the dean.' 
+                  {approvalStatus === 'pending'
+                    ? 'Schedule is pending approval from the dean.'
                     : approvalStatus === 'rejected'
-                    ? 'Schedule was rejected. Please contact your scheduler.'
-                    : 'No approved schedule available yet.'}
+                      ? 'Schedule was rejected. Please contact your scheduler.'
+                      : 'No approved schedule available yet.'}
                 </p>
               </div>
             </div>
@@ -669,10 +743,10 @@ const ProctorViewExam: React.FC<ProctorViewExamProps> = ({ user }) => {
                 color: '#999',
                 fontFamily: 'serif'
               }}>
-                {viewMode === "my-schedule" 
-                  ? "No schedules assigned to you yet" 
-                  : selectedFilter === "all" 
-                    ? "No schedules available" 
+                {viewMode === "my-schedule"
+                  ? "No schedules assigned to you yet"
+                  : selectedFilter === "all"
+                    ? "No schedules available"
                     : "No schedules found for selected filter"}
               </div>
             </div>
@@ -832,7 +906,7 @@ const ProctorViewExam: React.FC<ProctorViewExamProps> = ({ user }) => {
                               }
 
                               // Highlight if this is the proctor's schedule
-                              const isMySchedule = exam.proctor_id === user?.user_id || 
+                              const isMySchedule = exam.proctor_id === user?.user_id ||
                                 (exam.proctors && exam.proctors.includes(user?.user_id || 0));
 
                               return (
@@ -840,7 +914,7 @@ const ProctorViewExam: React.FC<ProctorViewExamProps> = ({ user }) => {
                                   <div
                                     style={{
                                       backgroundColor: courseColorMap[exam.course_id || ""] || "#ccc",
-                                      color: "black",
+                                      color: "white",
                                       padding: 4,
                                       borderRadius: 4,
                                       fontSize: 12,
@@ -854,7 +928,7 @@ const ProctorViewExam: React.FC<ProctorViewExamProps> = ({ user }) => {
                                       )
                                         ? "3px solid yellow"
                                         : "none",
-                                      boxShadow: isMySchedule 
+                                      boxShadow: isMySchedule
                                         ? "0 0 15px 3px rgba(76, 175, 80, 0.8)"
                                         : searchTerm && (
                                           exam.course_id?.toLowerCase().includes(searchTerm.toLowerCase()) ||
@@ -866,19 +940,19 @@ const ProctorViewExam: React.FC<ProctorViewExamProps> = ({ user }) => {
                                     }}
                                   >
                                     <p><strong>{exam.course_id}</strong></p>
-                                    <p style={{ 
+                                    <p style={{
                                       fontSize: exam.sections && exam.sections.length > 3 ? '10px' : '12px',
                                       lineHeight: '1.2'
                                     }}>
                                       {getSectionDisplay(exam)}
                                     </p>
-                                    <p style={{ 
+                                    <p style={{
                                       fontSize: exam.instructors && exam.instructors.length > 2 ? '10px' : '12px',
                                       lineHeight: '1.2'
                                     }}>
                                       Instructor: {getInstructorDisplay(exam)}
                                     </p>
-                                    <p style={{ 
+                                    <p style={{
                                       fontSize: exam.proctors && exam.proctors.length > 2 ? '10px' : '12px',
                                       lineHeight: '1.2'
                                     }}>
@@ -1053,7 +1127,7 @@ const ProctorViewExam: React.FC<ProctorViewExamProps> = ({ user }) => {
                                 }
                               }
 
-                              const isMySchedule = exam.proctor_id === user?.user_id || 
+                              const isMySchedule = exam.proctor_id === user?.user_id ||
                                 (exam.proctors && exam.proctors.includes(user?.user_id || 0));
 
                               return (
@@ -1061,7 +1135,7 @@ const ProctorViewExam: React.FC<ProctorViewExamProps> = ({ user }) => {
                                   <div
                                     style={{
                                       backgroundColor: courseColorMap[exam.course_id || ""] || "#ccc",
-                                      color: "black",
+                                      color: "white",
                                       padding: 4,
                                       borderRadius: 4,
                                       fontSize: 12,
@@ -1075,7 +1149,7 @@ const ProctorViewExam: React.FC<ProctorViewExamProps> = ({ user }) => {
                                       )
                                         ? "3px solid yellow"
                                         : "none",
-                                      boxShadow: isMySchedule 
+                                      boxShadow: isMySchedule
                                         ? "0 0 15px 3px rgba(76, 175, 80, 0.8)"
                                         : searchTerm && (
                                           exam.course_id?.toLowerCase().includes(searchTerm.toLowerCase()) ||
@@ -1087,19 +1161,19 @@ const ProctorViewExam: React.FC<ProctorViewExamProps> = ({ user }) => {
                                     }}
                                   >
                                     <p><strong>{exam.course_id}</strong></p>
-                                    <p style={{ 
+                                    <p style={{
                                       fontSize: exam.sections && exam.sections.length > 3 ? '10px' : '12px',
                                       lineHeight: '1.2'
                                     }}>
                                       {getSectionDisplay(exam)}
                                     </p>
-                                    <p style={{ 
+                                    <p style={{
                                       fontSize: exam.instructors && exam.instructors.length > 2 ? '10px' : '12px',
                                       lineHeight: '1.2'
                                     }}>
                                       Instructor: {getInstructorDisplay(exam)}
                                     </p>
-                                    <p style={{ 
+                                    <p style={{
                                       fontSize: exam.proctors && exam.proctors.length > 2 ? '10px' : '12px',
                                       lineHeight: '1.2'
                                     }}>
