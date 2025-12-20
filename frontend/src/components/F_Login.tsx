@@ -153,7 +153,6 @@ const LoginFaculty: React.FC = () => {
 
   return (
     <div className="login-container">
-      {/* Background Gradient & Greeting */}
       <div className="background-gradient">
         <div className="greeting-text">
           <p>{greeting}!</p>

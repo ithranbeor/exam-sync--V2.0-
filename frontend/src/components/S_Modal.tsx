@@ -13,7 +13,6 @@ export interface ModalProps {
 const Modal: React.FC<ModalProps> = ({ isOpen, onClose, children }) => {
   const [isAnimating, setIsAnimating] = useState(false);
 
-  // Create modal root if it doesn't exist
   useEffect(() => {
     let root = document.getElementById("modal-root");
     if (!root) {
@@ -35,10 +34,9 @@ const Modal: React.FC<ModalProps> = ({ isOpen, onClose, children }) => {
     setIsAnimating(false);
     setTimeout(() => {
       onClose();
-    }, 300); // Match animation duration
+    }, 300);
   };
 
-  // Handle ESC key to close modal
   useEscapeKey(handleClose, isOpen);
 
   if (!isOpen && !isAnimating) return null;

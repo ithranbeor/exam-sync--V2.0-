@@ -59,7 +59,7 @@ const EmailSender: React.FC<EmailSenderProps> = ({
 
         if (approvalStatus === 'approved' && examData && examData.length > 0) {
 
-          // 🔒 CRITICAL: Filter exam data by scheduler's college FIRST
+          //Filter exam data by scheduler's college FIRST
           const collegeExamData = examData.filter(
             exam => exam.college_name === collegeName
           );
@@ -265,9 +265,7 @@ const EmailSender: React.FC<EmailSenderProps> = ({
 
       if (failed_emails && failed_emails.length > 0) {
 
-        // Show detailed error messages
         failed_emails.forEach((fail: any) => {
-          // Show specific error toast
           if (fail.reason.includes('authentication')) {
             toast.error(`Gmail authentication failed. Contact system admin.`, {
               autoClose: 5000
@@ -285,7 +283,7 @@ const EmailSender: React.FC<EmailSenderProps> = ({
       }
 
       if (sent_count === emailsData.length) {
-        onClose(); // Only close if all succeeded
+        onClose(); 
       }
 
     } catch (err: any) {
@@ -297,9 +295,7 @@ const EmailSender: React.FC<EmailSenderProps> = ({
       const errorMessage = err?.response?.data?.error;
       const smtpConfig = err?.response?.data?.smtp_config;
 
-      // Show specific error messages based on status code
       if (status === 503) {
-        // Service unavailable - SMTP connection failed
         toast.error(
           `Email service unavailable: ${errorDetail || 'Cannot connect to Gmail SMTP server'}`,
           { autoClose: 7000 }
@@ -322,7 +318,6 @@ const EmailSender: React.FC<EmailSenderProps> = ({
           { autoClose: 5000 }
         );
       } else {
-        // Generic error
         toast.error(
           errorMessage || errorDetail || "Failed to send emails. Please try again.",
           { autoClose: 5000 }

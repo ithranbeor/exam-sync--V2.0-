@@ -52,7 +52,6 @@ const ProctorSetAvailability: React.FC<ProctorSetAvailabilityProps> = ({ user })
 
   const today = new Date();
 
-  // Fetch availability list for current user
   useEffect(() => {
     const fetchAvailability = async () => {
       if (!user?.user_id) return;
@@ -107,21 +106,18 @@ const ProctorSetAvailability: React.FC<ProctorSetAvailabilityProps> = ({ user })
     fetchAvailability();
   }, [user.user_id]);
 
-  // Initialize current month
   useEffect(() => {
     const localToday = new Date();
     localToday.setHours(12, 0, 0, 0);
     setCurrentMonth(new Date(localToday.getFullYear(), localToday.getMonth(), 1));
   }, []);
 
-  // Fetch allowed dates (based on exam period)
   useEffect(() => {
     const fetchUserRoleAndSchedule = async () => {
       setLoadingAllowedDates(true);
       try {
         if (!user?.user_id) return;
 
-        // 1️⃣ Fetch user roles from tbl_user_role
         const { data: roles } = await api.get(`/tbl_user_role`, {
           params: { user_id: user.user_id }
         });
@@ -133,7 +129,6 @@ const ProctorSetAvailability: React.FC<ProctorSetAvailabilityProps> = ({ user })
           return;
         }
 
-        // 2️⃣ Check if user is a proctor (role_id = 5)
         const proctorRole = roles.find((r: any) => r.role === 5 || r.role_id === 5);
         if (!proctorRole) {
           setCollegeId(null);
@@ -141,10 +136,8 @@ const ProctorSetAvailability: React.FC<ProctorSetAvailabilityProps> = ({ user })
           return;
         }
 
-        // 3️⃣ Get college from role or user record
         let college_id = proctorRole.college ?? proctorRole.college_id ?? null;
 
-        // If college not in role, fetch from tbl_users
         if (!college_id) {
           const { data: userData } = await api.get(`/tbl_users/${user.user_id}`);
           college_id = userData?.college_id ?? null;
@@ -158,14 +151,12 @@ const ProctorSetAvailability: React.FC<ProctorSetAvailabilityProps> = ({ user })
 
         setCollegeId(college_id);
 
-        // 4️⃣ Fetch exam periods
         const { data: allPeriods } = await api.get(`/tbl_examperiod`);
         if (!Array.isArray(allPeriods)) {
           setAllowedDates([]);
           return;
         }
 
-        // ✅ Filter by the correct college_id
         const collegePeriods = allPeriods.filter(
           (period: any) => String(period.college_id) === String(college_id)
         );
@@ -175,7 +166,6 @@ const ProctorSetAvailability: React.FC<ProctorSetAvailabilityProps> = ({ user })
           return;
         }
 
-        // 5️⃣ Generate all valid exam dates
         const generatedDates: string[] = [];
         collegePeriods.forEach((period: any) => {
           if (!period.start_date || !period.end_date) return;
@@ -198,7 +188,6 @@ const ProctorSetAvailability: React.FC<ProctorSetAvailabilityProps> = ({ user })
     fetchUserRoleAndSchedule();
   }, [user.user_id]);
 
-  // Check if there's an approved schedule for the proctor's college
   useEffect(() => {
     const checkApprovedSchedule = async () => {
       if (!_collegeId) {
@@ -207,7 +196,6 @@ const ProctorSetAvailability: React.FC<ProctorSetAvailabilityProps> = ({ user })
       }
 
       try {
-        // Get the college name from college_id
         const { data: collegeData } = await api.get(`/tbl_college/${_collegeId}/`);
 
         if (!collegeData?.college_name) {
@@ -215,7 +203,6 @@ const ProctorSetAvailability: React.FC<ProctorSetAvailabilityProps> = ({ user })
           return;
         }
 
-        // Check if there's an approved schedule for this college
         const { data: approvedSchedules } = await api.get(`/tbl_scheduleapproval/`, {
           params: {
             college_name: collegeData.college_name,
@@ -274,17 +261,16 @@ const ProctorSetAvailability: React.FC<ProctorSetAvailabilityProps> = ({ user })
       return;
     }
 
-    // Check for redundancy and total slots
     let totalSlots = 0;
     let isRedundant = false;
 
-    const daySlotMapCopy = { ...dayToTimeSlots }; // existing map of day -> time slots
+    const daySlotMapCopy = { ...dayToTimeSlots };
 
     for (const day of selectedDates) {
       const existingSlots = daySlotMapCopy[day] || [];
       for (const slot of selectedTimeSlots) {
         if (existingSlots.includes(slot)) {
-          isRedundant = true; // This slot already exists for this day
+          isRedundant = true; 
         } else {
           totalSlots++;
         }
@@ -301,7 +287,6 @@ const ProctorSetAvailability: React.FC<ProctorSetAvailabilityProps> = ({ user })
       return;
     }
 
-    // Show confirmation modal instead of submitting directly
     setConfirmPendingSubmit('availability');
     setShowConfirmAvailability(true);
   };
@@ -337,7 +322,6 @@ const ProctorSetAvailability: React.FC<ProctorSetAvailabilityProps> = ({ user })
           remarks: data.remarks ?? undefined,
         };
 
-        // Update state
         setAvailabilityList(prev => [...prev, formattedData]);
         setDayToTimeSlots(prev => {
           const updated = { ...prev };
@@ -351,7 +335,6 @@ const ProctorSetAvailability: React.FC<ProctorSetAvailabilityProps> = ({ user })
         });
         setAvailableDays(prev => Array.from(new Set([...prev, ...selectedDates])));
 
-        // Clear selections
         setSelectedDates([]);
         setSelectedTimeSlots([]);
         setAvailabilityStatus('available');
@@ -386,7 +369,6 @@ const ProctorSetAvailability: React.FC<ProctorSetAvailabilityProps> = ({ user })
       return;
     }
 
-    // Show confirmation modal
     setConfirmPendingSubmit('change');
     setShowConfirmChangeRequest(true);
   };

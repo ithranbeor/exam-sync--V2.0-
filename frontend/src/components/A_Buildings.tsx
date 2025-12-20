@@ -30,7 +30,7 @@ const Buildings: React.FC = () => {
   const [showImport, setShowImport] = useState(false);
   const [showRoomModal, setShowRoomModal] = useState(false);
   const [editMode, setEditMode] = useState(false);
-  const [loading, setLoading] = useState(true); // new state
+  const [loading, setLoading] = useState(true);
   const [isImporting, setIsImporting] = useState(false);
   const [currentPage, setCurrentPage] = useState(1);
   const [itemsPerPage, setItemsPerPage] = useState<number | 'all'>('all');
@@ -73,14 +73,13 @@ const Buildings: React.FC = () => {
   }, showRoomModal);
 
   useEffect(() => {
-    if (showModal || showImport) return; // pause refresh while editing/importing
+    if (showModal || showImport) return; 
 
     fetchBuildings();
     const interval = setInterval(fetchBuildings, 2000);
     return () => clearInterval(interval);
   }, [showModal, showImport]);
 
-  // Close dropdown when clicking outside
   useEffect(() => {
     const handleClickOutside = (event: MouseEvent) => {
       const target = event.target as HTMLElement;
@@ -101,7 +100,6 @@ const Buildings: React.FC = () => {
     };
   }, [showSortDropdown, showItemsPerPageDropdown]);
 
-  // ✅ Fetch buildings and rooms using Axios
   const fetchBuildings = async () => {
     try {
       const { data: buildingData } = await api.get('/tbl_buildings');
@@ -121,7 +119,7 @@ const Buildings: React.FC = () => {
       console.error(err);
       toast.error('Failed to fetch data');
     } finally {
-      if (loading) setLoading(false); // only hide first load
+      if (loading) setLoading(false); 
     }
   };
 
@@ -173,7 +171,6 @@ const Buildings: React.FC = () => {
     }
   };
 
-  // Handle scroll position and update button states
   useEffect(() => {
     const checkScroll = () => {
       const container = tableContainerRef.current;
@@ -183,7 +180,6 @@ const Buildings: React.FC = () => {
       setCanScrollLeft(scrollLeft > 0);
       setCanScrollRight(scrollLeft < scrollWidth - clientWidth - 1);
 
-      // Update scroll indicator classes
       container.classList.toggle('scrollable-left', scrollLeft > 0);
       container.classList.toggle('scrollable-right', scrollLeft < scrollWidth - clientWidth - 1);
     };
@@ -227,7 +223,6 @@ const Buildings: React.FC = () => {
     setShowRoomModal(true);
   };
 
-  // ✅ Add or update building
   const handleSubmit = async () => {
     const { building_id, building_name } = newBuilding;
     if (!building_id || !building_name) {
@@ -253,9 +248,6 @@ const Buildings: React.FC = () => {
     }
   };
 
-  // (Single-item delete removed; using bulk selection + delete instead)
-
-  // ✅ Import Excel file and insert via Axios
   const handleImportFile = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (!file) return;
@@ -279,7 +271,6 @@ const Buildings: React.FC = () => {
             await api.post('/tbl_buildings', { building_id, building_name });
             added++;
           } catch {
-            // Skip failed rows
           }
         }
 
@@ -310,7 +301,6 @@ const Buildings: React.FC = () => {
     setCurrentPage(1);
   }, [searchTerm, sortBy]);
 
-  // Helper function to determine if a string is numeric
   const isNumeric = (str: string): boolean => {
     return !isNaN(Number(str)) && !isNaN(parseFloat(str));
   };
@@ -321,16 +311,12 @@ const Buildings: React.FC = () => {
     const bIsNumeric = isNumeric(b);
 
     if (aIsNumeric && bIsNumeric) {
-      // Both are numbers - sort numerically
       return parseFloat(a) - parseFloat(b);
     } else if (aIsNumeric && !bIsNumeric) {
-      // a is number, b is text - numbers come first
       return -1;
     } else if (!aIsNumeric && bIsNumeric) {
-      // a is text, b is number - numbers come first
       return 1;
     } else {
-      // Both are text - sort alphabetically
       return a.localeCompare(b);
     }
   };

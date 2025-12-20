@@ -88,7 +88,7 @@ const SectionCourses: React.FC = () => {
     section_name: '',
     number_of_students: 0,
     year_level: '',
-    is_night_class: "", // Changed from null
+    is_night_class: "",
   } as SectionCourse);
 
   // Memoized sorted options for selects
@@ -141,14 +141,14 @@ const SectionCourses: React.FC = () => {
         api.get('/tbl_user_role')
       ]);
 
-      // ✅ FIX: Extract data from the new response structure
-      const secData = secRes.data?.data || secRes.data || [];  // Handle both formats
+      //Extract data from the new response structure
+      const secData = secRes.data?.data || secRes.data || [];
       const courseData = courseRes.data || [];
       const progData = progRes.data || [];
       const termData = termRes.data || [];
       const courseUserData = courseUserRes.data || [];
 
-      setSectionCourses(secData);  // ✅ Use extracted array
+      setSectionCourses(secData);
       setCourses(courseData);
       setPrograms(progData);
 
@@ -186,7 +186,6 @@ const SectionCourses: React.FC = () => {
     }
   }, []);
 
-  // Handle ESC key to close modals
   useEscapeKey(() => {
     if (showModal) {
       setShowModal(false);
@@ -213,7 +212,6 @@ const SectionCourses: React.FC = () => {
     fetchAll();
   }, [fetchAll]);
 
-  // Close dropdown when clicking outside
   useEffect(() => {
     const handleClickOutside = (event: MouseEvent) => {
       const target = event.target as HTMLElement;
@@ -246,7 +244,6 @@ const SectionCourses: React.FC = () => {
       return;
     }
 
-    // Prevent double-click submission
     if (isSubmitting) {
       return;
     }
@@ -262,7 +259,6 @@ const SectionCourses: React.FC = () => {
       is_night_class: newSection.is_night_class === "YES" ? "YES" : "",
     };
 
-    // ✅ IMPROVED: Better duplicate checking
     if (!editMode) {
       // Check for exact duplicate (all fields match)
       const exactDuplicate = sectionCourses.find(sc =>
@@ -281,7 +277,6 @@ const SectionCourses: React.FC = () => {
         return;
       }
 
-      // ✅ NEW: Check for section name conflict (same course, program, section name, term)
       const sectionConflict = sectionCourses.find(sc =>
         sc.course_id === course_id &&
         sc.program_id === program_id &&
@@ -302,9 +297,8 @@ const SectionCourses: React.FC = () => {
         return;
       }
     } else {
-      // ✅ EDIT MODE: Check for conflicts with OTHER records (exclude current)
       const conflict = sectionCourses.find(sc =>
-        sc.id !== newSection.id && // Exclude current record
+        sc.id !== newSection.id && 
         sc.course_id === course_id &&
         sc.program_id === program_id &&
         sc.section_name === section_name &&
@@ -362,12 +356,11 @@ const SectionCourses: React.FC = () => {
         const errors: string[] = [];
         const warnings: string[] = [];
 
-        // ✅ NEW: Track what we're about to import to detect duplicates within the import file itself
         const importMap = new Map<string, number>();
 
         for (let idx = 0; idx < rows.length; idx++) {
           const row = rows[idx];
-          const rowNum = idx + 2; // +2 because Excel is 1-indexed and we have a header row
+          const rowNum = idx + 2; 
 
           const section_name = String(row['Section Name'] || '').trim();
           const number_of_students = parseInt(String(row['Number of Students'] || '0'));
@@ -378,7 +371,6 @@ const SectionCourses: React.FC = () => {
           const program_id = String(row['Program ID'] || '').trim();
           const instructor_names_raw = String(row['Instructor Name'] || '').trim();
 
-          // Check for missing fields
           if (!section_name) {
             errors.push(`Row ${rowNum}: Missing Section Name`);
             continue;
@@ -425,7 +417,6 @@ const SectionCourses: React.FC = () => {
             continue;
           }
 
-          // Handle instructor names (can be empty, single, or multiple comma-separated)
           if (!instructor_names_raw) {
             errors.push(`Row ${rowNum}: Instructor Name is required`);
             continue;
@@ -433,7 +424,6 @@ const SectionCourses: React.FC = () => {
 
           const availableInstructors = courseInstructorsMap[course_id] || [];
 
-          // Split instructor names by comma and process each
           const instructorNames = instructor_names_raw.split(',').map(name => name.trim()).filter(name => name);
 
           if (instructorNames.length === 0) {
@@ -457,10 +447,8 @@ const SectionCourses: React.FC = () => {
               continue;
             }
 
-            // ✅ NEW: Create unique key for duplicate detection
             const uniqueKey = `${course_id}|${program_id}|${section_name}|${term.term_id}|${user.user_id}`;
 
-            // ✅ Check for duplicates in existing data
             const existingDuplicate = sectionCourses.find(sc =>
               sc.course_id === course_id &&
               sc.program_id === program_id &&
@@ -474,14 +462,12 @@ const SectionCourses: React.FC = () => {
               continue;
             }
 
-            // ✅ Check for duplicates within the import file itself
             if (importMap.has(uniqueKey)) {
               const firstRow = importMap.get(uniqueKey);
               warnings.push(`Row ${rowNum}: Duplicate of row ${firstRow} - skipping`);
               continue;
             }
 
-            // ✅ Check for section name conflicts (same section name for same course/program/term but different instructor)
             const existingSection = sectionCourses.find(sc =>
               sc.course_id === course_id &&
               sc.program_id === program_id &&
@@ -536,7 +522,7 @@ const SectionCourses: React.FC = () => {
           return;
         }
 
-        // ✅ Import valid rows in batches
+        // Import valid rows in batches
         let added = 0;
         let failed = 0;
         const batchSize = 10;
@@ -562,8 +548,8 @@ const SectionCourses: React.FC = () => {
 
         // Show final summary
         const messages = [];
-        if (added > 0) messages.push(`✅ ${added} section(s) added`);
-        if (failed > 0) messages.push(`❌ ${failed} failed`);
+        if (added > 0) messages.push(`${added} section(s) added`);
+        if (failed > 0) messages.push(`${failed} failed`);
         if (warnings.length > 0) messages.push(`⚠️ ${warnings.length} skipped`);
 
         if (added > 0) {
@@ -595,27 +581,21 @@ const SectionCourses: React.FC = () => {
     XLSX.writeFile(wb, 'sectioncourses_template.xlsx');
   };
 
-  // Helper function to determine if a string is numeric
   const isNumeric = (str: string): boolean => {
     return !isNaN(Number(str)) && !isNaN(parseFloat(str));
   };
 
-  // Smart sort function that handles both text and numbers
   const smartSort = (a: string, b: string): number => {
     const aIsNumeric = isNumeric(a);
     const bIsNumeric = isNumeric(b);
 
     if (aIsNumeric && bIsNumeric) {
-      // Both are numbers - sort numerically
       return parseFloat(a) - parseFloat(b);
     } else if (aIsNumeric && !bIsNumeric) {
-      // a is number, b is text - numbers come first
       return -1;
     } else if (!aIsNumeric && bIsNumeric) {
-      // a is text, b is number - numbers come first
       return 1;
     } else {
-      // Both are text - sort alphabetically
       return a.localeCompare(b);
     }
   };
@@ -628,9 +608,9 @@ const SectionCourses: React.FC = () => {
       filtered = sectionCourses.filter(sc => {
         const termName = sc.term?.term_name || '';
         const courseName = sc.course?.course_name || '';
-        const courseId = sc.course_id || '';  // ✅ NEW: Search course_id
+        const courseId = sc.course_id || '';  
         const programName = sc.program?.program_name || '';
-        const programId = sc.program_id || '';  // ✅ NEW: Search program_id
+        const programId = sc.program_id || '';  
         const instructor = sc.user?.full_name || '';
         const sectionName = sc.section_name || '';
         const yearLevel = sc.year_level || '';
@@ -639,9 +619,9 @@ const SectionCourses: React.FC = () => {
 
         return (
           sectionName.toLowerCase().includes(lowerSearch) ||
-          courseId.toLowerCase().includes(lowerSearch) ||  // ✅ NEW
+          courseId.toLowerCase().includes(lowerSearch) ||  
           courseName.toLowerCase().includes(lowerSearch) ||
-          programId.toLowerCase().includes(lowerSearch) ||  // ✅ NEW
+          programId.toLowerCase().includes(lowerSearch) || 
           programName.toLowerCase().includes(lowerSearch) ||
           instructor.toLowerCase().includes(lowerSearch) ||
           termName.toLowerCase().includes(lowerSearch) ||
@@ -682,7 +662,6 @@ const SectionCourses: React.FC = () => {
       });
     }
 
-    // Apply college filter (if not 'all') - include section when the instructor belongs to selected college
     if (selectedCollege && selectedCollege !== 'all') {
       filtered = filtered.filter((sc) => {
         const uid = sc.user_id || sc.user?.user_id;
@@ -705,7 +684,6 @@ const SectionCourses: React.FC = () => {
     if (totalItems === 0) return 1;
 
     if (itemsPerPage === 'all') {
-      // "Show All" should display 20 rows per page
       return 20;
     }
 
@@ -775,7 +753,6 @@ const SectionCourses: React.FC = () => {
     }
   };
 
-  // Handle scroll position and update button states
   useEffect(() => {
     const checkScroll = () => {
       const container = tableContainerRef.current;
@@ -785,7 +762,6 @@ const SectionCourses: React.FC = () => {
       setCanScrollLeft(scrollLeft > 0);
       setCanScrollRight(scrollLeft < scrollWidth - clientWidth - 1);
 
-      // Update scroll indicator classes
       container.classList.toggle('scrollable-left', scrollLeft > 0);
       container.classList.toggle('scrollable-right', scrollLeft < scrollWidth - clientWidth - 1);
     };
@@ -1507,7 +1483,7 @@ const SectionCourses: React.FC = () => {
                               program_id: sc.program?.program_id || sc.program_id,
                               term_id: sc.term?.term_id || sc.term_id,
                               user_id: sc.user?.user_id || sc.user_id,
-                              is_night_class: sc.is_night_class === "YES" ? "YES" : "" // Changed from null
+                              is_night_class: sc.is_night_class === "YES" ? "YES" : "" 
                             });
                             setShowModal(true);
                           }}

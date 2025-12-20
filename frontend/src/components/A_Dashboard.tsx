@@ -30,7 +30,6 @@ import MiniExamDateCalendar from "./F_MiniExamDateCalendar.tsx";
 
 const iconStyle = { className: 'icon', size: 25 };
 
-// Sidebar menu
 const adminSidebarItems = [
   { key: 'dashboard', label: 'Dashboard', icon: <FaHome {...iconStyle} /> },
   { key: 'colleges', label: 'Colleges', icon: <PiBuildingApartmentFill  {...iconStyle} /> },
@@ -57,7 +56,6 @@ const DashboardAdmin: React.FC = () => {
   const [roles, setRoles] = useState<string[]>([]);
   const navigate = useNavigate();
 
-  // Load logged-in user
   useEffect(() => {
     const loadUser = async () => {
       const stored = JSON.parse(localStorage.getItem('user') || 'null') ||
@@ -100,33 +98,28 @@ const DashboardAdmin: React.FC = () => {
     fetchUserRoles();
   }, [user]);
 
-  // Clock
   useEffect(() => {
     const timer = setInterval(() => setCurrentDateTime(new Date()), 1000);
     return () => clearInterval(timer);
   }, []);
 
-  /** 📱 Handle window resize for responsive behavior */
   useEffect(() => {
     let resizeTimer: NodeJS.Timeout;
 
     const handleResize = () => {
-      // Debounce resize events for better performance
       clearTimeout(resizeTimer);
       resizeTimer = setTimeout(() => {
         const nowMobile = window.innerWidth <= 1024;
 
         setIsMobile(prevMobile => {
-          // When switching between mobile and desktop: reset sidebar state
           if (prevMobile !== nowMobile) {
             setIsSidebarOpen(false);
           }
           return nowMobile;
         });
-      }, 150); // 150ms debounce
+      }, 150); 
     };
 
-    // Initial check
     const initialMobile = window.innerWidth <= 1024;
     setIsMobile(initialMobile);
 
@@ -135,7 +128,7 @@ const DashboardAdmin: React.FC = () => {
       clearTimeout(resizeTimer);
       window.removeEventListener('resize', handleResize);
     };
-  }, []); // Empty dependency array - only run on mount/unmount
+  }, []); 
 
   const handleLogout = () => {
     localStorage.removeItem('user');
@@ -143,12 +136,10 @@ const DashboardAdmin: React.FC = () => {
     navigate('/');
   };
 
-  /** 🍔 Toggle sidebar (for mobile/tablet) */
   const toggleSidebar = () => {
     setIsSidebarOpen(!isSidebarOpen);
   };
 
-  /** 📱 Handle menu item click - close sidebar on mobile/tablet */
   const handleMenuClick = (menuKey: string) => {
     setActiveMenu(menuKey);
     if (isMobile) {

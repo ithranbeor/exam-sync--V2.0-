@@ -42,7 +42,6 @@ const BayanihanModality: React.FC<UserProps> = ({ user }) => {
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [loadingRooms, setLoadingRooms] = useState(true);
 
-  // Modal states
   const [showRoomModal, setShowRoomModal] = useState(false);
   const [selectedBuilding, setSelectedBuilding] = useState<string | null>(null);
   const [buildingOptions, setBuildingOptions] = useState<{ id: string; name: string }[]>([]);
@@ -70,12 +69,10 @@ const BayanihanModality: React.FC<UserProps> = ({ user }) => {
     }
   }, [user]);
 
-  // Add this useEffect to load user's modalities on component mount
   useEffect(() => {
     fetchUserModalities();
   }, [fetchUserModalities]);
 
-  // Add delete handlers
   const handleDeleteSelected = async () => {
     if (selectedForDelete.length === 0) {
       toast.warn('Please select modalities to delete');
@@ -95,7 +92,6 @@ const BayanihanModality: React.FC<UserProps> = ({ user }) => {
       setSelectedForDelete([]);
       setShowDeleteConfirm(false);
 
-      // Refresh the list
       await fetchUserModalities();
     } catch (error) {
       console.error('Error deleting modalities:', error);
@@ -154,14 +150,12 @@ const BayanihanModality: React.FC<UserProps> = ({ user }) => {
     }
   };
 
-  // Room status with occupied times
   const [roomStatus, setRoomStatus] = useState<{
     [key: string]: { occupiedTimes: { start: string; end: string }[] }
   }>({});
 
-  /** FETCH ROOM STATUS BASED ON EXAMDETAILS (lazy loaded when viewing occupancy) */
   const fetchRoomOccupancy = useCallback(async (roomId: string) => {
-    if (roomStatus[roomId]) return; // Already loaded
+    if (roomStatus[roomId]) return;
 
     try {
       const { data: exams } = await api.get('/tbl_examdetails', {
@@ -182,16 +176,13 @@ const BayanihanModality: React.FC<UserProps> = ({ user }) => {
     }
   }, [roomStatus]);
 
-  // Memoize filtered courses based on program
   const filteredCourseOptions = useMemo(() => {
     if (!form.program) return [];
 
-    // 1. Filter the courses based on the selected program
     const filtered = courseOptions.filter(c =>
       sectionOptions.some(s => s.program_id === form.program && s.course_id === c.course_id)
     );
 
-    // 2. Sort the filtered courses by course_id (A-Z or 1-10)
     filtered.sort((a, b) =>
       a.course_id.localeCompare(b.course_id, undefined, {
         numeric: true,
@@ -202,7 +193,6 @@ const BayanihanModality: React.FC<UserProps> = ({ user }) => {
     return filtered;
   }, [courseOptions, sectionOptions, form.program]);
 
-  // Memoize filtered sections based on course
   const filteredSectionOptions = useMemo(() => {
     if (!form.course) return [];
     return sectionOptions
@@ -218,7 +208,6 @@ const BayanihanModality: React.FC<UserProps> = ({ user }) => {
       setLoadingRooms(true);
 
       try {
-        // PARALLEL API CALLS - Fetch everything at once
         const [
           { data: roles },
           { data: allPrograms },
@@ -240,11 +229,9 @@ const BayanihanModality: React.FC<UserProps> = ({ user }) => {
           return;
         }
 
-        // Check if user is admin (role 2 or role_id 2)
         const isAdmin = roles.some((r: any) => r.role === 2 || r.role_id === 2);
 
         if (isAdmin) {
-          // ADMIN: Show all programs, courses, sections, and ALL rooms
           setProgramOptions(allPrograms);
           setCourseOptions(allCourses);
 
@@ -271,7 +258,6 @@ const BayanihanModality: React.FC<UserProps> = ({ user }) => {
           return;
         }
 
-        // Get leader roles (Bayanihan Leader = role 4)
         const leaderRoles = roles.filter((r: any) =>
           r.role === 4 || r.role_id === 4
         );
@@ -282,17 +268,15 @@ const BayanihanModality: React.FC<UserProps> = ({ user }) => {
           return;
         }
 
-        // ✅ FIXED: Fetch user courses as Bayanihan Leader
         const { data: userCourses } = await api.get('/tbl_course_users/', {
           params: {
             user_id: user.user_id,
-            is_bayanihan_leader: 'true'  // ✅ ADD THIS PARAMETER
+            is_bayanihan_leader: 'true' 
           }
         });
 
-        // ✅ FIXED: Extract course IDs where user is Bayanihan Leader
         const courseIds = userCourses
-          .filter((c: any) => c.is_bayanihan_leader === true)  // ✅ Double-check the flag
+          .filter((c: any) => c.is_bayanihan_leader === true)
           .map((c: any) => c.course?.course_id || c.course_id)
           .filter((id: any) => id !== null && id !== undefined);
 
@@ -302,7 +286,6 @@ const BayanihanModality: React.FC<UserProps> = ({ user }) => {
           return;
         }
 
-        // ✅ Filter courses - only show courses where user is Bayanihan Leader
         const coursesWithNames = allCourses.filter((c: any) =>
           courseIds.includes(c.course_id)
         );
@@ -439,7 +422,6 @@ const BayanihanModality: React.FC<UserProps> = ({ user }) => {
     setForm(prev => ({ ...prev, roomType: requiredRoomType }));
   }, [form.modality]);
 
-  /** HANDLE FORM CHANGE */
   const handleChange = (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement | HTMLTextAreaElement>) => {
     const { name, value } = e.target;
     if (name === 'program') {
@@ -453,7 +435,6 @@ const BayanihanModality: React.FC<UserProps> = ({ user }) => {
   const calculateRoomAssignments = useMemo(() => {
     if (form.rooms.length === 0 || form.sections.length === 0) return [];
 
-    // Get student counts for each section and identify night classes
     const sectionStudentCounts = form.sections.map(sectionName => {
       const section = sectionOptions.find(
         s => s.course_id === form.course && s.section_name === sectionName
@@ -468,11 +449,9 @@ const BayanihanModality: React.FC<UserProps> = ({ user }) => {
       };
     });
 
-    // Separate day and night sections
     const daySections = sectionStudentCounts.filter(s => !s.isNightClass);
     const nightSections = sectionStudentCounts.filter(s => s.isNightClass);
 
-    // Get room capacities
     const roomCapacities = form.rooms.map(roomId => {
       const room = roomOptions.find(r => r.room_id === roomId);
       return {
@@ -481,21 +460,16 @@ const BayanihanModality: React.FC<UserProps> = ({ user }) => {
       };
     }).sort((a, b) => b.capacity - a.capacity);
 
-    // Initialize assignments
     const assignments: { roomId: string; sections: string[]; totalStudents: number; isNightClass: boolean }[] = [];
 
-    // ✅ Track which sections were successfully assigned
     const assignedSections = new Set<string>();
 
-    // Helper function to assign sections to rooms (bin packing)
     const assignSectionsToRooms = (
       sections: typeof sectionStudentCounts,
       isNightClass: boolean
     ) => {
-      // Sort sections by student count descending (largest first)
       const sortedSections = [...sections].sort((a, b) => b.studentCount - a.studentCount);
 
-      // Get available rooms (not yet assigned to opposite type)
       const availableRooms = roomCapacities.filter(room => {
         const existing = assignments.find(a => a.roomId === room.roomId);
         return !existing || existing.isNightClass === isNightClass;
@@ -504,7 +478,6 @@ const BayanihanModality: React.FC<UserProps> = ({ user }) => {
       sortedSections.forEach(section => {
         let assigned = false;
 
-        // Try to find best fit room with existing sections of same type
         for (const assignment of assignments.filter(a => a.isNightClass === isNightClass)) {
           const room = roomCapacities.find(r => r.roomId === assignment.roomId);
           if (!room) continue;
@@ -514,13 +487,12 @@ const BayanihanModality: React.FC<UserProps> = ({ user }) => {
           if (remainingCapacity >= section.studentCount) {
             assignment.sections.push(section.sectionName);
             assignment.totalStudents += section.studentCount;
-            assignedSections.add(section.sectionName); // ✅ Track assignment
+            assignedSections.add(section.sectionName); 
             assigned = true;
             break;
           }
         }
 
-        // If not assigned, create new assignment in an available room
         if (!assigned) {
           const availableRoom = availableRooms.find(room => {
             return !assignments.some(a => a.roomId === room.roomId);
@@ -533,17 +505,15 @@ const BayanihanModality: React.FC<UserProps> = ({ user }) => {
               totalStudents: section.studentCount,
               isNightClass
             });
-            assignedSections.add(section.sectionName); // ✅ Track assignment
+            assignedSections.add(section.sectionName); 
             assigned = true;
           }
         }
 
-        // Last resort: force into room with most space (even if over capacity)
         if (!assigned && availableRooms.length > 0) {
           let targetAssignment = assignments.find(a => a.isNightClass === isNightClass);
 
           if (!targetAssignment) {
-            // Create new assignment
             const roomToUse = availableRooms[0];
             targetAssignment = {
               roomId: roomToUse.roomId,
@@ -556,7 +526,7 @@ const BayanihanModality: React.FC<UserProps> = ({ user }) => {
 
           targetAssignment.sections.push(section.sectionName);
           targetAssignment.totalStudents += section.studentCount;
-          assignedSections.add(section.sectionName); // ✅ Track assignment
+          assignedSections.add(section.sectionName);
         }
       });
     };
@@ -571,12 +541,9 @@ const BayanihanModality: React.FC<UserProps> = ({ user }) => {
       assignSectionsToRooms(nightSections, true);
     }
 
-    // ✅ NEW: Check if all sections were assigned
     const unassignedSections = form.sections.filter(s => !assignedSections.has(s));
 
-    // ✅ If there are unassigned sections, add warning assignment
     if (unassignedSections.length > 0) {
-      // Separate unassigned day and night sections
       const unassignedDaySections = unassignedSections.filter(s =>
         !s.toLowerCase().includes('night') && !s.toLowerCase().includes('n-')
       );
@@ -616,7 +583,6 @@ const BayanihanModality: React.FC<UserProps> = ({ user }) => {
       }
     }
 
-    // Filter out empty assignments and return
     return assignments.filter(a => a.sections.length > 0);
   }, [form.rooms, form.sections, form.course, sectionOptions, roomOptions]);
 
@@ -636,7 +602,6 @@ const BayanihanModality: React.FC<UserProps> = ({ user }) => {
       return;
     }
 
-    // ✅ Validate room capacity
     const dayStudents = form.sections.reduce((sum, sectionName) => {
       const section = sectionOptions.find(
         s => s.course_id === form.course && s.section_name === sectionName
@@ -667,7 +632,6 @@ const BayanihanModality: React.FC<UserProps> = ({ user }) => {
     const hasDaySections = dayStudents > 0;
 
     if (hasNightSections && hasDaySections) {
-      // Need capacity for both (they can't share rooms at the same time)
       const minRequiredCapacity = Math.max(dayStudents, nightStudents);
       if (totalRoomCapacity < minRequiredCapacity) {
         toast.error(`Insufficient room capacity. Day sections need ${dayStudents} seats, night sections need ${nightStudents} seats. You need at least ${minRequiredCapacity} total capacity.`);
@@ -678,8 +642,6 @@ const BayanihanModality: React.FC<UserProps> = ({ user }) => {
       return;
     }
 
-    // Check if any room assignment exceeds capacity
-    // Check if any sections are not assigned to any room - THIS MUST BE CHECKED FIRST
     const hasUnassigned = calculateRoomAssignments.some(
       a => !a.roomId || a.roomId.includes("NOT ASSIGNED")
     );
@@ -695,9 +657,8 @@ const BayanihanModality: React.FC<UserProps> = ({ user }) => {
       return;
     }
 
-    // Check if any room assignment exceeds capacity
     const hasOverCapacity = calculateRoomAssignments.some(assignment => {
-      if (assignment.roomId === '⚠️ NOT ASSIGNED') return false; // Skip unassigned
+      if (assignment.roomId === '⚠️ NOT ASSIGNED') return false; 
       const room = roomOptions.find(r => r.room_id === assignment.roomId);
       return assignment.totalStudents > (room?.room_capacity || 0);
     });
@@ -709,10 +670,9 @@ const BayanihanModality: React.FC<UserProps> = ({ user }) => {
 
     setIsSubmitting(true);
 
-    // ✅ NEW: Create one modality per room assignment
+    // Create one modality per room assignment
     const submissions = calculateRoomAssignments.map(async (assignment) => {
       try {
-        // Check for existing record
         const { data: existing } = await api.get('/tbl_modality/', {
           params: {
             course_id: form.course,
@@ -734,9 +694,9 @@ const BayanihanModality: React.FC<UserProps> = ({ user }) => {
           modality_remarks: form.remarks,
           course_id: form.course,
           program_id: form.program,
-          sections: assignment.sections, // ✅ Array of sections sharing room
+          sections: assignment.sections, 
           total_students: assignment.totalStudents,
-          possible_rooms: [assignment.roomId], // ✅ Only the assigned room
+          possible_rooms: [assignment.roomId], 
           user_id: user.user_id,
           created_at: new Date().toISOString(),
         });
@@ -770,7 +730,6 @@ const BayanihanModality: React.FC<UserProps> = ({ user }) => {
 
     setIsSubmitting(false);
 
-    // Reset form
     setForm({
       modality: '',
       rooms: [],
@@ -781,11 +740,9 @@ const BayanihanModality: React.FC<UserProps> = ({ user }) => {
       remarks: '',
     });
 
-    // Refresh modalities list
     await fetchUserModalities();
   };
 
-  /** GET ROOM TIMESLOTS WITH 30-MINUTE VACANT INTERVALS */
   const getRoomTimeslots = useCallback((roomId: string) => {
     const dayStart = new Date();
     dayStart.setHours(7, 30, 0, 0);
@@ -830,7 +787,6 @@ const BayanihanModality: React.FC<UserProps> = ({ user }) => {
     return timeslots;
   }, [roomStatus]);
 
-  /** RENDER TIMESLOT LIST */
   const RoomTimeslots: React.FC<{ roomId: string }> = ({ roomId }) => {
     useEffect(() => {
       fetchRoomOccupancy(roomId);
@@ -862,19 +818,15 @@ const BayanihanModality: React.FC<UserProps> = ({ user }) => {
     );
   };
 
-  // Filter rooms to only show available ones
   const filteredRoomOptions = roomOptions;
 
-  // Memoized sorted and filtered rooms for modal
   const filteredAndSortedRooms = useMemo(() => {
     return filteredRoomOptions
       .filter(r => !selectedBuilding || r.building_id === selectedBuilding)
       .sort((a, b) => {
-        // First sort by room_type matching form.roomType
         if (a.room_type === form.roomType && b.room_type !== form.roomType) return -1;
         if (a.room_type !== form.roomType && b.room_type === form.roomType) return 1;
 
-        // Then sort alphabetically/numerically by room_id
         return a.room_id.localeCompare(b.room_id, undefined, { numeric: true });
       });
   }, [filteredRoomOptions, selectedBuilding, form.roomType]);
@@ -926,9 +878,9 @@ const BayanihanModality: React.FC<UserProps> = ({ user }) => {
                   onChange={selected => setForm(prev => ({
                     ...prev,
                     modality: selected?.value || '',
-                    course: '',      // ✅ Reset course when modality changes
-                    sections: [],    // ✅ Reset sections when modality changes
-                    rooms: []        // ✅ Reset rooms when modality changes
+                    course: '',     
+                    sections: [], 
+                    rooms: []       
                   }))}
                   placeholder="Select modality..."
                   isClearable
@@ -940,7 +892,7 @@ const BayanihanModality: React.FC<UserProps> = ({ user }) => {
                 <label>Program</label>
                 <Select
                   options={programOptions
-                    .slice() // create a copy to avoid mutating original array
+                    .slice() 
                     .sort((a, b) => a.program_id.localeCompare(b.program_id, undefined, { numeric: true }))
                     .map(p => ({ value: p.program_id, label: `${p.program_id} - ${p.program_name}` }))
                   }
@@ -960,7 +912,6 @@ const BayanihanModality: React.FC<UserProps> = ({ user }) => {
                 <Select
                   isDisabled={!form.program}
                   options={filteredCourseOptions.map(c => {
-                    // Check if this course already has a modality of the selected type
                     const hasModalityForType = userModalities.some(m =>
                       m.course_id === c.course_id &&
                       m.modality_type === form.modality
@@ -979,19 +930,17 @@ const BayanihanModality: React.FC<UserProps> = ({ user }) => {
                   onChange={selected => {
                     const courseId = selected?.value || "";
 
-                    // Filter out sections that already have ANY modality type for this specific course
                     const availableSections = sectionOptions
                       .filter(s => s.course_id === courseId)
                       .filter(s => {
-                        // Check if section already has ANY modality for this course
                         const hasModalityForThisCourse = userModalities.some(m =>
-                          m.course_id === courseId && // Same course
+                          m.course_id === courseId && 
                           (
                             (Array.isArray(m.sections) && m.sections.includes(s.section_name)) ||
                             (typeof m.sections === 'string' && m.sections.split(',').map((sec: string) => sec.trim()).includes(s.section_name))
                           )
                         );
-                        return !hasModalityForThisCourse; // Exclude if section already has modality for this course
+                        return !hasModalityForThisCourse; 
                       })
                       .map(s => s.section_name)
                       .sort((a, b) => a.localeCompare(b));
@@ -999,7 +948,7 @@ const BayanihanModality: React.FC<UserProps> = ({ user }) => {
                     setForm(prev => ({
                       ...prev,
                       course: courseId,
-                      sections: availableSections,  // Auto-select only available sections
+                      sections: availableSections,  
                       rooms: []
                     }));
                   }}
@@ -1037,11 +986,9 @@ const BayanihanModality: React.FC<UserProps> = ({ user }) => {
 
                     options={filteredSectionOptions
                       .map(s => {
-                        // Check if this section already has ANY modality for this course (regardless of modality type)
                         const hasModalityForCourse = userModalities.some(m =>
-                          m.course_id === form.course && // Check same course
+                          m.course_id === form.course && 
                           (
-                            // Handle both array and string formats
                             (Array.isArray(m.sections) && m.sections.includes(s.value)) ||
                             (typeof m.sections === 'string' && m.sections.split(',').map((sec: string) => sec.trim()).includes(s.value))
                           )
@@ -1050,7 +997,7 @@ const BayanihanModality: React.FC<UserProps> = ({ user }) => {
                         return {
                           value: s.value,
                           label: s.label,
-                          isDisabled: hasModalityForCourse // Disable if section has ANY modality for this course
+                          isDisabled: hasModalityForCourse 
                         };
                       })
                       .sort((a, b) => a.label.localeCompare(b.label))
@@ -1181,7 +1128,7 @@ const BayanihanModality: React.FC<UserProps> = ({ user }) => {
                   Room Assignment Preview
                 </h4>
                 <div style={{
-                  maxHeight: '240px', // Roughly 3 items (each ~80px)
+                  maxHeight: '240px', 
                   overflowY: 'auto',
                   paddingRight: '5px'
                 }}>

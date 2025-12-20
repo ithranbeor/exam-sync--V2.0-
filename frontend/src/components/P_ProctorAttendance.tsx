@@ -37,7 +37,6 @@ const ProctorAttendance: React.FC<UserProps> = ({ user }) => {
   const [remarks, setRemarks] = useState('');
   const [otpValidationStatus, setOtpValidationStatus] = useState<'idle' | 'valid-assigned' | 'valid-not-assigned' | 'invalid'>('idle');
 
-  // ✅ NEW: Categorized exams
   const [ongoingExams, setOngoingExams] = useState<ExamDetails[]>([]);
   const [upcomingExams, setUpcomingExams] = useState<ExamDetails[]>([]);
   const [completedExams, setCompletedExams] = useState<ExamDetails[]>([]);
@@ -50,7 +49,6 @@ const ProctorAttendance: React.FC<UserProps> = ({ user }) => {
   const [showVerificationSuccess, setShowVerificationSuccess] = useState(false);
   const [activeTab, setActiveTab] = useState<'ongoing' | 'upcoming' | 'completed'>('ongoing');
 
-  // Fetch proctor's assigned exams (categorized)
   const fetchAssignedExams = useCallback(async () => {
     if (!user?.user_id) return;
 
@@ -71,7 +69,6 @@ const ProctorAttendance: React.FC<UserProps> = ({ user }) => {
     }
   }, [user]);
 
-  // ✅ Fetch all exams for substitution (with conflict filtering)
   const fetchAllExams = useCallback(async () => {
     if (!user?.user_id) return;
 
@@ -88,7 +85,6 @@ const ProctorAttendance: React.FC<UserProps> = ({ user }) => {
     }
   }, [user]);
 
-  // ✅ Load data on mount and refresh
   useEffect(() => {
     const loadData = async () => {
       setLoading(true);
@@ -98,7 +94,6 @@ const ProctorAttendance: React.FC<UserProps> = ({ user }) => {
     };
     loadData();
 
-    // Refresh every 30 seconds
     const interval = setInterval(loadData, 30000);
     return () => clearInterval(interval);
   }, [fetchAssignedExams, fetchAllExams]);
@@ -109,8 +104,8 @@ const ProctorAttendance: React.FC<UserProps> = ({ user }) => {
     setShowModal(true);
     setOtpCode('');
     setRemarks('');
-    setOtpValidationStatus('idle'); // ✅ RESET THIS - prevents stale state
-    setShowVerificationSuccess(false); // ✅ ADD THIS TOO
+    setOtpValidationStatus('idle'); 
+    setShowVerificationSuccess(false); 
   };
 
   const handleCloseModal = () => {
@@ -217,11 +212,9 @@ const ProctorAttendance: React.FC<UserProps> = ({ user }) => {
         });
       }
 
-      // Refresh data
       await fetchAssignedExams();
       await fetchAllExams();
 
-      // Close modals
       setShowVerificationSuccess(false);
       handleCloseModal();
     } catch (error: any) {

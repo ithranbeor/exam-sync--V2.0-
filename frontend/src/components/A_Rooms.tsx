@@ -31,7 +31,7 @@ const Rooms: React.FC = () => {
   const [editMode, setEditMode] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [showImport, setShowImport] = useState(false);
-  const [loading, setLoading] = useState(true); // new state
+  const [loading, setLoading] = useState(true);
   const [isImporting, setIsImporting] = useState(false);
   const [currentPage, setCurrentPage] = useState(1);
   const [itemsPerPage, setItemsPerPage] = useState<number | 'all'>('all');
@@ -53,7 +53,6 @@ const Rooms: React.FC = () => {
     building_id: '',
   });
 
-  // Handle ESC key to close modals
   useEscapeKey(() => {
     if (showModal) {
       setShowModal(false);
@@ -74,7 +73,7 @@ const Rooms: React.FC = () => {
     }
   }, showImport);
 
-  // ✅ Fetch all data once on mount
+  // Fetch all data once on mount
   useEffect(() => {
     fetchAll();
   }, []);
@@ -100,7 +99,6 @@ const Rooms: React.FC = () => {
     };
   }, [showSortDropdown, showItemsPerPageDropdown]);
 
-  // ✅ Unified fetch for both rooms & buildings
   const fetchAll = async () => {
     try {
       setLoading(true);
@@ -118,7 +116,6 @@ const Rooms: React.FC = () => {
     }
   };
 
-  // ✅ Create or update
   const handleSubmit = async () => {
     const { room_id, room_name, room_type, room_capacity, building_id } = newRoom;
     if (!room_id || !room_name || !room_type || !room_capacity || !building_id) {
@@ -132,7 +129,7 @@ const Rooms: React.FC = () => {
         room_name,
         room_type,
         room_capacity,
-        building: building_id, // Django expects FK
+        building: building_id, 
       };
 
       if (editMode) {
@@ -144,7 +141,7 @@ const Rooms: React.FC = () => {
       }
 
       setShowModal(false);
-      setTimeout(() => fetchAll(), 300); // small delay for smoother refresh
+      setTimeout(() => fetchAll(), 300);
     } catch (err: any) {
       console.error(err.response?.data || err.message);
       toast.error('Failed to save room');
@@ -153,7 +150,6 @@ const Rooms: React.FC = () => {
     }
   };
 
-  // ✅ Bulk selection and delete
   const toggleSelect = (id: string) => {
     setSelectedIds((prev) => {
       const next = new Set(prev);
@@ -227,7 +223,6 @@ const Rooms: React.FC = () => {
       setCanScrollLeft(scrollLeft > 0);
       setCanScrollRight(scrollLeft < scrollWidth - clientWidth - 1);
 
-      // Update scroll indicator classes
       container.classList.toggle('scrollable-left', scrollLeft > 0);
       container.classList.toggle('scrollable-right', scrollLeft < scrollWidth - clientWidth - 1);
     };
@@ -262,7 +257,7 @@ const Rooms: React.FC = () => {
     });
   };
 
-  // ✅ Import Excel
+  // Import Excel
   const handleImportFile = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (!file) return;
@@ -313,7 +308,7 @@ const Rooms: React.FC = () => {
     reader.readAsArrayBuffer(file);
   };
 
-  // ✅ Download Template
+  // Download Template
   const downloadTemplate = () => {
     const ws = XLSX.utils.aoa_to_sheet([
       ['Room ID', 'Room Name', 'Room Type', 'Room Capacity', 'Building ID'],
@@ -333,22 +328,17 @@ const Rooms: React.FC = () => {
     return !isNaN(Number(str)) && !isNaN(parseFloat(str));
   };
 
-  // Smart sort function that handles both text and numbers
   const smartSort = (a: string, b: string): number => {
     const aIsNumeric = isNumeric(a);
     const bIsNumeric = isNumeric(b);
 
     if (aIsNumeric && bIsNumeric) {
-      // Both are numbers - sort numerically
       return parseFloat(a) - parseFloat(b);
     } else if (aIsNumeric && !bIsNumeric) {
-      // a is number, b is text - numbers come first
       return -1;
     } else if (!aIsNumeric && bIsNumeric) {
-      // a is text, b is number - numbers come first
       return 1;
     } else {
-      // Both are text - sort alphabetically
       return a.localeCompare(b);
     }
   };

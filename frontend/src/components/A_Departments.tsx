@@ -88,7 +88,6 @@ const Departments: React.FC = () => {
     };
   }, [showSortDropdown, showItemsPerPageDropdown]);
 
-  // Handle scroll position and update button states
   useEffect(() => {
     const checkScroll = () => {
       const container = tableContainerRef.current;
@@ -98,7 +97,6 @@ const Departments: React.FC = () => {
       setCanScrollLeft(scrollLeft > 0);
       setCanScrollRight(scrollLeft < scrollWidth - clientWidth - 1);
 
-      // Update scroll indicator classes
       container.classList.toggle('scrollable-left', scrollLeft > 0);
       container.classList.toggle('scrollable-right', scrollLeft < scrollWidth - clientWidth - 1);
     };
@@ -177,16 +175,12 @@ const Departments: React.FC = () => {
     const bIsNumeric = isNumeric(b);
 
     if (aIsNumeric && bIsNumeric) {
-      // Both are numbers - sort numerically
       return parseFloat(a) - parseFloat(b);
     } else if (aIsNumeric && !bIsNumeric) {
-      // a is number, b is text - numbers come first
       return -1;
     } else if (!aIsNumeric && bIsNumeric) {
-      // a is text, b is number - numbers come first
       return 1;
     } else {
-      // Both are text - sort alphabetically
       return a.localeCompare(b);
     }
   };
@@ -358,8 +352,6 @@ const Departments: React.FC = () => {
       setIsSubmitting(false);
     }
   };
-
-  // Single-item delete replaced by bulk delete
 
   // Import Excel
   const handleImportFile = (e: React.ChangeEvent<HTMLInputElement>) => {

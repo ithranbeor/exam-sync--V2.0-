@@ -16,7 +16,6 @@ const ResetPassword: React.FC = () => {
   const [searchParams] = useSearchParams();
   const navigate = useNavigate();
 
-  // Extract UID and token from URL parameters
   const uid = searchParams.get('uid');
   const token = searchParams.get('token');
 

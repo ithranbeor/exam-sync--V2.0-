@@ -20,7 +20,7 @@ const LoginAdmin: React.FC = () => {
   const [error, setError] = useState("");
 
   const showPasswordRef = useRef(false);
-  const [, forceRerender] = useState(false); // for toggling eye icon
+  const [, forceRerender] = useState(false);
 
   const handleChange = useCallback((e: any) => {
     const { id, value } = e.target;

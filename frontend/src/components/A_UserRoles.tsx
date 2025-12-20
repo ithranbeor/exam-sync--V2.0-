@@ -68,8 +68,7 @@ const UserRoles = () => {
   const [showImportModal, setShowImportModal] = useState(false);
   const [newRole, setNewRole] = useState<Partial<UserRole>>({});
   const [editingRole, setEditingRole] = useState<UserRole | null>(null);
-  const [loading, setLoading] = useState(true); // new state
-
+  const [loading, setLoading] = useState(true);
   const getAllowedFields = (roleId: number | undefined) => {
     const roleName = roles.find(r => r.role_id === roleId)?.role_name;
 
@@ -85,7 +84,7 @@ const UserRoles = () => {
       case "Proctor":
         return { college: true, department: true };
       default:
-        return { college: true, department: true }; // fallback
+        return { college: true, department: true };
     }
   };
 
@@ -96,16 +95,14 @@ const UserRoles = () => {
   const fetchData = async () => {
     setLoading(true);
     try {
-      // Fetch all data in parallel
       const [rolesRes, usersRes, collegesRes, departmentsRes, userRolesRes] = await Promise.all([
-        api.get('/tbl_roles/'),        // GET roles
-        api.get('/users/'),        // GET users
-        api.get('/tbl_college/'),     // GET colleges
-        api.get('/departments/'),  // GET departments
-        api.get('/tbl_user_role'),   // GET user_roles
+        api.get('/tbl_roles/'),       
+        api.get('/users/'),        
+        api.get('/tbl_college/'),  
+        api.get('/departments/'),  
+        api.get('/tbl_user_role'),  
       ]);
 
-      // Check if any request failed
       if (
         !rolesRes.data || !usersRes.data || !collegesRes.data ||
         !departmentsRes.data || !userRolesRes.data
@@ -114,10 +111,8 @@ const UserRoles = () => {
         return;
       }
 
-      // Set roles
       setRoles(rolesRes.data);
 
-      // Normalize users
       setUsers(
         usersRes.data.map((u: any) => ({
           user_id: u.user_id,
@@ -126,13 +121,11 @@ const UserRoles = () => {
         }))
       );
 
-      // Set colleges & departments
       setColleges(collegesRes.data);
       setDepartments(departmentsRes.data);
 
       const today = new Date().toISOString().split("T")[0];
 
-      // Compute correct status for each role
       const normalized = userRolesRes.data.map((r: any) => {
         let computedStatus = r.status ?? "Active";
         if (r.date_ended && r.date_ended < today) {
@@ -143,7 +136,6 @@ const UserRoles = () => {
 
       setUserRoles(normalized);
 
-      // Find roles that need a DB update
       const rolesToUpdate = normalized.filter((r: any) => {
         const dbStatus =
           userRolesRes.data.find((orig: any) => orig.user_role_id === r.user_role_id)?.status ??
@@ -151,7 +143,6 @@ const UserRoles = () => {
         return dbStatus !== r.status;
       });
 
-      // Persist changes
       await Promise.all(
         rolesToUpdate.map((role: any) =>
           api.put(`/tbl_user_role/${role.user_role_id}/`, { status: role.status })
@@ -193,13 +184,10 @@ const UserRoles = () => {
 
       toast.success("Role added successfully.");
 
-      // ✅ Instantly show the new role in the current modal
       setUserRoles(prev => [...prev, data]);
 
-      // ✅ Close the Add Role modal, but keep the Details modal open
       setShowAddRoleModal(false);
 
-      // optional: reset the form
       setNewRole({});
     } catch (err) {
       console.error(err);
@@ -212,7 +200,6 @@ const UserRoles = () => {
     const newStatus = currentStatus === "Suspended" ? "Active" : "Suspended";
 
     try {
-      // Update role status
       const { data, status } = await api.put(`/tbl_user_role/${user_role_id}/`, {
         status: newStatus,
       });
@@ -331,7 +318,6 @@ const UserRoles = () => {
               </tr>
             ) : (
               filteredUsers.map((user) => {
-                // Get this user's roles directly from userRoles
                 const rolesForUser = userRoles.filter((r) => r.user === user.user_id);
 
                 return (
@@ -388,7 +374,7 @@ const UserRoles = () => {
                 padding: '5px',
                 background: '#eef3f9',
                 borderRadius: '10px',
-                borderLeft: '5px solid rgb(17, 3, 101)', // ← fixed missing space
+                borderLeft: '5px solid rgb(17, 3, 101)',
               }}
             >
               <p>
@@ -414,7 +400,7 @@ const UserRoles = () => {
               </thead>
               <tbody>
                 {userRoles
-                  .filter((r) => r.user === selectedUserId) // ✅ FIXED: was r.user_id
+                  .filter((r) => r.user === selectedUserId) 
                   .map((role) => (
                     <tr key={role.user_role_id}>
                       <td>{role.role_name || '-'}</td>
@@ -504,7 +490,7 @@ const UserRoles = () => {
                               const response = await api.delete(`/tbl_user_role/${role.user_role_id}/`);
                               if (response.status === 200 || response.status === 204) {
                                 toast.success("Role deleted successfully.");
-                                setUserRoles(prev => prev.filter(r => r.user_role_id !== role.user_role_id)); // instantly update UI
+                                setUserRoles(prev => prev.filter(r => r.user_role_id !== role.user_role_id));
                               } else {
                                 toast.error("Failed to delete role.");
                               }
@@ -536,7 +522,7 @@ const UserRoles = () => {
               <button
                 className="modal-button save"
                 onClick={() => {
-                  setNewRole({ user: selectedUserId }); // ✅ changed to match serializer field
+                  setNewRole({ user: selectedUserId });
                   setShowAddRoleModal(true);
                 }}
               >
@@ -715,7 +701,6 @@ const UserRoles = () => {
                   if (!editingRole) return;
 
                   try {
-                    // Update the role only
                     await api.put(`/tbl_user_role/${editingRole.user_role_id}/`, {
                       role_id: editingRole.role_id,
                       college_id: editingRole.college_id,

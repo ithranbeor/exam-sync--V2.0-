@@ -44,7 +44,7 @@ const ExamPeriodComponent: React.FC = () => {
   const [filterDept, setFilterDept] = useState('');
   const [filterCollege, setFilterCollege] = useState('');
   const [showFilters, setShowFilters] = useState(false);
-  const [loading, setLoading] = useState(true); // new state
+  const [loading, setLoading] = useState(true); 
   const [currentPage, setCurrentPage] = useState(1);
   const [itemsPerPage, setItemsPerPage] = useState<number | 'all'>('all');
   const [showItemsPerPageDropdown, setShowItemsPerPageDropdown] = useState(false);
@@ -68,7 +68,6 @@ const ExamPeriodComponent: React.FC = () => {
     college_id: null,
   });
 
-  // Handle ESC key to close modals
   useEscapeKey(() => {
     if (showModal) {
       setShowModal(false);
@@ -95,7 +94,6 @@ const ExamPeriodComponent: React.FC = () => {
     fetchAll();
   }, []);
 
-  // Close dropdown when clicking outside
   useEffect(() => {
     const handleClickOutside = (event: MouseEvent) => {
       const target = event.target as HTMLElement;
@@ -137,7 +135,6 @@ const ExamPeriodComponent: React.FC = () => {
     }
   };
 
-  // keep newExam start/end in sync with selectedDates
   useEffect(() => {
     if (selectedDates.length === 1) {
       setNewExam(prev => ({
@@ -168,22 +165,19 @@ const ExamPeriodComponent: React.FC = () => {
 
     setIsSubmitting(true);
 
-    // ✅ Fixed function to create date at noon local time to avoid timezone shifts
     const toLocalDateString = (d: Date) => {
       const pad = (n: number) => n.toString().padStart(2, '0');
       const year = d.getFullYear();
       const month = pad(d.getMonth() + 1);
       const day = pad(d.getDate());
-      // Use noon (12:00:00) instead of midnight to avoid timezone issues
       return `${year}-${month}-${day}T12:00:00`;
     };
 
     try {
       if (editMode && examperiod_id) {
-        // Update mode (single record)
         const payload = {
-          start_date: newExam.start_date + 'T12:00:00', // Add time at noon
-          end_date: newExam.end_date + 'T12:00:00',     // Add time at noon
+          start_date: newExam.start_date + 'T12:00:00', 
+          end_date: newExam.end_date + 'T12:00:00',    
           academic_year,
           exam_category,
           term: term_id,
@@ -196,16 +190,15 @@ const ExamPeriodComponent: React.FC = () => {
           prev.map(ep => (ep.examperiod_id === examperiod_id ? res.data : ep))
         );
       } else {
-        // Create multiple — records per selected day
         const sortedDates = [...selectedDates].sort((a, b) => a.getTime() - b.getTime());
         const newRecords: any[] = [];
 
         for (const date of sortedDates) {
-          const formatted = toLocalDateString(date); // This now includes T12:00:00
+          const formatted = toLocalDateString(date);
 
           const payload = {
-            start_date: formatted,  // Already has T12:00:00
-            end_date: formatted,    // Already has T12:00:00
+            start_date: formatted,  
+            end_date: formatted,  
             academic_year,
             exam_category,
             term: term_id,
@@ -217,7 +210,6 @@ const ExamPeriodComponent: React.FC = () => {
           newRecords.push(res.data);
         }
 
-        // Update state once with all new records
         if (newRecords.length > 0) {
           setExamPeriods(prev => [...newRecords, ...prev]);
         }
@@ -240,27 +232,21 @@ const ExamPeriodComponent: React.FC = () => {
     setCurrentPage(1);
   }, [search, filterYear, filterCategory, filterTerm, filterDept, filterCollege, sortBy]);
 
-  // Helper function to determine if a string is numeric
   const isNumeric = (str: string): boolean => {
     return !isNaN(Number(str)) && !isNaN(parseFloat(str));
   };
 
-  // Smart sort function that handles both text and numbers
   const smartSort = (a: string, b: string): number => {
     const aIsNumeric = isNumeric(a);
     const bIsNumeric = isNumeric(b);
 
     if (aIsNumeric && bIsNumeric) {
-      // Both are numbers - sort numerically
       return parseFloat(a) - parseFloat(b);
     } else if (aIsNumeric && !bIsNumeric) {
-      // a is number, b is text - numbers come first
       return -1;
     } else if (!aIsNumeric && bIsNumeric) {
-      // a is text, b is number - numbers come first
       return 1;
     } else {
-      // Both are text - sort alphabetically
       return a.localeCompare(b);
     }
   };
@@ -294,7 +280,6 @@ const ExamPeriodComponent: React.FC = () => {
       (e.start_date)
     );
 
-    // Apply sorting
     if (sortBy !== 'none') {
       filtered = [...filtered].sort((a, b) => {
         if (sortBy === 'start_date') {
@@ -1286,7 +1271,7 @@ const ExamPeriodComponent: React.FC = () => {
                 </div>
 
                 <Calendar
-                  calendarType="gregory"    // 👈 forces Sunday as first day
+                  calendarType="gregory"  
                   value={undefined}
                   activeStartDate={activeDate}
                   onActiveStartDateChange={({ activeStartDate }) => {
@@ -1295,11 +1280,9 @@ const ExamPeriodComponent: React.FC = () => {
                     }
                   }}
                   onClickDay={(date) => {
-                    // Normalize the clicked date to midnight for accurate comparison
                     const normalizedDate = new Date(date);
                     normalizedDate.setHours(0, 0, 0, 0);
 
-                    // Check if this date already exists in selectedDates
                     const dateString = toLocalDateString(normalizedDate);
                     const exists = selectedDates.some(d => {
                       const normalizedD = new Date(d);
@@ -1308,7 +1291,6 @@ const ExamPeriodComponent: React.FC = () => {
                     });
 
                     if (exists) {
-                      // Remove the date if it exists (toggle off)
                       setSelectedDates(prev =>
                         prev.filter(d => {
                           const normalizedD = new Date(d);
@@ -1317,10 +1299,8 @@ const ExamPeriodComponent: React.FC = () => {
                         })
                       );
                     } else {
-                      // Add the date if it doesn't exist (toggle on)
                       setSelectedDates(prev => {
                         const updated = [...prev, normalizedDate];
-                        // Update activeDate to show the year of the newly selected date
                         setActiveDate(normalizedDate);
                         return updated;
                       });
@@ -1346,9 +1326,7 @@ const ExamPeriodComponent: React.FC = () => {
                   <Select
                     className="examperiod-select"
                     classNamePrefix="examperiod"
-                    // build options array from academicYears
                     options={academicYears.map(y => ({ value: y, label: y }))}
-                    // current value must be an object {value,label} or null
                     value={newExam.academic_year
                       ? { value: newExam.academic_year, label: newExam.academic_year }
                       : null}

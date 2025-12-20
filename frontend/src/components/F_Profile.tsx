@@ -15,7 +15,7 @@ interface UserProfile {
   email_address: string;
   contact_number: string;
   avatar_url: string | null;
-  employment_type?: 'full-time' | 'part-time' | null;  // ✅ ADD THIS
+  employment_type?: 'full-time' | 'part-time' | null;
 }
 
 interface UserRoleInfo {
@@ -45,7 +45,6 @@ const Profile: React.FC<ProfileProps> = ({ user }) => {
   const [loading, setLoading] = useState(true);
   const [isChangingPassword, setIsChangingPassword] = useState(false);
 
-  /** Fetch user profile */
   const fetchProfile = useCallback(async () => {
     if (!user?.user_id) return;
     setLoading(true);
@@ -59,7 +58,7 @@ const Profile: React.FC<ProfileProps> = ({ user }) => {
         email_address: data.email_address || user.email_address,
         contact_number: data.contact_number || '',
         avatar_url: data.avatar_url || null,
-        employment_type: data.employment_type || null,  // ✅ ADD THIS
+        employment_type: data.employment_type || null,
       };
       setProfile(mapped);
       setOriginalProfile(mapped);
@@ -72,7 +71,6 @@ const Profile: React.FC<ProfileProps> = ({ user }) => {
     }
   }, [user]);
 
-  /** Fetch user roles */
   const fetchRoles = useCallback(async () => {
     if (!user?.user_id) return;
     try {
@@ -96,26 +94,21 @@ const Profile: React.FC<ProfileProps> = ({ user }) => {
     fetchRoles();
   }, [fetchProfile, fetchRoles]);
 
-  /** Handle input changes */
   const handleChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     if (!profile) return;
     setProfile({ ...profile, [e.target.name]: e.target.value });
   };
 
-  /** Upload avatar */
   const handleAvatarPreview = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (!file) return;
 
-    // Create local preview URL
     const previewUrl = URL.createObjectURL(file);
     setPreview(previewUrl);
 
-    // Store file for later upload
     setProfile(prev => prev && { ...prev, avatarFile: file } as any);
   };
 
-  /** Upload avatar only when saving */
   const uploadAvatar = async (file: File) => {
     if (!user?.user_id) return null;
 
@@ -132,12 +125,10 @@ const Profile: React.FC<ProfileProps> = ({ user }) => {
     }
   };
 
-  /** Save profile changes */
   const handleSave = async () => {
     if (!profile) return;
     setLoading(true);
     try {
-      // Upload avatar first if changed
       let finalAvatarUrl = profile.avatar_url;
       if ((profile as any).avatarFile) {
         finalAvatarUrl = await uploadAvatar((profile as any).avatarFile);
@@ -153,7 +144,6 @@ const Profile: React.FC<ProfileProps> = ({ user }) => {
 
       const { data } = await api.patch(`/users/${profile.user_id}/`, payload);
 
-      // Update with new avatar URL if uploaded
       const updatedData = { ...data, avatar_url: finalAvatarUrl };
       setProfile(updatedData);
       setOriginalProfile(updatedData);
@@ -169,7 +159,6 @@ const Profile: React.FC<ProfileProps> = ({ user }) => {
     }
   };
 
-  /** Cancel editing and restore original */
   const handleCancel = () => {
     setEditing(false);
     setProfile(originalProfile);
@@ -228,7 +217,6 @@ const Profile: React.FC<ProfileProps> = ({ user }) => {
     <div className="profile-container">
       <div className="profile-header-title">Profile Details</div>
 
-      {/* 🔹 Avatar + Info */}
       <div className="profile-section profile-info-card">
         <div className="profile-avatar-wrapper">
           <img
@@ -300,7 +288,6 @@ const Profile: React.FC<ProfileProps> = ({ user }) => {
         </div>
       </div>
 
-      {/* 🔹 Editable Details */}
       <div className="profile-section personal-details-card">
         <div className="personal-details-header">
           <h3>Personal Details</h3>
@@ -343,7 +330,7 @@ const Profile: React.FC<ProfileProps> = ({ user }) => {
             <button
               type="button"
               className="btn cancel-personal-details"
-              onClick={handleCancel}  // ✅ Use new cancel handler
+              onClick={handleCancel} 
             >
               Cancel
             </button>

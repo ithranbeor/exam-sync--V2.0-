@@ -41,7 +41,7 @@ const Programs: React.FC<ProgramsProps> = ({ user: _user }) => {
   const [editMode, setEditMode] = useState(false);
   const [editingProgId, setEditingProgId] = useState<string | null>(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
-  const [loading, setLoading] = useState(true); // new state
+  const [loading, setLoading] = useState(true);
   const [isImporting, setIsImporting] = useState(false);
   const [currentPage, setCurrentPage] = useState(1);
   const [itemsPerPage, setItemsPerPage] = useState<number | 'all'>('all');
@@ -55,7 +55,6 @@ const Programs: React.FC<ProgramsProps> = ({ user: _user }) => {
   const [canScrollRight, setCanScrollRight] = useState(false);
   const tableContainerRef = useRef<HTMLDivElement>(null);
 
-  // Handle ESC key to close modals
   useEscapeKey(() => {
     if (showModal) {
       setShowModal(false);
@@ -206,16 +205,12 @@ const Programs: React.FC<ProgramsProps> = ({ user: _user }) => {
     const bIsNumeric = isNumeric(b);
 
     if (aIsNumeric && bIsNumeric) {
-      // Both are numbers - sort numerically
       return parseFloat(a) - parseFloat(b);
     } else if (aIsNumeric && !bIsNumeric) {
-      // a is number, b is text - numbers come first
       return -1;
     } else if (!aIsNumeric && bIsNumeric) {
-      // a is text, b is number - numbers come first
       return 1;
     } else {
-      // Both are text - sort alphabetically
       return a.localeCompare(b);
     }
   };
@@ -385,8 +380,6 @@ const Programs: React.FC<ProgramsProps> = ({ user: _user }) => {
       setIsSubmitting(false);
     }
   };
-
-  // Single-item delete replaced with bulk delete
 
   const handleImportFile = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];

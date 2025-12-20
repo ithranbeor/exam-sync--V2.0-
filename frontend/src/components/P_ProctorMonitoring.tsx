@@ -7,7 +7,6 @@ import '../styles/P_ProctorMonitoring.css';
 import jsPDF from 'jspdf';
 import autoTable from 'jspdf-autotable';
 
-// Extend jsPDF type to include autoTable
 declare module 'jspdf' {
   interface jsPDF {
     autoTable: (options: any) => jsPDF;
@@ -73,7 +72,6 @@ const ProctorMonitoring: React.FC<UserProps> = ({ }) => {
   const [showHistoryFilters, setShowHistoryFilters] = useState(false);
   const [historySortOrder, setHistorySortOrder] = useState<'newest' | 'oldest'>('newest');
 
-  // Generate year options (last 5 years)
   const currentYear = new Date().getFullYear();
   const yearOptions = Array.from({ length: 5 }, (_, i) => currentYear - i);
 
@@ -100,7 +98,6 @@ const ProctorMonitoring: React.FC<UserProps> = ({ }) => {
     approvedSchedules.forEach(async (s) => {
       const examEnd = new Date(`${s.exam_date}T${s.exam_end_time}`);
 
-      // ✅ Check if ANY proctor has time_in
       const hasAnyTimeIn = s.proctor_details.some(p => p.time_in);
       const currentStatus = (s.examdetails_status || '').toLowerCase();
 
@@ -124,7 +121,6 @@ const ProctorMonitoring: React.FC<UserProps> = ({ }) => {
     setShowProctorModal(true);
   };
 
-  // ✅ FIXED: Fetch and filter for multiple proctors
   const fetchMonitoringData = useCallback(async () => {
     setLoading(true);
     try {
@@ -132,7 +128,6 @@ const ProctorMonitoring: React.FC<UserProps> = ({ }) => {
       if (collegeFilter) {
         params.college_name = collegeFilter;
       }
-      // ✅ Add year/month filters
       if (selectedYear !== 'all') {
         params.year = selectedYear;
       }
@@ -142,17 +137,14 @@ const ProctorMonitoring: React.FC<UserProps> = ({ }) => {
 
       const { data: examData } = await api.get('/proctor-monitoring/', { params });
 
-      // ✅ PERFORMANCE FIX: Fetch ALL approvals in ONE request
       const approvalResponse = await api.get('/tbl_scheduleapproval/', {
         params: { status: 'approved' },
       });
 
-      // Create a Set of approved colleges for O(1) lookup
       const approvedColleges = new Set(
         approvalResponse.data.map((approval: any) => approval.college_name),
       );
 
-      // ✅ FIXED: Map schedules with proctor_details array
       const schedulesWithApproval = examData.map((schedule: any) => {
         const isApproved = approvedColleges.has(schedule.college);
 
@@ -166,7 +158,7 @@ const ProctorMonitoring: React.FC<UserProps> = ({ }) => {
           exam_end_time: schedule.exam_end_time || '',
           building_name: schedule.building_name || '',
           room_id: schedule.room_id || '',
-          proctor_details: schedule.proctor_details || [],  // ✅ Get proctor_details array from backend
+          proctor_details: schedule.proctor_details || [], 
           instructor_name: schedule.instructor_name || '',
           department: schedule.department || '',
           college: schedule.college || '',
@@ -178,7 +170,6 @@ const ProctorMonitoring: React.FC<UserProps> = ({ }) => {
         return mappedSchedule;
       });
 
-      // Filter to show ONLY approved schedules
       const approvedOnly = schedulesWithApproval.filter(
         (schedule: MonitoringSchedule) => schedule.approval_status === 'approved',
       );
@@ -441,7 +432,6 @@ const ProctorMonitoring: React.FC<UserProps> = ({ }) => {
       { align: 'center' },
     );
 
-    // ✅ FIXED: Prepare table data with multiple proctor columns
     const tableData = sortedSchedules.map((schedule, index) => {
       const proctorInfo = schedule.proctor_details
         .map((p, i) => `${i + 1}. ${p.proctor_name} (${getStatusDisplay(p.status)}) - ${formatTimeIn(p.time_in)}`)
@@ -484,7 +474,7 @@ const ProctorMonitoring: React.FC<UserProps> = ({ }) => {
         4: { cellWidth: 30, fontSize: 7 },
         5: { cellWidth: 35, fontSize: 7 },
         6: { cellWidth: 35 },
-        7: { cellWidth: 60, fontSize: 7 },  // ✅ Wider for multiple proctors
+        7: { cellWidth: 60, fontSize: 7 }, 
         8: { cellWidth: 22, halign: 'center', fontStyle: 'bold' },
       },
       bodyStyles: {
@@ -536,7 +526,6 @@ const ProctorMonitoring: React.FC<UserProps> = ({ }) => {
   const sortedSchedules = useMemo(() => {
     let data = approvedSchedules;
 
-    // Apply search filter
     if (searchTerm && searchTerm.trim()) {
       const term = searchTerm.toLowerCase();
       data = data.filter((schedule) => {
@@ -565,7 +554,6 @@ const ProctorMonitoring: React.FC<UserProps> = ({ }) => {
       });
     }
 
-    // Apply status filter
     if (statusFilter && statusFilter !== 'all') {
       data = data.filter((schedule) => {
         const status = (schedule.examdetails_status || '').toLowerCase();
@@ -579,7 +567,6 @@ const ProctorMonitoring: React.FC<UserProps> = ({ }) => {
       });
     }
 
-    // Group schedules by course, date, time, location
     const groupedMap = new Map<string, MonitoringSchedule & { sections: string[] }>();
 
     data.forEach((schedule) => {
@@ -589,7 +576,6 @@ const ProctorMonitoring: React.FC<UserProps> = ({ }) => {
         const existing = groupedMap.get(key)!;
         existing.sections.push(schedule.section_name);
 
-        // Merge proctor_details (avoid duplicates)
         const existingProctorIds = new Set(existing.proctor_details.map(p => p.proctor_id));
         schedule.proctor_details.forEach(p => {
           if (!existingProctorIds.has(p.proctor_id)) {
@@ -605,16 +591,11 @@ const ProctorMonitoring: React.FC<UserProps> = ({ }) => {
     });
 
     let groupedData = Array.from(groupedMap.values());
-
-    // Default sorting: If viewing history, sort by date (newest/oldest first)
-    // Otherwise, use the selected sort option
     if (sortBy === 'none') {
-      // If viewing history and no explicit sort, use date-based sorting
       if (isViewingHistory) {
         return [...groupedData].sort((a, b) => {
           const dateA = new Date(a.exam_date).getTime();
           const dateB = new Date(b.exam_date).getTime();
-          // If same date, sort by time
           if (dateA === dateB) {
             const timeA = a.exam_start_time || '';
             const timeB = b.exam_start_time || '';
@@ -630,7 +611,6 @@ const ProctorMonitoring: React.FC<UserProps> = ({ }) => {
       return groupedData;
     }
 
-    // Sort based on selected option
     const sorted = [...groupedData].sort((a, b) => {
       switch (sortBy) {
         case 'course_id':
@@ -640,7 +620,6 @@ const ProctorMonitoring: React.FC<UserProps> = ({ }) => {
         case 'section_name':
           return smartSort(a.section_name.toLowerCase(), b.section_name.toLowerCase());
         case 'exam_date':
-          // For date sorting, respect history sort order when viewing history
           const dateA = new Date(a.exam_date).getTime();
           const dateB = new Date(b.exam_date).getTime();
           if (dateA === dateB) {
@@ -680,7 +659,7 @@ const ProctorMonitoring: React.FC<UserProps> = ({ }) => {
           <p
             className={`proctor-monitoring-label ${
               (selectedYear !== 'all' || selectedMonth !== 'all')
-                ? 'proctor-monitoring-label-approved'  // History mode
+                ? 'proctor-monitoring-label-approved' 
                 : hasApprovedSchedules
                 ? 'proctor-monitoring-label-approved'
                 : 'proctor-monitoring-label-waiting'
@@ -1094,7 +1073,7 @@ const ProctorMonitoring: React.FC<UserProps> = ({ }) => {
                         <strong>Time In:</strong> {formatTimeIn(proctor.time_in)}
                       </p>
 
-                      {/* ✅ Show substitution info */}
+                      {/* Show substitution info */}
                       {proctor.is_substitute && (
                         <>
                           <p style={{ margin: '5px 0', color: '#856404', fontSize: '14px', fontWeight: 'bold' }}>

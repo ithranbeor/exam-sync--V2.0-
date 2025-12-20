@@ -33,7 +33,6 @@ const DeanScheduleViewer: React.FC<DeanScheduleViewerProps> = ({ scheduleData })
   const [currentPage, setCurrentPage] = useState(0);
   const maxRoomColumns = 5;
 
-  // Generate time slots
   const rawTimes = [
     "07:00", "07:30", "08:00", "08:30", "09:00", "09:30", "10:00", "10:30",
     "11:00", "11:30", "12:00", "12:30", "13:00", "13:30", "14:00", "14:30",
@@ -55,7 +54,6 @@ const DeanScheduleViewer: React.FC<DeanScheduleViewerProps> = ({ scheduleData })
     label: `${formatTo12Hour(t)} - ${formatTo12Hour(rawTimes[i + 1])}`,
   }));
 
-  // Generate course colors
   const generateCourseColors = (schedules: Schedule[]) => {
     const yearColors = {
       1: [
@@ -82,7 +80,6 @@ const DeanScheduleViewer: React.FC<DeanScheduleViewerProps> = ({ scheduleData })
       let yearLevel: number | null = null;
       let program = '';
 
-      // Extract from section_name
       if (schedule.section_name) {
         const sectionStr = String(schedule.section_name).trim();
         let match = sectionStr.match(/^([A-Za-z]+)(\d)([A-Za-z]*)$/);
@@ -102,7 +99,6 @@ const DeanScheduleViewer: React.FC<DeanScheduleViewerProps> = ({ scheduleData })
         }
       }
 
-      // Assign color based on year level
       if (yearLevel && yearLevel >= 1 && yearLevel <= 4) {
         const programYearKey = `${program}-${yearLevel}`;
         const availableColors = yearColors[yearLevel as keyof typeof yearColors];
@@ -115,7 +111,7 @@ const DeanScheduleViewer: React.FC<DeanScheduleViewerProps> = ({ scheduleData })
         courseColorMap[schedule.course_id] = availableColors[colorIndex];
         programYearMap[programYearKey]++;
       } else {
-        courseColorMap[schedule.course_id] = '#9CA3AF'; // Gray for unmatched
+        courseColorMap[schedule.course_id] = '#9CA3AF';
       }
     });
 
@@ -124,12 +120,10 @@ const DeanScheduleViewer: React.FC<DeanScheduleViewerProps> = ({ scheduleData })
 
   const courseColorMap = generateCourseColors(scheduleData.schedules);
 
-  // Group schedules by date
   const uniqueDates = Array.from(
     new Set(scheduleData.schedules.map(s => s.exam_date))
   ).sort();
 
-  // Get unique rooms for pagination
   const allRooms = Array.from(
     new Set(scheduleData.schedules.map(s => s.room_id))
   ).sort((a, b) => {
@@ -149,7 +143,6 @@ const DeanScheduleViewer: React.FC<DeanScheduleViewerProps> = ({ scheduleData })
     const dateSchedules = scheduleData.schedules.filter(s => s.exam_date === date);
     const occupiedCells: Record<string, boolean> = {};
 
-    // Group by room
     const groupedData: Record<string, Schedule[]> = {};
     dateSchedules.forEach((schedule) => {
       const key = `${date}-${schedule.room_id}`;
@@ -157,16 +150,13 @@ const DeanScheduleViewer: React.FC<DeanScheduleViewerProps> = ({ scheduleData })
       groupedData[key].push(schedule);
     });
 
-    // Group rooms by building
     const buildingGroups: Record<string, string[]> = {};
     pageRooms.forEach((room) => {
-      // Search in all schedules, not just dateSchedules
       const building = scheduleData.schedules.find(s => s.room_id === room)?.building_name || scheduleData.building;
       if (!buildingGroups[building]) buildingGroups[building] = [];
       buildingGroups[building].push(room);
     });
 
-    // Check if we have multiple buildings
     const buildingCount = Object.keys(buildingGroups).length;
 
     return (

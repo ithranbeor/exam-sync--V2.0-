@@ -537,7 +537,6 @@ const ProctorViewExam: React.FC<ProctorViewExamProps> = ({ user }) => {
   return (
     <div style={{ position: "relative", width: "100%", overflow: "visible" }}>
       <div className="scheduler-top-card">
-        {/* View Mode Toggle */}
         <div style={{
           display: 'flex',
           gap: '10px',
@@ -587,7 +586,6 @@ const ProctorViewExam: React.FC<ProctorViewExamProps> = ({ user }) => {
           </button>
         </div>
 
-        {/* Date Filter */}
         <div style={{
           top: "20px",
           right: "-100px",
@@ -618,7 +616,6 @@ const ProctorViewExam: React.FC<ProctorViewExamProps> = ({ user }) => {
           </select>
         </div>
 
-        {/* Search */}
         <div
           style={{
             padding: "1px",
@@ -670,7 +667,6 @@ const ProctorViewExam: React.FC<ProctorViewExamProps> = ({ user }) => {
         </div>
       </div>
 
-      {/* Navigation Buttons */}
       {hasData && page > 0 && (
         <button
           type="button"
@@ -691,7 +687,6 @@ const ProctorViewExam: React.FC<ProctorViewExamProps> = ({ user }) => {
         </button>
       )}
 
-      {/* Schedule Cards */}
       <div
         className="scheduler-view-card-wrapper"
         style={{

@@ -40,7 +40,6 @@ const ProctorCourseDetails = ({ user }: ProctorCourseDetailsProps) => {
       try {
         setLoading(true);
 
-        // ✅ SINGLE SOURCE OF TRUTH
         const response = await api.get(`/proctor-assigned-exams/${user.user_id}/`);
 
         const upcoming = Array.isArray(response.data?.upcoming)
@@ -67,14 +66,12 @@ const ProctorCourseDetails = ({ user }: ProctorCourseDetailsProps) => {
           is_history: isHistory,
         });
 
-        // ✅ Combine everything safely
         const combinedAssignments: ProctorAssignment[] = [
           ...upcoming.map((e: any) => mapExam(e, false)),
           ...ongoing.map((e: any) => mapExam(e, false)),
           ...completed.map((e: any) => mapExam(e, true)),
         ];
 
-        // ✅ Sort by exam date + time
         combinedAssignments.sort((a, b) => {
           const dateA = new Date(`${a.exam_date} ${a.exam_start_time}`).getTime();
           const dateB = new Date(`${b.exam_date} ${b.exam_start_time}`).getTime();
@@ -82,7 +79,7 @@ const ProctorCourseDetails = ({ user }: ProctorCourseDetailsProps) => {
         });
 
         setAssignments(combinedAssignments);
-        setHistoryRecords([]); // history already merged
+        setHistoryRecords([]);
 
       } catch (err) {
         console.error('❌ Error fetching proctor assignments:', err);
@@ -128,7 +125,6 @@ const ProctorCourseDetails = ({ user }: ProctorCourseDetailsProps) => {
 
   const now = new Date();
 
-  // ✅ Combine current assignments and history
   const allRecords = [...assignments, ...historyRecords];
 
   const filteredAssignments = allRecords.filter((assign) => {
@@ -152,10 +148,9 @@ const ProctorCourseDetails = ({ user }: ProctorCourseDetailsProps) => {
     } else if (filter === 'completed') {
       return hasCheckedIn || examEndTime < now || isHistoryRecord;
     }
-    return true; // 'all'
+    return true;
   });
 
-  // ✅ Updated count calculations
   const upcomingCount = allRecords.filter(a => {
     const isHistoryRecord = a.is_history === true;
     return new Date(a.exam_start_time) > now && !isHistoryRecord;

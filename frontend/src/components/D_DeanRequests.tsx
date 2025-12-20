@@ -524,7 +524,6 @@ const DeanRequests: React.FC<SchedulerViewProps> = ({ user }) => {
               )
             )}
 
-            {/* ACTION BAR (Shown Once Only) */}
             <div
               style={{
                 marginTop: "20px",
@@ -535,10 +534,8 @@ const DeanRequests: React.FC<SchedulerViewProps> = ({ user }) => {
                 paddingTop: showScheduleViewer ? "15px" : "0",
               }}
             >
-              {/* IF NOT EDITING STATUS */}
               {!editStatus && (
                 <>
-                  {/* Close button only in main view */}
                   {!showScheduleViewer && (
                     <button
                       type="button"
@@ -549,7 +546,6 @@ const DeanRequests: React.FC<SchedulerViewProps> = ({ user }) => {
                     </button>
                   )}
 
-                  {/* Delete only in main view */}
                   {!showScheduleViewer && (
                     <button
                       type="button"
@@ -561,7 +557,6 @@ const DeanRequests: React.FC<SchedulerViewProps> = ({ user }) => {
                     </button>
                   )}
 
-                  {/* Edit Status only if not pending */}
                   {!showScheduleViewer &&
                     selectedRequest.status !== "pending" &&
                     (
@@ -582,7 +577,6 @@ const DeanRequests: React.FC<SchedulerViewProps> = ({ user }) => {
                       </button>
                     )}
 
-                  {/* Approve / Reject (only ONCE) */}
                   {selectedRequest.status === "pending" && (
                     <>
                       <button
@@ -605,7 +599,6 @@ const DeanRequests: React.FC<SchedulerViewProps> = ({ user }) => {
                 </>
               )}
 
-              {/* IF EDITING STATUS — SHOW ONLY EDIT UI */}
               {editStatus && (
                 <>
                   <select

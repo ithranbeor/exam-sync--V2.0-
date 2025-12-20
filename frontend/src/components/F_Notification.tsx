@@ -85,9 +85,7 @@ const Notification: React.FC<UserProps> = ({ user }) => {
     });
   }, [notifications]);
 
-  // Handle click on notification - open modal
   const handleNotificationClick = async (notif: Notification) => {
-    // Mark as read
     if (!notif.is_seen) {
       try {
         await api.patch(`/notifications/${notif.notification_id}/update/`, {
@@ -106,20 +104,17 @@ const Notification: React.FC<UserProps> = ({ user }) => {
       }
     }
 
-    // Open modal with full message
     setSelectedNotification(notif);
   };
 
-  // Close modal
   const handleCloseModal = () => {
     setSelectedNotification(null);
   };
 
-  // Mark all as unread
   const handleMarkAllUnread = async () => {
     if (!user?.user_id) return;
     try {
-      await api.patch(`/notifications/${user.user_id}/mark-all-unread/`); // Optional: create this endpoint
+      await api.patch(`/notifications/${user.user_id}/mark-all-unread/`); 
       setNotifications(prev =>
         prev.map(n => ({ ...n, is_seen: false, read_at: null }))
       );
@@ -263,7 +258,6 @@ const Notification: React.FC<UserProps> = ({ user }) => {
         ))
       )}
 
-      {/* Modal for viewing full notification */}
       {selectedNotification && (
         <div className="modal-overlay" onClick={handleCloseModal}>
           <div className="modal-message-pane" onClick={(e) => e.stopPropagation()}>

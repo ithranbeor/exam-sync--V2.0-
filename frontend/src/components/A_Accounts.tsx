@@ -48,14 +48,14 @@ export const Accounts: React.FC<AccountsProps> = () => {
   // Fetch accounts
   // -----------------------------
   const fetchAccounts = async () => {
-    setLoading(true); // start loading
+    setLoading(true); 
     try {
       const response = await api.get<UserAccount[]>('/accounts/');
       setAccounts(response.data);
     } catch (err: any) {
       toast.error('Error fetching accounts');
     } finally {
-      setLoading(false); // stop loading
+      setLoading(false);
     }
   };
 
@@ -76,7 +76,6 @@ export const Accounts: React.FC<AccountsProps> = () => {
 
     try {
       if (isEditMode) {
-        // ✅ Update existing account (no password change unless explicitly set)
         await api.put(`/accounts/${user_id}/`, {
           first_name,
           last_name,
@@ -87,7 +86,6 @@ export const Accounts: React.FC<AccountsProps> = () => {
         });
         toast.success('Account updated successfully!');
       } else {
-        // ✅ Create new account with default password
         const defaultPassword = `${last_name}@${user_id}`;
         await api.post('/create-account/', {
           user_id,
@@ -170,8 +168,6 @@ export const Accounts: React.FC<AccountsProps> = () => {
             password: defaultPassword,
             created_at: new Date().toISOString(),
           };
-
-          // ✅ Use the correct endpoint that hashes passwords
           await api.post('/create-account/', payload);
           successCount++;
         } catch (err: any) {

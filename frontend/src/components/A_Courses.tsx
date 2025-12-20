@@ -62,7 +62,6 @@ const Courses: React.FC = () => {
   const [itemsPerPage, setItemsPerPage] = useState<number | 'all'>('all');
   const [showItemsPerPageDropdown, setShowItemsPerPageDropdown] = useState(false);
   const [customItemsPerPage, setCustomItemsPerPage] = useState<string>('');
-  // college dropdown popover not needed; using a plain select like UserManagement
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
   const [isBulkDeleting, setIsBulkDeleting] = useState(false);
   const [sortBy, setSortBy] = useState<string>('none');
@@ -159,7 +158,7 @@ const Courses: React.FC = () => {
     };
   }, [showSortDropdown, showItemsPerPageDropdown]);
 
-  // ✅ Optimized useEffect for faster load
+  // ptimized useEffect for faster load
   useEffect(() => {
     let mounted = true;
 
@@ -174,7 +173,6 @@ const Courses: React.FC = () => {
           api.get("/tbl_user_role"),
         ]);
 
-        // Fetch courses first to show them immediately
         const { data: coursesData } = await coursesPromise;
         if (mounted) setCourses(coursesData);
 
@@ -204,7 +202,7 @@ const Courses: React.FC = () => {
     return `${u.first_name}${mid} ${u.last_name}`.trim();
   };
 
-  // ✅ Prevent re-fetch race conditions
+  // Prevent re-fetch race conditions
   const fetchCourses = useCallback(async () => {
     setLoading(true);
     try {
@@ -232,25 +230,19 @@ const Courses: React.FC = () => {
     const bIsNumeric = isNumeric(b);
 
     if (aIsNumeric && bIsNumeric) {
-      // Both are numbers - sort numerically
       return parseFloat(a) - parseFloat(b);
     } else if (aIsNumeric && !bIsNumeric) {
-      // a is number, b is text - numbers come first
       return -1;
     } else if (!aIsNumeric && bIsNumeric) {
-      // a is text, b is number - numbers come first
       return 1;
     } else {
-      // Both are text - sort alphabetically
       return a.localeCompare(b);
     }
   };
 
-  // 🧠 Memoize filtered results
   const filteredCourses = useMemo(() => {
     const search = searchTerm.toLowerCase();
     let filtered = courses.filter((c) => {
-      // Search in course_id, course_name, term_name, and instructor names
       const matchesCourseId = c.course_id.toLowerCase().includes(search);
       const matchesCourseName = c.course_name.toLowerCase().includes(search);
       const matchesTerm = (c.term_name || '').toLowerCase().includes(search);
@@ -261,16 +253,13 @@ const Courses: React.FC = () => {
       return matchesCourseId || matchesCourseName || matchesTerm || matchesInstructors;
     });
 
-    // Apply college filter (if not 'all') - include course when any instructor belongs to selected college
     if (selectedCollege && selectedCollege !== 'all') {
       filtered = filtered.filter((c) => {
         const ids = c.user_ids || [];
         if (ids.length === 0) return false;
 
-        // check userRoles for any instructor
         for (const uid of ids) {
           const role = userRoles.find((r: any) => {
-            // role may include user_id or user
             return Number(r.user_id || r.user) === Number(uid);
           });
           if (role) {
@@ -434,9 +423,8 @@ const Courses: React.FC = () => {
     }
   }, [newCourse, editMode, fetchCourses, originalCourseId]);
 
-  // ✅ Fix Edit button handler (correctly loads full editable data)
   const handleEdit = (course: Course) => {
-    setOriginalCourseId(course.course_id); // Store original ID
+    setOriginalCourseId(course.course_id); 
     setNewCourse({
       course_id: course.course_id,
       course_name: course.course_name,
@@ -450,13 +438,12 @@ const Courses: React.FC = () => {
 
   const clean = (str: string) =>
     String(str)
-      .replace(/\u00A0/g, " ")      // remove non-breaking spaces
-      .replace(/\t/g, " ")          // remove hidden tabs
+      .replace(/\u00A0/g, " ")     
+      .replace(/\t/g, " ")         
       .trim()
       .toLowerCase();
 
 
-  // --- IMPORT FUNCTION FIX ---
   const handleImport = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (!file) {
@@ -485,7 +472,6 @@ const Courses: React.FC = () => {
 
         for (const row of data as any[]) {
           const rawCourseId = String(row["Course ID"] || "").trim();
-          // still clean invisible characters but DO NOT lowercase
           const course_id = rawCourseId
             .replace(/\u00A0/g, " ")
             .replace(/\t/g, " ")
@@ -500,7 +486,6 @@ const Courses: React.FC = () => {
             continue;
           }
 
-          // --- TERM MATCHING EXACTLY LIKE MANUAL ADD (no academic year) ---
           const term = terms.find(
             (t) => clean(t.term_name) === term_full
           );
@@ -511,7 +496,6 @@ const Courses: React.FC = () => {
             continue;
           }
 
-          // --- INSTRUCTOR MATCHING ---
           let instructorIds: number[] = [];
 
           if (instructors_raw && instructors_raw.trim() !== "") {
@@ -533,18 +517,16 @@ const Courses: React.FC = () => {
               );
             }
           } else {
-            // no instructors provided
             instructorIds = [];
           }
 
-          // --- POST EXACTLY THE SAME STRUCTURE AS MANUAL ADD ---
           try {
             await api.post("/courses/", {
               course_id,
               course_name,
               term_id: term.term_id,
               user_ids: instructorIds,
-              leaders: [],     // import same behavior as manual add
+              leaders: [],    
             });
 
             successCount++;
@@ -568,7 +550,6 @@ const Courses: React.FC = () => {
     reader.readAsBinaryString(file);
   };
 
-  // Download Excel template (unchanged)
   const downloadTemplate = useCallback(() => {
     const ws = XLSX.utils.aoa_to_sheet([
       ["Course ID", "Course Name", "Term Name", "Instructor Full Names"],
@@ -1154,7 +1135,6 @@ const Courses: React.FC = () => {
         </div>
       </div>
 
-      {/* ✅ Modals and Toast unchanged */}
       {showModal && (
         <div className="modal-overlay">
           <div className="modal">
@@ -1167,7 +1147,7 @@ const Courses: React.FC = () => {
               <input
                 type="text"
                 value={newCourse.course_id}
-                disabled={false}  // Changed from {editMode} to {false}
+                disabled={false}  
                 onChange={(e) =>
                   setNewCourse({ ...newCourse, course_id: e.target.value })
                 }

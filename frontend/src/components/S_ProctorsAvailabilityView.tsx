@@ -82,7 +82,6 @@ const SchedulerAvailability: React.FC<ProctorSetAvailabilityProps> = ({ user }) 
     return <components.MultiValue {...props} />;
   };
 
-  // Handle ESC key to close modals
   useEscapeKey(() => {
     if (showModal) {
       setShowModal(false);
@@ -98,7 +97,6 @@ const SchedulerAvailability: React.FC<ProctorSetAvailabilityProps> = ({ user }) 
   }, showRemarksModal);
 
   useEffect(() => {
-    // ✅ Load all data in parallel on mount
     Promise.all([
       fetchInstructorsAndAvailability(),
       fetchAllowedDates(),
@@ -106,7 +104,6 @@ const SchedulerAvailability: React.FC<ProctorSetAvailabilityProps> = ({ user }) 
     ]);
   }, []);
 
-  // Close dropdown when clicking outside
   useEffect(() => {
     const handleClickOutside = (event: MouseEvent) => {
       const target = event.target as HTMLElement;
@@ -127,13 +124,11 @@ const SchedulerAvailability: React.FC<ProctorSetAvailabilityProps> = ({ user }) 
     };
   }, [showSortDropdown, showItemsPerPageDropdown]);
 
-  // ✅ Combined function to fetch both instructors and availability in one go
   const fetchInstructorsAndAvailability = async () => {
     if (!user?.user_id) return;
 
     setLoading(true);
     try {
-      // Fetch scheduler's college and all proctors in parallel
       const [schedulerRolesRes, proctorRolesRes] = await Promise.all([
         api.get(`/tbl_user_role`, { params: { user_id: user.user_id, role_id: 3 } }),
         api.get(`/tbl_user_role`, { params: { role_id: 5 } })
@@ -156,7 +151,6 @@ const SchedulerAvailability: React.FC<ProctorSetAvailabilityProps> = ({ user }) 
         return;
       }
 
-      // Filter valid proctors matching the college
       const validProctorRoles = proctorRoles.filter(
         (p: any) => p.user_id != null && p.college_id === schedulerCollegeId
       );
@@ -167,12 +161,9 @@ const SchedulerAvailability: React.FC<ProctorSetAvailabilityProps> = ({ user }) 
         return;
       }
 
-      // Get unique user IDs
       const uniqueUserIds = [...new Set(validProctorRoles.map((p: any) => p.user_id))];
 
-      // ✅ Fetch user data and availability for all proctors in parallel
       const [userDataResults, availabilityResults] = await Promise.all([
-        // Fetch all user data
         Promise.all(
           uniqueUserIds.map(async (userId) => {
             try {
@@ -183,7 +174,6 @@ const SchedulerAvailability: React.FC<ProctorSetAvailabilityProps> = ({ user }) 
             }
           })
         ),
-        // Fetch all availability data
         Promise.all(
           uniqueUserIds.map(async (userId) => {
             try {
@@ -198,7 +188,6 @@ const SchedulerAvailability: React.FC<ProctorSetAvailabilityProps> = ({ user }) 
         )
       ]);
 
-      // ✅ Build user cache
       const newUserCache = new Map();
       userDataResults.forEach(({ userId, data }) => {
         if (data) {
@@ -207,7 +196,6 @@ const SchedulerAvailability: React.FC<ProctorSetAvailabilityProps> = ({ user }) 
       });
       setUserCache(newUserCache);
 
-      // Build instructors list
       const instructorsList = validProctorRoles
         .reduce((acc: any[], current: any) => {
           const exists = acc.find(item => item.user_id === current.user_id);
@@ -225,15 +213,13 @@ const SchedulerAvailability: React.FC<ProctorSetAvailabilityProps> = ({ user }) 
               : `User ${p.user_id}`,
           };
         })
-        .filter(i => i.label !== `User ${i.value}`); // Remove entries without valid user data
+        .filter(i => i.label !== `User ${i.value}`); 
 
       setInstructors(instructorsList);
 
-      // Process availability data
       const allAvailability = availabilityResults.flat();
       const validAvailability = allAvailability.filter((entry: any) => entry.user_id != null);
 
-      // Map availability with cached user data (no additional API calls!)
       const mappedAvailability = validAvailability.map((entry: any) => {
         const userData = newUserCache.get(entry.user_id);
         return {
@@ -255,12 +241,10 @@ const SchedulerAvailability: React.FC<ProctorSetAvailabilityProps> = ({ user }) 
       console.error('Error fetching data:', error);
       toast.error('An error occurred while fetching data');
     } finally {
-      setLoading(false); // ✅ stop loading
+      setLoading(false);
     }
   };
 
-  // ✅ Simplified refresh function
-  // ✅ Simplified refresh function
   const fetchAvailability = async () => {
     if (!user?.user_id) return;
     setLoading(true);
@@ -283,7 +267,6 @@ const SchedulerAvailability: React.FC<ProctorSetAvailabilityProps> = ({ user }) 
 
       if (!proctorRoles || !Array.isArray(proctorRoles)) return;
 
-      // Filter proctors by college BEFORE processing
       const validProctorRoles = proctorRoles.filter(
         (p: any) => p.user_id != null && p.college_id === schedulerCollegeId
       );
@@ -295,7 +278,6 @@ const SchedulerAvailability: React.FC<ProctorSetAvailabilityProps> = ({ user }) 
         return;
       }
 
-      // Fetch availability and missing user data in parallel
       const [availabilityResults, newUserData] = await Promise.all([
         Promise.all(
           uniqueUserIds.map(async (userId) => {
@@ -309,7 +291,6 @@ const SchedulerAvailability: React.FC<ProctorSetAvailabilityProps> = ({ user }) 
             }
           })
         ),
-        // Fetch user data for users not in cache
         Promise.all(
           uniqueUserIds
             .filter(userId => !userCache.has(userId))
@@ -324,7 +305,6 @@ const SchedulerAvailability: React.FC<ProctorSetAvailabilityProps> = ({ user }) 
         )
       ]);
 
-      // Update cache with new user data
       const updatedCache = new Map(userCache);
       newUserData.forEach(({ userId, data }) => {
         if (data) {
@@ -334,7 +314,6 @@ const SchedulerAvailability: React.FC<ProctorSetAvailabilityProps> = ({ user }) 
       setUserCache(updatedCache);
 
       const allAvailability = availabilityResults.flat();
-      // Only show availability for proctors in this college
       const validAvailability = allAvailability.filter((entry: any) =>
         entry.user_id != null && uniqueUserIds.includes(entry.user_id)
       );
@@ -357,7 +336,7 @@ const SchedulerAvailability: React.FC<ProctorSetAvailabilityProps> = ({ user }) 
       setEntries(mappedAvailability);
     } catch (error) {
     } finally {
-      setLoading(false); // ✅ stop loading
+      setLoading(false);
     }
   };
 
@@ -414,7 +393,7 @@ const SchedulerAvailability: React.FC<ProctorSetAvailabilityProps> = ({ user }) 
         const end = new Date(period.end_date);
 
         for (let d = new Date(start); d <= end; d.setDate(d.getDate() + 1)) {
-          dates.push(formatLocal(new Date(d)));  // 👈 FIXED: local date, no UTC shift
+          dates.push(formatLocal(new Date(d)));
         }
       });
 
@@ -430,7 +409,6 @@ const SchedulerAvailability: React.FC<ProctorSetAvailabilityProps> = ({ user }) 
     }
   };
 
-  // Calendar helpers
   const daysInMonth = (y: number, m: number) => new Date(y, m + 1, 0).getDate();
   const firstDayOfMonth = (y: number, m: number) => new Date(y, m, 1).getDay();
   const getCalendarDays = () => {
@@ -530,7 +508,7 @@ const SchedulerAvailability: React.FC<ProctorSetAvailabilityProps> = ({ user }) 
       }
 
       setShowModal(false);
-      fetchAvailability(); // Async, doesn't block
+      fetchAvailability();
     } catch (error: any) {
       toast.error(`Failed to process: ${error?.message || 'Unknown error'}`);
     } finally {
@@ -575,7 +553,6 @@ const SchedulerAvailability: React.FC<ProctorSetAvailabilityProps> = ({ user }) 
     }
   };
 
-  // Bulk selection functions
   const toggleSelect = (id: number) => {
     setSelectedAvailabilityIds((prev) => {
       const next = new Set(prev);
@@ -592,27 +569,21 @@ const SchedulerAvailability: React.FC<ProctorSetAvailabilityProps> = ({ user }) 
     setCurrentPage(1);
   }, [searchTerm, sortBy]);
 
-  // Helper function to determine if a string is numeric
   const isNumeric = (str: string): boolean => {
     return !isNaN(Number(str)) && !isNaN(parseFloat(str));
   };
 
-  // Smart sort function that handles both text and numbers
   const smartSort = (a: string, b: string): number => {
     const aIsNumeric = isNumeric(a);
     const bIsNumeric = isNumeric(b);
 
     if (aIsNumeric && bIsNumeric) {
-      // Both are numbers - sort numerically
       return parseFloat(a) - parseFloat(b);
     } else if (aIsNumeric && !bIsNumeric) {
-      // a is number, b is text - numbers come first
       return -1;
     } else if (!aIsNumeric && bIsNumeric) {
-      // a is text, b is number - numbers come first
       return 1;
     } else {
-      // Both are text - sort alphabetically
       return a.localeCompare(b);
     }
   };
@@ -622,7 +593,6 @@ const SchedulerAvailability: React.FC<ProctorSetAvailabilityProps> = ({ user }) 
       (entry.user_fullname || '').toLowerCase().includes(searchTerm.toLowerCase())
     );
 
-    // Apply sorting
     if (sortBy !== 'none') {
       filtered = [...filtered].sort((a, b) => {
         if (sortBy === 'proctor_name') {
@@ -630,12 +600,10 @@ const SchedulerAvailability: React.FC<ProctorSetAvailabilityProps> = ({ user }) 
           const bName = (b.user_fullname || '').toLowerCase();
           return smartSort(aName, bName);
         } else if (sortBy === 'day') {
-          // Sort by first day in the days array
           const aDay = a.days && a.days.length > 0 ? new Date(a.days[0]).getTime() : 0;
           const bDay = b.days && b.days.length > 0 ? new Date(b.days[0]).getTime() : 0;
           return aDay - bDay;
         } else if (sortBy === 'time_slot') {
-          // Sort by first time slot
           const aSlot = a.time_slots && a.time_slots.length > 0 ? a.time_slots[0] : '';
           const bSlot = b.time_slots && b.time_slots.length > 0 ? b.time_slots[0] : '';
           return smartSort(aSlot.toLowerCase(), bSlot.toLowerCase());
@@ -659,7 +627,6 @@ const SchedulerAvailability: React.FC<ProctorSetAvailabilityProps> = ({ user }) 
     if (totalItems === 0) return 1;
 
     if (itemsPerPage === 'all') {
-      // "Show All" should display 20 rows per page
       return 20;
     }
 
@@ -718,7 +685,6 @@ const SchedulerAvailability: React.FC<ProctorSetAvailabilityProps> = ({ user }) 
     }
   };
 
-  // Handle scroll position and update button states
   useEffect(() => {
     const checkScroll = () => {
       const container = tableContainerRef.current;
@@ -728,7 +694,6 @@ const SchedulerAvailability: React.FC<ProctorSetAvailabilityProps> = ({ user }) 
       setCanScrollLeft(scrollLeft > 0);
       setCanScrollRight(scrollLeft < scrollWidth - clientWidth - 1);
 
-      // Update scroll indicator classes
       container.classList.toggle('scrollable-left', scrollLeft > 0);
       container.classList.toggle('scrollable-right', scrollLeft < scrollWidth - clientWidth - 1);
     };

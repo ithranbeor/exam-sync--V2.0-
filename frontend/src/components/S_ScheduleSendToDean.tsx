@@ -40,7 +40,7 @@ const DeanSender: React.FC<DeanSenderProps> = ({
       if (!user?.user_id) return;
 
       try {
-        // ✅ Get scheduler's college first
+        // Get scheduler's college first
         const userRoleResponse = await api.get('/tbl_user_role', {
           params: {
             user_id: user.user_id,
@@ -55,23 +55,21 @@ const DeanSender: React.FC<DeanSenderProps> = ({
 
         const schedulerCollegeId = userRoleResponse.data[0].college_id;
 
-        // ✅ IMPORTANT: Also verify this matches the collegeName prop
         // This ensures we're showing the dean for the CURRENT college being viewed
         const collegeResponse = await api.get(`/tbl_college/${schedulerCollegeId}/`);
         const schedulerCollegeName = collegeResponse.data?.college_name;
 
-        // ✅ If collegeName doesn't match, something is wrong
         if (schedulerCollegeName !== collegeName && collegeName !== "Add schedule first") {
           setDeanName("College Mismatch");
           setDeanUserId(null);
           return;
         }
 
-        // ✅ Get dean's role using the scheduler's college ID (not name)
+        // Get dean's role using the scheduler's college ID (not name)
         const deanRoleResponse = await api.get('/tbl_user_role', {
           params: {
-            college_id: schedulerCollegeId, // ✅ Use ID, not name
-            role_id: 1 // Dean role
+            college_id: schedulerCollegeId,
+            role_id: 1
           }
         });
 
@@ -84,11 +82,10 @@ const DeanSender: React.FC<DeanSenderProps> = ({
         const deanRole = deanRoleResponse.data[0];
         setDeanUserId(deanRole.user_id);
 
-        // ✅ Fetch dean's user information
+        // Fetch dean's user information
         const deanUserResponse = await api.get(`/users/${deanRole.user_id}/`);
         const deanData = deanUserResponse.data;
 
-        // ✅ Set full name properly
         const fullName = `${deanData.first_name || ''} ${deanData.last_name || ''}`.trim();
         setDeanName(fullName || "Dean Name Not Available");
 
@@ -134,7 +131,6 @@ const DeanSender: React.FC<DeanSenderProps> = ({
 
     setLoading(true);
     try {
-      // ✅ Validate schedule data
       const validSchedules = filteredExamData.filter(exam =>
         exam.course_id &&
         exam.exam_date &&
@@ -152,9 +148,8 @@ const DeanSender: React.FC<DeanSenderProps> = ({
         toast.warn(`${filteredExamData.length - validSchedules.length} incomplete schedules will be skipped`);
       }
 
-      // Prepare schedule data
       const scheduleData = {
-        user_id: user.user_id,  // ✅ Must include user_id at top level
+        user_id: user.user_id,  
         college_name: collegeName,
         exam_period: examPeriodName || "Not specified",
         term: termName || "Not specified",
@@ -164,7 +159,6 @@ const DeanSender: React.FC<DeanSenderProps> = ({
         remarks: remarks || "No remarks",
         schedules: validSchedules.map((exam) => ({
           course_id: exam.course_id,
-          // ✅ Send BOTH array and legacy format
           sections: exam.sections && exam.sections.length > 0 ? exam.sections : [exam.section_name || "N/A"],
           section_name: exam.sections && exam.sections.length > 0
             ? exam.sections.join(', ')
@@ -174,14 +168,12 @@ const DeanSender: React.FC<DeanSenderProps> = ({
           exam_end_time: exam.exam_end_time,
           room_id: exam.room_id,
           building_name: exam.building_name || buildingName,
-          // ✅ Send BOTH array and string format for instructors
           instructors: exam.instructors && exam.instructors.length > 0
             ? exam.instructors
             : (exam.instructor_id ? [exam.instructor_id] : []),
           instructor: exam.instructors && exam.instructors.length > 0
             ? exam.instructors.map((id: number) => getUserName(id)).filter((n: string) => n !== '-').join(', ')
             : getUserName(exam.instructor_id),
-          // ✅ Send BOTH array and string format for proctors
           proctors: exam.proctors && exam.proctors.length > 0
             ? exam.proctors
             : (exam.proctor_id ? [exam.proctor_id] : []),
@@ -191,14 +183,12 @@ const DeanSender: React.FC<DeanSenderProps> = ({
         })),
       };
 
-      // ✅ Send to backend
       const response = await api.post('/send_schedule_to_dean/', scheduleData);
 
       toast.success(
         `Schedule sent successfully! (${validSchedules.length} exams sent to ${response.data.dean_name || 'dean'})`
       );
 
-      // Delay closing to show success message
       setTimeout(() => {
         onClose();
       }, 1500);
@@ -297,7 +287,7 @@ const DeanSender: React.FC<DeanSenderProps> = ({
           loading ||
           !deanUserId ||
           filteredExamData.length === 0 ||
-          (persistentUnscheduled && persistentUnscheduled.length > 0) // ✅ ADD THIS
+          (persistentUnscheduled && persistentUnscheduled.length > 0)
         }
         style={{
           opacity: (persistentUnscheduled && persistentUnscheduled.length > 0) ? 0.5 : 1,

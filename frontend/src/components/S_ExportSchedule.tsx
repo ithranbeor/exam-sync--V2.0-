@@ -18,7 +18,6 @@ import { saveAs } from "file-saver";
 import "../styles/S_ExportSchedule.css";
 import { FaRegStopCircle } from "react-icons/fa";
 
-// ✅ NEW: Add approvalStatus prop
 interface ExportScheduleProps {
   onClose: () => void;
   collegeName: string;
@@ -71,31 +70,24 @@ const ExportSchedule: React.FC<ExportScheduleProps> = ({
     });
   };
 
-  // ✅ FIXED: Function to add watermark to PDF with proper typing
   const addWatermark = (pdf: jsPDF, pageWidth: number, pageHeight: number) => {
-    // Save current graphics state
     pdf.saveGraphicsState();
 
-    // Set watermark properties
     pdf.setFont("helvetica", "bold");
     pdf.setFontSize(80);
-    pdf.setTextColor(200, 200, 200); // Light gray color
+    pdf.setTextColor(200, 200, 200); 
 
-    // ✅ FIX: Use proper setGState method - jsPDF accepts plain object
-    (pdf as any).setGState({ opacity: 0.2 }); // 20% opacity
+    (pdf as any).setGState({ opacity: 0.2 });
 
-    // Calculate center position
     const centerX = pageWidth / 2;
     const centerY = pageHeight / 2;
 
-    // Add rotated text at center - angle parameter handles rotation
     pdf.text("APPROVED", centerX, centerY, {
       align: "center",
-      angle: -45, // Diagonal angle
+      angle: -45, 
       baseline: "middle"
     });
 
-    // Restore graphics state
     pdf.restoreGraphicsState();
   };
 
@@ -108,7 +100,6 @@ const ExportSchedule: React.FC<ExportScheduleProps> = ({
     setExporting(true);
     setProgress(0);
 
-    // ✅ Show watermark info if approved
     if (approvalStatus === 'approved') {
       toast.info("Generating PDF with APPROVED watermark...");
     } else {

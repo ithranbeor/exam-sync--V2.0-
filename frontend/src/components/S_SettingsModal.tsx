@@ -53,13 +53,11 @@ const FooterSettingsModal: React.FC<FooterSettingsModalProps> = ({
   const [vcaaName, setVcaaName] = useState<string>('');
   const [activeTab, setActiveTab] = useState<'appearance' | 'display' | 'footer' | 'about'>('appearance');
 
-  // Fetch dean name and VCAA name
   useEffect(() => {
     const fetchRoleNames = async () => {
       if (!collegeName || collegeName === "Add schedule first") return;
 
       try {
-        // Fetch Dean name (role_id: 1)
         const deanResponse = await api.get('/tbl_user_role', {
           params: {
             college_name: collegeName,
@@ -70,13 +68,11 @@ const FooterSettingsModal: React.FC<FooterSettingsModalProps> = ({
         if (deanResponse.data?.length > 0) {
           const deanRole = deanResponse.data[0];
 
-          // ✅ Case 1: backend already expanded user (future-proof)
           if (deanRole.user?.first_name && deanRole.user?.last_name) {
             const fullName = `${deanRole.user.first_name} ${deanRole.user.last_name}`;
             setDeanName(fullName);
           }
 
-          // ✅ Case 2: only user_id exists → fetch user manually
           else if (deanRole.user_id) {
             try {
               const userRes = await api.get(`/users/${deanRole.user_id}/`);
@@ -91,13 +87,11 @@ const FooterSettingsModal: React.FC<FooterSettingsModalProps> = ({
             }
           }
 
-          // ❌ No usable data
           else {
             setDeanName('Dean Name Not Found');
           }
         }
 
-        // Fetch VCAA name (role_id: 2)
         const vcaaResponse = await api.get('/tbl_user_role', {
           params: {
             role_id: 2
@@ -120,12 +114,11 @@ const FooterSettingsModal: React.FC<FooterSettingsModalProps> = ({
     fetchRoleNames();
   }, [collegeName]);
 
-  // Wait for collegeId before fetching footer data
   useEffect(() => {
     if (isOpen && collegeId && (deanName || vcaaName)) {
       fetchFooterData();
     }
-  }, [isOpen, collegeId, deanName, vcaaName]); // ✅ Added deanName and vcaaName as dependencies
+  }, [isOpen, collegeId, deanName, vcaaName]);
 
   const fetchFooterData = async () => {
     if (!collegeId) return;
@@ -148,7 +141,6 @@ const FooterSettingsModal: React.FC<FooterSettingsModalProps> = ({
         setLogoPreview(data.logo_url);
       } else {
 
-        // ✅ Use the dean name and VCAA name from state - they should be populated now
         const preparedByName = deanName || 'Dean Name Not Found';
         const approvedByName = vcaaName || 'VCAA Name Not Found';
 
@@ -178,14 +170,12 @@ const FooterSettingsModal: React.FC<FooterSettingsModalProps> = ({
     const file = e.target.files?.[0];
     if (!file) return;
 
-    // Validate file type
     const allowedTypes = ['image/jpeg', 'image/jpg', 'image/png', 'image/gif', 'image/webp'];
     if (!allowedTypes.includes(file.type)) {
       toast.error('Invalid file type. Please upload JPEG, PNG, GIF, or WEBP');
       return;
     }
 
-    // Validate file size (max 5MB)
     if (file.size > 5 * 1024 * 1024) {
       toast.error('File too large. Maximum size is 5MB');
       return;
@@ -193,7 +183,6 @@ const FooterSettingsModal: React.FC<FooterSettingsModalProps> = ({
 
     setLogoFile(file);
 
-    // Create preview
     const reader = new FileReader();
     reader.onloadend = () => {
       setLogoPreview(reader.result as string);
@@ -216,7 +205,6 @@ const FooterSettingsModal: React.FC<FooterSettingsModalProps> = ({
       return;
     }
 
-    // Validate required fields
     if (!footerData.prepared_by_name?.trim()) {
       toast.error('Prepared by name is required');
       return;
@@ -231,7 +219,6 @@ const FooterSettingsModal: React.FC<FooterSettingsModalProps> = ({
     try {
       let logoUrl = footerData.logo_url;
 
-      // Upload logo if changed
       if (logoFile) {
         const formData = new FormData();
         formData.append('logo', logoFile);
@@ -246,7 +233,6 @@ const FooterSettingsModal: React.FC<FooterSettingsModalProps> = ({
         logoUrl = uploadResponse.data.logo_url;
       }
 
-      // Clean data before sending
       const dataToSave = {
         college_id: collegeId,
         prepared_by_name: (footerData.prepared_by_name || '').trim(),
@@ -259,11 +245,9 @@ const FooterSettingsModal: React.FC<FooterSettingsModalProps> = ({
       };
 
       if (footerData.footer_id) {
-        // Update existing
         await api.put(`/tbl_schedule_footer/${footerData.footer_id}/`, dataToSave);
         toast.success('Footer settings updated successfully!');
       } else {
-        // Create new
         await api.post('/tbl_schedule_footer/', dataToSave);
         toast.success('Footer settings saved successfully!');
       }
@@ -271,13 +255,11 @@ const FooterSettingsModal: React.FC<FooterSettingsModalProps> = ({
       onSave();
       onClose();
     } catch (error: any) {
-      // Better error handling
       let errorMessage = 'Failed to save footer settings';
 
       if (error?.response?.data) {
         const data = error.response.data;
         if (typeof data === 'object') {
-          // Extract first error message from validation errors
           const firstError = Object.values(data)[0];
           if (Array.isArray(firstError)) {
             errorMessage = firstError[0];
@@ -303,7 +285,6 @@ const FooterSettingsModal: React.FC<FooterSettingsModalProps> = ({
 
     setIsSaving(true);
     try {
-      // Use dean name and VCAA name from state for reset
       const resetData = {
         college_id: collegeId,
         prepared_by_name: (deanName || 'Dean Name Not Found').trim(),
@@ -316,27 +297,21 @@ const FooterSettingsModal: React.FC<FooterSettingsModalProps> = ({
       };
 
       if (footerData.footer_id) {
-        // Update existing
         await api.put(`/tbl_schedule_footer/${footerData.footer_id}/`, resetData);
         toast.success('Footer settings reset to default values!');
       } else {
-        // Create new with default values
         await api.post('/tbl_schedule_footer/', resetData);
         toast.success('Footer settings reset to default values!');
       }
-
-      // Update local state to match saved data
       setFooterData({
         ...resetData,
-        footer_id: footerData.footer_id // Keep the footer_id if it exists
+        footer_id: footerData.footer_id
       });
       setLogoFile(null);
       setLogoPreview(null);
 
-      // Refresh the data from server
       await fetchFooterData();
 
-      // Trigger parent refresh
       onSave();
 
     } catch (error: any) {

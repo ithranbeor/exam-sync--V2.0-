@@ -196,12 +196,11 @@ const DashboardFaculty = () => {
     new Map(
       roles
         .flatMap(role => roleSidebarMap[role] || [])
-        .filter(item => item.key !== 'notification') // Filter out notification as it will be rendered separately
+        .filter(item => item.key !== 'notification') 
         .map(item => [item.key, item])
     ).values()
   );
 
-  // Extract notification item separately to place it at the top
   const notificationItem = roles
     .flatMap(role => roleSidebarMap[role] || [])
     .find(item => item.key === 'notification');

@@ -160,14 +160,12 @@ export const UserManagement: React.FC<UserManagementProps> = ({ }) => {
 
       const today = new Date().toISOString().split("T")[0];
 
-      // Enrich user roles with names
       const normalized = userRolesRes.data.map((r: any) => {
         let computedStatus = r.status ?? "Active";
         if (r.date_ended && r.date_ended < today) {
           computedStatus = "Suspended";
         }
 
-        // Find and attach role name
         const roleData = rolesData.find((role: any) => role.role_id === r.role);
         const collegData = collegesData.find((college: any) => college.college_id === r.college);
         const deptData = departmentsData.find((dept: any) => dept.department_id === r.department);
@@ -185,12 +183,10 @@ export const UserManagement: React.FC<UserManagementProps> = ({ }) => {
 
       setUserRoles(normalized);
 
-      // Set default college filter to first college
       if (collegesData.length > 0 && !selectedCollege) {
         setSelectedCollege(collegesData[0].college_id);
       }
 
-      // Update roles with outdated status
       const rolesToUpdate = normalized.filter((r: any) => {
         const dbStatus = userRolesRes.data.find((orig: any) => orig.user_role_id === r.user_role_id)?.status ?? "Active";
         return dbStatus !== r.status;
@@ -209,7 +205,6 @@ export const UserManagement: React.FC<UserManagementProps> = ({ }) => {
     }
   };
 
-  // Handle ESC key to close modals
   useEscapeKey(() => {
     if (showDetailsModal) {
       setShowDetailsModal(false);
@@ -258,7 +253,6 @@ export const UserManagement: React.FC<UserManagementProps> = ({ }) => {
     fetchData();
   }, []);
 
-  // Close dropdown when clicking outside
   useEffect(() => {
     const handleClickOutside = (event: MouseEvent) => {
       const target = event.target as HTMLElement;
@@ -279,27 +273,21 @@ export const UserManagement: React.FC<UserManagementProps> = ({ }) => {
     };
   }, [showSortDropdown, showItemsPerPageDropdown]);
 
-  // Helper function to determine if a string is numeric
   const isNumeric = (str: string): boolean => {
     return !isNaN(Number(str)) && !isNaN(parseFloat(str));
   };
 
-  // Smart sort function that handles both text and numbers
   const smartSort = (a: string, b: string): number => {
     const aIsNumeric = isNumeric(a);
     const bIsNumeric = isNumeric(b);
 
     if (aIsNumeric && bIsNumeric) {
-      // Both are numbers - sort numerically
       return parseFloat(a) - parseFloat(b);
     } else if (aIsNumeric && !bIsNumeric) {
-      // a is number, b is text - numbers come first
       return -1;
     } else if (!aIsNumeric && bIsNumeric) {
-      // a is text, b is number - numbers come first
       return 1;
     } else {
-      // Both are text - sort alphabetically
       return a.localeCompare(b);
     }
   };
@@ -379,7 +367,7 @@ export const UserManagement: React.FC<UserManagementProps> = ({ }) => {
 
       setShowAccountModal(false);
       setNewAccountRoles([]);
-      await fetchData(); // Make sure to await this
+      await fetchData(); 
     } catch (err: any) {
       console.error(err);
       toast.error(err.response?.data?.detail || 'Error saving account');
@@ -391,13 +379,11 @@ export const UserManagement: React.FC<UserManagementProps> = ({ }) => {
     if (!globalThis.confirm('Are you sure you want to delete this account?')) return;
 
     try {
-      // First, delete all roles associated with this user
       const userRolesToDelete = userRoles.filter(r => r.user === id);
       await Promise.all(
         userRolesToDelete.map(role => api.delete(`/tbl_user_role/${role.user_role_id}/`))
       );
 
-      // Then delete the account
       await api.delete(`/accounts/${id}/`);
       toast.success('Account and associated roles deleted');
       fetchData();
@@ -443,7 +429,6 @@ export const UserManagement: React.FC<UserManagementProps> = ({ }) => {
     }
   };
 
-  // Handle Role Add
   const handleAddRole = async () => {
     if (!newRole.role_id) {
       toast.error("Role is required.");
@@ -478,7 +463,6 @@ export const UserManagement: React.FC<UserManagementProps> = ({ }) => {
     }
   };
 
-  // Handle Role Edit
   const handleUpdateRole = async () => {
     if (!editingRole) return;
 
@@ -500,7 +484,6 @@ export const UserManagement: React.FC<UserManagementProps> = ({ }) => {
     }
   };
 
-  // Toggle Role Status
   const toggleUserRoleStatus = async (user_role_id: number, currentStatus: string) => {
     const newStatus = currentStatus === "Suspended" ? "Active" : "Suspended";
 
@@ -522,7 +505,6 @@ export const UserManagement: React.FC<UserManagementProps> = ({ }) => {
     }
   };
 
-  // Delete Role
   const handleDeleteRole = async (user_role_id: number) => {
     if (!confirm('Are you sure you want to delete this role?')) return;
 
@@ -540,7 +522,6 @@ export const UserManagement: React.FC<UserManagementProps> = ({ }) => {
     }
   };
 
-  // Import Accounts
   const handleImportAccounts = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (!file) return;
@@ -562,7 +543,7 @@ export const UserManagement: React.FC<UserManagementProps> = ({ }) => {
 
       for (let rowIndex = 0; rowIndex < json.length; rowIndex++) {
         const row = json[rowIndex];
-        const rowNumber = rowIndex + 2; // +2 because Excel rows start at 1 and header is row 1
+        const rowNumber = rowIndex + 2;
 
         try {
           const user_id = Number(row.user_id ?? row.id);
@@ -573,7 +554,6 @@ export const UserManagement: React.FC<UserManagementProps> = ({ }) => {
           const contact_number = String(row.contact_number ?? '').trim();
           const status = String(row.status ?? 'Active');
 
-          // Validation
           if (!user_id) {
             errors.push(`Row ${rowNumber}: Missing user_id`);
             errorCount++;
@@ -600,12 +580,10 @@ export const UserManagement: React.FC<UserManagementProps> = ({ }) => {
             continue;
           }
 
-          // Check if account exists
           const existingAccount = accounts.find(acc => acc.user_id === user_id);
           const defaultPassword = `${last_name}@${user_id}`;
 
           if (existingAccount) {
-            // Update existing account - only update fields that are not null/empty in the Excel
             const updateData: any = {};
             if (first_name) updateData.first_name = first_name;
             if (last_name) updateData.last_name = last_name;
@@ -617,7 +595,6 @@ export const UserManagement: React.FC<UserManagementProps> = ({ }) => {
             await api.put(`/accounts/${user_id}/`, updateData);
             updatedCount++;
           } else {
-            // Create new account
             await api.post('/create-account/', {
               user_id,
               first_name,
@@ -632,7 +609,6 @@ export const UserManagement: React.FC<UserManagementProps> = ({ }) => {
             successCount++;
           }
 
-          // Parse and add/update roles
           const rolesStr = String(row.roles ?? '').trim();
           const collegesStr = String(row.colleges ?? '').trim();
           const departmentsStr = String(row.departments ?? '').trim();
@@ -646,7 +622,6 @@ export const UserManagement: React.FC<UserManagementProps> = ({ }) => {
             const dateStarts = dateStartsStr.split(';').map(d => excelSerialToDate(d.trim()));
             const dateEndeds = dateEndedsStr.split(';').map(d => excelSerialToDate(d.trim()));
 
-            // Validate role data counts match
             if (roleIds.length !== collegeIds.length || roleIds.length !== departmentIds.length) {
               errors.push(`Row ${rowNumber}: Mismatch in role data counts (roles: ${roleIds.length}, colleges: ${collegeIds.length}, departments: ${departmentIds.length})`);
               continue;
@@ -659,32 +634,27 @@ export const UserManagement: React.FC<UserManagementProps> = ({ }) => {
               const dateStart = dateStarts[i];
               const dateEnded = dateEndeds[i];
 
-              // Validate role exists
               const roleExists = roles.find(r => r.role_id === roleId);
               if (!roleExists) {
                 errors.push(`Row ${rowNumber}: Invalid role ID ${roleId} for user ${user_id}`);
                 continue;
               }
 
-              // Validate college or department is provided
               if (!collegeId && !departmentId) {
                 errors.push(`Row ${rowNumber}: Role ${roleId} for user ${user_id} must have either college or department`);
                 continue;
               }
 
-              // Validate college exists if provided
               if (collegeId && !colleges.find(c => c.college_id === collegeId)) {
                 errors.push(`Row ${rowNumber}: Invalid college ID "${collegeId}" for user ${user_id}`);
                 continue;
               }
 
-              // Validate department exists if provided
               if (departmentId && !departments.find(d => d.department_id === departmentId)) {
                 errors.push(`Row ${rowNumber}: Invalid department ID "${departmentId}" for user ${user_id}`);
                 continue;
               }
 
-              // Validate dates
               if (dateStart && !/^\d{4}-\d{2}-\d{2}$/.test(dateStart)) {
                 errors.push(`Row ${rowNumber}: Invalid date_start format for user ${user_id}, role ${roleId}`);
                 continue;
@@ -694,7 +664,6 @@ export const UserManagement: React.FC<UserManagementProps> = ({ }) => {
                 continue;
               }
 
-              // Check if this exact role combination already exists for this user
               const existingRole = userRoles.find(ur =>
                 ur.user === user_id &&
                 ur.role === roleId &&
@@ -703,7 +672,6 @@ export const UserManagement: React.FC<UserManagementProps> = ({ }) => {
               );
 
               if (existingRole) {
-                // Role already exists - update dates if provided
                 if (dateStart || dateEnded) {
                   try {
                     await api.put(`/tbl_user_role/${existingRole.user_role_id}/`, {
@@ -715,11 +683,9 @@ export const UserManagement: React.FC<UserManagementProps> = ({ }) => {
                     errors.push(`Row ${rowNumber}: Failed to update role ${roleId} for user ${user_id} - ${errorMsg}`);
                   }
                 }
-                // Skip creating duplicate
                 continue;
               }
 
-              // Create new role
               try {
                 await api.post("/tbl_user_role/CRUD/", {
                   user: user_id,
@@ -745,7 +711,6 @@ export const UserManagement: React.FC<UserManagementProps> = ({ }) => {
 
       toast.dismiss('import-progress');
 
-      // Show results
       const messages: string[] = [];
       if (successCount > 0) messages.push(`${successCount} new account(s) created`);
       if (updatedCount > 0) messages.push(`${updatedCount} account(s) updated`);
@@ -755,7 +720,6 @@ export const UserManagement: React.FC<UserManagementProps> = ({ }) => {
         toast.success(messages.join(', '));
       }
 
-      // Show detailed errors
       if (errors.length > 0) {
         console.error('Import errors:', errors);
         toast.error(
@@ -779,14 +743,13 @@ export const UserManagement: React.FC<UserManagementProps> = ({ }) => {
     reader.readAsArrayBuffer(file);
   };
 
-  // Import Roles
   const handleImportRoles = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (!file) return;
 
     const reader = new FileReader();
     reader.onload = async (evt) => {
-      setImportLoading(true); // Start loading
+      setImportLoading(true);
       toast.info('Importing roles... Please wait.', { autoClose: false, toastId: 'import-roles-progress' });
 
       const data = new Uint8Array(evt.target?.result as ArrayBuffer);
@@ -810,7 +773,6 @@ export const UserManagement: React.FC<UserManagementProps> = ({ }) => {
           const convertedDateStart = excelSerialToDate(date_start);
           const convertedDateEnded = excelSerialToDate(date_ended);
 
-          // Check if this exact role combination already exists
           const existingRole = userRoles.find(ur =>
             ur.user === user &&
             ur.role === role &&
@@ -819,7 +781,6 @@ export const UserManagement: React.FC<UserManagementProps> = ({ }) => {
           );
 
           if (existingRole) {
-            // Update existing role dates if provided
             if (convertedDateStart || convertedDateEnded) {
               await api.put(`/tbl_user_role/${existingRole.user_role_id}/`, {
                 date_start: convertedDateStart || existingRole.date_start,
@@ -827,7 +788,6 @@ export const UserManagement: React.FC<UserManagementProps> = ({ }) => {
               });
             }
           } else {
-            // Create new role
             await api.post("/tbl_user_role/CRUD/", {
               user,
               role,
@@ -845,7 +805,7 @@ export const UserManagement: React.FC<UserManagementProps> = ({ }) => {
         }
       }
 
-      toast.dismiss('import-roles-progress'); // Dismiss loading toast
+      toast.dismiss('import-roles-progress');
 
       if (successCount > 0) {
         toast.success(`Successfully imported ${successCount} role(s)`);
@@ -855,14 +815,13 @@ export const UserManagement: React.FC<UserManagementProps> = ({ }) => {
       }
 
       await fetchData();
-      setImportLoading(false); // End loading
+      setImportLoading(false);
       setShowImportRolesModal(false);
     };
 
     reader.readAsArrayBuffer(file);
   };
 
-  // Download Templates
   const downloadAccountsTemplate = () => {
     const ws = XLSX.utils.aoa_to_sheet([
       ['user_id', 'first_name', 'last_name', 'middle_name', 'email_address', 'contact_number', 'status', 'roles', 'colleges', 'departments', 'date_starts', 'date_endeds'],
@@ -870,7 +829,6 @@ export const UserManagement: React.FC<UserManagementProps> = ({ }) => {
       [2025000002, 'Maria', 'Santos', 'B.', 'maria@example.com', '09987654321', 'Active', '3', '', 'DIT', '2025-01-01', '2025-12-31'],
     ]);
 
-    // Add note
     XLSX.utils.sheet_add_aoa(ws, [
       [''],
       ['INSTRUCTIONS:'],
@@ -896,7 +854,6 @@ export const UserManagement: React.FC<UserManagementProps> = ({ }) => {
       [2025000001, 2, 'CITC', '', '2025-01-01', '2025-12-31']
     ]);
 
-    // Add note
     XLSX.utils.sheet_add_aoa(ws, [
       [''],
       ['INSTRUCTIONS:'],
@@ -913,12 +870,10 @@ export const UserManagement: React.FC<UserManagementProps> = ({ }) => {
     XLSX.writeFile(wb, 'UserRoles_Import_Template.xlsx');
   };
 
-  // Get roles for a user
   const getUserRoles = useCallback((userId: number) => {
     return userRoles.filter(r => r.user === userId);
   }, [userRoles]);
 
-  // Enhanced filtering with college and search
   const filteredAccounts = useMemo(() => {
     let filtered = accounts.filter(account => {
       const fullName = `${account.first_name} ${account.last_name} ${account.middle_name || ''}`.toLowerCase();
@@ -926,25 +881,21 @@ export const UserManagement: React.FC<UserManagementProps> = ({ }) => {
       const email = account.email_address.toLowerCase();
       const search = searchTerm.toLowerCase();
 
-      // Get user's roles
       const accountRoles = getUserRoles(account.user_id);
       const roleNames = accountRoles.map(r => r.role_name?.toLowerCase() || '').join(' ');
 
-      // Check if matches search term (ID, name, email, or role)
       const matchesSearch = !searchTerm ||
         userId.includes(search) ||
         fullName.includes(search) ||
         email.includes(search) ||
         roleNames.includes(search);
 
-      // Check if matches college filter
       const matchesCollege = !selectedCollege ||
         accountRoles.some(r => r.college_id === selectedCollege);
 
       return matchesSearch && matchesCollege;
     });
 
-    // Apply sorting
     if (sortBy !== 'none') {
       filtered = [...filtered].sort((a, b) => {
         if (sortBy === 'user_id') {
@@ -1038,7 +989,6 @@ export const UserManagement: React.FC<UserManagementProps> = ({ }) => {
     }
   };
 
-  // Handle scroll position and update button states
   useEffect(() => {
     const checkScroll = () => {
       const container = tableContainerRef.current;
@@ -1048,7 +998,6 @@ export const UserManagement: React.FC<UserManagementProps> = ({ }) => {
       setCanScrollLeft(scrollLeft > 0);
       setCanScrollRight(scrollLeft < scrollWidth - clientWidth - 1);
 
-      // Update scroll indicator classes
       container.classList.toggle('scrollable-left', scrollLeft > 0);
       container.classList.toggle('scrollable-right', scrollLeft < scrollWidth - clientWidth - 1);
     };
@@ -1106,26 +1055,20 @@ export const UserManagement: React.FC<UserManagementProps> = ({ }) => {
     ));
   };
 
-  // Helper function to convert Excel serial date to YYYY-MM-DD format
   const excelSerialToDate = (serial: string | number): string | null => {
     if (!serial) return null;
 
     const num = Number(serial);
 
-    // If it's already a valid date string (YYYY-MM-DD format), return it
     if (isNaN(num) && /^\d{4}-\d{2}-\d{2}$/.test(String(serial))) {
       return String(serial);
     }
 
-    // If it's not a number, return null
     if (isNaN(num)) return null;
 
-    // Excel serial date starts from 1900-01-01
-    // Note: Excel incorrectly treats 1900 as a leap year, so we need to account for that
-    const excelEpoch = new Date(1899, 11, 30); // December 30, 1899
+    const excelEpoch = new Date(1899, 11, 30); 
     const date = new Date(excelEpoch.getTime() + num * 24 * 60 * 60 * 1000);
 
-    // Format as YYYY-MM-DD
     const year = date.getFullYear();
     const month = String(date.getMonth() + 1).padStart(2, '0');
     const day = String(date.getDate()).padStart(2, '0');

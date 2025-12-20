@@ -23,7 +23,7 @@ const Colleges: React.FC = () => {
   const [editMode, setEditMode] = useState(false);
   const [editingCollegeId, setEditingCollegeId] = useState<string | null>(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
-  const [loading, setLoading] = useState(true); // new state
+  const [loading, setLoading] = useState(true);
   const [isImporting, setIsImporting] = useState(false);
   const [currentPage, setCurrentPage] = useState(1);
   const [itemsPerPage, setItemsPerPage] = useState<number | 'all'>('all');
@@ -58,7 +58,6 @@ const Colleges: React.FC = () => {
     fetchColleges();
   }, []);
 
-  // Close dropdown when clicking outside
   useEffect(() => {
     const handleClickOutside = (event: MouseEvent) => {
       const target = event.target as HTMLElement;
@@ -79,7 +78,6 @@ const Colleges: React.FC = () => {
     };
   }, [showSortDropdown, showItemsPerPageDropdown]);
 
-  // Handle scroll position and update button states
   useEffect(() => {
     const checkScroll = () => {
       const container = tableContainerRef.current;
@@ -89,7 +87,6 @@ const Colleges: React.FC = () => {
       setCanScrollLeft(scrollLeft > 0);
       setCanScrollRight(scrollLeft < scrollWidth - clientWidth - 1);
 
-      // Update scroll indicator classes
       container.classList.toggle('scrollable-left', scrollLeft > 0);
       container.classList.toggle('scrollable-right', scrollLeft < scrollWidth - clientWidth - 1);
     };
@@ -156,16 +153,12 @@ const Colleges: React.FC = () => {
     const bIsNumeric = isNumeric(b);
 
     if (aIsNumeric && bIsNumeric) {
-      // Both are numbers - sort numerically
       return parseFloat(a) - parseFloat(b);
     } else if (aIsNumeric && !bIsNumeric) {
-      // a is number, b is text - numbers come first
       return -1;
     } else if (!aIsNumeric && bIsNumeric) {
-      // a is text, b is number - numbers come first
       return 1;
     } else {
-      // Both are text - sort alphabetically
       return a.localeCompare(b);
     }
   };
@@ -311,22 +304,18 @@ const Colleges: React.FC = () => {
     }
   };
 
-  // Single-item delete removed in favor of bulk delete
-
   const handleImportFile = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (!file) return;
 
     const reader = new FileReader();
     reader.onload = async (event: any) => {
-      setIsImporting(true); // start loading
+      setIsImporting(true); 
       const data = new Uint8Array(event.target.result);
       const workbook = XLSX.read(data, { type: 'array' });
       const sheetName = workbook.SheetNames[0];
       const worksheet = workbook.Sheets[sheetName];
       const json: any[] = XLSX.utils.sheet_to_json(worksheet);
-
-      // Use built-in template check for missing headers
       const requiredHeaders = ['College ID', 'College Name'];
       const missingHeaders = requiredHeaders.filter(
         (h) => !Object.keys(json[0] || {}).includes(h)
@@ -354,7 +343,7 @@ const Colleges: React.FC = () => {
       toast.success(`Import completed! ${added} college(s) added.`);
       fetchColleges();
       setShowImport(false);
-      setIsImporting(false); // end loading
+      setIsImporting(false); 
     };
 
     reader.readAsArrayBuffer(file);

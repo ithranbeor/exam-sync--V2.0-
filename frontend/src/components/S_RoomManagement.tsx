@@ -39,7 +39,6 @@ interface Timeslot {
   occupied: boolean;
 }
 
-// Debounce helper
 function debounce<F extends (...args: any[]) => void>(func: F, wait: number) {
   let timeout: ReturnType<typeof setTimeout>;
   return (...args: Parameters<F>) => {
@@ -131,9 +130,8 @@ const RoomManagement: React.FC<UserProps> = ({ user }) => {
       if (userCollegeId) {
         // Fetch available rooms for this college
         const availableRoomsResponse = await api.get(`/tbl_available_rooms/?college_id=${userCollegeId}`);
-        // Handle both nested room object and direct room_id from API response
         const roomIds = availableRoomsResponse.data.map((ar: any) => ar.room?.room_id || ar.room_id);
-        setSelectedRooms(roomIds.filter((id: string) => id)); // Filter out any undefined values
+        setSelectedRooms(roomIds.filter((id: string) => id));
       }
     } catch (error) {
       console.error('Error fetching selected rooms:', error);
@@ -186,7 +184,6 @@ const RoomManagement: React.FC<UserProps> = ({ user }) => {
     );
   };
 
-  // Auto-save capacity handlers
   const handleSaveCapacity = async (room_id: string, newCapacity: number) => {
     if (isNaN(newCapacity) || newCapacity <= 0) {
       toast.warn('Invalid capacity');
@@ -218,14 +215,12 @@ const RoomManagement: React.FC<UserProps> = ({ user }) => {
         return;
       }
 
-      // Delete all available rooms for this college
       const availableRoomsResponse = await api.get(`/tbl_available_rooms/?college_id=${userCollegeId}`);
 
       let deletedCount = 0;
       let errorCount = 0;
 
       for (const roomData of availableRoomsResponse.data) {
-        // Extract room_id from nested room object or directly
         let roomId = null;
 
         if (roomData.room && typeof roomData.room === 'object') {

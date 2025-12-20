@@ -4,7 +4,6 @@ import Select from 'react-select';
 import { toast } from 'react-toastify';
 import '../styles/S_ManualScheduleEditor.css';
 
-// ✅ CORRECTED: Added attempted_assignment property
 interface UnscheduledSection {
   modality_id: number;
   course_id: string;
@@ -15,7 +14,7 @@ interface UnscheduledSection {
   instructors?: number[];
   total_students: number;
   possible_rooms: string[];
-  conflicts: string[]; // Array of conflict reasons
+  conflicts: string[];
   is_night_class?: string;
   attempted_assignment?: {
     date: string;
@@ -54,7 +53,7 @@ const ManualScheduleEditor: React.FC<ManualScheduleEditorProps> = ({
   const [selectedDate, setSelectedDate] = useState<string>('');
   const [selectedTime, setSelectedTime] = useState<string>('');
   const [selectedRoom, setSelectedRoom] = useState<string>('');
-  const [selectedProctors, setSelectedProctors] = useState<number[]>([]); // Changed from single to array
+  const [selectedProctors, setSelectedProctors] = useState<number[]>([]); 
   const [availableProctors, setAvailableProctors] = useState<any[]>([]);
   const [availableRooms, setAvailableRooms] = useState<string[]>([]);
   const [availableTimes, setAvailableTimes] = useState<string[]>([]);
@@ -91,7 +90,7 @@ const ManualScheduleEditor: React.FC<ManualScheduleEditorProps> = ({
     const sorted = [...unscheduledSections].sort((a, b) => {
       const aIsNight = a.is_night_class === "YES" ? 1 : 0;
       const bIsNight = b.is_night_class === "YES" ? 1 : 0;
-      return aIsNight - bIsNight; // Day classes (0) come before night classes (1)
+      return aIsNight - bIsNight;
     });
     setRemainingSections(sorted);
   }, [unscheduledSections]);
@@ -148,7 +147,6 @@ const ManualScheduleEditor: React.FC<ManualScheduleEditorProps> = ({
 
       if (roomSchedules.length === 0) return true;
 
-      // ✅ FIXED: Always check time conflicts if time is selected
       if (selectedTime) {
         const startMinutes = timeToMinutes(selectedTime);
         const endMinutes = startMinutes + totalDurationMinutes;
@@ -160,8 +158,7 @@ const ManualScheduleEditor: React.FC<ManualScheduleEditorProps> = ({
         });
       }
 
-      // ✅ If no time selected, don't show rooms that are busy at ANY time
-      return false; // Changed from true to false
+      return false;
     });
 
     setAvailableRooms(available);
@@ -214,7 +211,6 @@ const ManualScheduleEditor: React.FC<ManualScheduleEditorProps> = ({
     if (!selectedDate || !selectedTime) return;
 
     try {
-      // ✅ Get scheduler's college
       const userRolesResponse = await api.get('/tbl_user_role', {
         params: {
           role_id: 3 // Scheduler role
@@ -234,11 +230,10 @@ const ManualScheduleEditor: React.FC<ManualScheduleEditorProps> = ({
 
       const schedulerCollegeId = schedulerRole.college_id || schedulerRole.college?.college_id;
 
-      // ✅ Get all users
+      // Get all users
       const usersResponse = await api.get('/users/');
       const allUsers = usersResponse.data;
 
-      // ✅ Get proctor roles for the scheduler's college
       const proctorRolesResponse = await api.get('/tbl_user_role', {
         params: {
           role_id: 5 // Proctor role
@@ -247,7 +242,7 @@ const ManualScheduleEditor: React.FC<ManualScheduleEditorProps> = ({
 
       const allProctorRoles = proctorRolesResponse.data || [];
 
-      // ✅ Get departments under scheduler's college
+      // Get departments under scheduler's college
       const departmentsResponse = await api.get('/departments/', {
         params: {
           college_id: schedulerCollegeId
@@ -255,7 +250,7 @@ const ManualScheduleEditor: React.FC<ManualScheduleEditorProps> = ({
       });
       const departmentIds = departmentsResponse.data?.map((d: any) => d.department_id) || [];
 
-      // ✅ Filter proctor roles by college or department
+      // Filter proctor roles by college or department
       const collegeProctorIds = new Set<number>();
       allProctorRoles.forEach((p: any) => {
         if (p.college_id && String(p.college_id) === String(schedulerCollegeId)) {
@@ -265,13 +260,13 @@ const ManualScheduleEditor: React.FC<ManualScheduleEditorProps> = ({
         }
       });
 
-      // ✅ Calculate time range for conflict checking
+      // Calculate time range for conflict checking
       const startMinutes = timeToMinutes(selectedTime);
       const endMinutes = startMinutes + totalDurationMinutes;
 
       const schedulesOnDate = existingSchedules.filter(s => s.exam_date === selectedDate);
 
-      // ✅ Filter out proctors with conflicts
+      // Filter out proctors with conflicts
       const freeProctors = Array.from(collegeProctorIds).filter(proctorId => {
         const proctorSchedules = schedulesOnDate.filter(s =>
           s.proctor_id === proctorId || (s.proctors && s.proctors.includes(proctorId))
@@ -284,7 +279,7 @@ const ManualScheduleEditor: React.FC<ManualScheduleEditorProps> = ({
         });
       });
 
-      // ✅ Get user details and filter by employment type
+      // Get user details and filter by employment type
       const proctorDetails = freeProctors
         .map(id => allUsers.find((u: any) => u.user_id === id))
         .filter(user => user) // Remove undefined
@@ -313,7 +308,7 @@ const ManualScheduleEditor: React.FC<ManualScheduleEditorProps> = ({
     const finalTime = selectedTime || selectedSection.attempted_assignment?.time || '';
     const finalRoom = selectedRoom || selectedSection.attempted_assignment?.room || '';
 
-    // ✅ NEW: Check if we need multiple proctors
+    // Check if we need multiple proctors
     const needsMultipleProctors = selectedSection.sections.length > 1;
     const requiredProctors = selectedSection.sections.length;
 
@@ -333,7 +328,7 @@ const ManualScheduleEditor: React.FC<ManualScheduleEditorProps> = ({
       return;
     }
 
-    // ✅ NEW: Validate proctor count
+    // Validate proctor count
     if (needsMultipleProctors && selectedProctors.length < requiredProctors) {
       toast.error(`This section has ${requiredProctors} sub-sections and requires ${requiredProctors} proctors. You have selected ${selectedProctors.length}.`);
       return;
@@ -378,10 +373,10 @@ const ManualScheduleEditor: React.FC<ManualScheduleEditorProps> = ({
         room_id: finalRoom,
         sections: selectedSection.sections,
         instructors: selectedSection.instructors || [],
-        proctors: selectedProctors, // ✅ Use array directly
+        proctors: selectedProctors,
         section_name: selectedSection.sections[0],
         instructor_id: selectedSection.instructors?.[0] || null,
-        proctor_id: selectedProctors[0] || null, // ✅ First proctor as canonical
+        proctor_id: selectedProctors[0] || null,
         examperiod_id: matchedPeriod.examperiod_id,
         exam_date: finalDate,
         exam_start_time: startTimestamp,
@@ -399,7 +394,6 @@ const ManualScheduleEditor: React.FC<ManualScheduleEditorProps> = ({
 
       toast.success(`Scheduled ${selectedSection.course_id} (${selectedSection.sections.join(', ')}) with ${selectedProctors.length} proctor(s)`);
 
-      // ✅ Remove from remaining sections
       const updatedRemaining = remainingSections.filter(
         s => s.modality_id !== selectedSection.modality_id
       );
@@ -407,17 +401,15 @@ const ManualScheduleEditor: React.FC<ManualScheduleEditorProps> = ({
 
       if (updatedRemaining.length === 0) {
         toast.success("🎉 All sections scheduled successfully!");
-        onScheduleCreated([]); // Pass empty array to indicate all done
+        onScheduleCreated([]); 
         onClose();
       } else {
-        // ✅ Show progress
         const scheduled = unscheduledSections.length - updatedRemaining.length;
         toast.info(
           `Progress: ${scheduled}/${unscheduledSections.length} scheduled (${updatedRemaining.length} remaining)`,
           { autoClose: 3000 }
         );
 
-        // Refresh data and reset form for next section
         fetchInitialData();
         setSelectedSection(null);
         setSelectedDate('');
@@ -452,7 +444,6 @@ const ManualScheduleEditor: React.FC<ManualScheduleEditorProps> = ({
     }
   };
 
-  // Add this helper function after the imports
   const analyzeConflicts = (section: UnscheduledSection) => {
     const conflicts = section.conflicts || [];
     const needs = {
@@ -475,7 +466,7 @@ const ManualScheduleEditor: React.FC<ManualScheduleEditorProps> = ({
       if (lower.includes('invalid time') ||
         lower.includes('after 9 pm') ||
         lower.includes('would end after') ||
-        lower.includes('proctor conflict at this time') || // ✅ This means we need new time
+        lower.includes('proctor conflict at this time') ||
         lower.includes('time conflict')) {
         needs.time = true;
       }
@@ -497,7 +488,6 @@ const ManualScheduleEditor: React.FC<ManualScheduleEditorProps> = ({
     return needs;
   };
 
-  // ✅ Add save and close functionality
   const handleSaveAndClose = () => {
     const result = window.confirm(
       `Close manual scheduling editor?\n\n` +
@@ -542,7 +532,6 @@ const ManualScheduleEditor: React.FC<ManualScheduleEditorProps> = ({
                   onClick={() => {
                     setSelectedSection(section);
 
-                    // Immediately populate with attempted values
                     const attempted = section.attempted_assignment;
                     if (attempted) {
                       setSelectedDate(attempted.date || '');
@@ -554,7 +543,7 @@ const ManualScheduleEditor: React.FC<ManualScheduleEditorProps> = ({
                       setSelectedRoom('');
                     }
 
-                    setSelectedProctors([]); // ✅ Changed from setSelectedProctor(null)
+                    setSelectedProctors([]);
                   }}
                 >
                   <div className="section-header">
@@ -619,7 +608,6 @@ const ManualScheduleEditor: React.FC<ManualScheduleEditorProps> = ({
                 const needs = analyzeConflicts(selectedSection);
                 const needsMultiple = Object.values(needs).filter(Boolean).length > 1;
 
-                // Pre-fill attempted values if available
                 if (selectedSection.attempted_assignment && !selectedDate && !selectedTime && !selectedRoom) {
                   const attempted = selectedSection.attempted_assignment;
                   if (!needs.date && attempted.date) setSelectedDate(attempted.date);
@@ -627,7 +615,6 @@ const ManualScheduleEditor: React.FC<ManualScheduleEditorProps> = ({
                   if (!needs.room && attempted.room) setSelectedRoom(attempted.room);
                 }
 
-                // ✅ Separate proctors by employment type
                 const fullTimeProctors = availableProctors.filter(p => p.employment_type === 'full-time');
                 const otherProctors = availableProctors.filter(p => p.employment_type !== 'full-time');
 
@@ -655,7 +642,6 @@ const ManualScheduleEditor: React.FC<ManualScheduleEditorProps> = ({
                           onChange={(selected) => {
                             setSelectedDate(selected?.value || '');
                             if (!needs.time && !needs.room && !needs.proctor) {
-                              // Auto-fill others if this is the only conflict
                               if (selectedSection.attempted_assignment) {
                                 setSelectedTime(selectedSection.attempted_assignment.time);
                                 setSelectedRoom(selectedSection.attempted_assignment.room);
@@ -785,7 +771,7 @@ const ManualScheduleEditor: React.FC<ManualScheduleEditorProps> = ({
                           <Select
                             isMulti
                             options={fullTimeProctors
-                              .filter(p => !selectedProctors.includes(p.user_id)) // ✅ Hide already selected
+                              .filter(p => !selectedProctors.includes(p.user_id))
                               .map(p => ({
                                 value: p.user_id,
                                 label: `${p.first_name} ${p.last_name}`
@@ -828,7 +814,7 @@ const ManualScheduleEditor: React.FC<ManualScheduleEditorProps> = ({
                           <Select
                             isMulti
                             options={otherProctors
-                              .filter(p => !selectedProctors.includes(p.user_id)) // ✅ Hide already selected
+                              .filter(p => !selectedProctors.includes(p.user_id))
                               .map(p => ({
                                 value: p.user_id,
                                 label: `${p.first_name} ${p.last_name} ${p.employment_type === 'part-time' ? '(Part-time)' : '(Type not specified)'}`
@@ -978,7 +964,6 @@ const ManualScheduleEditor: React.FC<ManualScheduleEditorProps> = ({
                     !selectedDate ||
                     (analyzeConflicts(selectedSection).time && !selectedTime) ||
                     (analyzeConflicts(selectedSection).room && !selectedRoom) ||
-                    // ✅ NEW: Disable if not enough proctors selected
                     selectedProctors.length < selectedSection.sections.length
                   }
                   style={{

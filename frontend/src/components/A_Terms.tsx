@@ -22,7 +22,7 @@ const Terms: React.FC = () => {
   const [editMode, setEditMode] = useState(false);
   const [editingTermId, setEditingTermId] = useState<number | null>(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
-  const [loading, setLoading] = useState(true); // new state
+  const [loading, setLoading] = useState(true); 
   const [isImporting, setIsImporting] = useState(false);
   const [currentPage, setCurrentPage] = useState(1);
   const [itemsPerPage, setItemsPerPage] = useState<number | 'all'>('all');
@@ -36,7 +36,6 @@ const Terms: React.FC = () => {
   const [canScrollRight, setCanScrollRight] = useState(false);
   const tableContainerRef = useRef<HTMLDivElement>(null);
 
-  // Handle ESC key to close modals
   useEscapeKey(() => {
     if (showModal) {
       setShowModal(false);
@@ -122,7 +121,7 @@ const Terms: React.FC = () => {
     });
   };
 
-  // ✅ Fetch all terms
+  // Fetch all terms
   const fetchTerms = async () => {
     setLoading(true);
     try {
@@ -151,16 +150,12 @@ const Terms: React.FC = () => {
     const bIsNumeric = isNumeric(b);
 
     if (aIsNumeric && bIsNumeric) {
-      // Both are numbers - sort numerically
       return parseFloat(a) - parseFloat(b);
     } else if (aIsNumeric && !bIsNumeric) {
-      // a is number, b is text - numbers come first
       return -1;
     } else if (!aIsNumeric && bIsNumeric) {
-      // a is text, b is number - numbers come first
       return 1;
     } else {
-      // Both are text - sort alphabetically
       return a.localeCompare(b);
     }
   };
@@ -191,7 +186,6 @@ const Terms: React.FC = () => {
     if (totalItems === 0) return 1;
 
     if (itemsPerPage === 'all') {
-      // "Show All" should display 20 rows per page
       return 20;
     }
 
@@ -217,7 +211,7 @@ const Terms: React.FC = () => {
     }
   }, [currentPage, totalPages]);
 
-  // ✅ Add or edit term
+  // Add or edit term
   const handleModalSubmit = async () => {
     if (!newTermName.trim()) {
       toast.error("Term name is required");
@@ -378,7 +372,7 @@ const Terms: React.FC = () => {
     reader.readAsArrayBuffer(file);
   };
 
-  // ✅ Template download
+  // Template download
   const downloadTemplate = () => {
     const worksheet = XLSX.utils.aoa_to_sheet([
       ["Term Name"],

@@ -48,7 +48,6 @@ const ProctorExamDate = () => {
   const currentYear = currentMonth.getFullYear();
   const currentMonthIndex = currentMonth.getMonth();
 
-  // Fetch scheduler role + college
   useEffect(() => {
     const fetchUserRoleAndCollege = async () => {
       try {
@@ -88,7 +87,6 @@ const ProctorExamDate = () => {
     fetchUserRoleAndCollege();
   }, []);
 
-  // Fetch exam periods + terms
   useEffect(() => {
     const fetchExamPeriods = async () => {
       try {
@@ -120,12 +118,10 @@ const ProctorExamDate = () => {
           d.getDate()
         ).padStart(2, "0")}`;
 
-      // Find all exam periods for this date
       const existingPeriods = examPeriods.filter(
         (ep) => new Date(ep.start_date).toDateString() === date.toDateString()
       );
 
-      // Get unique assigned college IDs for this day (excluding nulls)
       const uniqueCollegeIds = Array.from(
         new Set(
           existingPeriods
@@ -134,23 +130,20 @@ const ProctorExamDate = () => {
         )
       );
 
-      // Check if YOUR college is already assigned on this day
       const isMyCollegeAssigned = uniqueCollegeIds.includes(schedulerCollege!);
 
-      // If your college is already assigned, remove only your college
       if (isMyCollegeAssigned) {
         const payload = {
           updates: [
             {
               start_date: formatDate(date),
               college_name: null,
-              college_to_remove: schedulerCollege, // Use college_id to remove
+              college_to_remove: schedulerCollege,
             },
           ],
         };
         await api.put("/tbl_examperiod/bulk_update/", payload);
       } else {
-        // Adding your college: enforce max 2 colleges per day
         const otherCollegesCount = uniqueCollegeIds.length;
 
         if (otherCollegesCount >= 2) {
@@ -158,12 +151,11 @@ const ProctorExamDate = () => {
           return;
         }
 
-        // Pass the college_id to the backend
         const payload = {
           updates: [
             {
               start_date: formatDate(date),
-              college_name: schedulerCollege, // Pass college_id
+              college_name: schedulerCollege,
             },
           ],
         };
@@ -171,7 +163,6 @@ const ProctorExamDate = () => {
         await api.put("/tbl_examperiod/bulk_update/", payload);
       }
 
-      // Refresh data
       const { data: refreshed } = await api.get("/tbl_examperiod");
       if (refreshed) setExamPeriods(refreshed);
 
@@ -180,10 +171,6 @@ const ProctorExamDate = () => {
       alert("An error occurred. Check console for details.");
     }
   };
-
-  //const handleEditToggle = () => {
-  //setIsEditMode(!isEditMode);
-  //};
 
   const handleMonthChange = (e: React.ChangeEvent<HTMLSelectElement>) => {
     const newMonth = parseInt(e.target.value);

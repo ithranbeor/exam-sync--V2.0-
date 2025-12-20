@@ -59,7 +59,6 @@ const SchedulerView: React.FC<SchedulerViewProps> = ({ user }) => {
   const semesterName = examData.find(e => e.semester)?.semester ?? "-";
   const yearName = examData.find(e => e.academic_year)?.academic_year ?? "-";
   const buildingName = examData.find(e => e.building_name)?.building_name ?? "-";
-  // Add these new state variables near your other state declarations (around line ~60)
   
   const [searchTerm, setSearchTerm] = useState<string>("");
   const [searchMatches, setSearchMatches] = useState<ExamDetail[]>([]);
@@ -153,7 +152,7 @@ const SchedulerView: React.FC<SchedulerViewProps> = ({ user }) => {
 
       try {
         const response = await api.get('/tbl_schedule_footer/', {
-          params: { college_id: schedulerCollegeId }  // ✅ Use college_id
+          params: { college_id: schedulerCollegeId } 
         });
 
         if (response.data && response.data.length > 0) {
@@ -480,20 +479,16 @@ const SchedulerView: React.FC<SchedulerViewProps> = ({ user }) => {
     return parts.join(", ");
   };
 
-  // ✅ NEW: Helper function to get instructor display
   const getInstructorDisplay = (exam: ExamDetail): string => {
     if (exam.instructors && exam.instructors.length > 0) {
-      // Multiple instructors - always show as comma-separated list
       const names = exam.instructors.map(id => getUserName(id)).filter(n => n !== '-');
       if (names.length === 0) return '-';
       if (names.length === 1) return names[0];
       return names.join(', ');
     }
-    // Fallback to legacy single instructor
     return getUserName(exam.instructor_id);
   };
 
-  // ✅ UPDATED: Better display for multiple proctors
   const getProctorDisplay = (exam: ExamDetail): string => {
     // Priority 1: Use proctors array if available
     if (exam.proctors && exam.proctors.length > 0) {
@@ -513,13 +508,10 @@ const SchedulerView: React.FC<SchedulerViewProps> = ({ user }) => {
     return 'Not Assigned';
   };
 
-  // ✅ UPDATED: Handle both single and multiple proctor selection WITHOUT auto-closing
   const handleProctorChange = async (examId: number, proctorIds: number | number[]) => {
     try {
-      // Convert to array if single value
       const proctorArray = Array.isArray(proctorIds) ? proctorIds : [proctorIds];
 
-      // Primary proctor is the first one selected (or undefined if array is empty)
       const primaryProctorId = proctorArray.length > 0 ? proctorArray[0] : undefined;
 
       await api.put(`/tbl_examdetails/${examId}/`, {
@@ -527,7 +519,6 @@ const SchedulerView: React.FC<SchedulerViewProps> = ({ user }) => {
         proctors: proctorArray
       });
 
-      // ✅ Update local state with new proctor assignments
       setExamData(prev =>
         prev.map(e => e.examdetails_id === examId
           ? {
@@ -538,8 +529,6 @@ const SchedulerView: React.FC<SchedulerViewProps> = ({ user }) => {
           : e
         )
       );
-
-      // ✅ REMOVED: setActiveProctorEdit(null) - don't auto-close
 
       if (proctorArray.length === 0) {
         toast.success("Proctors cleared!");
@@ -585,7 +574,6 @@ const SchedulerView: React.FC<SchedulerViewProps> = ({ user }) => {
         selectedSwap.exam_start_time === exam.exam_start_time &&
         selectedSwap.exam_end_time === exam.exam_end_time
       ) {
-        // ✅ Add swapping class for visual feedback
         const swapElements = document.querySelectorAll(`[data-exam-id="${selectedSwap.examdetails_id}"], [data-exam-id="${exam.examdetails_id}"]`);
         swapElements.forEach(el => el.classList.add('swapping-animation'));
 
@@ -610,7 +598,6 @@ const SchedulerView: React.FC<SchedulerViewProps> = ({ user }) => {
 
           toast.success("Schedules swapped successfully!", { autoClose: 2000 });
 
-          // ✅ Remove animation class after completion
           setTimeout(() => {
             swapElements.forEach(el => el.classList.remove('swapping-animation'));
           }, 600);
@@ -632,30 +619,24 @@ const SchedulerView: React.FC<SchedulerViewProps> = ({ user }) => {
       return filterKey === selectedFilter;
     });
 
-  // Helper function to check if exam matches search term
   const examMatchesSearch = (exam: ExamDetail, searchLower: string): boolean => {
-    // Section matching
     const sectionMatch =
       (exam.sections && exam.sections.some(s => s.toLowerCase().includes(searchLower))) ||
       (exam.section_name?.toLowerCase().includes(searchLower) ?? false);
 
-    // Instructor matching
     const instructorMatch =
       (exam.instructors && exam.instructors.some(id => getUserName(id).toLowerCase().includes(searchLower))) ||
       getUserName(exam.instructor_id).toLowerCase().includes(searchLower);
 
-    // Proctor matching
     const proctorMatch =
       (exam.proctors && exam.proctors.some(id => getUserName(id).toLowerCase().includes(searchLower))) ||
       getUserName(exam.proctor_id).toLowerCase().includes(searchLower);
 
-    // Time matching - check both 24-hour format and 12-hour format
     let timeMatch = false;
     if (exam.exam_start_time && exam.exam_end_time) {
-      const start24 = exam.exam_start_time.slice(11, 16); // HH:MM format
+      const start24 = exam.exam_start_time.slice(11, 16); 
       const end24 = exam.exam_end_time.slice(11, 16);
       
-      // Convert to 12-hour format for matching
       const formatTo12Hour = (time24: string) => {
         const [hourStr, minute] = time24.split(":");
         let hour = Number(hourStr);
@@ -677,10 +658,8 @@ const SchedulerView: React.FC<SchedulerViewProps> = ({ user }) => {
         (searchLower.includes('pm') && (start12.toLowerCase().includes('pm') || end12.toLowerCase().includes('pm')));
     }
 
-    // Date matching (case-insensitive)
     const dateMatch = exam.exam_date?.toLowerCase().includes(searchLower) ?? false;
 
-    // Header fields matching (semester, academic year, exam period, exam category, building, college)
     const headerFieldsMatch =
       (exam.semester?.toLowerCase().includes(searchLower) ?? false) ||
       (exam.academic_year?.toLowerCase().includes(searchLower) ?? false) ||
@@ -701,7 +680,6 @@ const SchedulerView: React.FC<SchedulerViewProps> = ({ user }) => {
     );
   };
 
-  // Always show all data - don't filter it out, just highlight matches
   const searchFilteredData = filteredExamData;
 
   const handleNextMatch = () => {
@@ -709,7 +687,6 @@ const SchedulerView: React.FC<SchedulerViewProps> = ({ user }) => {
     const nextIndex = (currentMatchIndex + 1) % searchMatches.length;
     setCurrentMatchIndex(nextIndex);
     
-    // Gentle scroll to match (only when user clicks)
     const currentMatch = searchMatches[nextIndex];
     if (currentMatch?.examdetails_id) {
       const examElement = document.querySelector(`[data-exam-id="${currentMatch.examdetails_id}"]`);
@@ -724,7 +701,6 @@ const SchedulerView: React.FC<SchedulerViewProps> = ({ user }) => {
     const prevIndex = (currentMatchIndex - 1 + searchMatches.length) % searchMatches.length;
     setCurrentMatchIndex(prevIndex);
     
-    // Gentle scroll to match (only when user clicks)
     const currentMatch = searchMatches[prevIndex];
     if (currentMatch?.examdetails_id) {
       const examElement = document.querySelector(`[data-exam-id="${currentMatch.examdetails_id}"]`);
@@ -734,7 +710,6 @@ const SchedulerView: React.FC<SchedulerViewProps> = ({ user }) => {
     }
   };
 
-  // Calculate all matches when search term changes
   useEffect(() => {
     if (searchTerm.trim() === "") {
       setSearchMatches([]);
@@ -746,7 +721,6 @@ const SchedulerView: React.FC<SchedulerViewProps> = ({ user }) => {
     const matches = filteredExamData.filter(exam => examMatchesSearch(exam, searchLower));
     setSearchMatches(matches);
     
-    // Reset to first match if we have matches
     if (matches.length > 0) {
       setCurrentMatchIndex(0);
     } else {
@@ -754,15 +728,12 @@ const SchedulerView: React.FC<SchedulerViewProps> = ({ user }) => {
     }
   }, [searchTerm, filteredExamData, users, allCollegeUsers]);
 
-  // Handle keyboard shortcuts (Ctrl+F, Enter, Escape)
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
-      // Ctrl+F or Cmd+F to focus search
       if ((e.ctrlKey || e.metaKey) && e.key === 'f') {
         e.preventDefault();
         searchInputRef.current?.focus();
       }
-      // Enter to go to next match (when search is focused)
       if (e.key === 'Enter' && !e.shiftKey && document.activeElement === searchInputRef.current) {
         e.preventDefault();
         if (searchMatches.length > 0) {
@@ -777,7 +748,6 @@ const SchedulerView: React.FC<SchedulerViewProps> = ({ user }) => {
           }
         }
       }
-      // Shift+Enter to go to previous match
       if (e.key === 'Enter' && e.shiftKey && document.activeElement === searchInputRef.current) {
         e.preventDefault();
         if (searchMatches.length > 0) {
@@ -792,7 +762,6 @@ const SchedulerView: React.FC<SchedulerViewProps> = ({ user }) => {
           }
         }
       }
-      // Escape to clear search
       if (e.key === 'Escape' && document.activeElement === searchInputRef.current) {
         setSearchTerm("");
         setCurrentMatchIndex(-1);
@@ -886,7 +855,6 @@ const SchedulerView: React.FC<SchedulerViewProps> = ({ user }) => {
             match = sectionStr.match(/^([A-Za-z]+)-(\d)([A-Za-z]*)$/);
           }
 
-          // Pattern 4: Just look for any digit in the string
           if (!match) {
             const digitMatch = sectionStr.match(/(\d)/);
             const letterMatch = sectionStr.match(/^([A-Za-z]+)/);
@@ -938,7 +906,7 @@ const SchedulerView: React.FC<SchedulerViewProps> = ({ user }) => {
         courseColorMap[exam.course_id] = availableColors[colorIndex];
         programYearMap[programYearKey]++;
       } else {
-        courseColorMap[exam.course_id] = '#9CA3AF'; // Gray for unmatched
+        courseColorMap[exam.course_id] = '#9CA3AF';
       }
     });
 
@@ -948,24 +916,21 @@ const SchedulerView: React.FC<SchedulerViewProps> = ({ user }) => {
   const courseColorMapRef = useRef<Record<string, string>>({});
 
   useEffect(() => {
-    // Only generate colors for NEW courses that don't have colors yet
     const currentCourses = new Set(examData.map(e => e.course_id).filter(Boolean));
     const existingCourses = new Set(Object.keys(courseColorMapRef.current));
 
     const newCourses = Array.from(currentCourses).filter(c => !existingCourses.has(c));
 
     if (newCourses.length > 0) {
-      // Only generate colors for new courses
       const newExams = examData.filter(e => e.course_id && newCourses.includes(e.course_id));
       const newColors = generateCourseColors(newExams);
 
-      // Merge with existing colors
       courseColorMapRef.current = {
         ...courseColorMapRef.current,
         ...newColors
       };
     }
-  }, [examData.length]); // Only check when exam count changes
+  }, [examData.length]); 
 
   const courseColorMap = courseColorMapRef.current;
 
@@ -1001,14 +966,12 @@ const SchedulerView: React.FC<SchedulerViewProps> = ({ user }) => {
         return;
       }
 
-      // Initialize progress
       setDeleteProgress({
         isDeleting: true,
         progress: 0,
         message: 'Preparing to delete schedules...'
       });
 
-      // Simulate progress steps
       await new Promise(resolve => setTimeout(resolve, 500));
       setDeleteProgress({
         isDeleting: true,
@@ -1016,7 +979,6 @@ const SchedulerView: React.FC<SchedulerViewProps> = ({ user }) => {
         message: `Deleting ${examsToDelete.length} schedule(s)...`
       });
 
-      // Delete schedules
       const response = await api.post('/tbl_examdetails/batch-delete/', {
         college_name: schedulerCollegeName
       });
@@ -1040,7 +1002,6 @@ const SchedulerView: React.FC<SchedulerViewProps> = ({ user }) => {
           await Promise.all(deletePromises);
         }
       } catch (approvalError) {
-        // Continue even if approval deletion fails
       }
 
       setDeleteProgress({
@@ -1051,7 +1012,6 @@ const SchedulerView: React.FC<SchedulerViewProps> = ({ user }) => {
 
       await new Promise(resolve => setTimeout(resolve, 300));
 
-      // Clear states
       setApprovalStatus(null);
       setRemarks(null);
       setExamData([]);
@@ -1065,7 +1025,6 @@ const SchedulerView: React.FC<SchedulerViewProps> = ({ user }) => {
 
       await new Promise(resolve => setTimeout(resolve, 500));
 
-      // Close progress modal
       setDeleteProgress(null);
 
       toast.success(`Successfully deleted ${response.data.deleted_count} schedules for ${schedulerCollegeName}!`);
@@ -1085,13 +1044,11 @@ const SchedulerView: React.FC<SchedulerViewProps> = ({ user }) => {
     const availableUserPool = allCollegeUsers.length > 0 ? allCollegeUsers : users;
 
     const availableUsers = availableUserPool.filter((p) => {
-      // ✅ Find all exams where this proctor is assigned on the SAME DATE
+      // ind all exams where this proctor is assigned on the SAME DATE
       const assignedExamsSameDay = examData.filter(
         (ex) => {
-          // Skip the current exam
           if (ex.examdetails_id === exam.examdetails_id) return false;
 
-          // Check if proctor is assigned (in either proctor_id OR proctors array)
           const isAssigned =
             ex.proctor_id === p.user_id ||
             (ex.proctors && ex.proctors.includes(p.user_id));
@@ -1100,7 +1057,7 @@ const SchedulerView: React.FC<SchedulerViewProps> = ({ user }) => {
         }
       );
 
-      // ✅ Check if ANY assignment conflicts with this exam's time
+      // check if ANY assignment conflicts with this exam's time
       return !assignedExamsSameDay.some((ex) => {
         if (!exam.exam_start_time || !exam.exam_end_time ||
           !ex.exam_start_time || !ex.exam_end_time) {
@@ -1242,7 +1199,7 @@ const SchedulerView: React.FC<SchedulerViewProps> = ({ user }) => {
         } else {
           resetAllModes();
 
-          // ✅ Check for unscheduled sections
+          // Check for unscheduled sections
           if (persistentUnscheduled.length > 0) {
             const result = window.confirm(
               `Found ${persistentUnscheduled.length} unscheduled section(s) from previous attempt.\n\n` +
@@ -1897,7 +1854,7 @@ const SchedulerView: React.FC<SchedulerViewProps> = ({ user }) => {
                                   return false;
                                 }
 
-                                // ✅ FIX: Extract time directly from ISO string (HH:MM format)
+                                // Extract time directly from ISO string (HH:MM format)
                                 const examStartTimeStr = e.exam_start_time.slice(11, 16);
                                 const examEndTimeStr = e.exam_end_time.slice(11, 16);
 
@@ -1917,7 +1874,7 @@ const SchedulerView: React.FC<SchedulerViewProps> = ({ user }) => {
 
                               if (!exam) return <td key={room}></td>;
 
-                              // ✅ FIX: Extract time directly from ISO string
+                              // Extract time directly from ISO string
                               const examStartTimeStr = exam.exam_start_time!.slice(11, 16);
                               const examEndTimeStr = exam.exam_end_time!.slice(11, 16);
 
@@ -2278,7 +2235,7 @@ const SchedulerView: React.FC<SchedulerViewProps> = ({ user }) => {
                                   return false;
                                 }
 
-                                // ✅ FIX: Extract time directly from ISO string (HH:MM format)
+                                // Extract time directly from ISO string (HH:MM format)
                                 const examStartTimeStr = e.exam_start_time.slice(11, 16);
                                 const examEndTimeStr = e.exam_end_time.slice(11, 16);
 
@@ -2298,7 +2255,7 @@ const SchedulerView: React.FC<SchedulerViewProps> = ({ user }) => {
 
                               if (!exam) return <td key={room}></td>;
 
-                              // ✅ FIX: Extract time directly from ISO string
+                              // Extract time directly from ISO string
                               const examStartTimeStr = exam.exam_start_time!.slice(11, 16);
                               const examEndTimeStr = exam.exam_end_time!.slice(11, 16);
 
@@ -2366,7 +2323,7 @@ const SchedulerView: React.FC<SchedulerViewProps> = ({ user }) => {
                                       {getSectionDisplay(exam)}
                                     </p>
 
-                                    {/* ✅ UPDATED: Show all instructors without tooltip, adjust font for many */}
+                                    {/* Show all instructors without tooltip, adjust font for many */}
                                     <p style={{
                                       fontSize: exam.instructors && exam.instructors.length > 2 ? '10px' : '12px',
                                       lineHeight: '1.2'
@@ -2374,7 +2331,7 @@ const SchedulerView: React.FC<SchedulerViewProps> = ({ user }) => {
                                       Instructor: {getInstructorDisplay(exam)}
                                     </p>
 
-                                    {/* ✅ UPDATED: Proctor section - show all without tooltip */}
+                                    {/* Proctor section - show all without tooltip */}
                                     <div style={{
                                       fontSize: exam.proctors && exam.proctors.length > 2 ? '10px' : '12px',
                                       lineHeight: '1.2'
@@ -2541,7 +2498,6 @@ const SchedulerView: React.FC<SchedulerViewProps> = ({ user }) => {
             });
           })
         )}
-        // Replace around line ~950:
         <Modal isOpen={isModalOpen} onClose={() => setIsModalOpen(false)}>
           <AddScheduleForm
             user={user}
