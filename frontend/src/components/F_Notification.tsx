@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { api } from '../lib/apiClient.ts';
 import '../styles/F_Notification.css';
-import { FaCheckCircle, FaTimesCircle, FaTrash, FaEnvelopeOpenText, FaTimes } from "react-icons/fa";
+import { FaCheckCircle, FaTimesCircle, FaCheckDouble, FaTrash, FaEnvelopeOpenText, FaTimes } from "react-icons/fa";
 
 interface UserProps {
   user: {
@@ -113,13 +113,59 @@ const Notification: React.FC<UserProps> = ({ user }) => {
 
   const handleMarkAllUnread = async () => {
     if (!user?.user_id) return;
+
+    const seenNotifications = notifications.filter(n => n.is_seen);
+    if (seenNotifications.length === 0) return;
+
     try {
-      await api.patch(`/notifications/${user.user_id}/mark-all-unread/`); 
+      await Promise.all(
+        seenNotifications.map(n =>
+          api.patch(`/notifications/${n.notification_id}/update/`, {
+            is_seen: false,
+            read_at: null
+          })
+        )
+      );
+
       setNotifications(prev =>
-        prev.map(n => ({ ...n, is_seen: false, read_at: null }))
+        prev.map(n => ({
+          ...n,
+          is_seen: false,
+          read_at: null
+        }))
       );
     } catch (err) {
       console.error("Error marking all unread:", err);
+    }
+  };
+
+  const handleMarkAllRead = async () => {
+    if (!user?.user_id) return;
+
+    const unreadNotifications = notifications.filter(n => !n.is_seen);
+    if (unreadNotifications.length === 0) return;
+
+    const now = new Date().toISOString();
+
+    try {
+      await Promise.all(
+        unreadNotifications.map(n =>
+          api.patch(`/notifications/${n.notification_id}/update/`, {
+            is_seen: true,
+            read_at: now
+          })
+        )
+      );
+
+      setNotifications(prev =>
+        prev.map(n => ({
+          ...n,
+          is_seen: true,
+          read_at: now
+        }))
+      );
+    } catch (err) {
+      console.error("Error marking all read:", err);
     }
   };
 
@@ -181,9 +227,14 @@ const Notification: React.FC<UserProps> = ({ user }) => {
       <div className="notification-banner">
         <span>Notifications</span>
         <div style={{ marginLeft: 'auto', display: 'flex', alignItems: 'center', gap: '1px' }}>
+          <button className="notif-btn" title="Mark all as read" onClick={handleMarkAllRead}>
+            <FaCheckDouble />
+          </button>
+
           <button className="notif-btn" title="Mark all as unread" onClick={handleMarkAllUnread}>
             <FaEnvelopeOpenText />
           </button>
+
           <button
             className="notif-btn"
             title="Delete selected"
