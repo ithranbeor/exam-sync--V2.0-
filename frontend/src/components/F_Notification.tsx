@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { api } from '../lib/apiClient.ts';
 import '../styles/F_Notification.css';
-import { FaCheckCircle, FaTimesCircle, FaCheckDouble, FaTrash, FaEnvelopeOpenText, FaTimes } from "react-icons/fa";
+import {FaCheckDouble, FaTrash, FaEnvelopeOpenText, FaTimes } from "react-icons/fa";
 
 interface UserProps {
   user: {
@@ -277,17 +277,6 @@ const Notification: React.FC<UserProps> = ({ user }) => {
               cursor: 'pointer'
             }}
           >
-            <div className="notif-left">
-              <span className="notif-icon">
-                {notif.priority === 2 ? (
-                  <FaTimesCircle style={{ color: '#f44336' }} />
-                ) : notif.priority === 1 ? (
-                  <FaCheckCircle style={{ color: '#4CAF50' }} />
-                ) : (
-                  '⏵'
-                )}
-              </span>
-            </div>
 
             <div className="notif-center">
               <div className="notif-sender-name">{notif.sender_name || 'System'}</div>

@@ -1385,7 +1385,7 @@ def tbl_scheduleapproval_list(request):
 def tbl_scheduleapproval_detail(request, pk):
     """
     GET → Retrieve  
-    PUT → Update (and notify proctors if approved)
+    PUT → Update (and notify proctors with their schedules if approved)
     DELETE → Delete  
     """
     try:
@@ -1404,7 +1404,7 @@ def tbl_scheduleapproval_detail(request, pk):
         if serializer.is_valid():
             updated_approval = serializer.save()
             
-            # If status changed to approved, notify all proctors
+            # If status changed to approved, notify all proctors with their schedules
             if old_status != 'approved' and updated_approval.status == 'approved':
                 try:
                     # Get college name from approval
@@ -1413,41 +1413,93 @@ def tbl_scheduleapproval_detail(request, pk):
                     # Get all exam schedules for this college
                     exams = TblExamdetails.objects.filter(
                         college_name=college_name
-                    ).select_related('proctor')
-                    
-                    # Collect all unique proctor IDs
-                    proctor_ids = set()
-                    for exam in exams:
-                        if exam.proctor_id:
-                            proctor_ids.add(exam.proctor_id)
-                        if exam.proctors:
-                            proctor_ids.update(exam.proctors)
+                    ).select_related('proctor', 'room', 'room__building').order_by('exam_date', 'exam_start_time')
                     
                     # Get dean name for notification
                     dean_name = "Dean"
+                    dean_email = ""
                     if updated_approval.dean_user_id:
                         try:
                             dean = TblUsers.objects.get(user_id=updated_approval.dean_user_id)
                             dean_name = f"{dean.first_name} {dean.last_name}"
+                            dean_email = dean.email_address or ""
                         except TblUsers.DoesNotExist:
                             pass
                     
-                    # Create notifications for all proctors
-                    notification_title = f"Exam Schedule Approved - {college_name}"
-                    notification_message = (
-                        f"The exam schedule for {college_name} has been approved by {dean_name}.\n\n"
-                        f"You can now view your assigned proctoring duties in the schedule viewer.\n\n"
-                        f"Please review your schedule and ensure you are available for all assigned exams.\n\n"
-                        f"If you have any conflicts or concerns, please contact your scheduler immediately."
-                    )
+                    # Group exams by proctor
+                    proctor_schedules = {}
+                    for exam in exams:
+                        proctor_ids_list = []
+                        
+                        if exam.proctor_id:
+                            proctor_ids_list.append(exam.proctor_id)
+                        if exam.proctors:
+                            proctor_ids_list.extend(exam.proctors)
+                        
+                        for proctor_id in proctor_ids_list:
+                            if proctor_id not in proctor_schedules:
+                                proctor_schedules[proctor_id] = []
+                            proctor_schedules[proctor_id].append(exam)
                     
-                    notifications_created = 0
-                    for proctor_id in proctor_ids:
+                    # Helper function to format time
+                    def format_time_12hour(time_obj):
+                        if isinstance(time_obj, str):
+                            time_obj = datetime.fromisoformat(time_obj).time()
+                        hour = time_obj.hour
+                        minute = time_obj.minute
+                        ampm = "PM" if hour >= 12 else "AM"
+                        hour = hour % 12 or 12
+                        return f"{hour}:{str(minute).zfill(2)} {ampm}"
+                    
+                    def format_date(date_str):
                         try:
+                            date_obj = datetime.strptime(date_str, '%Y-%m-%d')
+                            return date_obj.strftime('%B %d, %Y')
+                        except:
+                            return date_str
+                    
+                    # Create notifications for all proctors with their specific schedules
+                    notifications_created = 0
+                    for proctor_id, proctor_exams in proctor_schedules.items():
+                        try:
+                            # Get proctor details
+                            proctor = TblUsers.objects.get(user_id=proctor_id)
+                            proctor_name = f"{proctor.first_name} {proctor.last_name}"
+                            
+                            # Build detailed schedule message
+                            notification_message = f"Dear {proctor.first_name} {proctor.last_name},\n\n"
+                            notification_message += f"The exam schedule for {college_name} has been approved by {dean_name}.\n\n"
+                            notification_message += f"You have been assigned as a proctor for the following examination schedule(s):\n\n"
+                            
+                            for index, exam in enumerate(proctor_exams, 1):
+                                # Get section display
+                                sections_display = ', '.join(exam.sections) if exam.sections else exam.section_name
+                                
+                                notification_message += f"{index}. {exam.course_id} - {sections_display}\n"
+                                notification_message += f"   Date: {format_date(exam.exam_date)}\n"
+                                
+                                if exam.exam_start_time and exam.exam_end_time:
+                                    start_time = format_time_12hour(exam.exam_start_time)
+                                    end_time = format_time_12hour(exam.exam_end_time)
+                                    notification_message += f"   Time: {start_time} - {end_time}\n"
+                                
+                                if exam.room and exam.building_name:
+                                    notification_message += f"   Room: {exam.room.room_id}, {exam.building_name}\n"
+                                
+                                notification_message += "\n"
+                            
+                            notification_message += "Please ensure you arrive at least 15 minutes before the exam starts.\n\n"
+                            notification_message += "If you have any conflicts or concerns, please contact your scheduler immediately.\n\n"
+                            notification_message += f"Best regards,\n{dean_name}\n"
+                            notification_message += f"Dean, {college_name}\n"
+                            if dean_email:
+                                notification_message += f"{dean_email}"
+                            
+                            # Create notification
                             TblNotification.objects.create(
                                 user_id=proctor_id,
                                 sender_id=updated_approval.dean_user_id,
-                                title=notification_title,
+                                title=f"Proctoring Assignment - {college_name}",
                                 message=notification_message,
                                 type='schedule_approval',
                                 status='unread',
@@ -1457,16 +1509,28 @@ def tbl_scheduleapproval_detail(request, pk):
                                 created_at=timezone.now()
                             )
                             notifications_created += 1
-                        except Exception:
+                            
+                        except TblUsers.DoesNotExist:
+                            continue
+                        except Exception as e:
+                            import traceback
+                            traceback.print_exc()
                             continue
                     
                     # Also notify the scheduler who submitted it
                     if updated_approval.submitted_by_id:
                         try:
+                            scheduler = TblUsers.objects.get(user_id=updated_approval.submitted_by_id)
+                            scheduler_name = f"{scheduler.first_name} {scheduler.last_name}"
+                            
                             scheduler_notification_message = (
+                                f"Dear {scheduler.first_name} {scheduler.last_name},\n\n"
                                 f"Your exam schedule for {college_name} has been approved by {dean_name}.\n\n"
-                                f"All assigned proctors have been notified of their schedules.\n\n"
-                                f"The schedule is now active and visible to all proctors."
+                                f"All {notifications_created} assigned proctor(s) have been notified of their schedules with detailed exam information.\n\n"
+                                f"The schedule is now active and visible to all proctors.\n\n"
+                                f"Best regards,\n"
+                                f"{dean_name}\n"
+                                f"Dean, {college_name}"
                             )
                             
                             TblNotification.objects.create(
