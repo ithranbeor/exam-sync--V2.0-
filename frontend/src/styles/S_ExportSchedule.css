@@ -3,7 +3,7 @@
   border-radius: 18px;
   box-shadow: 0 8px 30px rgba(0, 0, 0, 0.08);
   padding: 30px;
-  max-width: 450px;
+  max-width: 578px;
   margin: 0 auto;
   text-align: center;
   font-family: "Inter", sans-serif;
@@ -194,7 +194,7 @@
 @media screen and (max-width: 1024px) {
   .export-container {
     padding: 25px;
-    max-width: 400px;
+    max-width: 578px;
   }
 
   .export-title {

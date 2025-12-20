@@ -3,7 +3,7 @@ import { FaSort, FaSearch, FaFilter } from 'react-icons/fa';
 import { toast, ToastContainer } from 'react-toastify';
 import 'react-toastify/dist/ReactToastify.css';
 import api from '../lib/apiClient';
-import '../styles/P_ProctorMonitoring.css';
+import '../styles/S_ProctorMonitoring.css';
 import jsPDF from 'jspdf';
 import autoTable from 'jspdf-autotable';
 
@@ -11,6 +11,17 @@ declare module 'jspdf' {
   interface jsPDF {
     autoTable: (options: any) => jsPDF;
   }
+}
+
+interface MonitoringStats {
+  totalExams: number;
+  activeExams: number;
+  upcomingExams: number;
+  completedExams: number;
+  totalProctors: number;
+  presentProctors: number;
+  absentProctors: number;
+  lateProctors: number;
 }
 
 interface UserProps {
@@ -650,12 +661,136 @@ const ProctorMonitoring: React.FC<UserProps> = ({ }) => {
     return sorted;
   }, [approvedSchedules, sortBy, searchTerm, statusFilter, selectedYear, selectedMonth, historySortOrder]);
 
+  const getMonitoringStats = useMemo((): MonitoringStats => {
+    const now = new Date();
+    let activeExams = 0;
+    let upcomingExams = 0;
+    let completedExams = 0;
+    let totalProctors = 0;
+    let presentProctors = 0;
+    let absentProctors = 0;
+    let lateProctors = 0;
+
+    sortedSchedules.forEach(schedule => {
+      const examStart = new Date(`${schedule.exam_date}T${schedule.exam_start_time}`);
+      const examEnd = new Date(`${schedule.exam_date}T${schedule.exam_end_time}`);
+
+      if (now >= examStart && now <= examEnd) {
+        activeExams++;
+      } else if (now < examStart) {
+        upcomingExams++;
+      } else {
+        completedExams++;
+      }
+
+      totalProctors += schedule.proctor_details.length;
+      schedule.proctor_details.forEach(proctor => {
+        const status = proctor.status.toLowerCase();
+        if (status.includes('confirm') || status.includes('present')) {
+          presentProctors++;
+        } else if (status.includes('absent')) {
+          absentProctors++;
+        } else if (status.includes('late')) {
+          lateProctors++;
+        }
+      });
+    });
+
+    return {
+      totalExams: sortedSchedules.length,
+      activeExams,
+      upcomingExams,
+      completedExams,
+      totalProctors,
+      presentProctors,
+      absentProctors,
+      lateProctors
+    };
+  }, [sortedSchedules]);
+
+  const getExamStatus = (schedule: MonitoringSchedule): 'active' | 'upcoming' | 'completed' => {
+    const now = new Date();
+    const examStart = new Date(`${schedule.exam_date}T${schedule.exam_start_time}`);
+    const examEnd = new Date(`${schedule.exam_date}T${schedule.exam_end_time}`);
+
+    if (now >= examStart && now <= examEnd) return 'active';
+    if (now < examStart) return 'upcoming';
+    return 'completed';
+  };
+
   return (
     <div className="proctor-monitoring-container">
       <ToastContainer position="top-right" autoClose={3000} />
 
-      <div className="proctor-monitoring-header">
-        <div className="proctor-monitoring-header-left">
+      {/* Monitoring Dashboard Header */}
+      <div className="monitoring-dashboard-header">
+        <div className="dashboard-title-section">
+          <h1 className="dashboard-title">PROCTOR MONITORING DASHBOARD</h1>
+          <p className="dashboard-subtitle">Real-time Exam Proctoring Oversight</p>
+        </div>
+        
+        {/* Statistics Cards */}
+        <div className="stats-cards-container">
+          <div className="stat-card stat-card-total">
+            <div className="stat-icon"></div>
+            <div className="stat-content">
+              <div className="stat-value">{getMonitoringStats.totalExams}</div>
+              <div className="stat-label">Total Exams</div>
+            </div>
+          </div>
+          
+          <div className="stat-card stat-card-active">
+            <div className="stat-icon"></div>
+            <div className="stat-content">
+              <div className="stat-value">{getMonitoringStats.activeExams}</div>
+              <div className="stat-label">Active Now</div>
+            </div>
+          </div>
+          
+          <div className="stat-card stat-card-upcoming">
+            <div className="stat-icon"></div>
+            <div className="stat-content">
+              <div className="stat-value">{getMonitoringStats.upcomingExams}</div>
+              <div className="stat-label">Upcoming</div>
+            </div>
+          </div>
+          
+          <div className="stat-card stat-card-completed">
+            <div className="stat-icon"></div>
+            <div className="stat-content">
+              <div className="stat-value">{getMonitoringStats.completedExams}</div>
+              <div className="stat-label">Completed</div>
+            </div>
+          </div>
+        </div>
+
+        {/* Proctor Status Summary */}
+        <div className="proctor-status-summary">
+          <h3>Proctor Attendance Overview</h3>
+          <div className="proctor-stats-grid">
+            <div className="proctor-stat">
+              <span className="proctor-stat-label">Total Proctors:</span>
+              <span className="proctor-stat-value">{getMonitoringStats.totalProctors}</span>
+            </div>
+            <div className="proctor-stat proctor-stat-present">
+              <span className="proctor-stat-label">Present:</span>
+              <span className="proctor-stat-value">{getMonitoringStats.presentProctors}</span>
+            </div>
+            <div className="proctor-stat proctor-stat-late">
+              <span className="proctor-stat-label">Late:</span>
+              <span className="proctor-stat-value">{getMonitoringStats.lateProctors}</span>
+            </div>
+            <div className="proctor-stat proctor-stat-absent">
+              <span className="proctor-stat-label">Absent:</span>
+              <span className="proctor-stat-value">{getMonitoringStats.absentProctors}</span>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      {/* Controls Section */}
+      <div className="monitoring-controls-section">
+        <div className="controls-left">
           <p
             className={`proctor-monitoring-label ${
               (selectedYear !== 'all' || selectedMonth !== 'all')
@@ -671,6 +806,7 @@ const ProctorMonitoring: React.FC<UserProps> = ({ }) => {
               ? 'EXAM SCHEDULE HAS BEEN APPROVED. CLICK TO GENERATE EXAM CODES'
               : 'WAITING FOR DEAN APPROVAL'}
           </p>
+          
           <div className="pm-button-row" data-sort-dropdown>
             <button type='button' className="pm-control-button pm-sort-button" onClick={() => setShowSortDropdown(!showSortDropdown)} title="Sort by">
               <FaSort />
@@ -752,7 +888,7 @@ const ProctorMonitoring: React.FC<UserProps> = ({ }) => {
                 </div>
               )}
             </div>
-            {/* Status filter button - same design as Sort by button */}
+
             <div className="pm-status-wrapper" data-status-dropdown>
               <button type='button' className="pm-control-button pm-status-button" onClick={() => setShowStatusDropdown(!showStatusDropdown)} title="Filter by status">
                 <FaFilter />
@@ -774,6 +910,7 @@ const ProctorMonitoring: React.FC<UserProps> = ({ }) => {
                 </div>
               )}
             </div>
+
             {showSortDropdown && (
               <div className="pm-dropdown">
                 {[
@@ -880,6 +1017,7 @@ const ProctorMonitoring: React.FC<UserProps> = ({ }) => {
               <thead>
                 <tr>
                   <th>#</th>
+                  <th>Status</th>
                   <th>Course Code</th>
                   <th>Subject</th>
                   <th>Section/s</th>
@@ -895,13 +1033,22 @@ const ProctorMonitoring: React.FC<UserProps> = ({ }) => {
               <tbody>
                 {sortedSchedules.length > 0 ? (
                   sortedSchedules.map((schedule, index) => {
+                    const examStatus = getExamStatus(schedule);
                     return (
                       <tr
                         key={schedule.id}
                         onClick={() => handleRowClick(schedule)}
+                        className={`exam-row exam-row-${examStatus}`}
                         style={{ cursor: 'pointer' }}
                       >
                         <td>{index + 1}</td>
+                        <td>
+                          <div className={`exam-status-badge exam-status-${examStatus}`}>
+                            {examStatus === 'active' && 'LIVE'}
+                            {examStatus === 'upcoming' && 'UPCOMING'}
+                            {examStatus === 'completed' && 'DONE'}
+                          </div>
+                        </td>
                         <td>{schedule.course_id}</td>
                         <td>{schedule.subject}</td>
                         <td>{formatSectionRanges(schedule.sections || [schedule.section_name])}</td>
@@ -942,7 +1089,7 @@ const ProctorMonitoring: React.FC<UserProps> = ({ }) => {
                   })
                 ) : (
                   <tr>
-                    <td colSpan={11} className="no-data-message">
+                    <td colSpan={12} className="no-data-message">
                       {hasApprovedSchedules
                         ? 'No approved schedules found'
                         : 'No approved schedules yet. Schedules must be approved by the dean before codes can be generated.'}
@@ -955,7 +1102,7 @@ const ProctorMonitoring: React.FC<UserProps> = ({ }) => {
         </>
       )}
 
-      {/* Proctor Details Modal */}
+      {/* Keep existing modals */}
       {showProctorModal && selectedSchedule && (
         <div
           style={{
@@ -1060,7 +1207,7 @@ const ProctorMonitoring: React.FC<UserProps> = ({ }) => {
                     >
                       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '10px' }}>
                         <h5 style={{ margin: 0, color: '#333', fontSize: '16px' }}>
-                          {proctor.is_substitute ? ' ' : ''}
+                          {proctor.is_substitute ? '🔄 ' : ''}
                           {proctor.proctor_name}
                           {proctor.is_assigned ? ' (Assigned)' : ' (Substitute)'}
                         </h5>
@@ -1073,7 +1220,6 @@ const ProctorMonitoring: React.FC<UserProps> = ({ }) => {
                         <strong>Time In:</strong> {formatTimeIn(proctor.time_in)}
                       </p>
 
-                      {/* Show substitution info */}
                       {proctor.is_substitute && (
                         <>
                           <p style={{ margin: '5px 0', color: '#856404', fontSize: '14px', fontWeight: 'bold' }}>
@@ -1114,7 +1260,6 @@ const ProctorMonitoring: React.FC<UserProps> = ({ }) => {
         </div>
       )}
 
-      {/* Reset Confirmation Modal */}
       {showResetConfirm && (
         <div
           style={{

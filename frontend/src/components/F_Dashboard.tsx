@@ -20,7 +20,7 @@ import SchedulerPlotSchedule from "./S_ExamViewer.tsx";
 import SchedulerAvailability from "./S_ProctorsAvailabilityView.tsx";
 import DeanRequests from "./D_DeanRequests.tsx";
 import RoomManagement from './S_RoomManagement.tsx';
-import ProctorMonitoring from './P_ProctorMonitoring.tsx';
+import ProctorMonitoring from './S_ProctorMonitoring.tsx';
 import ProctorAttendance from './P_ProctorAttendance.tsx';
 import MiniExamDateCalendar from './F_MiniExamDateCalendar.tsx';
 import ProctorCourseDetails from './P_ProctorAssignedExams.tsx';

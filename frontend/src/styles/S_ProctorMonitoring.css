@@ -747,3 +747,261 @@
 .pm-control-button:active {
   transform: translateY(0);
 }
+/* ============================================
+   MONITORING DASHBOARD STYLES
+   ============================================ */
+
+.monitoring-dashboard-header {
+  background: linear-gradient(135deg, #0A3765 0%, #0d4a7a 100%);
+  padding: 30px;
+  border-radius: 12px;
+  margin-bottom: 25px;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+}
+
+.dashboard-title-section {
+  text-align: center;
+  margin-bottom: 25px;
+}
+
+.dashboard-title {
+  color: white;
+  font-size: 28px;
+  font-weight: 700;
+  margin: 0 0 8px 0;
+  text-transform: uppercase;
+  letter-spacing: 2px;
+}
+
+.dashboard-subtitle {
+  color: rgba(255, 255, 255, 0.9);
+  font-size: 14px;
+  margin: 0;
+  font-weight: 400;
+}
+
+.stats-cards-container {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+  gap: 15px;
+  margin-bottom: 25px;
+}
+
+.stat-card {
+  background: white;
+  border-radius: 10px;
+  padding: 20px;
+  display: flex;
+  align-items: center;
+  gap: 15px;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+  transition: transform 0.2s ease, box-shadow 0.2s ease;
+}
+
+.stat-card:hover {
+  transform: translateY(-3px);
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+}
+
+.stat-icon {
+  font-size: 32px;
+  opacity: 0.9;
+}
+
+.stat-content {
+  flex: 1;
+}
+
+.stat-value {
+  font-size: 32px;
+  font-weight: 700;
+  color: #0A3765;
+  line-height: 1;
+  margin-bottom: 4px;
+}
+
+.stat-label {
+  font-size: 13px;
+  color: #666;
+  font-weight: 500;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+}
+
+.stat-card-total {
+  border-left: 4px solid #0A3765;
+}
+
+.stat-card-active {
+  border-left: 4px solid #dc3545;
+}
+.stat-card-active .stat-value {
+color: #dc3545;
+}
+.stat-card-upcoming {
+border-left: 4px solid #ffc107;
+}
+.stat-card-upcoming .stat-value {
+color: #ffc107;
+}
+.stat-card-completed {
+border-left: 4px solid #28a745;
+}
+.stat-card-completed .stat-value {
+color: #28a745;
+}
+/* Proctor Status Summary */
+.proctor-status-summary {
+background: white;
+border-radius: 10px;
+padding: 20px;
+box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+}
+.proctor-status-summary h3 {
+margin: 0 0 15px 0;
+color: #0A3765;
+font-size: 18px;
+font-weight: 600;
+text-align: center;
+}
+.proctor-stats-grid {
+display: grid;
+grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+gap: 15px;
+}
+.proctor-stat {
+display: flex;
+justify-content: space-between;
+align-items: center;
+padding: 12px 16px;
+background: #f8f9fa;
+border-radius: 8px;
+border-left: 3px solid #0A3765;
+}
+.proctor-stat-present {
+border-left-color: #28a745;
+background: #d4edda;
+}
+.proctor-stat-late {
+border-left-color: #ffc107;
+background: #fff3cd;
+}
+.proctor-stat-absent {
+border-left-color: #dc3545;
+background: #f8d7da;
+}
+.proctor-stat-label {
+font-size: 13px;
+font-weight: 600;
+color: #333;
+}
+.proctor-stat-value {
+font-size: 20px;
+font-weight: 700;
+color: #0A3765;
+}
+.proctor-stat-present .proctor-stat-value {
+color: #28a745;
+}
+.proctor-stat-late .proctor-stat-value {
+color: #856404;
+}
+.proctor-stat-absent .proctor-stat-value {
+color: #dc3545;
+}
+/* Controls Section */
+.monitoring-controls-section {
+display: flex;
+justify-content: space-between;
+align-items: flex-start;
+margin-bottom: 20px;
+gap: 20px;
+background: white;
+padding: 20px;
+border-radius: 10px;
+box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+}
+.controls-left {
+display: flex;
+flex-direction: column;
+gap: 12px;
+flex: 1;
+}
+/* Exam Status Badges in Table */
+.exam-status-badge {
+display: inline-block;
+padding: 6px 12px;
+border-radius: 20px;
+font-size: 11px;
+font-weight: 700;
+text-transform: uppercase;
+letter-spacing: 0.5px;
+white-space: nowrap;
+}
+.exam-status-active {
+background: linear-gradient(135deg, #dc3545, #c82333);
+color: white;
+animation: pulse-glow 2s infinite;
+}
+.exam-status-upcoming {
+background: linear-gradient(135deg, #ffc107, #e0a800);
+color: #000;
+}
+.exam-status-completed {
+background: linear-gradient(135deg, #28a745, #218838);
+color: white;
+}
+@keyframes pulse-glow {
+0%, 100% {
+box-shadow: 0 0 5px rgba(220, 53, 69, 0.5);
+}
+50% {
+box-shadow: 0 0 15px rgba(220, 53, 69, 0.8);
+}
+}
+/* Row highlighting based on status */
+.exam-row-active {
+background-color: #fff5f5 !important;
+border-left: 4px solid #dc3545;
+}
+.exam-row-active:hover {
+background-color: #ffe5e5 !important;
+}
+.exam-row-upcoming {
+background-color: #fffbf0 !important;
+border-left: 4px solid #ffc107;
+}
+.exam-row-upcoming:hover {
+background-color: #fff3d9 !important;
+}
+.exam-row-completed {
+opacity: 0.7;
+}
+/* Responsive Dashboard */
+@media screen and (max-width: 1024px) {
+.stats-cards-container {
+grid-template-columns: repeat(2, 1fr);
+}
+.proctor-stats-grid {
+grid-template-columns: repeat(2, 1fr);
+}
+.monitoring-controls-section {
+flex-direction: column;
+}
+}
+@media screen and (max-width: 768px) {
+.monitoring-dashboard-header {
+padding: 20px;
+}
+.dashboard-title {
+font-size: 20px;
+}
+.stats-cards-container {
+grid-template-columns: 1fr;
+}
+.proctor-stats-grid {
+grid-template-columns: 1fr;
+}
+.stat-value {
+font-size: 28px;
+}}

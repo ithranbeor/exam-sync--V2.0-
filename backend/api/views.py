@@ -1385,7 +1385,7 @@ def tbl_scheduleapproval_list(request):
 def tbl_scheduleapproval_detail(request, pk):
     """
     GET → Retrieve  
-    PUT → Update  
+    PUT → Update (and notify proctors if approved)
     DELETE → Delete  
     """
     try:
@@ -1398,10 +1398,99 @@ def tbl_scheduleapproval_detail(request, pk):
         return Response(serializer.data)
 
     elif request.method == 'PUT':
+        old_status = approval.status
         serializer = TblScheduleapprovalSerializer(approval, data=request.data, partial=True)
+        
         if serializer.is_valid():
-            serializer.save()
+            updated_approval = serializer.save()
+            
+            # If status changed to approved, notify all proctors
+            if old_status != 'approved' and updated_approval.status == 'approved':
+                try:
+                    # Get college name from approval
+                    college_name = updated_approval.college_name
+                    
+                    # Get all exam schedules for this college
+                    exams = TblExamdetails.objects.filter(
+                        college_name=college_name
+                    ).select_related('proctor')
+                    
+                    # Collect all unique proctor IDs
+                    proctor_ids = set()
+                    for exam in exams:
+                        if exam.proctor_id:
+                            proctor_ids.add(exam.proctor_id)
+                        if exam.proctors:
+                            proctor_ids.update(exam.proctors)
+                    
+                    # Get dean name for notification
+                    dean_name = "Dean"
+                    if updated_approval.dean_user_id:
+                        try:
+                            dean = TblUsers.objects.get(user_id=updated_approval.dean_user_id)
+                            dean_name = f"{dean.first_name} {dean.last_name}"
+                        except TblUsers.DoesNotExist:
+                            pass
+                    
+                    # Create notifications for all proctors
+                    notification_title = f"Exam Schedule Approved - {college_name}"
+                    notification_message = (
+                        f"The exam schedule for {college_name} has been approved by {dean_name}.\n\n"
+                        f"You can now view your assigned proctoring duties in the schedule viewer.\n\n"
+                        f"Please review your schedule and ensure you are available for all assigned exams.\n\n"
+                        f"If you have any conflicts or concerns, please contact your scheduler immediately."
+                    )
+                    
+                    notifications_created = 0
+                    for proctor_id in proctor_ids:
+                        try:
+                            TblNotification.objects.create(
+                                user_id=proctor_id,
+                                sender_id=updated_approval.dean_user_id,
+                                title=notification_title,
+                                message=notification_message,
+                                type='schedule_approval',
+                                status='unread',
+                                link_url='/proctor-schedule',
+                                is_seen=False,
+                                priority=2,
+                                created_at=timezone.now()
+                            )
+                            notifications_created += 1
+                        except Exception:
+                            continue
+                    
+                    # Also notify the scheduler who submitted it
+                    if updated_approval.submitted_by_id:
+                        try:
+                            scheduler_notification_message = (
+                                f"Your exam schedule for {college_name} has been approved by {dean_name}.\n\n"
+                                f"All assigned proctors have been notified of their schedules.\n\n"
+                                f"The schedule is now active and visible to all proctors."
+                            )
+                            
+                            TblNotification.objects.create(
+                                user_id=updated_approval.submitted_by_id,
+                                sender_id=updated_approval.dean_user_id,
+                                title=f"Schedule Approved - {college_name}",
+                                message=scheduler_notification_message,
+                                type='schedule_approval',
+                                status='unread',
+                                link_url='/scheduler-dashboard',
+                                is_seen=False,
+                                priority=1,
+                                created_at=timezone.now()
+                            )
+                        except Exception:
+                            pass
+                    
+                except Exception as e:
+                    # Log error but don't fail the approval
+                    import traceback
+                    traceback.print_exc()
+            
             return Response(serializer.data)
+        
         return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
 
     elif request.method == 'DELETE':

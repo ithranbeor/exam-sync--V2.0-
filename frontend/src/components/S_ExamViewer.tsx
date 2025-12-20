@@ -59,7 +59,7 @@ const SchedulerView: React.FC<SchedulerViewProps> = ({ user }) => {
   const semesterName = examData.find(e => e.semester)?.semester ?? "-";
   const yearName = examData.find(e => e.academic_year)?.academic_year ?? "-";
   const buildingName = examData.find(e => e.building_name)?.building_name ?? "-";
-  
+
   const [searchTerm, setSearchTerm] = useState<string>("");
   const [searchMatches, setSearchMatches] = useState<ExamDetail[]>([]);
   const [currentMatchIndex, setCurrentMatchIndex] = useState<number>(-1);
@@ -152,7 +152,7 @@ const SchedulerView: React.FC<SchedulerViewProps> = ({ user }) => {
 
       try {
         const response = await api.get('/tbl_schedule_footer/', {
-          params: { college_id: schedulerCollegeId } 
+          params: { college_id: schedulerCollegeId }
         });
 
         if (response.data && response.data.length > 0) {
@@ -634,9 +634,9 @@ const SchedulerView: React.FC<SchedulerViewProps> = ({ user }) => {
 
     let timeMatch = false;
     if (exam.exam_start_time && exam.exam_end_time) {
-      const start24 = exam.exam_start_time.slice(11, 16); 
+      const start24 = exam.exam_start_time.slice(11, 16);
       const end24 = exam.exam_end_time.slice(11, 16);
-      
+
       const formatTo12Hour = (time24: string) => {
         const [hourStr, minute] = time24.split(":");
         let hour = Number(hourStr);
@@ -644,11 +644,11 @@ const SchedulerView: React.FC<SchedulerViewProps> = ({ user }) => {
         hour = hour % 12 || 12;
         return `${hour}:${minute} ${ampm}`;
       };
-      
+
       const start12 = formatTo12Hour(start24);
       const end12 = formatTo12Hour(end24);
-      
-      timeMatch = 
+
+      timeMatch =
         start24.includes(searchTerm) ||
         end24.includes(searchTerm) ||
         start12.toLowerCase().includes(searchLower) ||
@@ -686,7 +686,7 @@ const SchedulerView: React.FC<SchedulerViewProps> = ({ user }) => {
     if (searchMatches.length === 0) return;
     const nextIndex = (currentMatchIndex + 1) % searchMatches.length;
     setCurrentMatchIndex(nextIndex);
-    
+
     const currentMatch = searchMatches[nextIndex];
     if (currentMatch?.examdetails_id) {
       const examElement = document.querySelector(`[data-exam-id="${currentMatch.examdetails_id}"]`);
@@ -700,7 +700,7 @@ const SchedulerView: React.FC<SchedulerViewProps> = ({ user }) => {
     if (searchMatches.length === 0) return;
     const prevIndex = (currentMatchIndex - 1 + searchMatches.length) % searchMatches.length;
     setCurrentMatchIndex(prevIndex);
-    
+
     const currentMatch = searchMatches[prevIndex];
     if (currentMatch?.examdetails_id) {
       const examElement = document.querySelector(`[data-exam-id="${currentMatch.examdetails_id}"]`);
@@ -720,7 +720,7 @@ const SchedulerView: React.FC<SchedulerViewProps> = ({ user }) => {
     const searchLower = searchTerm.toLowerCase();
     const matches = filteredExamData.filter(exam => examMatchesSearch(exam, searchLower));
     setSearchMatches(matches);
-    
+
     if (matches.length > 0) {
       setCurrentMatchIndex(0);
     } else {
@@ -930,7 +930,7 @@ const SchedulerView: React.FC<SchedulerViewProps> = ({ user }) => {
         ...newColors
       };
     }
-  }, [examData.length]); 
+  }, [examData.length]);
 
   const courseColorMap = courseColorMapRef.current;
 
@@ -1116,6 +1116,9 @@ const SchedulerView: React.FC<SchedulerViewProps> = ({ user }) => {
           const newMode = activeProctorEdit === -1 ? null : -1;
           resetAllModes();
           setActiveProctorEdit(newMode);
+          if (newMode === -1) {
+            toast.info("Click on any schedule's proctor section to edit it", { autoClose: 3000 });
+          }
         }
       },
     },
@@ -1919,13 +1922,13 @@ const SchedulerView: React.FC<SchedulerViewProps> = ({ user }) => {
                                       outline: selectedSwap?.examdetails_id === exam.examdetails_id
                                         ? "10px solid blue"
                                         : searchTerm && examMatchesSearch(exam, searchTerm.toLowerCase())
-                                          ? currentMatchIndex >= 0 && 
+                                          ? currentMatchIndex >= 0 &&
                                             searchMatches[currentMatchIndex]?.examdetails_id === exam.examdetails_id
                                             ? "3px solid #2563eb"
                                             : "2px solid #fbbf24"
                                           : "none",
                                       boxShadow: searchTerm && examMatchesSearch(exam, searchTerm.toLowerCase())
-                                        ? currentMatchIndex >= 0 && 
+                                        ? currentMatchIndex >= 0 &&
                                           searchMatches[currentMatchIndex]?.examdetails_id === exam.examdetails_id
                                           ? "0 0 8px 2px rgba(37, 99, 235, 0.5)"
                                           : "0 0 4px 1px rgba(251, 191, 36, 0.4)"
@@ -1942,7 +1945,6 @@ const SchedulerView: React.FC<SchedulerViewProps> = ({ user }) => {
                                       {getSectionDisplay(exam)}
                                     </p>
 
-                                    {/* ✅ UPDATED: Show all instructors without tooltip, adjust font for many */}
                                     <p style={{
                                       fontSize: exam.instructors && exam.instructors.length > 2 ? '10px' : '12px',
                                       lineHeight: '1.2'
@@ -1950,13 +1952,24 @@ const SchedulerView: React.FC<SchedulerViewProps> = ({ user }) => {
                                       Instructor: {getInstructorDisplay(exam)}
                                     </p>
 
-                                    {/* ✅ UPDATED: Proctor section - editable for ALL schedules */}
-                                    <div style={{
-                                      fontSize: exam.proctors && exam.proctors.length > 2 ? '10px' : '12px',
-                                      lineHeight: '1.2'
-                                    }}>
+                                    <div
+                                      style={{
+                                        fontSize: exam.proctors && exam.proctors.length > 2 ? '10px' : '12px',
+                                        lineHeight: '1.2',
+                                        cursor: activeProctorEdit === -1 ? 'pointer' : 'default',
+                                        padding: '4px',
+                                        borderRadius: '4px',
+                                        backgroundColor: activeProctorEdit === exam.examdetails_id ? 'rgba(255,255,255,0.2)' : 'transparent'
+                                      }}
+                                      onClick={(e) => {
+                                        if (activeProctorEdit === -1) {
+                                          e.stopPropagation();
+                                          setActiveProctorEdit(exam.examdetails_id!);
+                                        }
+                                      }}
+                                    >
                                       Proctor:
-                                      {activeProctorEdit === exam.examdetails_id || activeProctorEdit === -1 ? (
+                                      {activeProctorEdit === exam.examdetails_id ? (
                                         <div style={{ position: 'relative' }}>
                                           <Select
                                             isMulti
@@ -1988,16 +2001,28 @@ const SchedulerView: React.FC<SchedulerViewProps> = ({ user }) => {
                                             blurInputOnSelect={false}
                                             captureMenuScroll={false}
                                             menuShouldScrollIntoView={false}
+                                            menuPortalTarget={document.body}
                                             styles={{
+                                              menuPortal: (base) => ({ ...base, zIndex: 9999 }),
                                               menu: (provided) => ({ ...provided, zIndex: 9999 }),
                                               control: (provided) => ({
                                                 ...provided,
                                                 fontSize: '10px',
                                                 minHeight: '25px',
                                                 maxHeight: '80px',
-                                                overflowY: 'auto'
+                                                overflowY: 'auto',
+                                                color: '#092C4C' 
                                               }),
-                                              option: (provided) => ({ ...provided, fontSize: '10px' }),
+                                              option: (provided, state) => ({ 
+                                                ...provided, 
+                                                fontSize: '10px',
+                                                color: state.isSelected ? 'white' : '#092C4C', // Dropdown option text color
+                                                backgroundColor: state.isSelected 
+                                                  ? '#092C4C' 
+                                                  : state.isFocused 
+                                                    ? '#e5e7eb' 
+                                                    : 'white'
+                                              }),
                                               valueContainer: (provided) => ({
                                                 ...provided,
                                                 padding: '2px 6px',
@@ -2007,7 +2032,7 @@ const SchedulerView: React.FC<SchedulerViewProps> = ({ user }) => {
                                               multiValue: (provided) => ({
                                                 ...provided,
                                                 fontSize: '9px',
-                                                margin: '1px'
+                                                margin: '1px',
                                               }),
                                               multiValueLabel: (provided) => ({
                                                 ...provided,
@@ -2020,7 +2045,7 @@ const SchedulerView: React.FC<SchedulerViewProps> = ({ user }) => {
                                             type="button"
                                             onClick={(e) => {
                                               e.stopPropagation();
-                                              setActiveProctorEdit(null);
+                                              setActiveProctorEdit(-1);
                                             }}
                                             style={{
                                               position: 'absolute',
@@ -2042,14 +2067,26 @@ const SchedulerView: React.FC<SchedulerViewProps> = ({ user }) => {
                                       ) : (
                                         <span style={{ marginLeft: '5px', display: 'block', marginTop: '2px' }}>
                                           {getProctorDisplay(exam)}
-                                          {exam.proctors && exam.proctors.length > 1 && (
-                                            <span style={{
-                                              fontSize: '9px',
-                                              color: '#666',
-                                              display: 'block',
-                                              marginTop: '2px'
-                                            }}>
-                                            </span>
+                                          {activeProctorEdit === -1 && (
+                                            <div
+                                              style={{
+                                                position: "fixed",
+                                                top: "140px",
+                                                left: "50%",
+                                                transform: "translateX(-50%)",
+                                                backgroundColor: "#3b82f6",
+                                                color: "white",
+                                                padding: "10px 20px",
+                                                borderRadius: "8px",
+                                                boxShadow: "0 4px 10px rgba(0,0,0,0.3)",
+                                                zIndex: 1200,
+                                                textAlign: "center",
+                                                fontWeight: "500",
+                                                fontSize: "14px"
+                                              }}
+                                            >
+                                              👆 Click on any schedule's proctor section to edit
+                                            </div>
                                           )}
                                         </span>
                                       )}
@@ -2300,13 +2337,13 @@ const SchedulerView: React.FC<SchedulerViewProps> = ({ user }) => {
                                       outline: selectedSwap?.examdetails_id === exam.examdetails_id
                                         ? "10px solid blue"
                                         : searchTerm && examMatchesSearch(exam, searchTerm.toLowerCase())
-                                          ? currentMatchIndex >= 0 && 
+                                          ? currentMatchIndex >= 0 &&
                                             searchMatches[currentMatchIndex]?.examdetails_id === exam.examdetails_id
                                             ? "3px solid #2563eb"
                                             : "2px solid #fbbf24"
                                           : "none",
                                       boxShadow: searchTerm && examMatchesSearch(exam, searchTerm.toLowerCase())
-                                        ? currentMatchIndex >= 0 && 
+                                        ? currentMatchIndex >= 0 &&
                                           searchMatches[currentMatchIndex]?.examdetails_id === exam.examdetails_id
                                           ? "0 0 8px 2px rgba(37, 99, 235, 0.5)"
                                           : "0 0 4px 1px rgba(251, 191, 36, 0.4)"
@@ -2315,7 +2352,6 @@ const SchedulerView: React.FC<SchedulerViewProps> = ({ user }) => {
                                   >
                                     <p><strong>{exam.course_id}</strong></p>
 
-                                    {/* ✅ UPDATED: Show all sections without tooltip limit */}
                                     <p style={{
                                       fontSize: exam.sections && exam.sections.length > 3 ? '10px' : '12px',
                                       lineHeight: '1.2'
@@ -2323,7 +2359,6 @@ const SchedulerView: React.FC<SchedulerViewProps> = ({ user }) => {
                                       {getSectionDisplay(exam)}
                                     </p>
 
-                                    {/* Show all instructors without tooltip, adjust font for many */}
                                     <p style={{
                                       fontSize: exam.instructors && exam.instructors.length > 2 ? '10px' : '12px',
                                       lineHeight: '1.2'
@@ -2331,13 +2366,24 @@ const SchedulerView: React.FC<SchedulerViewProps> = ({ user }) => {
                                       Instructor: {getInstructorDisplay(exam)}
                                     </p>
 
-                                    {/* Proctor section - show all without tooltip */}
-                                    <div style={{
-                                      fontSize: exam.proctors && exam.proctors.length > 2 ? '10px' : '12px',
-                                      lineHeight: '1.2'
-                                    }}>
+                                    <div
+                                      style={{
+                                        fontSize: exam.proctors && exam.proctors.length > 2 ? '10px' : '12px',
+                                        lineHeight: '1.2',
+                                        cursor: activeProctorEdit === -1 ? 'pointer' : 'default',
+                                        padding: '4px',
+                                        borderRadius: '4px',
+                                        backgroundColor: activeProctorEdit === exam.examdetails_id ? 'rgba(255,255,255,0.2)' : 'transparent'
+                                      }}
+                                      onClick={(e) => {
+                                        if (activeProctorEdit === -1) {
+                                          e.stopPropagation();
+                                          setActiveProctorEdit(exam.examdetails_id!);
+                                        }
+                                      }}
+                                    >
                                       Proctor:
-                                      {activeProctorEdit === exam.examdetails_id || activeProctorEdit === -1 ? (
+                                      {activeProctorEdit === exam.examdetails_id ? (
                                         <div style={{ position: 'relative' }}>
                                           <Select
                                             isMulti
@@ -2369,26 +2415,33 @@ const SchedulerView: React.FC<SchedulerViewProps> = ({ user }) => {
                                             blurInputOnSelect={false}
                                             captureMenuScroll={false}
                                             menuShouldScrollIntoView={false}
+                                            menuPortalTarget={document.body}
                                             styles={{
+                                              menuPortal: (base) => ({ ...base, zIndex: 9999 }),
                                               menu: (provided) => ({ ...provided, zIndex: 9999 }),
                                               control: (provided) => ({
                                                 ...provided,
                                                 fontSize: '10px',
                                                 minHeight: '25px',
                                                 maxHeight: '80px',
-                                                overflowY: 'auto'
+                                                overflowY: 'auto',
+                                                color: '#092C4C' 
                                               }),
-                                              option: (provided) => ({ ...provided, fontSize: '10px' }),
-                                              valueContainer: (provided) => ({
-                                                ...provided,
-                                                padding: '2px 6px',
-                                                maxHeight: '70px',
-                                                overflowY: 'auto'
+                                              option: (provided, state) => ({ 
+                                                ...provided, 
+                                                fontSize: '10px',
+                                                color: state.isSelected ? 'white' : '#092C4C', 
+                                                backgroundColor: state.isSelected 
+                                                  ? '#092C4C' 
+                                                  : state.isFocused 
+                                                    ? '#e5e7eb' 
+                                                    : 'white'
                                               }),
                                               multiValue: (provided) => ({
                                                 ...provided,
                                                 fontSize: '9px',
-                                                margin: '1px'
+                                                margin: '1px',
+                                                color: 'white'
                                               }),
                                               multiValueLabel: (provided) => ({
                                                 ...provided,
@@ -2401,7 +2454,7 @@ const SchedulerView: React.FC<SchedulerViewProps> = ({ user }) => {
                                             type="button"
                                             onClick={(e) => {
                                               e.stopPropagation();
-                                              setActiveProctorEdit(null);
+                                              setActiveProctorEdit(-1);
                                             }}
                                             style={{
                                               position: 'absolute',
@@ -2423,14 +2476,26 @@ const SchedulerView: React.FC<SchedulerViewProps> = ({ user }) => {
                                       ) : (
                                         <span style={{ marginLeft: '5px', display: 'block', marginTop: '2px' }}>
                                           {getProctorDisplay(exam)}
-                                          {exam.proctors && exam.proctors.length > 1 && (
-                                            <span style={{
-                                              fontSize: '9px',
-                                              color: '#666',
-                                              display: 'block',
-                                              marginTop: '2px'
-                                            }}>
-                                            </span>
+                                          {activeProctorEdit === -1 && (
+                                            <div
+                                              style={{
+                                                position: "fixed",
+                                                top: "140px",
+                                                left: "50%",
+                                                transform: "translateX(-50%)",
+                                                backgroundColor: "#3b82f6",
+                                                color: "white",
+                                                padding: "10px 20px",
+                                                borderRadius: "8px",
+                                                boxShadow: "0 4px 10px rgba(0,0,0,0.3)",
+                                                zIndex: 1200,
+                                                textAlign: "center",
+                                                fontWeight: "500",
+                                                fontSize: "14px"
+                                              }}
+                                            >
+                                              👆 Click on any schedule's proctor section to edit
+                                            </div>
                                           )}
                                         </span>
                                       )}
@@ -2567,7 +2632,7 @@ const SchedulerView: React.FC<SchedulerViewProps> = ({ user }) => {
           semesterName={semesterName}
           yearName={yearName}
           buildingName={buildingName}
-          persistentUnscheduled={persistentUnscheduled} 
+          persistentUnscheduled={persistentUnscheduled}
         />
       </Modal>
 

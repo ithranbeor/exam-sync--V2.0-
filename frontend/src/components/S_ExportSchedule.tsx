@@ -2,19 +2,6 @@ import React, { useState, useRef, useEffect } from "react";
 import { toast } from "react-toastify";
 import jsPDF from "jspdf";
 import html2canvas from "html2canvas";
-import * as XLSX from "xlsx";
-import {
-  Document,
-  Packer,
-  Paragraph,
-  Table,
-  TableCell,
-  TableRow,
-  WidthType,
-  AlignmentType,
-  BorderStyle,
-} from "docx";
-import { saveAs } from "file-saver";
 import "../styles/S_ExportSchedule.css";
 import { FaRegStopCircle } from "react-icons/fa";
 
@@ -31,21 +18,60 @@ const ExportSchedule: React.FC<ExportScheduleProps> = ({
 }) => {
   const [exporting, setExporting] = useState(false);
   const [progress, setProgress] = useState(0);
-  const [exportMode, setExportMode] = useState("ALL");
-  const [selectedDate, setSelectedDate] = useState("");
-  const [availableDates, setAvailableDates] = useState<string[]>([]);
+  const [pagePreviews, setPagePreviews] = useState<{ date: string; preview: string; selected: boolean }[]>([]);
+  const [loadingPreviews, setLoadingPreviews] = useState(false);
 
   const stopExport = useRef(false);
 
   useEffect(() => {
-    const cards = Array.from(document.querySelectorAll(".scheduler-view-card"));
-    const dates = cards
-      .map((card) =>
-        card.textContent?.match(/\b[A-Za-z]+\s\d{1,2},\s\d{4}/)?.[0]
-      )
-      .filter((d): d is string => !!d);
-    setAvailableDates([...new Set(dates)]);
+    generatePreviews();
   }, []);
+
+  const generatePreviews = async () => {
+    setLoadingPreviews(true);
+    const cards = Array.from(document.querySelectorAll(".scheduler-view-card"));
+    const previews: { date: string; preview: string; selected: boolean }[] = [];
+
+    for (let i = 0; i < cards.length; i++) {
+      const card = cards[i] as HTMLElement;
+      const dateText = card.textContent?.match(/\b[A-Za-z]+\s\d{1,2},\s\d{4}/)?.[0] || `Page ${i + 1}`;
+      
+      try {
+        card.classList.add("export-mode");
+        await new Promise((r) => setTimeout(r, 100));
+        
+        const canvas = await html2canvas(card, { scale: 0.3 });
+        const preview = canvas.toDataURL("image/jpeg", 0.7);
+        
+        previews.push({
+          date: dateText,
+          preview,
+          selected: true
+        });
+        
+        card.classList.remove("export-mode");
+      } catch (error) {
+        console.error("Preview generation error:", error);
+      }
+    }
+
+    setPagePreviews(previews);
+    setLoadingPreviews(false);
+  };
+
+  const togglePageSelection = (index: number) => {
+    setPagePreviews(prev =>
+      prev.map((p, i) => i === index ? { ...p, selected: !p.selected } : p)
+    );
+  };
+
+  const selectAllPages = () => {
+    setPagePreviews(prev => prev.map(p => ({ ...p, selected: true })));
+  };
+
+  const deselectAllPages = () => {
+    setPagePreviews(prev => prev.map(p => ({ ...p, selected: false })));
+  };
 
   const handleStop = () => {
     stopExport.current = true;
@@ -55,13 +81,13 @@ const ExportSchedule: React.FC<ExportScheduleProps> = ({
   };
 
   const getCards = () => {
-    const cards = document.querySelectorAll(".scheduler-view-card");
-    if (exportMode === "SPECIFIC" && selectedDate !== "") {
-      return Array.from(cards).filter((card) =>
-        card.textContent?.includes(selectedDate)
-      );
+    const cards = Array.from(document.querySelectorAll(".scheduler-view-card"));
+    
+    if (pagePreviews.length > 0) {
+      return cards.filter((_, index) => pagePreviews[index]?.selected);
     }
-    return Array.from(cards);
+    
+    return cards;
   };
 
   const cleanupExportMode = () => {
@@ -72,11 +98,9 @@ const ExportSchedule: React.FC<ExportScheduleProps> = ({
 
   const addWatermark = (pdf: jsPDF, pageWidth: number, pageHeight: number) => {
     pdf.saveGraphicsState();
-
     pdf.setFont("helvetica", "bold");
     pdf.setFontSize(80);
-    pdf.setTextColor(200, 200, 200); 
-
+    pdf.setTextColor(200, 200, 200);
     (pdf as any).setGState({ opacity: 0.2 });
 
     const centerX = pageWidth / 2;
@@ -84,7 +108,7 @@ const ExportSchedule: React.FC<ExportScheduleProps> = ({
 
     pdf.text("APPROVED", centerX, centerY, {
       align: "center",
-      angle: -45, 
+      angle: -45,
       baseline: "middle"
     });
 
@@ -92,11 +116,13 @@ const ExportSchedule: React.FC<ExportScheduleProps> = ({
   };
 
   const exportToPDF = async () => {
+    const cardsToExport = getCards();
+    
+    if (cardsToExport.length === 0) {
+      return toast.error("No pages selected for export.");
+    }
+
     stopExport.current = false;
-    const cards = getCards();
-
-    if (cards.length === 0) return toast.error("No schedule found for the selected date.");
-
     setExporting(true);
     setProgress(0);
 
@@ -111,10 +137,10 @@ const ExportSchedule: React.FC<ExportScheduleProps> = ({
       const pageWidth = pdf.internal.pageSize.getWidth();
       const pageHeight = pdf.internal.pageSize.getHeight();
 
-      for (let i = 0; i < cards.length; i++) {
+      for (let i = 0; i < cardsToExport.length; i++) {
         if (stopExport.current) return cleanupExportMode();
 
-        const card = cards[i] as HTMLElement;
+        const card = cardsToExport[i] as HTMLElement;
         card.classList.add("export-mode");
         await new Promise((r) => setTimeout(r, 60));
         const canvas = await html2canvas(card, { scale: 2 });
@@ -123,22 +149,19 @@ const ExportSchedule: React.FC<ExportScheduleProps> = ({
         if (i > 0) pdf.addPage();
         pdf.addImage(imgData, "JPEG", 5, 5, pageWidth - 10, pageHeight - 10);
 
-        // ✅ Add watermark if approved
         if (approvalStatus === 'approved') {
           addWatermark(pdf, pageWidth, pageHeight);
         }
 
-        setProgress(Math.round(((i + 1) / cards.length) * 100));
+        setProgress(Math.round(((i + 1) / cardsToExport.length) * 100));
       }
 
-      // ✅ Include approval status in filename
       const filename = approvalStatus === 'approved'
         ? `${collegeName}_Schedule_APPROVED.pdf`
         : `${collegeName}_Schedule.pdf`;
 
       pdf.save(filename);
 
-      // ✅ Success message mentions watermark if approved
       if (approvalStatus === 'approved') {
         toast.success("PDF exported successfully with APPROVED watermark!");
       } else {
@@ -155,160 +178,10 @@ const ExportSchedule: React.FC<ExportScheduleProps> = ({
     }
   };
 
-  const exportToWord = async () => {
-    stopExport.current = false;
-    const cards = getCards();
-    if (cards.length === 0) return toast.error("No schedule found for the selected date.");
-
-    setExporting(true);
-    setProgress(0);
-    toast.info("Generating Word document...");
-
-    try {
-      const sections: any[] = [];
-
-      // ✅ Add watermark paragraph at the beginning if approved
-      if (approvalStatus === 'approved') {
-        sections.push(
-          new Paragraph({
-            text: "🔒 APPROVED SCHEDULE",
-            alignment: AlignmentType.CENTER,
-            heading: "Heading1",
-            spacing: {
-              after: 400,
-            },
-          })
-        );
-      }
-
-      for (let i = 0; i < cards.length; i++) {
-        if (stopExport.current) return;
-
-        const tables = cards[i].querySelectorAll("table.exam-table");
-        tables.forEach((table) => {
-          const rows: TableRow[] = [];
-          const tr = table.querySelectorAll("tr");
-
-          tr.forEach((row) => {
-            const cells = Array.from(row.querySelectorAll("th, td")).map(
-              (cell) =>
-                new TableCell({
-                  children: [
-                    new Paragraph({
-                      text: cell.textContent?.trim() || "",
-                      alignment: AlignmentType.CENTER,
-                    }),
-                  ],
-                  borders: {
-                    top: { style: BorderStyle.SINGLE, size: 1 },
-                    bottom: { style: BorderStyle.SINGLE, size: 1 },
-                    left: { style: BorderStyle.SINGLE, size: 1 },
-                    right: { style: BorderStyle.SINGLE, size: 1 },
-                  },
-                  width: { size: 100, type: WidthType.PERCENTAGE },
-                })
-            );
-            rows.push(new TableRow({ children: cells }));
-          });
-
-          sections.push(new Table({ rows, width: { size: 100, type: WidthType.PERCENTAGE } }));
-        });
-
-        setProgress(Math.round(((i + 1) / cards.length) * 100));
-        await new Promise((r) => setTimeout(r, 60));
-      }
-
-      const doc = new Document({ sections: [{ children: sections }] });
-      const blob = await Packer.toBlob(doc);
-
-      // ✅ Include approval status in filename
-      const filename = approvalStatus === 'approved'
-        ? `${collegeName}_Schedule_APPROVED.docx`
-        : `${collegeName}_Schedule.docx`;
-
-      saveAs(blob, filename);
-
-      // ✅ Success message mentions approval if approved
-      if (approvalStatus === 'approved') {
-        toast.success("Word exported successfully with APPROVED status!");
-      } else {
-        toast.success("Word exported successfully!");
-      }
-
-      onClose();
-    } catch (error) {
-      console.error("Word export error:", error);
-      toast.error("Failed to export Word");
-    } finally {
-      cleanupExportMode();
-      setExporting(false);
-    }
-  };
-
-  const exportToExcel = async () => {
-    stopExport.current = false;
-    const cards = getCards();
-    if (cards.length === 0) return toast.error("No schedule found for the selected date.");
-
-    setExporting(true);
-    setProgress(0);
-    toast.info("Generating Excel file...");
-
-    try {
-      const workbook = XLSX.utils.book_new();
-
-      for (let i = 0; i < cards.length; i++) {
-        if (stopExport.current) return;
-
-        const tables = cards[i].querySelectorAll("table.exam-table");
-        const allData: string[][] = [];
-
-        // ✅ Add approval status header if approved
-        if (approvalStatus === 'approved' && i === 0) {
-          allData.push(["🔒 APPROVED SCHEDULE"]);
-          allData.push([]); // Empty row for spacing
-        }
-
-        tables.forEach((table) => {
-          table.querySelectorAll("tr").forEach((row) => {
-            const cells = row.querySelectorAll("td, th");
-            allData.push(Array.from(cells).map((c) => c.textContent?.trim() || ""));
-          });
-        });
-
-        XLSX.utils.book_append_sheet(workbook, XLSX.utils.aoa_to_sheet(allData), `Page_${i + 1}`);
-        setProgress(Math.round(((i + 1) / cards.length) * 100));
-      }
-
-      // ✅ Include approval status in filename
-      const filename = approvalStatus === 'approved'
-        ? `${collegeName}_Schedule_APPROVED.xlsx`
-        : `${collegeName}_Schedule.xlsx`;
-
-      XLSX.writeFile(workbook, filename);
-
-      // ✅ Success message mentions approval if approved
-      if (approvalStatus === 'approved') {
-        toast.success("Excel exported successfully with APPROVED status!");
-      } else {
-        toast.success("Excel exported successfully!");
-      }
-
-      onClose();
-    } catch (error) {
-      console.error("Excel export error:", error);
-      toast.error("Failed to export Excel");
-    } finally {
-      cleanupExportMode();
-      setExporting(false);
-    }
-  };
-
   return (
     <div className="export-container">
       <h2 className="export-title">Export Schedule</h2>
 
-      {/* ✅ Show approval status indicator */}
       {approvalStatus === 'approved' && (
         <div style={{
           background: '#4CAF50',
@@ -319,49 +192,145 @@ const ExportSchedule: React.FC<ExportScheduleProps> = ({
           textAlign: 'center',
           fontWeight: 'bold'
         }}>
-          ✅ This schedule is APPROVED
+          ✓ This schedule is APPROVED
           <div style={{ fontSize: '12px', marginTop: '5px', opacity: 0.9 }}>
             Exports will include "APPROVED" watermark
           </div>
         </div>
       )}
 
-      <div className="export-options">
-        <label className="radio">
-          <input
-            type="radio"
-            value="ALL"
-            checked={exportMode === "ALL"}
-            onChange={() => setExportMode("ALL")}
-          />
-          <span>All Dates</span>
-        </label>
-
-        <label className="radio">
-          <input
-            type="radio"
-            value="SPECIFIC"
-            checked={exportMode === "SPECIFIC"}
-            onChange={() => setExportMode("SPECIFIC")}
-          />
-          <span>Specific Date</span>
-        </label>
+      <div style={{ marginTop: '20px' }}>
+        {loadingPreviews ? (
+          <div style={{ textAlign: 'center', padding: '20px', color: 'black' }}>
+            <p>Loading page previews...</p>
+          </div>
+        ) : pagePreviews.length > 0 ? (
+          <>
+            <div style={{ 
+              display: 'flex', 
+              justifyContent: 'space-between', 
+              alignItems: 'center',
+              marginBottom: '15px',
+              padding: '10px',
+              background: '#f5f5f5',
+              borderRadius: '8px'
+            }}>
+              <h3 style={{ margin: 0, fontSize: '16px' }}>
+                Page Previews ({pagePreviews.filter(p => p.selected).length} of {pagePreviews.length} selected)
+              </h3>
+              <div style={{ display: 'flex', gap: '10px' }}>
+                <button
+                  type="button"
+                  onClick={selectAllPages}
+                  style={{
+                    padding: '6px 12px',
+                    fontSize: '12px',
+                    background: '#4CAF50',
+                    color: 'white',
+                    border: 'none',
+                    borderRadius: '5px',
+                    cursor: 'pointer'
+                  }}
+                >
+                  Select All
+                </button>
+                <button
+                  type="button"
+                  onClick={deselectAllPages}
+                  style={{
+                    padding: '6px 12px',
+                    fontSize: '12px',
+                    background: '#f44336',
+                    color: 'white',
+                    border: 'none',
+                    borderRadius: '5px',
+                    cursor: 'pointer'
+                  }}
+                >
+                  Deselect All
+                </button>
+              </div>
+            </div>
+            
+            <div style={{
+              display: 'grid',
+              gridTemplateColumns: 'repeat(auto-fill, minmax(150px, 1fr))',
+              gap: '15px',
+              maxHeight: '400px',
+              overflowY: 'auto',
+              padding: '10px',
+              background: '#fafafa',
+              borderRadius: '8px'
+            }}>
+              {pagePreviews.map((page, index) => (
+                <div
+                  key={index}
+                  onClick={() => togglePageSelection(index)}
+                  style={{
+                    position: 'relative',
+                    cursor: 'pointer',
+                    border: page.selected ? '3px solid #4CAF50' : '3px solid #ddd',
+                    borderRadius: '8px',
+                    overflow: 'hidden',
+                    transition: 'all 0.2s',
+                    boxShadow: page.selected ? '0 4px 8px rgba(76, 175, 80, 0.3)' : '0 2px 4px rgba(0,0,0,0.1)',
+                    display: 'flex',
+                    flexDirection: 'column'
+                  }}
+                >
+                  <div style={{ position: 'relative', flexGrow: 1 }}>
+                    <img
+                      src={page.preview}
+                      alt={`Page ${index + 1}`}
+                      style={{
+                        width: '100%',
+                        height: 'auto',
+                        display: 'block',
+                        opacity: page.selected ? 1 : 0.5
+                      }}
+                    />
+                    {page.selected && (
+                      <div style={{
+                        position: 'absolute',
+                        top: '5px',
+                        right: '5px',
+                        background: '#4CAF50',
+                        color: 'white',
+                        borderRadius: '50%',
+                        width: '24px',
+                        height: '24px',
+                        display: 'flex',
+                        alignItems: 'center',
+                        justifyContent: 'center',
+                        fontWeight: 'bold',
+                        fontSize: '16px',
+                        zIndex: 2
+                      }}>
+                        ✓
+                      </div>
+                    )}
+                  </div>
+                  <div style={{
+                    padding: '8px',
+                    background: page.selected ? '#4CAF50' : '#666',
+                    color: 'white',
+                    fontSize: '11px',
+                    textAlign: 'center',
+                    fontWeight: page.selected ? 'bold' : 'normal',
+                    minHeight: '32px',
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    flexShrink: 0
+                  }}>
+                    Page {index + 1}
+                  </div>
+                </div>
+              ))}
+            </div>
+          </>
+        ) : null}
       </div>
-
-      {exportMode === "SPECIFIC" && (
-        <select
-          className="date-select"
-          value={selectedDate}
-          onChange={(e) => setSelectedDate(e.target.value)}
-        >
-          <option value="">Select a Date</option>
-          {availableDates.map((date, i) => (
-            <option key={i} value={date}>
-              {date}
-            </option>
-          ))}
-        </select>
-      )}
 
       {exporting && (
         <div className="progress-wrapper">
@@ -382,14 +351,6 @@ const ExportSchedule: React.FC<ExportScheduleProps> = ({
         <button className="btn pdf" disabled={exporting} onClick={exportToPDF}>
           Export to PDF
           {approvalStatus === 'approved' && <span style={{ fontSize: '10px', display: 'block' }}>(with watermark)</span>}
-        </button>
-        <button className="btn word" disabled={exporting} onClick={exportToWord}>
-          Export to Word
-          {approvalStatus === 'approved' && <span style={{ fontSize: '10px', display: 'block' }}>(with status)</span>}
-        </button>
-        <button className="btn excel" disabled={exporting} onClick={exportToExcel}>
-          Export to Excel
-          {approvalStatus === 'approved' && <span style={{ fontSize: '10px', display: 'block' }}>(with status)</span>}
         </button>
       </div>
     </div>
