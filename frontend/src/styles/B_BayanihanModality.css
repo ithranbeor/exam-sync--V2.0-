@@ -1173,3 +1173,86 @@ button.open-modal-btn:hover {
     border: 1px solid #ddd;
   }
 }
+
+/* Modal Base Styles */
+.modal {
+  background: #fff;
+  padding: 25px;
+  width: 90%;
+  max-width: 400px;
+  border-radius: 10px;
+  box-shadow: 0 5px 15px rgba(0, 0, 0, 0.3);
+  display: flex;
+  flex-direction: column;
+  gap: 15px;
+}
+
+.modal h3 {
+  margin: 0;
+  font-size: 20px;
+  color: #ffb800;
+  text-align: center;
+  margin-bottom: 10px;
+}
+
+/* Delete Confirmation Modal Styles */
+.delete-confirm-modal {
+  max-width: 450px;
+  text-align: center;
+}
+
+.delete-confirm-modal .modal-actions {
+  display: flex !important;
+  flex-direction: row !important;
+  justify-content: center !important;
+  align-items: center !important;
+  gap: 10px;
+  flex-wrap: nowrap;
+}
+
+.delete-confirm-message {
+  font-size: 16px;
+  color: #333;
+  margin: 10px 0;
+  padding: 15px;
+  background-color: #f8f8f8;
+  border-radius: 5px;
+}
+
+.modal-button.confirm-delete {
+  background-color: #dc3545;
+  color: white;
+  border: none;
+  padding: 10px 20px;
+  border-radius: 4px;
+  cursor: pointer;
+  font-size: 14px;
+}
+
+.modal-button.confirm-delete:hover {
+  background-color: #c82333;
+}
+
+.modal-button.confirm-delete:disabled {
+  background-color: #ccc;
+  cursor: not-allowed;
+}
+
+.modal-button.cancel-delete {
+  background-color: #6c757d;
+  color: white;
+  border: none;
+  padding: 10px 20px;
+  border-radius: 4px;
+  cursor: pointer;
+  font-size: 14px;
+}
+
+.modal-button.cancel-delete:hover {
+  background-color: #5a6268;
+}
+
+.modal-button.cancel-delete:disabled {
+  background-color: #ccc;
+  cursor: not-allowed;
+}

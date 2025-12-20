@@ -41,6 +41,8 @@ const Rooms: React.FC = () => {
   const [isBulkDeleting, setIsBulkDeleting] = useState(false);
   const [canScrollLeft, setCanScrollLeft] = useState(false);
   const [canScrollRight, setCanScrollRight] = useState(false);
+  const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
+  const [deleteCount, setDeleteCount] = useState(0);
   const tableContainerRef = useRef<HTMLDivElement>(null);
   const [sortBy, setSortBy] = useState<string>('none');
   const [showSortDropdown, setShowSortDropdown] = useState(false);
@@ -73,7 +75,12 @@ const Rooms: React.FC = () => {
     }
   }, showImport);
 
-  // Fetch all data once on mount
+  useEscapeKey(() => {
+    if (showDeleteConfirm) {
+      setShowDeleteConfirm(false);
+    }
+  }, showDeleteConfirm);
+
   useEffect(() => {
     fetchAll();
   }, []);
@@ -190,13 +197,19 @@ const Rooms: React.FC = () => {
     }
   };
 
-  const handleBulkDelete = async () => {
+  const handleBulkDelete = () => {
     const ids = Array.from(selectedIds);
     if (ids.length === 0) {
       toast.info('No rooms selected');
       return;
     }
-    if (!globalThis.confirm(`Delete ${ids.length} selected room(s)?`)) return;
+    setDeleteCount(ids.length);
+    setShowDeleteConfirm(true);
+  };
+
+  const confirmDelete = async () => {
+    const ids = Array.from(selectedIds);
+    setShowDeleteConfirm(false);
     setIsBulkDeleting(true);
     try {
       const results = await Promise.allSettled(ids.map((id) => api.delete(`/tbl_rooms/${id}/`)));
@@ -1023,7 +1036,7 @@ const Rooms: React.FC = () => {
         </div>
       </div>
 
-      {/* ✅ Add/Edit Modal */}
+      {/* Add/Edit Modal */}
       {showModal && (
         <div className="modal-overlay">
           <div className="modal">
@@ -1102,7 +1115,7 @@ const Rooms: React.FC = () => {
         </div>
       )}
 
-      {/* ✅ Import Modal */}
+      {/* Import Modal */}
       {showImport && (
         <div className="modal-overlay">
           <div className="modal">
@@ -1122,6 +1135,38 @@ const Rooms: React.FC = () => {
               </button>
               <button type="button" onClick={() => setShowImport(false)} disabled={isImporting}>
                 {isImporting ? "Importing…" : "Close"}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Delete Confirmation Modal */}
+      {showDeleteConfirm && (
+        <div className="modal-overlay" onClick={() => setShowDeleteConfirm(false)}>
+          <div className="modal delete-confirm-modal" onClick={(e) => e.stopPropagation()}>
+            <h3>Are you sure to delete this Room?</h3>
+            <p className="delete-confirm-message">
+              {deleteCount === 1 
+                ? 'Delete this one room' 
+                : `Delete these ${deleteCount} rooms`}
+            </p>
+            <div className="modal-actions">
+              <button 
+                type="button" 
+                className="modal-button confirm-delete"
+                onClick={confirmDelete}
+                disabled={isBulkDeleting}
+              >
+                {isBulkDeleting ? 'Deleting...' : 'Delete'}
+              </button>
+              <button 
+                type="button" 
+                className="modal-button cancel-delete"
+                onClick={() => setShowDeleteConfirm(false)}
+                disabled={isBulkDeleting}
+              >
+                Cancel
               </button>
             </div>
           </div>

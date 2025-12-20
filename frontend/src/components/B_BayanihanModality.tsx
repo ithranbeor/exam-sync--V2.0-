@@ -51,6 +51,8 @@ const BayanihanModality: React.FC<UserProps> = ({ user }) => {
   });
 
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
+  const [showFinalDeleteConfirm, setShowFinalDeleteConfirm] = useState(false);
+  const [deleteMode, setDeleteMode] = useState<'selected' | 'all'>('selected');
   const [userModalities, setUserModalities] = useState<any[]>([]);
   const [selectedForDelete, setSelectedForDelete] = useState<number[]>([]);
   const [isDeleting, setIsDeleting] = useState(false);
@@ -73,13 +75,25 @@ const BayanihanModality: React.FC<UserProps> = ({ user }) => {
     fetchUserModalities();
   }, [fetchUserModalities]);
 
-  const handleDeleteSelected = async () => {
+
+  // Add delete handlers
+  const handleDeleteSelected = () => {
     if (selectedForDelete.length === 0) {
       toast.warn('Please select modalities to delete');
       return;
     }
+    // Show confirmation dialog
+    setDeleteMode('selected');
+    setShowFinalDeleteConfirm(true);
+  };
+
+  const confirmDeleteSelected = async () => {
+    if (selectedForDelete.length === 0) {
+      return;
+    }
 
     setIsDeleting(true);
+    setShowFinalDeleteConfirm(false);
 
     try {
       await Promise.all(
@@ -101,19 +115,31 @@ const BayanihanModality: React.FC<UserProps> = ({ user }) => {
     }
   };
 
-  const handleDeleteAll = async () => {
+  const handleFinalConfirm = async () => {
+    if (deleteMode === 'selected') {
+      await confirmDeleteSelected();
+    } else {
+      await confirmDeleteAll();
+    }
+  };
+
+  const handleDeleteAll = () => {
     if (userModalities.length === 0) {
       toast.warn('No modalities to delete');
       return;
     }
+    // Show confirmation dialog
+    setDeleteMode('all');
+    setShowFinalDeleteConfirm(true);
+  };
 
-    const confirmed = window.confirm(
-      `⚠️ WARNING: You are about to delete ALL ${userModalities.length} modalities you created.\n\nThis action cannot be undone. Continue?`
-    );
-
-    if (!confirmed) return;
+  const confirmDeleteAll = async () => {
+    if (userModalities.length === 0) {
+      return;
+    }
 
     setIsDeleting(true);
+    setShowFinalDeleteConfirm(false);
 
     try {
       await Promise.all(
@@ -1564,6 +1590,38 @@ const BayanihanModality: React.FC<UserProps> = ({ user }) => {
                 </div>
               </>
             )}
+          </div>
+        </div>
+      )}
+
+      {/* Final Delete Confirmation Modal */}
+      {showFinalDeleteConfirm && (
+        <div className="modal-overlay" onClick={() => setShowFinalDeleteConfirm(false)}>
+          <div className="modal delete-confirm-modal" onClick={(e) => e.stopPropagation()}>
+            <h3>Are you sure to delete?</h3>
+            <p className="delete-confirm-message">
+              {deleteMode === 'all' 
+                ? `You are about to delete ALL ${userModalities.length} modality/modalities. This action cannot be undone.`
+                : `You are about to delete ${selectedForDelete.length} selected modality/modalities. This action cannot be undone.`}
+            </p>
+            <div className="modal-actions">
+              <button 
+                type="button" 
+                className="modal-button confirm-delete"
+                onClick={handleFinalConfirm}
+                disabled={isDeleting}
+              >
+                {isDeleting ? 'Deleting...' : 'Delete'}
+              </button>
+              <button 
+                type="button" 
+                className="modal-button cancel-delete"
+                onClick={() => setShowFinalDeleteConfirm(false)}
+                disabled={isDeleting}
+              >
+                Cancel
+              </button>
+            </div>
           </div>
         </div>
       )}

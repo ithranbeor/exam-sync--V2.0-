@@ -53,6 +53,8 @@ const ExamPeriodComponent: React.FC = () => {
   const [selectedExamIds, setSelectedExamIds] = useState<Set<number>>(new Set());
   const [canScrollLeft, setCanScrollLeft] = useState(false);
   const [canScrollRight, setCanScrollRight] = useState(false);
+  const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
+  const [deleteCount, setDeleteCount] = useState(0);
   const tableContainerRef = useRef<HTMLDivElement>(null);
   const [sortBy, setSortBy] = useState<string>('none');
   const [showSortDropdown, setShowSortDropdown] = useState(false);
@@ -89,6 +91,12 @@ const ExamPeriodComponent: React.FC = () => {
       setShowImport(false);
     }
   }, showImport);
+
+  useEscapeKey(() => {
+    if (showDeleteConfirm) {
+      setShowDeleteConfirm(false);
+    }
+  }, showDeleteConfirm);
 
   useEffect(() => {
     fetchAll();
@@ -266,6 +274,34 @@ const ExamPeriodComponent: React.FC = () => {
       setCurrentPage(1);
     } else {
       toast.error('Please enter a valid positive number.');
+    }
+  };
+
+  const handleBulkDelete = () => {
+    const idsToDelete = Array.from(selectedExamIds);
+    if (idsToDelete.length === 0) {
+      toast.error('No items selected');
+      return;
+    }
+    setDeleteCount(idsToDelete.length);
+    setShowDeleteConfirm(true);
+  };
+
+  const confirmDelete = async () => {
+    const idsToDelete = Array.from(selectedExamIds);
+    setShowDeleteConfirm(false);
+    try {
+      // Delete each individually
+      await Promise.all(
+        idsToDelete.map(id => api.delete(`/tbl_examperiod/${id}/`))
+      );
+
+      toast.success(`Deleted ${idsToDelete.length} exam period(s)`);
+      setSelectedExamIds(new Set());
+      fetchAll();
+    } catch (err) {
+      console.error(err);
+      toast.error('Failed to delete selected items');
     }
   };
 
@@ -1010,30 +1046,7 @@ const ExamPeriodComponent: React.FC = () => {
           <button
             type='button'
             className="action-button delete"
-            onClick={async () => {
-              const idsToDelete = Array.from(selectedExamIds);
-
-              if (idsToDelete.length === 0) {
-                toast.error('No items selected');
-                return;
-              }
-
-              if (!globalThis.confirm(`Delete ${idsToDelete.length} selected exam periods?`)) return;
-
-              try {
-                // Delete each individually
-                await Promise.all(
-                  idsToDelete.map(id => api.delete(`/tbl_examperiod/${id}/`))
-                );
-
-                toast.success(`Deleted ${idsToDelete.length} exam period(s)`);
-                setSelectedExamIds(new Set());
-                fetchAll();
-              } catch (err) {
-                console.error(err);
-                toast.error('Failed to delete selected items');
-              }
-            }}
+            onClick={handleBulkDelete}
           >
             <FaTrash />
           </button>
@@ -1413,6 +1426,36 @@ const ExamPeriodComponent: React.FC = () => {
             <h3>Import Exam Periods</h3>
             <input type="file" accept=".xlsx, .xls" onChange={handleImport} />
             <button type='button' onClick={() => setShowImport(false)}>Close</button>
+          </div>
+        </div>
+      )}
+
+      {/* Delete Confirmation Modal */}
+      {showDeleteConfirm && (
+        <div className="modal-overlay" onClick={() => setShowDeleteConfirm(false)}>
+          <div className="modal delete-confirm-modal" onClick={(e) => e.stopPropagation()}>
+            <h3>Are you sure to delete this Exam Period?</h3>
+            <p className="delete-confirm-message">
+              {deleteCount === 1 
+                ? 'Delete this one exam period' 
+                : `Delete these ${deleteCount} exam periods`}
+            </p>
+            <div className="modal-actions">
+              <button 
+                type="button" 
+                className="modal-button confirm-delete"
+                onClick={confirmDelete}
+              >
+                Delete
+              </button>
+              <button 
+                type="button" 
+                className="modal-button cancel-delete"
+                onClick={() => setShowDeleteConfirm(false)}
+              >
+                Cancel
+              </button>
+            </div>
           </div>
         </div>
       )}

@@ -400,6 +400,62 @@ h3 {
   background-color: #193e60;
 }
 
+/* Delete Confirmation Modal Styles */
+.delete-confirm-modal {
+  max-width: 450px;
+  text-align: center;
+}
+
+.delete-confirm-modal .modal-actions {
+  display: flex !important;
+  flex-direction: row !important;
+  justify-content: center !important;
+  align-items: center !important;
+  gap: 10px;
+  flex-wrap: nowrap;
+}
+
+.delete-confirm-message {
+  font-size: 16px;
+  color: #333;
+  margin: 10px 0;
+  padding: 15px;
+  background-color: #f8f8f8;
+  border-radius: 5px;
+}
+
+.modal-button.confirm-delete {
+  background-color: #dc3545;
+  color: white;
+  border: none;
+}
+
+.modal-button.confirm-delete:hover {
+  background-color: #b02a37;
+}
+
+.modal-button.confirm-delete:disabled {
+  background-color: #ccc;
+  cursor: not-allowed;
+  opacity: 0.6;
+}
+
+.modal-button.cancel-delete {
+  background-color: #0A3765;
+  color: white;
+  border: none;
+}
+
+.modal-button.cancel-delete:hover {
+  background-color: #0d4a7a;
+}
+
+.modal-button.cancel-delete:disabled {
+  background-color: #ccc;
+  cursor: not-allowed;
+  opacity: 0.6;
+}
+
 .input-group {
   position: relative;
   margin-bottom: 16px;

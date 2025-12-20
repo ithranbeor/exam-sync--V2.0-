@@ -47,6 +47,8 @@ const Buildings: React.FC = () => {
   const [selectedBuildingIds, setSelectedBuildingIds] = useState<Set<string>>(new Set());
   const [canScrollLeft, setCanScrollLeft] = useState(false);
   const [canScrollRight, setCanScrollRight] = useState(false);
+  const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
+  const [deleteCount, setDeleteCount] = useState(0);
   const tableContainerRef = useRef<HTMLDivElement>(null);
 
   // Handle ESC key to close modals
@@ -71,6 +73,12 @@ const Buildings: React.FC = () => {
       setSelectedBuildingRooms([]);
     }
   }, showRoomModal);
+
+  useEscapeKey(() => {
+    if (showDeleteConfirm) {
+      setShowDeleteConfirm(false);
+    }
+  }, showDeleteConfirm);
 
   useEffect(() => {
     if (showModal || showImport) return; 
@@ -377,14 +385,19 @@ const Buildings: React.FC = () => {
     }
   }, [currentPage, totalPages]);
 
-  const handleBulkDelete = async () => {
+  const handleBulkDelete = () => {
     const ids = Array.from(selectedBuildingIds);
     if (ids.length === 0) {
       toast.info('No buildings selected');
       return;
     }
-    const confirmDelete = window.confirm(`Delete ${ids.length} selected building(s)? This cannot be undone.`);
-    if (!confirmDelete) return;
+    setDeleteCount(ids.length);
+    setShowDeleteConfirm(true);
+  };
+
+  const confirmDelete = async () => {
+    const ids = Array.from(selectedBuildingIds);
+    setShowDeleteConfirm(false);
     setIsBulkDeleting(true);
     try {
       const results = await Promise.allSettled(
@@ -1055,6 +1068,38 @@ const Buildings: React.FC = () => {
             </div>
             <div className="modal-actions">
               <button type="button" onClick={() => setShowRoomModal(false)}>Close</button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Delete Confirmation Modal */}
+      {showDeleteConfirm && (
+        <div className="modal-overlay" onClick={() => setShowDeleteConfirm(false)}>
+          <div className="modal delete-confirm-modal" onClick={(e) => e.stopPropagation()}>
+            <h3>Are you sure to delete this Building?</h3>
+            <p className="delete-confirm-message">
+              {deleteCount === 1 
+                ? 'Delete this one building' 
+                : `Delete these ${deleteCount} buildings`}
+            </p>
+            <div className="modal-actions">
+              <button 
+                type="button" 
+                className="modal-button confirm-delete"
+                onClick={confirmDelete}
+                disabled={isBulkDeleting}
+              >
+                {isBulkDeleting ? 'Deleting...' : 'Delete'}
+              </button>
+              <button 
+                type="button" 
+                className="modal-button cancel-delete"
+                onClick={() => setShowDeleteConfirm(false)}
+                disabled={isBulkDeleting}
+              >
+                Cancel
+              </button>
             </div>
           </div>
         </div>
