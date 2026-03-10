@@ -53,7 +53,6 @@ from datetime import datetime, timedelta
 import secrets
 from django.core.cache import cache
 import re
-import traceback
 
 User = get_user_model()
 
@@ -2485,7 +2484,8 @@ def confirm_password_change(request):
 @api_view(['POST'])
 @permission_classes([AllowAny])
 def login_faculty(request):
-    print("LOGIN DATA:", request.data)  # check frontend payload
+
+    print("LOGIN DATA:", request.data)  # 🔹 Debug frontend payload
 
     user_id = request.data.get('user_id')
     password = request.data.get('password')
@@ -2520,9 +2520,9 @@ def login_faculty(request):
         return Response({'message': 'Invalid credentials'}, status=status.HTTP_401_UNAUTHORIZED)
 
     except Exception as e:
-        # Log full traceback for debugging
-        print("❌ LOGIN EXCEPTION:\n", traceback.format_exc())
+        print("❌ LOGIN EXCEPTION:", str(e))  # 🔹 Print full error
         return Response({'message': 'Internal server error'}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+
 # ============================================================
 # PASSWORD RESET CONFIRMATION
 # ============================================================
