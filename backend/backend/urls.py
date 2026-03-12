@@ -10,24 +10,9 @@ from api import views
 def health_check(request):
     return JsonResponse({"status": "ok"})
 
-
-def cache_test(request):
-    try:
-        cache.set("ping", "pong", timeout=30)
-        value = cache.get("ping")
-        return JsonResponse({
-            "status": "✅ Redis working" if value == "pong" else "⚠️ Cache set/get failed",
-            "value": value,
-            "backend": str(cache.__class__)
-        })
-    except Exception as e:
-        return JsonResponse({"status": "❌ Cache error", "error": str(e)})
-
-
 urlpatterns = [
     # ── Utility endpoints ──
     path('health/', health_check, name='health_check'),
-    path('debug/cache/', cache_test, name='cache_test'),  # ← Remove after confirming Redis works
 
     # User API
     path('api/login/', views.login_faculty, name='login_faculty'),
