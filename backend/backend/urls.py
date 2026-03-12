@@ -3,15 +3,31 @@
 from django.urls import path, re_path
 from django.views.generic import RedirectView
 from django.http import JsonResponse
+from django.core.cache import cache
 from api import views
+
 
 def health_check(request):
     return JsonResponse({"status": "ok"})
 
 
+def cache_test(request):
+    try:
+        cache.set("ping", "pong", timeout=30)
+        value = cache.get("ping")
+        return JsonResponse({
+            "status": "✅ Redis working" if value == "pong" else "⚠️ Cache set/get failed",
+            "value": value,
+            "backend": str(cache.__class__)
+        })
+    except Exception as e:
+        return JsonResponse({"status": "❌ Cache error", "error": str(e)})
+
+
 urlpatterns = [
-    # ── Keep-alive endpoint (ping this with UptimeRobot) ──
+    # ── Utility endpoints ──
     path('health/', health_check, name='health_check'),
+    path('debug/cache/', cache_test, name='cache_test'),  # ← Remove after confirming Redis works
 
     # User API
     path('api/login/', views.login_faculty, name='login_faculty'),
@@ -29,7 +45,6 @@ urlpatterns = [
     path('api/users/me/', views.get_current_user, name='get_current_user'),
 
     # Tables
-    # tbl_examperiod — static routes before dynamic <pk>
     path('api/tbl_examperiod/bulk_update/', views.tbl_examperiod_bulk_update),
     path('api/tbl_examperiod', views.tbl_examperiod_list, name='tbl_examperiod_list'),
     path('api/tbl_examperiod/<int:pk>/', views.tbl_examperiod_detail, name='tbl_examperiod_detail'),
@@ -68,7 +83,6 @@ urlpatterns = [
     path('api/user-role-history/', views.user_role_history_list, name='user_role_history_list'),
     path('api/user-role-history/create/', views.user_role_history_create, name='user_role_history_create'),
 
-    # tbl_sectioncourse — static routes before dynamic <pk>
     path('api/tbl_sectioncourse/page-data/', views.tbl_sectioncourse_page_data, name='tbl_sectioncourse_page_data'),
     path('api/tbl_sectioncourse/', views.tbl_sectioncourse_list, name='tbl_sectioncourse_list'),
     path('api/tbl_sectioncourse/<int:pk>/', views.tbl_sectioncourse_detail, name='tbl_sectioncourse_detail'),
@@ -82,7 +96,6 @@ urlpatterns = [
     path('api/tbl_modality/', views.tbl_modality_list, name='tbl_modality_list'),
     path('api/tbl_modality/<int:pk>/', views.tbl_modality_detail, name='tbl_modality_detail'),
 
-    # tbl_examdetails — static routes before dynamic <pk>
     path('api/tbl_examdetails/batch-delete/', views.tbl_examdetails_batch_delete, name='examdetails-batch-delete'),
     path('api/tbl_examdetails', views.tbl_examdetails_list, name='tbl_examdetails_list'),
     path('api/tbl_examdetails/<int:pk>/', views.tbl_examdetails_detail, name='tbl_examdetails_detail'),
@@ -116,6 +129,7 @@ urlpatterns = [
     path('api/tbl_schedule_footer/<int:pk>/', views.tbl_schedule_footer_detail, name='tbl_schedule_footer_detail'),
     path('api/upload-schedule-logo/', views.upload_schedule_logo, name='upload_schedule_logo'),
 
-    # Redirect all non-API routes to the React frontend
-    re_path(r'^(?!api/).*$', RedirectView.as_view(url='https://exam-sync-frontend.onrender.com/', permanent=False)),
+    # ── Redirect all non-API, non-utility routes to the React frontend ──
+    # Fixed: also excludes health/ and debug/ from being redirected
+    re_path(r'^(?!api/|health/|debug/).*$', RedirectView.as_view(url='https://exam-sync-frontend.onrender.com/', permanent=False)),
 ]

@@ -156,7 +156,8 @@ DATABASES = {
         "PASSWORD": config("DB_PASSWORD"),
         "HOST": config("DB_HOST"),
         "PORT": config("DB_PORT", cast=int),
-        "CONN_MAX_AGE": 600,  # Reuse DB connections for 10 minutes
+        "CONN_MAX_AGE": 600,
+        "CONN_HEALTH_CHECKS": True,  # Reuse DB connections for 10 minutes
         "OPTIONS": {
             "application_name": "DjangoApp",
             "sslmode": "require",
