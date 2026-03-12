@@ -1901,56 +1901,200 @@ def tbl_course_users_detail(request, course_id, user_id):
         course_user.delete()
         return Response(status=status.HTTP_204_NO_CONTENT)
     
-@api_view(['GET'])
+Now I can see exactly what's happening. Two problems:
+
+WORKER TIMEOUT — the query takes too long and Gunicorn kills it
+KeyError: 'term' — CourseSerializer.to_representation is doing extra DB queries per row (N+1 problem) because select_related('term') isn't being respected through the nested serializer chain
+
+The crash is at serializers.py line 22 — inside CourseSerializer.to_representation:
+pythonterm = instance.term  # ← This triggers a new DB query for EVERY course
+The fix — replace your tbl_sectioncourse_page_data view:
+python@api_view(['GET'])
 @permission_classes([AllowAny])
 def tbl_sectioncourse_page_data(request):
     from django.core.cache import cache
-    import json
 
     CACHE_KEY = 'sectioncourse_page_data'
     cached = cache.get(CACHE_KEY)
     if cached:
         return Response(cached)
 
-    section_courses = TblSectioncourse.objects.select_related(
-        'course', 'program', 'term', 'user'
-    ).all()
+    try:
+        # ✅ Use .values() for everything — no serializers, no N+1 queries
+        
+        section_courses = list(
+            TblSectioncourse.objects.select_related(
+                'course', 'program', 'term', 'user'
+            ).values(
+                'id',
+                'section_name',
+                'number_of_students',
+                'year_level',
+                'is_night_class',
+                'course_id',
+                'course__course_name',
+                'program_id',
+                'program__program_name',
+                'term_id',
+                'term__term_name',
+                'user_id',
+                'user__first_name',
+                'user__last_name',
+            )
+        )
 
-    courses = TblCourse.objects.select_related('term').prefetch_related(
-        'tblcourseusers_set__user'
-    ).all()
+        # Reshape section_courses to match frontend interface
+        section_courses_shaped = [
+            {
+                'id': sc['id'],
+                'section_name': sc['section_name'],
+                'number_of_students': sc['number_of_students'],
+                'year_level': sc['year_level'],
+                'is_night_class': sc['is_night_class'],
+                'course_id': sc['course_id'],
+                'program_id': sc['program_id'],
+                'term_id': sc['term_id'],
+                'user_id': sc['user_id'],
+                'course': {
+                    'course_id': sc['course_id'],
+                    'course_name': sc['course__course_name'],
+                },
+                'program': {
+                    'program_id': sc['program_id'],
+                    'program_name': sc['program__program_name'],
+                },
+                'term': {
+                    'term_id': sc['term_id'],
+                    'term_name': sc['term__term_name'],
+                },
+                'user': {
+                    'user_id': sc['user_id'],
+                    'full_name': f"{sc['user__first_name']} {sc['user__last_name']}" if sc['user_id'] else None,
+                } if sc['user_id'] else None,
+            }
+            for sc in section_courses
+        ]
 
-    programs = TblProgram.objects.select_related('department').all()
-    terms = TblTerm.objects.prefetch_related('tblexamperiod_set').all()
-    colleges = TblCollege.objects.all()
+        # ✅ Courses — flat values
+        courses_qs = list(
+            TblCourse.objects.select_related('term').values(
+                'course_id', 'course_name',
+                'term_id', 'term__term_name'
+            )
+        )
+        # Get instructors per course
+        course_users_qs = list(
+            TblCourseUsers.objects.select_related('user').values(
+                'course_id', 'user_id',
+                'course_name', 'is_bayanihan_leader',
+                'user__first_name', 'user__last_name',
+                'course__course_id',
+            )
+        )
+        # Build instructor map
+        instructor_map = {}
+        for cu in course_users_qs:
+            cid = cu['course__course_id'] or cu['course_id']
+            if cid not in instructor_map:
+                instructor_map[cid] = []
+            instructor_map[cid].append(cu['user_id'])
 
-    user_roles = TblUserRole.objects.select_related(
-        'college', 'user'
-    ).filter(
-        status__iexact='active'
-    ).only(
-        'user_role_id', 'user_id', 'role_id', 'college_id', 'status'
-    )
+        courses_shaped = [
+            {
+                'course_id': c['course_id'],
+                'course_name': c['course_name'],
+                'term_id': c['term_id'],
+                'term_name': c['term__term_name'],
+                'user_ids': instructor_map.get(c['course_id'], []),
+                'leaders': [],
+                'instructor_names': [
+                    f"{cu['user__first_name']} {cu['user__last_name']}"
+                    for cu in course_users_qs
+                    if (cu['course__course_id'] or cu['course_id']) == c['course_id']
+                ],
+            }
+            for c in courses_qs
+        ]
 
-    course_users = TblCourseUsers.objects.select_related(
-        'course', 'user'
-    ).only(
-        'course_id', 'user_id', 'course_name', 'is_bayanihan_leader'
-    )
+        # ✅ Programs
+        programs = list(
+            TblProgram.objects.select_related('department').values(
+                'program_id', 'program_name',
+                'department_id', 'department__department_name'
+            )
+        )
+        programs_shaped = [
+            {
+                'program_id': p['program_id'],
+                'program_name': p['program_name'],
+                'department_id': p['department_id'],
+                'department': p['department__department_name'] or 'N/A',
+            }
+            for p in programs
+        ]
 
-    data = {
-        'section_courses': TblSectioncourseSerializer(section_courses, many=True).data,
-        'courses': CourseSerializer(courses, many=True).data,
-        'programs': TblProgramSerializer(programs, many=True).data,
-        'terms': TblTermSerializer(terms, many=True).data,
-        'colleges': TblCollegeSerializer(colleges, many=True).data,
-        'user_roles': TblUserRoleSerializer(user_roles, many=True).data,
-        'course_users': TblCourseUsersSerializer(course_users, many=True).data,
-    }
+        # ✅ Terms
+        terms = list(TblTerm.objects.values('term_id', 'term_name'))
+        terms_shaped = [
+            {
+                'term_id': t['term_id'],
+                'term_name': t['term_name'],
+                'tbl_examperiod': []
+            }
+            for t in terms
+        ]
 
-    cache.set(CACHE_KEY, data, timeout=60 * 3)
+        # ✅ Colleges
+        colleges = list(TblCollege.objects.values('college_id', 'college_name'))
 
-    return Response(data)
+        # ✅ User roles — only what frontend needs for college filter
+        user_roles = list(
+            TblUserRole.objects.filter(
+                status__iexact='active'
+            ).values(
+                'user_role_id', 'user_id', 'role_id',
+                'college_id', 'department_id', 'status'
+            )
+        )
+
+        # ✅ Course users — shaped to match frontend expectation
+        course_users_shaped = [
+            {
+                'course_id': cu['course__course_id'] or cu['course_id'],
+                'user_id': cu['user_id'],
+                'course_name': cu['course_name'],
+                'is_bayanihan_leader': cu['is_bayanihan_leader'],
+                'tbl_users': {
+                    'user_id': cu['user_id'],
+                    'full_name': f"{cu['user__first_name']} {cu['user__last_name']}"
+                },
+                'course': {
+                    'course_id': cu['course__course_id'] or cu['course_id'],
+                }
+            }
+            for cu in course_users_qs
+        ]
+
+        data = {
+            'section_courses': section_courses_shaped,
+            'courses':         courses_shaped,
+            'programs':        programs_shaped,
+            'terms':           terms_shaped,
+            'colleges':        colleges,
+            'user_roles':      user_roles,
+            'course_users':    course_users_shaped,
+        }
+
+        cache.set(CACHE_KEY, data, timeout=60 * 3)
+        return Response(data)
+
+    except Exception as e:
+        import traceback
+        traceback.print_exc()
+        return Response(
+            {'error': str(e), 'detail': 'Failed to load page data'},
+            status=status.HTTP_500_INTERNAL_SERVER_ERROR
+        )
     
 @api_view(['GET', 'POST'])
 @permission_classes([AllowAny])
