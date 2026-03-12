@@ -1,10 +1,18 @@
-# exam-sync-v2/backend/backend/url.py
+# exam-sync-v2/backend/backend/urls.py
 
 from django.urls import path, re_path
 from django.views.generic import RedirectView
+from django.http import JsonResponse
 from api import views
 
+def health_check(request):
+    return JsonResponse({"status": "ok"})
+
+
 urlpatterns = [
+    # ── Keep-alive endpoint (ping this with UptimeRobot) ──
+    path('health/', health_check, name='health_check'),
+
     # User API
     path('api/login/', views.login_faculty, name='login_faculty'),
     path('api/users/', views.users_list, name='users_list'),
@@ -108,6 +116,6 @@ urlpatterns = [
     path('api/tbl_schedule_footer/<int:pk>/', views.tbl_schedule_footer_detail, name='tbl_schedule_footer_detail'),
     path('api/upload-schedule-logo/', views.upload_schedule_logo, name='upload_schedule_logo'),
 
-    # Redirect frontend routes to React
+    # Redirect all non-API routes to the React frontend
     re_path(r'^(?!api/).*$', RedirectView.as_view(url='https://exam-sync-frontend.onrender.com/', permanent=False)),
 ]

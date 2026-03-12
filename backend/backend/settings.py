@@ -1,4 +1,5 @@
 # exam-sync-v2/backend/backend/settings.py
+# NOTE: See url.py output file for the updated urls.py with health check endpoint
 
 from pathlib import Path
 import os
@@ -14,8 +15,8 @@ DEBUG = config('DEBUG', default=False, cast=bool)
 FRONTEND_URL = config('FRONTEND_URL', default="https://exam-sync-v2-0-lkat.onrender.com")
 
 ALLOWED_HOSTS = [
-    "exam-sync-v2-0-lkat.onrender.com",  
-    "exam-sync-v2-0-mwnp.onrender.com", 
+    "exam-sync-v2-0-lkat.onrender.com",
+    "exam-sync-v2-0-mwnp.onrender.com",
     "localhost",
     "127.0.0.1",
     "www.examsyncv2.com",
@@ -57,16 +58,15 @@ MIDDLEWARE = [
 ]
 
 # ──────────────────────────────────────────────
-# CORS / CSRF CONFIG - CRITICAL FIX
+# CORS / CSRF CONFIG
 # ──────────────────────────────────────────────
 CORS_ALLOWED_ORIGINS = [
     "https://exam-sync-v2-0-lkat.onrender.com",
     "https://exam-sync-v2-0-mwnp.onrender.com",
-    "https://www.examsyncv2.com",  # <-- ADD THIS
+    "https://www.examsyncv2.com",
     "http://localhost:5173",
     "http://127.0.0.1:5173",
 ]
-
 
 CORS_ALLOW_CREDENTIALS = True
 
@@ -97,7 +97,7 @@ CORS_EXPOSE_HEADERS = ['Content-Type', 'X-CSRFToken']
 CSRF_TRUSTED_ORIGINS = [
     "https://exam-sync-v2-0-lkat.onrender.com",
     "https://exam-sync-v2-0-mwnp.onrender.com",
-    "https://www.examsyncv2.com",  # <-- ADD THIS
+    "https://www.examsyncv2.com",
     "http://localhost:5173",
     "http://127.0.0.1:5173",
 ]
@@ -108,15 +108,42 @@ CSRF_TRUSTED_ORIGINS = [
 ROOT_URLCONF = "backend.urls"
 WSGI_APPLICATION = "backend.wsgi.application"
 
-# ──────────────────────────────────────────────
-# CACHING CONFIGURATION
-# ──────────────────────────────────────────────
-CACHES = {
-    'default': {
-        'BACKEND': 'django.core.cache.backends.locmem.LocMemCache',
-        'LOCATION': 'unique-snowflake',
+REDIS_URL = config('REDIS_URL', default=None)
+
+if REDIS_URL:
+    # ✅ Best option: Upstash Redis — persists across cold starts, free tier available
+    CACHES = {
+        "default": {
+            "BACKEND": "django_redis.cache.RedisCache",
+            "LOCATION": REDIS_URL,
+            "OPTIONS": {
+                "CLIENT_CLASS": "django_redis.client.DefaultClient",
+                "SOCKET_CONNECT_TIMEOUT": 5,
+                "SOCKET_TIMEOUT": 5,
+                "IGNORE_EXCEPTIONS": True,  # Fallback gracefully if Redis is unavailable
+            },
+            "KEY_PREFIX": "examsync",
+            "TIMEOUT": 300,  # 5 minutes default cache timeout
+        }
     }
-}
+    # Use Redis for session storage too (faster than DB)
+    SESSION_ENGINE = "django.contrib.sessions.backends.cache"
+    SESSION_CACHE_ALIAS = "default"
+else:
+    # ✅ Fallback: Filesystem cache — survives within the same Render instance session
+    # Better than LocMemCache which wipes on every cold start process
+    CACHES = {
+        "default": {
+            "BACKEND": "django.core.cache.backends.filebased.FileBasedCache",
+            "LOCATION": "/tmp/django_cache",
+            "TIMEOUT": 300,
+            "OPTIONS": {
+                "MAX_ENTRIES": 1000,
+            },
+        }
+    }
+    # Fallback session engine
+    SESSION_ENGINE = "django.contrib.sessions.backends.cached_db"
 
 # ──────────────────────────────────────────────
 # DATABASE CONFIGURATION
@@ -129,11 +156,16 @@ DATABASES = {
         "PASSWORD": config("DB_PASSWORD"),
         "HOST": config("DB_HOST"),
         "PORT": config("DB_PORT", cast=int),
-        "CONN_MAX_AGE": 600,
+        "CONN_MAX_AGE": 600,  # Reuse DB connections for 10 minutes
         "OPTIONS": {
             "application_name": "DjangoApp",
             "sslmode": "require",
-            "connect_timeout": 10,
+            "connect_timeout": 5,       # Reduced from 10 → faster fail/retry on cold start
+            # TCP keepalives prevent stale connections from being dropped by the DB proxy
+            "keepalives": 1,
+            "keepalives_idle": 30,
+            "keepalives_interval": 5,
+            "keepalives_count": 5,
         },
     }
 }
@@ -151,6 +183,22 @@ REST_FRAMEWORK = {
     ],
     "DEFAULT_PAGINATION_CLASS": "rest_framework.pagination.PageNumberPagination",
     "PAGE_SIZE": 30,
+    # ✅ Drop BrowsableAPIRenderer in production — saves memory and response time
+    "DEFAULT_RENDERER_CLASSES": [
+        "rest_framework.renderers.JSONRenderer",
+    ] if not config('DEBUG', default=False, cast=bool) else [
+        "rest_framework.renderers.JSONRenderer",
+        "rest_framework.renderers.BrowsableAPIRenderer",
+    ],
+    # ✅ Basic throttling to protect the free-tier server from overload
+    "DEFAULT_THROTTLE_CLASSES": [
+        "rest_framework.throttling.AnonRateThrottle",
+        "rest_framework.throttling.UserRateThrottle",
+    ],
+    "DEFAULT_THROTTLE_RATES": {
+        "anon": "60/min",
+        "user": "300/min",
+    },
 }
 
 # ──────────────────────────────────────────────
@@ -193,11 +241,6 @@ LANGUAGE_CODE = "en-us"
 TIME_ZONE = "Asia/Manila"
 USE_I18N = True
 USE_TZ = True
-
-# ──────────────────────────────────────────────
-# SESSION PERFORMANCE BOOST
-# ──────────────────────────────────────────────
-SESSION_ENGINE = "django.contrib.sessions.backends.cached_db"
 
 # ──────────────────────────────────────────────
 # MISC
