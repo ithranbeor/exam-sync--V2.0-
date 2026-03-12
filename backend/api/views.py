@@ -1900,16 +1900,8 @@ def tbl_course_users_detail(request, course_id, user_id):
     elif request.method == 'DELETE':
         course_user.delete()
         return Response(status=status.HTTP_204_NO_CONTENT)
-    
-Now I can see exactly what's happening. Two problems:
 
-WORKER TIMEOUT — the query takes too long and Gunicorn kills it
-KeyError: 'term' — CourseSerializer.to_representation is doing extra DB queries per row (N+1 problem) because select_related('term') isn't being respected through the nested serializer chain
-
-The crash is at serializers.py line 22 — inside CourseSerializer.to_representation:
-pythonterm = instance.term  # ← This triggers a new DB query for EVERY course
-The fix — replace your tbl_sectioncourse_page_data view:
-python@api_view(['GET'])
+@api_view(['GET'])
 @permission_classes([AllowAny])
 def tbl_sectioncourse_page_data(request):
     from django.core.cache import cache
