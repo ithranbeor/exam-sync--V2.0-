@@ -939,7 +939,7 @@ const Buildings: React.FC = () => {
                       <td>{b.building_id}</td>
                       <td>{b.building_name}</td>
                       <td>{roomCounts[b.building_id] || 0}</td>
-                      <td className="action-buttons" style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                      <td className="action-buttons" style={{ display: 'flex', alignItems: 'center', gap: 8   }}>
                         <button
                           type="button"
                           className="icon-button view-button"

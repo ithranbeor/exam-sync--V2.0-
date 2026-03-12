@@ -669,7 +669,6 @@ input {
 }
 
 .accounts-table th, .accounts-table td {
-  border: 1px solid transparent;
   padding: 10px 12px;
   text-align: left;
 }
