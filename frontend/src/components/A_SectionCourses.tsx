@@ -133,28 +133,17 @@ const SectionCourses: React.FC = () => {
   const fetchAll = useCallback(async () => {
     setLoading(true);
     try {
-      const [secRes, courseRes, progRes, termRes, courseUserRes, collegesRes, userRolesRes] = await Promise.all([
-        api.get('/tbl_sectioncourse/'),
-        api.get('/courses/'),
-        api.get('/programs/'),
-        api.get('/tbl_term'),
-        api.get('/tbl_course_users/'),
-        api.get('/tbl_college/'),
-        api.get('/tbl_user_role')
-      ]);
+      const res = await api.get('/tbl_sectioncourse/page-data/');
+      const { section_courses, courses, programs, terms, 
+              colleges, user_roles, course_users } = res.data;
 
-      //Extract data from the new response structure
-      const secData = secRes.data?.data || secRes.data || [];
-      const courseData = courseRes.data || [];
-      const progData = progRes.data || [];
-      const termData = termRes.data || [];
-      const courseUserData = courseUserRes.data || [];
+      setSectionCourses(section_courses);
+      setCourses(courses);
+      setPrograms(programs);
+      setColleges(colleges);
+      setUserRoles(user_roles);
 
-      setSectionCourses(secData);
-      setCourses(courseData);
-      setPrograms(progData);
-
-      const mappedTerms = termData.map((t: any) => ({
+      const mappedTerms = terms.map((t: any) => ({
         ...t,
         tbl_examperiod: {
           academic_year: Array.isArray(t.tbl_examperiod) && t.tbl_examperiod.length > 0
@@ -164,15 +153,13 @@ const SectionCourses: React.FC = () => {
       }));
       setTerms(mappedTerms);
 
-      setColleges((collegesRes.data && collegesRes.data) || []);
-      setUserRoles((userRolesRes.data && userRolesRes.data) || []);
-
       const instructorMap: Record<string, User[]> = {};
-      courseUserData.forEach((row: any) => {
+      course_users.forEach((row: any) => {
         if (!row.tbl_users) return;
         const user: User = {
           user_id: row.tbl_users.user_id,
-          full_name: row.tbl_users.full_name || `${row.tbl_users.first_name} ${row.tbl_users.last_name}`
+          full_name: row.tbl_users.full_name || 
+            `${row.tbl_users.first_name} ${row.tbl_users.last_name}`
         };
         const courseId = row.course?.course_id || row.course_id;
         if (!courseId) return;

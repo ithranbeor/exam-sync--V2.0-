@@ -49,6 +49,7 @@ urlpatterns = [
     path('api/user-role-history/create/', views.user_role_history_create, name='user_role_history_create'),
     path('api/tbl_sectioncourse/', views.tbl_sectioncourse_list, name='tbl_sectioncourse_list'),
     path('api/tbl_sectioncourse/<int:pk>/', views.tbl_sectioncourse_detail, name='tbl_sectioncourse_detail'),
+    path('api/tbl_sectioncourse/page-data/', views.tbl_sectioncourse_page_data, name='tbl_sectioncourse_page_data'),
     path('api/tbl_course_users/', views.tbl_course_users_list, name='tbl_course_users_list'),
     path('api/tbl_course_users/<str:course_id>/<int:user_id>/', views.tbl_course_users_detail, name='tbl_course_users_detail'),
     path('api/tbl_availability/', views.tbl_availability_list, name='tbl_availability_list'),

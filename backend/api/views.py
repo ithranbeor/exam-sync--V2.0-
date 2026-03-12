@@ -1901,6 +1901,51 @@ def tbl_course_users_detail(request, course_id, user_id):
         course_user.delete()
         return Response(status=status.HTTP_204_NO_CONTENT)
     
+@api_view(['GET'])
+@permission_classes([AllowAny])
+def tbl_sectioncourse_page_data(request):
+    """
+    Single endpoint returning all data needed by the SectionCourses page.
+    Replaces 7 separate frontend calls with 1.
+    """
+    from django.db.models import Prefetch
+
+    section_courses = TblSectioncourse.objects.select_related(
+        'course', 'course__term',
+        'program', 'program__department',
+        'term', 'user'
+    ).prefetch_related(
+        'course__tblcourseusers_set__user'
+    ).all()
+
+    courses = TblCourse.objects.select_related('term').prefetch_related(
+        'tblcourseusers_set__user'
+    ).all()
+
+    programs = TblProgram.objects.select_related('department').all()
+
+    terms = TblTerm.objects.prefetch_related('tblexamperiod_set').all()
+
+    colleges = TblCollege.objects.all()
+
+    user_roles = TblUserRole.objects.select_related(
+        'user', 'role', 'college', 'department'
+    ).all()
+
+    course_users = TblCourseUsers.objects.select_related(
+        'course', 'user'
+    ).all()
+
+    return Response({
+        'section_courses': TblSectioncourseSerializer(section_courses, many=True).data,
+        'courses': CourseSerializer(courses, many=True).data,
+        'programs': TblProgramSerializer(programs, many=True).data,
+        'terms': TblTermSerializer(terms, many=True).data,
+        'colleges': TblCollegeSerializer(colleges, many=True).data,
+        'user_roles': TblUserRoleSerializer(user_roles, many=True).data,
+        'course_users': TblCourseUsersSerializer(course_users, many=True).data,
+    })
+    
 @api_view(['GET', 'POST'])
 @permission_classes([AllowAny])
 def tbl_sectioncourse_list(request):
@@ -1912,6 +1957,8 @@ def tbl_sectioncourse_list(request):
             'program__department',
             'term',
             'user'
+        ).prefetch_related(
+            'course__tblcourseusers_set__user'
         ).all()
 
         serializer = TblSectioncourseSerializer(qs, many=True)
