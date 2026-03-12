@@ -1904,18 +1904,16 @@ def tbl_course_users_detail(request, course_id, user_id):
 @api_view(['GET'])
 @permission_classes([AllowAny])
 def tbl_sectioncourse_page_data(request):
-    """
-    Single endpoint returning all data needed by the SectionCourses page.
-    Replaces 7 separate frontend calls with 1.
-    """
-    from django.db.models import Prefetch
+    from django.core.cache import cache
+    import json
+
+    CACHE_KEY = 'sectioncourse_page_data'
+    cached = cache.get(CACHE_KEY)
+    if cached:
+        return Response(cached)
 
     section_courses = TblSectioncourse.objects.select_related(
-        'course', 'course__term',
-        'program', 'program__department',
-        'term', 'user'
-    ).prefetch_related(
-        'course__tblcourseusers_set__user'
+        'course', 'program', 'term', 'user'
     ).all()
 
     courses = TblCourse.objects.select_related('term').prefetch_related(
@@ -1923,20 +1921,24 @@ def tbl_sectioncourse_page_data(request):
     ).all()
 
     programs = TblProgram.objects.select_related('department').all()
-
     terms = TblTerm.objects.prefetch_related('tblexamperiod_set').all()
-
     colleges = TblCollege.objects.all()
 
     user_roles = TblUserRole.objects.select_related(
-        'user', 'role', 'college', 'department'
-    ).all()
+        'college', 'user'
+    ).filter(
+        status__iexact='active'
+    ).only(
+        'user_role_id', 'user_id', 'role_id', 'college_id', 'status'
+    )
 
     course_users = TblCourseUsers.objects.select_related(
         'course', 'user'
-    ).all()
+    ).only(
+        'course_id', 'user_id', 'course_name', 'is_bayanihan_leader'
+    )
 
-    return Response({
+    data = {
         'section_courses': TblSectioncourseSerializer(section_courses, many=True).data,
         'courses': CourseSerializer(courses, many=True).data,
         'programs': TblProgramSerializer(programs, many=True).data,
@@ -1944,7 +1946,11 @@ def tbl_sectioncourse_page_data(request):
         'colleges': TblCollegeSerializer(colleges, many=True).data,
         'user_roles': TblUserRoleSerializer(user_roles, many=True).data,
         'course_users': TblCourseUsersSerializer(course_users, many=True).data,
-    })
+    }
+
+    cache.set(CACHE_KEY, data, timeout=60 * 3)
+
+    return Response(data)
     
 @api_view(['GET', 'POST'])
 @permission_classes([AllowAny])
@@ -1968,6 +1974,7 @@ def tbl_sectioncourse_list(request):
         serializer = TblSectioncourseSerializer(data=request.data)
         if serializer.is_valid():
             serializer.save()
+            cache.delete('sectioncourse_page_data')
             return Response(serializer.data, status=status.HTTP_201_CREATED)
         return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
 
@@ -1987,11 +1994,13 @@ def tbl_sectioncourse_detail(request, pk):
         serializer = TblSectioncourseSerializer(section, data=request.data)
         if serializer.is_valid():
             serializer.save()
+            cache.delete('sectioncourse_page_data')
             return Response(serializer.data)
         return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
 
     elif request.method == 'DELETE':
         section.delete()
+        cache.delete('sectioncourse_page_data')
         return Response(status=status.HTTP_204_NO_CONTENT)
 
 @cache_page(60 * 5)    
