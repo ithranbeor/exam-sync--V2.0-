@@ -21,53 +21,77 @@ urlpatterns = [
     path('api/users/me/', views.get_current_user, name='get_current_user'),
 
     # Tables
+    # tbl_examperiod — static routes before dynamic <pk>
+    path('api/tbl_examperiod/bulk_update/', views.tbl_examperiod_bulk_update),
     path('api/tbl_examperiod', views.tbl_examperiod_list, name='tbl_examperiod_list'),
     path('api/tbl_examperiod/<int:pk>/', views.tbl_examperiod_detail, name='tbl_examperiod_detail'),
-    path('api/tbl_examperiod/bulk_update/', views.tbl_examperiod_bulk_update),
+
+    path('api/tbl_user_role/CRUD/', views.tbl_user_role_list, name='tbl_user_role_list_crud'),
     path('api/tbl_user_role', views.tbl_user_role_list, name='tbl_user_role_list'),
     path('api/tbl_user_role/<int:user_role_id>/', views.tbl_user_role_detail, name='tbl_user_role_detail'),
-    path('api/tbl_user_role/CRUD/', views.tbl_user_role_list, name='tbl_user_role_list'),
+
     path('api/tbl_term', views.tbl_term_list, name='tbl_term_list'),
     path('api/tbl_term/<int:pk>/', views.tbl_term_detail, name='tbl_term_detail'),
+
     path('api/tbl_college/', views.tbl_college_list),
     path('api/tbl_college/<str:pk>/', views.tbl_college_detail),
+
     path('api/departments/', views.department_list, name='department_list'),
     path('api/departments/<str:pk>/', views.department_detail, name='department_detail'),
+
     path('api/programs/', views.program_list, name='program_list'),
     path('api/programs/<str:pk>/', views.program_detail, name='program_detail'),
+
     path('api/courses/', views.courses_list, name='courses_list'),
     path('api/courses/<str:pk>/', views.course_detail, name='course_detail'),
+
     path('api/tbl_buildings', views.tbl_buildings_list, name='tbl_buildings_list'),
     path('api/tbl_buildings/<str:pk>', views.tbl_buildings_detail, name='tbl_buildings_detail'),
+
     path('api/tbl_rooms', views.tbl_rooms_list, name='tbl_rooms_list'),
     path('api/tbl_rooms/<str:pk>/', views.tbl_rooms_detail, name='tbl_rooms_detail'),
+
     path('api/accounts/', views.accounts_list, name='accounts_list'),
     path('api/accounts/<int:pk>/', views.accounts_detail, name='accounts_detail'),
+
     path('api/tbl_roles/', views.tbl_roles_list, name='tbl_roles_list'),
     path('api/tbl_roles/<int:role_id>/', views.tbl_roles_detail, name='tbl_roles_detail'),
+
     path('api/user-role-history/', views.user_role_history_list, name='user_role_history_list'),
     path('api/user-role-history/create/', views.user_role_history_create, name='user_role_history_create'),
+
+    # tbl_sectioncourse — static routes before dynamic <pk>
+    path('api/tbl_sectioncourse/page-data/', views.tbl_sectioncourse_page_data, name='tbl_sectioncourse_page_data'),
     path('api/tbl_sectioncourse/', views.tbl_sectioncourse_list, name='tbl_sectioncourse_list'),
     path('api/tbl_sectioncourse/<int:pk>/', views.tbl_sectioncourse_detail, name='tbl_sectioncourse_detail'),
-    path('api/tbl_sectioncourse/page-data/', views.tbl_sectioncourse_page_data, name='tbl_sectioncourse_page_data'),
+
     path('api/tbl_course_users/', views.tbl_course_users_list, name='tbl_course_users_list'),
     path('api/tbl_course_users/<str:course_id>/<int:user_id>/', views.tbl_course_users_detail, name='tbl_course_users_detail'),
+
     path('api/tbl_availability/', views.tbl_availability_list, name='tbl_availability_list'),
     path('api/tbl_availability/<int:availability_id>/', views.tbl_availability_detail, name='tbl_availability_detail'),
+
     path('api/tbl_modality/', views.tbl_modality_list, name='tbl_modality_list'),
     path('api/tbl_modality/<int:pk>/', views.tbl_modality_detail, name='tbl_modality_detail'),
+
+    # tbl_examdetails — static routes before dynamic <pk>
+    path('api/tbl_examdetails/batch-delete/', views.tbl_examdetails_batch_delete, name='examdetails-batch-delete'),
     path('api/tbl_examdetails', views.tbl_examdetails_list, name='tbl_examdetails_list'),
     path('api/tbl_examdetails/<int:pk>/', views.tbl_examdetails_detail, name='tbl_examdetails_detail'),
-    path('api/tbl_examdetails/batch-delete/', views.tbl_examdetails_batch_delete, name='examdetails-batch-delete'),
+
     path('api/tbl_scheduleapproval/', views.tbl_scheduleapproval_list, name='tbl_scheduleapproval_list'),
     path('api/tbl_scheduleapproval/<uuid:pk>/', views.tbl_scheduleapproval_detail, name='tbl_scheduleapproval_detail'),
+
     path('api/send_schedule_to_dean/', views.send_schedule_to_dean, name='send_schedule_to_dean'),
+
     path('api/notifications/<int:user_id>/', views.notification_list, name='notification_list'),
     path('api/notifications/create/', views.notification_create, name='notification_create'),
     path('api/notifications/<int:pk>/update/', views.notification_update, name='notification_update'),
     path('api/notifications/<int:pk>/delete/', views.notification_delete, name='notification_delete'),
+
     path('api/proctors/<int:scheduler_id>/', views.proctors_list, name='proctors_list'),
     path('api/send-email/', views.send_email_notification, name='send_email_notification'),
+
     path('api/tbl_available_rooms/', views.tbl_available_rooms_list, name='tbl_available_rooms_list'),
     path('api/tbl_available_rooms/<str:room_id>/<str:college_id>/', views.tbl_available_rooms_delete, name='tbl_available_rooms_delete'),
 
