@@ -687,9 +687,9 @@ const SchedulerPlottingSchedule: React.FC<SchedulerProps> = ({ user, onScheduleC
 
   const generateRandomChromosome = (
     allModalities: any[],
-    sortedDates: string[],
-    validTimes: string[],
-    eveningTimeSlots: string[],
+    _sortedDates: string[],
+    _validTimes: string[],
+    _eveningTimeSlots: string[],
     modalityRoomsMap: Map<string | number, string[]>,
     totalDurationMinutes: number,
     getAvailableProctors: (date: string, time: string) => number[],
@@ -1032,9 +1032,9 @@ const SchedulerPlottingSchedule: React.FC<SchedulerProps> = ({ user, onScheduleC
   const mutate = (
     chromosome: Chromosome,
     sectionMap: Map<string | number, any>,
-    sortedDates: string[],
-    validTimes: string[],
-    eveningTimeSlots: string[],
+    _sortedDates: string[],
+    _validTimes: string[],
+    _eveningTimeSlots: string[],
     modalityRoomsMap: Map<string | number, string[]>,
     getAvailableProctors: (date: string, time: string) => number[],
     mutationRate: number

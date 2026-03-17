@@ -96,7 +96,7 @@ const SchedulerView: React.FC<SchedulerViewProps> = ({ user }) => {
   // ✅ Drag-and-drop state for reordering exams
   const [draggedExamId, setDraggedExamId] = useState<number | null>(null);
   const [draggedOverExamId, setDraggedOverExamId] = useState<number | null>(null);
-  const [isDragDropMode, setIsDragDropMode] = useState(false);
+  const [_isDragDropMode, setIsDragDropMode] = useState(false);
   const [hoveredCellId, setHoveredCellId] = useState<string | null>(null);
 
   const handleDragStart = (examId: number) => {
@@ -179,7 +179,7 @@ const SchedulerView: React.FC<SchedulerViewProps> = ({ user }) => {
     setIsDragDropMode(false);
   };
 
-  const handleDropToCell = async (cellDate: string | undefined, cellRoomId: string, cellStartTime: string, cellEndTime: string) => {
+  const handleDropToCell = async (cellDate: string | undefined, cellRoomId: string, cellStartTime: string, _cellEndTime: string) => {
     if (!draggedExamId || !cellDate) {
       setDraggedExamId(null);
       setDraggedOverExamId(null);
