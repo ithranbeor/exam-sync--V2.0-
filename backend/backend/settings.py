@@ -1,5 +1,4 @@
 # exam-sync-v2/backend/backend/settings.py
-# NOTE: See url.py output file for the updated urls.py with health check endpoint
 
 from pathlib import Path
 import os
@@ -48,7 +47,7 @@ INSTALLED_APPS = [
 MIDDLEWARE = [
     "django.middleware.security.SecurityMiddleware",
     "whitenoise.middleware.WhiteNoiseMiddleware",
-    "corsheaders.middleware.CorsMiddleware",  # Must be before CommonMiddleware
+    "corsheaders.middleware.CorsMiddleware",
     "django.contrib.sessions.middleware.SessionMiddleware",
     "django.middleware.common.CommonMiddleware",
     "django.middleware.csrf.CsrfViewMiddleware",
@@ -111,7 +110,6 @@ WSGI_APPLICATION = "backend.wsgi.application"
 REDIS_URL = config('REDIS_URL', default=None)
 
 if REDIS_URL:
-    # ✅ Best option: Upstash Redis — persists across cold starts, free tier available
     CACHES = {
         "default": {
             "BACKEND": "django_redis.cache.RedisCache",
@@ -120,18 +118,15 @@ if REDIS_URL:
                 "CLIENT_CLASS": "django_redis.client.DefaultClient",
                 "SOCKET_CONNECT_TIMEOUT": 5,
                 "SOCKET_TIMEOUT": 5,
-                "IGNORE_EXCEPTIONS": True,  # Fallback gracefully if Redis is unavailable
+                "IGNORE_EXCEPTIONS": True,
             },
             "KEY_PREFIX": "examsync",
-            "TIMEOUT": 300,  # 5 minutes default cache timeout
+            "TIMEOUT": 300,
         }
     }
-    # Use Redis for session storage too (faster than DB)
     SESSION_ENGINE = "django.contrib.sessions.backends.cache"
     SESSION_CACHE_ALIAS = "default"
 else:
-    # ✅ Fallback: Filesystem cache — survives within the same Render instance session
-    # Better than LocMemCache which wipes on every cold start process
     CACHES = {
         "default": {
             "BACKEND": "django.core.cache.backends.filebased.FileBasedCache",
@@ -142,7 +137,6 @@ else:
             },
         }
     }
-    # Fallback session engine
     SESSION_ENGINE = "django.contrib.sessions.backends.cached_db"
 
 # ──────────────────────────────────────────────
@@ -157,12 +151,11 @@ DATABASES = {
         "HOST": config("DB_HOST"),
         "PORT": config("DB_PORT", cast=int),
         "CONN_MAX_AGE": 600,
-        "CONN_HEALTH_CHECKS": True,  # Reuse DB connections for 10 minutes
+        "CONN_HEALTH_CHECKS": True,
         "OPTIONS": {
             "application_name": "DjangoApp",
             "sslmode": "require",
-            "connect_timeout": 5,       # Reduced from 10 → faster fail/retry on cold start
-            # TCP keepalives prevent stale connections from being dropped by the DB proxy
+            "connect_timeout": 5,
             "keepalives": 1,
             "keepalives_idle": 30,
             "keepalives_interval": 5,
@@ -184,14 +177,12 @@ REST_FRAMEWORK = {
     ],
     "DEFAULT_PAGINATION_CLASS": "rest_framework.pagination.PageNumberPagination",
     "PAGE_SIZE": 30,
-    # ✅ Drop BrowsableAPIRenderer in production — saves memory and response time
     "DEFAULT_RENDERER_CLASSES": [
         "rest_framework.renderers.JSONRenderer",
     ] if not config('DEBUG', default=False, cast=bool) else [
         "rest_framework.renderers.JSONRenderer",
         "rest_framework.renderers.BrowsableAPIRenderer",
     ],
-    # ✅ Basic throttling to protect the free-tier server from overload
     "DEFAULT_THROTTLE_CLASSES": [
         "rest_framework.throttling.AnonRateThrottle",
         "rest_framework.throttling.UserRateThrottle",
@@ -211,12 +202,10 @@ STATICFILES_DIRS = [BASE_DIR / "static"] if (BASE_DIR / "static").exists() else 
 STATICFILES_STORAGE = "whitenoise.storage.CompressedManifestStaticFilesStorage"
 
 # ──────────────────────────────────────────────
-# EMAIL SETTINGS
+# EMAIL SETTINGS (Resend)
 # ──────────────────────────────────────────────
-EMAIL_BACKEND = 'sendgrid_backend.SendgridBackend'
-SENDGRID_API_KEY = config('SENDGRID_API_KEY')
-SENDGRID_SANDBOX_MODE_IN_DEBUG = False
-DEFAULT_FROM_EMAIL = config("EMAIL_HOST_USER")
+RESEND_API_KEY = os.environ.get('RESEND_API_KEY', '')
+DEFAULT_FROM_EMAIL = os.environ.get('DEFAULT_FROM_EMAIL', 'onboarding@resend.dev')
 
 # ──────────────────────────────────────────────
 # SMS SETTINGS

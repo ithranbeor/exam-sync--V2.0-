@@ -2542,9 +2542,16 @@ def request_password_change(request):
 
         def send_email_async():
             try:
-                send_mail(subject, message, settings.DEFAULT_FROM_EMAIL, [email])
+                import resend
+                resend.api_key = settings.RESEND_API_KEY
+                resend.Emails.send({
+                    "from": settings.DEFAULT_FROM_EMAIL,
+                    "to": [email],
+                    "subject": subject,
+                    "text": message,
+                })
             except Exception:
-                pass 
+                pass
 
         Thread(target=send_email_async).start()
 
@@ -2560,44 +2567,45 @@ def request_password_change(request):
 @api_view(['POST'])
 @permission_classes([AllowAny])
 def send_proctor_emails(request):
-    """
-    Send real Gmail emails to proctors with their personalized schedules
-    """
     try:
+        import resend
+        resend.api_key = settings.RESEND_API_KEY
+
         emails_data = request.data.get('emails', [])
         sender_id = request.data.get('sender_id')
-        
+
         if not emails_data:
             return Response(
-                {'error': 'No emails to send'}, 
+                {'error': 'No emails to send'},
                 status=status.HTTP_400_BAD_REQUEST
             )
-        
+
         sent_count = 0
         failed_emails = []
-        
+
         for email_data in emails_data:
             proctor_email = email_data.get('email')
             proctor_name = email_data.get('name')
             subject = email_data.get('subject')
             message = email_data.get('message')
-            
+
             if not all([proctor_email, subject, message]):
                 failed_emails.append({
                     'email': proctor_email,
+                    'name': proctor_name,
                     'reason': 'Missing required fields'
                 })
                 continue
-            
+
             try:
-                send_mail(
-                    subject=subject,
-                    message=message,
-                    from_email=settings.DEFAULT_FROM_EMAIL,
-                    recipient_list=[proctor_email],
-                    fail_silently=False,
-                )
-                
+                params = {
+                    "from": settings.DEFAULT_FROM_EMAIL,
+                    "to": [proctor_email],
+                    "subject": subject,
+                    "text": message,
+                }
+                resend.Emails.send(params)
+
                 TblNotification.objects.create(
                     user_id=email_data.get('user_id'),
                     sender_id=sender_id,
@@ -2609,32 +2617,32 @@ def send_proctor_emails(request):
                     priority=2,
                     created_at=timezone.now()
                 )
-                
+
                 sent_count += 1
-                
+
             except Exception as e:
                 failed_emails.append({
                     'email': proctor_email,
                     'name': proctor_name,
                     'reason': str(e)
                 })
-        
+
         response_data = {
             'sent_count': sent_count,
             'total_count': len(emails_data),
             'success': sent_count > 0
         }
-        
+
         if failed_emails:
             response_data['failed_emails'] = failed_emails
-        
+
         return Response(response_data, status=status.HTTP_200_OK)
-        
+
     except Exception as e:
         import traceback
         traceback.print_exc()
         return Response(
-            {'error': str(e), 'detail': 'Failed to send emails'}, 
+            {'error': str(e), 'detail': 'Failed to send emails'},
             status=status.HTTP_500_INTERNAL_SERVER_ERROR
         )
     
