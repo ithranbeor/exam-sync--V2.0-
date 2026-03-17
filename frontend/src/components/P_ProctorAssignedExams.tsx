@@ -263,7 +263,7 @@ const ProctorCourseDetails = ({ user }: ProctorCourseDetailsProps) => {
           </p>
         </div>
       ) : (
-        <div className="courses-list">
+        <div className="courses-list" style={{ maxHeight: '320px', overflowY: 'auto', paddingRight: '4px' }}>
           {filteredAssignments.map((assign) => {
             const examStartTime = new Date(assign.exam_start_time);
             const examEndTime = new Date(assign.exam_end_time);

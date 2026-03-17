@@ -24,6 +24,7 @@ interface FooterData {
   address_line: string;
   contact_line: string;
   logo_url: string | null;
+  logo_urls?: string[];
 }
 
 const FooterSettingsModal: React.FC<FooterSettingsModalProps> = ({
@@ -42,11 +43,12 @@ const FooterSettingsModal: React.FC<FooterSettingsModalProps> = ({
     approved_by_title: 'VCAA, USTP-CDO',
     address_line: 'C.M Recto Avenue, Lapasan, Cagayan de Oro City 9000 Philippines',
     contact_line: 'Tel Nos. +63 (88) 856 1738; Telefax +63 (88) 856 4696 | http://www.ustp.edu.ph',
-    logo_url: null
+    logo_url: null,
+    logo_urls: []
   });
 
-  const [logoFile, setLogoFile] = useState<File | null>(null);
-  const [logoPreview, setLogoPreview] = useState<string | null>(null);
+  const [logoFiles, setLogoFiles] = useState<File[]>([]);
+  const [logoPreviews, setLogoPreviews] = useState<string[]>([]);
   const [isLoading, setIsLoading] = useState(false);
   const [isSaving, setIsSaving] = useState(false);
   const [deanName, setDeanName] = useState<string>('');
@@ -71,44 +73,30 @@ const FooterSettingsModal: React.FC<FooterSettingsModalProps> = ({
           if (deanRole.user?.first_name && deanRole.user?.last_name) {
             const fullName = `${deanRole.user.first_name} ${deanRole.user.last_name}`;
             setDeanName(fullName);
-          }
-
-          else if (deanRole.user_id) {
+          } else if (deanRole.user_id) {
             try {
               const userRes = await api.get(`/users/${deanRole.user_id}/`);
               const user = userRes.data;
-
               if (user?.first_name && user?.last_name) {
-                const fullName = `${user.first_name} ${user.last_name}`;
-                setDeanName(fullName);
-              } else {
+                setDeanName(`${user.first_name} ${user.last_name}`);
               }
-            } catch (err) {
-            }
-          }
-
-          else {
+            } catch (err) {}
+          } else {
             setDeanName('Dean Name Not Found');
           }
         }
 
         const vcaaResponse = await api.get('/tbl_user_role', {
-          params: {
-            role_id: 2
-          }
+          params: { role_id: 2 }
         });
 
         if (vcaaResponse.data && vcaaResponse.data.length > 0) {
           const vcaaRole = vcaaResponse.data[0];
-          if (vcaaRole.user && vcaaRole.user.first_name && vcaaRole.user.last_name) {
-            const fullVcaaName = `${vcaaRole.user.first_name} ${vcaaRole.user.last_name}`;
-            setVcaaName(fullVcaaName);
-          } else {
+          if (vcaaRole.user?.first_name && vcaaRole.user?.last_name) {
+            setVcaaName(`${vcaaRole.user.first_name} ${vcaaRole.user.last_name}`);
           }
-        } else {
         }
-      } catch (error) {
-      }
+      } catch (error) {}
     };
 
     fetchRoleNames();
@@ -138,9 +126,16 @@ const FooterSettingsModal: React.FC<FooterSettingsModalProps> = ({
               ? data.prepared_by_name
               : deanName,
         });
-        setLogoPreview(data.logo_url);
-      } else {
 
+        // Support both logo_urls (array) and legacy logo_url (single)
+        if (data.logo_urls && data.logo_urls.length > 0) {
+          setLogoPreviews(data.logo_urls);
+        } else if (data.logo_url) {
+          setLogoPreviews([data.logo_url]);
+        } else {
+          setLogoPreviews([]);
+        }
+      } else {
         const preparedByName = deanName || 'Dean Name Not Found';
         const approvedByName = vcaaName || 'VCAA Name Not Found';
 
@@ -151,6 +146,7 @@ const FooterSettingsModal: React.FC<FooterSettingsModalProps> = ({
           approved_by_name: approvedByName,
           approved_by_title: 'VCAA, USTP-CDO'
         }));
+        setLogoPreviews([]);
       }
     } catch (error) {
       toast.error("Failed to load footer settings");
@@ -181,22 +177,36 @@ const FooterSettingsModal: React.FC<FooterSettingsModalProps> = ({
       return;
     }
 
-    setLogoFile(file);
+    // Append new file to existing list
+    setLogoFiles(prev => [...prev, file]);
 
     const reader = new FileReader();
     reader.onloadend = () => {
-      setLogoPreview(reader.result as string);
+      setLogoPreviews(prev => [...prev, reader.result as string]);
     };
     reader.readAsDataURL(file);
+
+    // Reset input so same file can be re-added
+    e.target.value = '';
   };
 
-  const handleRemoveLogo = () => {
-    setLogoFile(null);
-    setLogoPreview(null);
-    setFooterData(prev => ({
-      ...prev,
-      logo_url: null
-    }));
+  const handleRemoveLogo = (index: number) => {
+    const isExistingUrl = logoPreviews[index]?.startsWith('http');
+
+    setLogoPreviews(prev => prev.filter((_, i) => i !== index));
+
+    // Only remove from logoFiles if it's a newly added file (not an existing URL)
+    if (!isExistingUrl) {
+      // Count how many previews before this index are base64 (new files)
+      const newFileIndex = logoPreviews
+        .slice(0, index)
+        .filter(p => !p.startsWith('http')).length;
+      setLogoFiles(prev => prev.filter((_, i) => i !== newFileIndex));
+    }
+
+    if (logoPreviews.length === 1) {
+      setFooterData(prev => ({ ...prev, logo_url: null, logo_urls: [] }));
+    }
   };
 
   const handleSave = async () => {
@@ -217,20 +227,22 @@ const FooterSettingsModal: React.FC<FooterSettingsModalProps> = ({
 
     setIsSaving(true);
     try {
-      let logoUrl = footerData.logo_url;
+      let logoUrls: string[] = [];
 
-      if (logoFile) {
+      // Keep existing saved URLs (those that are http URLs, not base64)
+      const existingUrls = logoPreviews.filter(p => p.startsWith('http'));
+      logoUrls = [...existingUrls];
+
+      // Upload any new files (base64 previews)
+      for (const file of logoFiles) {
         const formData = new FormData();
-        formData.append('logo', logoFile);
+        formData.append('logo', file);
         formData.append('college_id', collegeId);
 
         const uploadResponse = await api.post('/upload-schedule-logo/', formData, {
-          headers: {
-            'Content-Type': 'multipart/form-data'
-          }
+          headers: { 'Content-Type': 'multipart/form-data' }
         });
-
-        logoUrl = uploadResponse.data.logo_url;
+        logoUrls.push(uploadResponse.data.logo_url);
       }
 
       const dataToSave = {
@@ -241,7 +253,8 @@ const FooterSettingsModal: React.FC<FooterSettingsModalProps> = ({
         approved_by_title: (footerData.approved_by_title || 'VCAA, USTP-CDO').trim(),
         address_line: (footerData.address_line || 'C.M Recto Avenue, Lapasan, Cagayan de Oro City 9000 Philippines').trim(),
         contact_line: (footerData.contact_line || 'Tel Nos. +63 (88) 856 1738; Telefax +63 (88) 856 4696 | http://www.ustp.edu.ph').trim(),
-        logo_url: logoUrl
+        logo_url: logoUrls[0] || null,   // backward compat
+        logo_urls: logoUrls              // all logos
       };
 
       if (footerData.footer_id) {
@@ -293,7 +306,8 @@ const FooterSettingsModal: React.FC<FooterSettingsModalProps> = ({
         approved_by_title: 'VCAA, USTP-CDO',
         address_line: 'C.M Recto Avenue, Lapasan, Cagayan de Oro City 9000 Philippines',
         contact_line: 'Tel Nos. +63 (88) 856 1738; Telefax +63 (88) 856 4696 | http://www.ustp.edu.ph',
-        logo_url: null
+        logo_url: null,
+        logo_urls: []
       };
 
       if (footerData.footer_id) {
@@ -303,17 +317,13 @@ const FooterSettingsModal: React.FC<FooterSettingsModalProps> = ({
         await api.post('/tbl_schedule_footer/', resetData);
         toast.success('Footer settings reset to default values!');
       }
-      setFooterData({
-        ...resetData,
-        footer_id: footerData.footer_id
-      });
-      setLogoFile(null);
-      setLogoPreview(null);
+
+      setFooterData({ ...resetData, footer_id: footerData.footer_id });
+      setLogoFiles([]);
+      setLogoPreviews([]);
 
       await fetchFooterData();
-
       onSave();
-
     } catch (error: any) {
       let errorMessage = 'Failed to reset footer settings';
 
@@ -385,40 +395,95 @@ const FooterSettingsModal: React.FC<FooterSettingsModalProps> = ({
                     <div className="settings-section">
                       <h3>Logo</h3>
                       <p className="section-description">
-                        Upload your institution's logo to appear on all schedule documents
+                        Upload one or more logos to appear on all schedule documents. New logos are added to the right.
                       </p>
+
                       <div className="logo-upload-section">
-                        <div className="logo-preview-container">
-                          {logoPreview ? (
-                            <div className="logo-preview">
-                              <img src={logoPreview} alt="Logo Preview" />
-                            </div>
-                          ) : (
+                        {/* Logo row */}
+                        <div style={{
+                          display: 'flex',
+                          flexWrap: 'wrap',
+                          gap: '12px',
+                          marginBottom: '16px',
+                          minHeight: '96px',
+                          alignItems: 'flex-start'
+                        }}>
+                          {logoPreviews.length === 0 && (
                             <div className="logo-upload-placeholder">
                               <p>No logo<br />uploaded</p>
                             </div>
                           )}
-                          <div className="logo-actions">
-                            <input
-                              type="file"
-                              accept="image/jpeg,image/jpg,image/png,image/gif,image/webp"
-                              onChange={handleLogoChange}
-                              id="logo-upload"
-                              style={{ display: 'none' }}
-                            />
-                            <label htmlFor="logo-upload" className="upload-logo-btn">
-                              {logoPreview ? 'Change Logo' : 'Upload Logo'}
-                            </label>
-                            {logoPreview && (
+
+                          {logoPreviews.map((preview, index) => (
+                            <div
+                              key={index}
+                              style={{
+                                position: 'relative',
+                                display: 'inline-block',
+                                flexShrink: 0
+                              }}
+                            >
+                              <img
+                                src={preview}
+                                alt={`Logo ${index + 1}`}
+                                style={{
+                                  width: '100px',
+                                  height: '80px',
+                                  objectFit: 'contain',
+                                  borderRadius: '8px',
+                                  border: '2px solid #e5e7eb',
+                                  background: '#f9f9f9',
+                                  padding: '4px',
+                                  display: 'block'
+                                }}
+                              />
                               <button
                                 type="button"
-                                className="remove-logo-btn"
-                                onClick={handleRemoveLogo}
+                                onClick={() => handleRemoveLogo(index)}
+                                title="Remove logo"
+                                style={{
+                                  position: 'absolute',
+                                  top: '-8px',
+                                  right: '-8px',
+                                  background: '#ef4444',
+                                  color: 'white',
+                                  border: 'none',
+                                  borderRadius: '50%',
+                                  width: '22px',
+                                  height: '22px',
+                                  fontSize: '11px',
+                                  cursor: 'pointer',
+                                  display: 'flex',
+                                  alignItems: 'center',
+                                  justifyContent: 'center',
+                                  fontWeight: 'bold',
+                                  boxShadow: '0 2px 4px rgba(0,0,0,0.25)',
+                                  lineHeight: 1
+                                }}
                               >
-                                Remove Logo
+                                ✕
                               </button>
-                            )}
-                          </div>
+                            </div>
+                          ))}
+                        </div>
+
+                        {/* Upload controls */}
+                        <div className="logo-actions" style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+                          <input
+                            type="file"
+                            accept="image/jpeg,image/jpg,image/png,image/gif,image/webp"
+                            onChange={handleLogoChange}
+                            id="logo-upload"
+                            style={{ display: 'none' }}
+                          />
+                          <label htmlFor="logo-upload" className="upload-logo-btn">
+                            + Add Logo
+                          </label>
+                          {logoPreviews.length > 0 && (
+                            <span style={{ fontSize: '12px', color: '#666' }}>
+                              {logoPreviews.length} logo{logoPreviews.length > 1 ? 's' : ''} added
+                            </span>
+                          )}
                         </div>
                       </div>
                     </div>

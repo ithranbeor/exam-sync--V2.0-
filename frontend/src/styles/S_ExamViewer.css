@@ -707,15 +707,6 @@
   }
 }
 
-.exam-table td>div {
-  min-height: 80px;
-  max-height: 200px;
-  overflow-y: auto;
-  display: flex;
-  flex-direction: column;
-  justify-content: flex-start;
-}
-
 .exam-table td>div p {
   margin: 2px 0;
   font-size: 12px;
@@ -838,4 +829,62 @@
   .search-container input::placeholder {
     font-size: 10px;
   }
+}
+
+.exam-table tbody td {
+  vertical-align: top;
+  padding: 2px;
+}
+
+.exam-table tbody td > div {
+  height: 100%;
+  box-sizing: border-box;
+}
+
+.exam-table tbody tr {
+  height: 60px;  /* fixed row height — adjust to taste */
+}
+
+.exam-table tbody td {
+  height: 60px;
+  vertical-align: top;
+  padding: 2px;
+  overflow: hidden;
+}
+
+/* Cards fill their cell completely */
+.exam-table tbody td > div[data-exam-id] {
+  height: 100%;
+  min-height: unset;
+  box-sizing: border-box;
+  overflow-y: hidden;
+}
+
+.exam-table tbody td:first-child {
+  height: 60px !important;
+  max-height: 60px !important;
+  vertical-align: middle !important;
+  text-align: center;
+  white-space: nowrap;
+  overflow: hidden;
+  padding: 0 4px;
+  box-sizing: border-box;
+}
+
+.exam-table tbody td > div[data-exam-id] {
+  cursor: default;
+}
+
+.scheduler-icon.active {
+  background-color: #092C4C;
+  color: white !important;
+  border-radius: 10px;
+}
+
+.scheduler-icon.active svg {
+  color: white !important;
+}
+
+.scheduler-icon.active span {
+  color: white !important;
 }

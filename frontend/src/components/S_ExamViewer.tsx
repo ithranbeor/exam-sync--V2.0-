@@ -45,6 +45,7 @@ const SchedulerView: React.FC<SchedulerViewProps> = ({ user }) => {
   const [_proctors, setProctors] = useState<{ user_id: number; first_name: string; last_name: string }[]>([]);
   const [allCollegeUsers, setAllCollegeUsers] = useState<{ user_id: number; first_name: string; last_name: string }[]>([]);
   const [activeProctorEdit, setActiveProctorEdit] = useState<number | null>(null);
+  const [showProctorInstructions, setShowProctorInstructions] = useState(false);
   const [showEnvelopeDropdown, setShowEnvelopeDropdown] = useState(false);
   const [showEmailModal, setShowEmailModal] = useState(false);
   const [showDeanModal, setShowDeanModal] = useState(false);
@@ -92,13 +93,223 @@ const SchedulerView: React.FC<SchedulerViewProps> = ({ user }) => {
     message: string;
   } | null>(null);
 
+  // ✅ Drag-and-drop state for reordering exams
+  const [draggedExamId, setDraggedExamId] = useState<number | null>(null);
+  const [draggedOverExamId, setDraggedOverExamId] = useState<number | null>(null);
+  const [isDragDropMode, setIsDragDropMode] = useState(false);
+  const [hoveredCellId, setHoveredCellId] = useState<string | null>(null);
+
+  const handleDragStart = (examId: number) => {
+    if (!swapMode) return;
+    setDraggedExamId(examId);
+    setIsDragDropMode(true);
+  };
+
+  const handleDragOver = (e: React.DragEvent) => {
+    e.preventDefault();
+    e.dataTransfer.dropEffect = 'move';
+  };
+
+  const handleDragEnter = (examId: number) => {
+    setDraggedOverExamId(examId);
+  };
+
+  const handleDrop = async (targetExamId: number) => {
+    if (!draggedExamId || draggedExamId === targetExamId) {
+      setDraggedExamId(null);
+      setDraggedOverExamId(null);
+      setIsDragDropMode(false);
+      return;
+    }
+
+    const draggedIdx = examData.findIndex(e => e.examdetails_id === draggedExamId);
+    const targetIdx = examData.findIndex(e => e.examdetails_id === targetExamId);
+
+    if (draggedIdx === -1 || targetIdx === -1) {
+      setDraggedExamId(null);
+      setDraggedOverExamId(null);
+      setIsDragDropMode(false);
+      return;
+    }
+
+    // ✅ Save originals BEFORE touching the array
+    const originalDragged = examData[draggedIdx];
+    const originalTarget = examData[targetIdx];
+
+    try {
+      const updates = [
+        {
+          examdetails_id: originalDragged.examdetails_id,
+          exam_date: originalTarget.exam_date,
+          exam_start_time: originalTarget.exam_start_time,
+          exam_end_time: originalTarget.exam_end_time,
+          room_id: originalTarget.room_id
+        },
+        {
+          examdetails_id: originalTarget.examdetails_id,
+          exam_date: originalDragged.exam_date,
+          exam_start_time: originalDragged.exam_start_time,
+          exam_end_time: originalDragged.exam_end_time,
+          room_id: originalDragged.room_id
+        }
+      ];
+
+      await Promise.all(updates.map(update =>
+        api.patch(`/tbl_examdetails/${update.examdetails_id}/`, {
+          exam_date: update.exam_date,
+          exam_start_time: update.exam_start_time,
+          exam_end_time: update.exam_end_time,
+          room_id: update.room_id
+        })
+      ));
+
+      // ✅ Now update local state to reflect the swap
+      const newExamData = [...examData];
+      newExamData[draggedIdx] = { ...originalDragged, ...updates[0] };
+      newExamData[targetIdx] = { ...originalTarget, ...updates[1] };
+
+      setExamData(newExamData);
+      toast.success('Exams reordered successfully!');
+    } catch (error: any) {
+      toast.error('Failed to reorder exams: ' + (error.response?.data?.detail || error.message));
+    }
+
+    setDraggedExamId(null);
+    setDraggedOverExamId(null);
+    setIsDragDropMode(false);
+  };
+
+  const handleDropToCell = async (cellDate: string | undefined, cellRoomId: string, cellStartTime: string, cellEndTime: string) => {
+    if (!draggedExamId || !cellDate) {
+      setDraggedExamId(null);
+      setDraggedOverExamId(null);
+      setIsDragDropMode(false);
+      return;
+    }
+
+    try {
+      const draggedExam = examData.find(e => e.examdetails_id === draggedExamId);
+      if (!draggedExam) {
+        toast.error('Exam not found');
+        return;
+      }
+
+      // ✅ Calculate original duration from the exam itself
+      const origStartStr = draggedExam.exam_start_time!.slice(11, 16); // "HH:MM"
+      const origEndStr = draggedExam.exam_end_time!.slice(11, 16);
+
+      const [origStartH, origStartM] = origStartStr.split(':').map(Number);
+      const [origEndH, origEndM] = origEndStr.split(':').map(Number);
+      const durationMinutes = (origEndH * 60 + origEndM) - (origStartH * 60 + origStartM);
+
+      // ✅ New start = cell slot time, new end = start + original duration
+      const cellSlotTime = cellStartTime.slice(11, 16); // extract "HH:MM" from the cell
+      const [newStartH, newStartM] = cellSlotTime.split(':').map(Number);
+      const newEndTotalMinutes = newStartH * 60 + newStartM + durationMinutes;
+      const newEndH = Math.floor(newEndTotalMinutes / 60);
+      const newEndM = newEndTotalMinutes % 60;
+
+      const newStartTimeStr = `${String(newStartH).padStart(2, '0')}:${String(newStartM).padStart(2, '0')}`;
+      const newEndTimeStr = `${String(newEndH).padStart(2, '0')}:${String(newEndM).padStart(2, '0')}`;
+
+      // ✅ Build timestamps without Z suffix (match your DB format)
+      const newExamStartTime = `${cellDate}T${newStartTimeStr}:00`;
+      const newExamEndTime = `${cellDate}T${newEndTimeStr}:00`;
+
+      // Validate: must end by 9 PM
+      if (newEndTotalMinutes > 21 * 60) {
+        toast.error(`Exam would end after 9:00 PM. Cannot move here.`);
+        setDraggedExamId(null);
+        setDraggedOverExamId(null);
+        setIsDragDropMode(false);
+        return;
+      }
+
+      // Validate proctor conflicts (use new time range)
+      const realProctorIds = [
+        ...(draggedExam.proctors ?? []),
+        ...(draggedExam.proctor_id ? [draggedExam.proctor_id] : [])
+      ].filter(id => id && id > 0); // ✅ filter out -1, -9999, 0, null, undefined
+
+      if (realProctorIds.length > 0) {
+        for (const proctorId of realProctorIds) {
+          const conflict = examData.find(e => {
+            if (e.examdetails_id === draggedExamId) return false;
+            if (e.exam_date !== cellDate) return false;
+            const hasProctor = e.proctor_id === proctorId || (e.proctors && e.proctors.includes(proctorId));
+            if (!hasProctor) return false;
+            if (!e.exam_start_time || !e.exam_end_time) return false;
+            const eStart = Number(e.exam_start_time.slice(11, 16).replace(':', ''));
+            const eEnd = Number(e.exam_end_time.slice(11, 16).replace(':', ''));
+            const nStart = Number(newStartTimeStr.replace(':', ''));
+            const nEnd = Number(newEndTimeStr.replace(':', ''));
+            return nStart < eEnd && nEnd > eStart;
+          });
+
+          if (conflict) {
+            const proctorName = getUserName(proctorId);
+            toast.error(`Proctor ${proctorName} has a conflict at this time.`);
+            setDraggedExamId(null);
+            setDraggedOverExamId(null);
+            setIsDragDropMode(false);
+            return;
+          }
+        }
+      }
+
+      // Validate room conflicts (use new time range)
+      const roomConflict = examData.find(e => {
+        if (e.examdetails_id === draggedExamId) return false;
+        if (e.exam_date !== cellDate || e.room_id !== cellRoomId) return false;
+        if (!e.exam_start_time || !e.exam_end_time) return false;
+        const eStart = Number(e.exam_start_time.slice(11, 16).replace(':', ''));
+        const eEnd = Number(e.exam_end_time.slice(11, 16).replace(':', ''));
+        const nStart = Number(newStartTimeStr.replace(':', ''));
+        const nEnd = Number(newEndTimeStr.replace(':', ''));
+        return nStart < eEnd && nEnd > eStart;
+      });
+
+      if (roomConflict) {
+        toast.error(`Room ${cellRoomId} is already occupied at this time.`);
+        setDraggedExamId(null);
+        setDraggedOverExamId(null);
+        setIsDragDropMode(false);
+        return;
+      }
+
+      // All clear — update DB and local state
+      await api.put(`/tbl_examdetails/${draggedExamId}/`, {
+        exam_date: cellDate,
+        exam_start_time: newExamStartTime,
+        exam_end_time: newExamEndTime,
+        room_id: cellRoomId
+      });
+
+      setExamData(prev => prev.map(e =>
+        e.examdetails_id === draggedExamId
+          ? { ...e, exam_date: cellDate, exam_start_time: newExamStartTime, exam_end_time: newExamEndTime, room_id: cellRoomId }
+          : e
+      ));
+
+      toast.success('Exam moved successfully!');
+    } catch (error: any) {
+      toast.error('Failed to move exam: ' + (error.response?.data?.detail || error.message));
+    }
+
+    setDraggedExamId(null);
+    setDraggedOverExamId(null);
+    setIsDragDropMode(false);
+  };
+
   const resetAllModes = () => {
     setIsModalOpen(false);
     setActiveProctorEdit(null);
     setSwapMode(false);
     setShowSwapInstructions(false);
+    setShowProctorInstructions(false);
     setShowEnvelopeDropdown(false);
     setShowExportDropdown(false);
+    setIsDragDropMode(false);
   };
 
   const saveUnscheduledSections = (sections: any[]) => {
@@ -123,6 +334,7 @@ const SchedulerView: React.FC<SchedulerViewProps> = ({ user }) => {
     address_line: string;
     contact_line: string;
     logo_url: string | null;
+    logo_urls?: string[];       // ← add this
   } | null>(null);
 
   useEffect(() => {
@@ -145,6 +357,17 @@ const SchedulerView: React.FC<SchedulerViewProps> = ({ user }) => {
     }
   }, [schedulerCollegeName]);
 
+  useEffect(() => {
+    const preventZoom = (e: WheelEvent) => {
+      if (e.ctrlKey) {
+        e.preventDefault();
+      }
+    };
+    
+    document.addEventListener('wheel', preventZoom, { passive: false });
+    return () => document.removeEventListener('wheel', preventZoom);
+  }, []);
+
   // Fetch footer data
   useEffect(() => {
     const fetchFooterData = async () => {
@@ -163,6 +386,11 @@ const SchedulerView: React.FC<SchedulerViewProps> = ({ user }) => {
               data.prepared_by_name?.trim()
                 ? data.prepared_by_name
                 : deanName,
+            logo_urls: data.logo_urls && data.logo_urls.length > 0
+              ? data.logo_urls
+              : data.logo_url
+                ? [data.logo_url]
+                : [],
           });
         } else {
           setFooterData({
@@ -172,7 +400,8 @@ const SchedulerView: React.FC<SchedulerViewProps> = ({ user }) => {
             approved_by_title: 'VCAA, USTP-CDO',
             address_line: 'C.M Recto Avenue, Lapasan, Cagayan de Oro City 9000 Philippines',
             contact_line: 'Tel Nos. +63 (88) 856 1738; Telefax +63 (88) 856 4696 | http://www.ustp.edu.ph',
-            logo_url: null
+            logo_url: null,
+            logo_urls: []
           });
         }
       } catch (error) {
@@ -801,19 +1030,27 @@ const SchedulerView: React.FC<SchedulerViewProps> = ({ user }) => {
     "17:00", "17:30", "18:00", "18:30", "19:00", "19:30", "20:00", "20:30", "21:00"
   ];
 
-  const formatTo12Hour = (time: string) => {
-    const [hourStr, minute] = time.split(":");
-    let hour = Number(hourStr);
-    const ampm = hour >= 12 ? "PM" : "AM";
-    hour = hour % 12 || 12;
-    return `${hour}:${minute} ${ampm}`;
+  const formatTo12Hour = (time: string): string => {
+    const [hourStr, minuteStr] = time.split(":");
+    const hour = Number(hourStr);
+    const minute = minuteStr;
+
+    if (hour === 0) return `12:${minute}AM`;
+    if (hour === 12) return `12:${minute}NN`;   // ✅ noon = NN
+    if (hour > 12) return `${hour - 12}:${minute}PM`;
+    return `${hour}:${minute}AM`;
   };
 
-  const timeSlots = rawTimes.slice(0, -1).map((t, i) => ({
-    start24: t,
-    end24: rawTimes[i + 1],
-    label: `${formatTo12Hour(t)} - ${formatTo12Hour(rawTimes[i + 1])}`,
-  }));
+  // ✅ Consistent time slot labels — always "X:XXAM - X:XXAM" format
+  const timeSlots = rawTimes.slice(0, -1).map((t, i) => {
+    const start = formatTo12Hour(t);
+    const end = formatTo12Hour(rawTimes[i + 1]);
+    return {
+      start24: t,
+      end24: rawTimes[i + 1],
+      label: `${start} - ${end}`,
+    };
+  });
 
   const generateCourseColors = (exams: ExamDetail[]) => {
     const yearColors = {
@@ -1044,41 +1281,29 @@ const SchedulerView: React.FC<SchedulerViewProps> = ({ user }) => {
     const availableUserPool = allCollegeUsers.length > 0 ? allCollegeUsers : users;
 
     const availableUsers = availableUserPool.filter((p) => {
-      // ind all exams where this proctor is assigned on the SAME DATE
-      const assignedExamsSameDay = examData.filter(
-        (ex) => {
-          if (ex.examdetails_id === exam.examdetails_id) return false;
+      const assignedExamsSameDay = examData.filter((ex) => {
+        if (ex.examdetails_id === exam.examdetails_id) return false;
 
-          const isAssigned =
-            ex.proctor_id === p.user_id ||
-            (ex.proctors && ex.proctors.includes(p.user_id));
+        const isAssigned =
+          ex.proctor_id === p.user_id ||
+          (ex.proctors && ex.proctors.includes(p.user_id));
 
-          return isAssigned && ex.exam_date === exam.exam_date;
-        }
-      );
+        // ✅ Check SAME DATE regardless of room — a proctor can't be in two rooms at once
+        return isAssigned && ex.exam_date === exam.exam_date;
+      });
 
-      // check if ANY assignment conflicts with this exam's time
       return !assignedExamsSameDay.some((ex) => {
-        if (!exam.exam_start_time || !exam.exam_end_time ||
-          !ex.exam_start_time || !ex.exam_end_time) {
-          return false;
-        }
+        if (
+          !exam.exam_start_time || !exam.exam_end_time ||
+          !ex.exam_start_time || !ex.exam_end_time
+        ) return false;
 
-        const examStartStr = exam.exam_start_time.slice(11, 16);
-        const examEndStr = exam.exam_end_time.slice(11, 16);
-        const exStartStr = ex.exam_start_time.slice(11, 16);
-        const exEndStr = ex.exam_end_time.slice(11, 16);
+        const startA = timeToMinutesFromISO(exam.exam_start_time);
+        const endA = timeToMinutesFromISO(exam.exam_end_time);
+        const startB = timeToMinutesFromISO(ex.exam_start_time);
+        const endB = timeToMinutesFromISO(ex.exam_end_time);
 
-        const [examStartHour, examStartMin] = examStartStr.split(':').map(Number);
-        const [examEndHour, examEndMin] = examEndStr.split(':').map(Number);
-        const [exStartHour, exStartMin] = exStartStr.split(':').map(Number);
-        const [exEndHour, exEndMin] = exEndStr.split(':').map(Number);
-
-        const startA = examStartHour * 60 + examStartMin;
-        const endA = examEndHour * 60 + examEndMin;
-        const startB = exStartHour * 60 + exStartMin;
-        const endB = exEndHour * 60 + exEndMin;
-
+        // ✅ True overlap check — any overlap means conflict
         return startA < endB && endA > startB;
       });
     });
@@ -1087,6 +1312,13 @@ const SchedulerView: React.FC<SchedulerViewProps> = ({ user }) => {
       value: p.user_id,
       label: `${p.first_name} ${p.last_name}`,
     }));
+  };
+
+  // ✅ Add this helper near the top of SchedulerView (outside the component or inside):
+  const timeToMinutesFromISO = (isoTime: string): number => {
+    const timePart = isoTime.slice(11, 16); // "HH:MM"
+    const [h, m] = timePart.split(':').map(Number);
+    return h * 60 + m;
   };
 
   const dynamicIcons = [
@@ -1116,9 +1348,7 @@ const SchedulerView: React.FC<SchedulerViewProps> = ({ user }) => {
           const newMode = activeProctorEdit === -1 ? null : -1;
           resetAllModes();
           setActiveProctorEdit(newMode);
-          if (newMode === -1) {
-            toast.info("Click on any schedule's proctor section to edit it", { autoClose: 3000 });
-          }
+          setShowProctorInstructions(newMode === -1); // ✅ ADD
         }
       },
     },
@@ -1135,6 +1365,9 @@ const SchedulerView: React.FC<SchedulerViewProps> = ({ user }) => {
           resetAllModes();
           setSwapMode(newSwapMode);
           setSelectedSwap(null);
+          setDraggedExamId(null);       // ✅ clear any active drag
+          setDraggedOverExamId(null);   // ✅ clear hover state
+          setIsDragDropMode(false);     // ✅ reset drag mode
           setShowSwapInstructions(newSwapMode);
         }
       },
@@ -1325,6 +1558,28 @@ const SchedulerView: React.FC<SchedulerViewProps> = ({ user }) => {
           </div>
         )}
 
+        {activeProctorEdit === -1 && (
+          <div
+            style={{
+              position: "fixed",
+              top: "90px",
+              left: "50%",
+              transform: "translateX(-50%)",
+              backgroundColor: "#ff9500ff",
+              color: "white",
+              padding: "12px 25px",
+              borderRadius: "10px",
+              boxShadow: "0 4px 10px rgba(0,0,0,0.3)",
+              zIndex: 1200,
+              textAlign: "center",
+              fontWeight: "bold",
+              opacity: 0.9
+            }}
+          >
+            Proctor Edit Mode
+          </div>
+        )}
+
         {showSwapInstructions && (
           <div
             style={{
@@ -1345,12 +1600,55 @@ const SchedulerView: React.FC<SchedulerViewProps> = ({ user }) => {
           >
             <h4 style={{ marginBottom: "8px", fontWeight: "bold" }}>Swapping Instructions</h4>
             <p style={{ fontSize: "15px", lineHeight: "1.5", marginBottom: "10px" }}>
-              1️. Click the schedule you want to move. <br />
-              2️. Click another schedule to swap with. <br />
-              ⚠️ Swapping is only possible if both schedules have the <strong>same timeslot and course</strong>.
+              <strong>Option 1 — Swap rooms:</strong><br />
+              1. Click a schedule to select it.<br />
+              2. Click another schedule with the same course & timeslot to swap rooms.<br /><br />
+              <strong>Option 2 — Drag & drop:</strong><br />
+              1. Drag any schedule card to an empty cell to move it there.
             </p>
             <button type="button"
               onClick={() => setShowSwapInstructions(false)}
+              style={{
+                backgroundColor: "transparent",
+                color: "red",
+                border: "none",
+                borderRadius: "10px",
+                padding: "6px 12px",
+                cursor: "pointer",
+                fontWeight: "bold",
+              }}
+            >
+              Close Instructions
+            </button>
+          </div>
+        )}
+
+        {showProctorInstructions && (
+          <div
+            style={{
+              position: "fixed",
+              top: "250px",
+              left: "50%",
+              transform: "translateX(-50%)",
+              backgroundColor: "white",
+              color: "#092C4C",
+              borderRadius: "10px",
+              padding: "5px 10px",
+              width: "400px",
+              zIndex: 1201,
+              boxShadow: "0 4px 12px rgba(0,0,0,0.3)",
+              textAlign: "center",
+              animation: "fadeIn 0.3s ease",
+            }}
+          >
+            <h4 style={{ marginBottom: "8px", fontWeight: "bold" }}>Proctor Edit Instructions</h4>
+            <p style={{ fontSize: "15px", lineHeight: "1.5", marginBottom: "10px" }}>
+              1. Click on any schedule's <strong>Proctor</strong> section to open the selector.<br />
+              2. Search and select one or more proctors from the dropdown.<br />
+              3. Click <strong>✕</strong> on the selector to confirm and close.
+            </p>
+            <button type="button"
+              onClick={() => setShowProctorInstructions(false)}
               style={{
                 backgroundColor: "transparent",
                 color: "red",
@@ -1370,13 +1668,14 @@ const SchedulerView: React.FC<SchedulerViewProps> = ({ user }) => {
           <div
             key={key}
             ref={key === "Send Messages" ? ref : undefined}
-            className={`scheduler-icon ${(swapMode && key === "Swap Room") ||
+            className={`scheduler-icon ${
+              (swapMode && key === "Swap Room") ||
               (activeProctorEdit !== null && key === "Change Proctor") ||
               (isModalOpen && key === "Add Schedule") ||
               (showEnvelopeDropdown && key === "Send Messages")
-              ? "active"
-              : ""
-              }`}
+                ? "active"
+                : ""
+            }`}
             style={{
               position: key === "Send Messages" ? "relative" : undefined,
               flexDirection: showIconLabels ? 'column' : 'row',
@@ -1710,11 +2009,21 @@ const SchedulerView: React.FC<SchedulerViewProps> = ({ user }) => {
           >
             <div className="scheduler-view-container">
               <div className="header" style={{ textAlign: "center", marginBottom: "20px" }}>
-                <img
-                  src={footerData?.logo_url || "/logo/USTPlogo.png"}
-                  alt="School Logo"
-                  style={{ width: '200px', height: '160px', marginBottom: '5px' }}
-                />
+                <div style={{ display: 'flex', justifyContent: 'center', alignItems: 'center', gap: '16px', marginBottom: '5px' }}>
+                  {(footerData?.logo_urls && footerData.logo_urls.length > 0
+                    ? footerData.logo_urls
+                    : footerData?.logo_url
+                      ? [footerData.logo_url]
+                      : ["/logo/USTPlogo.png"]
+                  ).map((url, idx) => (
+                    <img
+                      key={idx}
+                      src={url}
+                      alt={`School Logo ${idx + 1}`}
+                      style={{ width: '160px', height: '130px', objectFit: 'contain' }}
+                    />
+                  ))}
+                </div>
                 <div style={{ fontSize: '30px', color: '#333', marginBottom: '-10px', fontFamily: 'serif' }}>
                   University of Science and Technology of Southern Philippines
                 </div>
@@ -1788,11 +2097,21 @@ const SchedulerView: React.FC<SchedulerViewProps> = ({ user }) => {
                 >
                   <div className="scheduler-view-container">
                     <div className="header" style={{ textAlign: "center", marginBottom: "20px" }}>
-                      <img
-                        src={footerData?.logo_url || "/logo/USTPlogo.png"}
-                        alt="School Logo"
-                        style={{ width: '200px', height: '160px', marginBottom: '5px' }}
-                      />
+                      <div style={{ display: 'flex', justifyContent: 'center', alignItems: 'center', gap: '16px', marginBottom: '5px' }}>
+                        {(footerData?.logo_urls && footerData.logo_urls.length > 0
+                          ? footerData.logo_urls
+                          : footerData?.logo_url
+                            ? [footerData.logo_url]
+                            : ["/logo/USTPlogo.png"]
+                        ).map((url, idx) => (
+                          <img
+                            key={idx}
+                            src={url}
+                            alt={`School Logo ${idx + 1}`}
+                            style={{ width: '160px', height: '130px', objectFit: 'contain' }}
+                          />
+                        ))}
+                      </div>
                       <div style={{ fontSize: '30px', color: '#333', marginBottom: '-10px', fontFamily: 'serif' }}>
                         University of Science and Technology of Southern Philippines
                       </div>
@@ -1875,7 +2194,29 @@ const SchedulerView: React.FC<SchedulerViewProps> = ({ user }) => {
                                 return matches;
                               });
 
-                              if (!exam) return <td key={room}></td>;
+                              if (!exam) return (
+                                <td
+                                  key={room}
+                                  onDragOver={handleDragOver}
+                                  onDragEnter={() => setHoveredCellId(key)}
+                                  onDragLeave={() => setHoveredCellId(null)}
+                                  onDrop={() => {
+                                    const cellStartTime = `${date}T${slot.start24}:00`;
+                                    const cellEndTime = `${date}T${slot.end24}:00`;
+                                    handleDropToCell(date, String(room), cellStartTime, cellEndTime);
+                                    setHoveredCellId(null);
+                                  }}
+                                  style={{
+                                    backgroundColor: hoveredCellId === key && draggedExamId && swapMode ? '#e0f7fa' : '#f5f5f5',
+                                    border: hoveredCellId === key && draggedExamId && swapMode ? '3px dashed #0288d1' : '1px solid #ddd',
+                                    cursor: draggedExamId && swapMode ? 'pointer' : 'default',
+                                    transition: 'all 0.2s ease',
+                                    minHeight: '80px',
+                                    padding: '8px',
+                                    boxSizing: 'border-box'
+                                  }}
+                                ></td>
+                              );
 
                               // Extract time directly from ISO string
                               const examStartTimeStr = exam.exam_start_time!.slice(11, 16);
@@ -1905,34 +2246,51 @@ const SchedulerView: React.FC<SchedulerViewProps> = ({ user }) => {
                                 <td key={room} rowSpan={rowSpan}>
                                   <div
                                     data-exam-id={exam.examdetails_id}
+                                    draggable={swapMode}
+                                    onDragStart={() => handleDragStart(exam.examdetails_id!)}
+                                    onDragOver={handleDragOver}
+                                    onDragEnter={() => handleDragEnter(exam.examdetails_id!)}
+                                    onDrop={() => handleDrop(exam.examdetails_id!)}
+                                    onDragLeave={() => setDraggedOverExamId(null)}
                                     onClick={() => handleScheduleClick(exam)}
                                     style={{
                                       backgroundColor: courseColorMap[exam.course_id || ""] || "#ccc",
                                       color: "white",
-                                      padding: "8px",
+                                      padding: "6px 8px",
                                       borderRadius: "6px",
-                                      fontSize: "12px",
-                                      minHeight: "80px",
-                                      maxHeight: "200px",
-                                      overflowY: "auto",
-                                      cursor: swapMode ? "pointer" : "default",
+                                      fontSize: "11px",
+                                      height: "100%",          // ✅ fill the entire rowSpan cell
+                                      minHeight: "60px",
+                                      boxSizing: "border-box",
+                                      overflowY: "hidden",
+                                      cursor: swapMode ? "grab" : "default",
                                       display: "flex",
                                       flexDirection: "column",
                                       justifyContent: "flex-start",
-                                      outline: selectedSwap?.examdetails_id === exam.examdetails_id
-                                        ? "10px solid blue"
-                                        : searchTerm && examMatchesSearch(exam, searchTerm.toLowerCase())
-                                          ? currentMatchIndex >= 0 &&
-                                            searchMatches[currentMatchIndex]?.examdetails_id === exam.examdetails_id
-                                            ? "3px solid #2563eb"
-                                            : "2px solid #fbbf24"
-                                          : "none",
-                                      boxShadow: searchTerm && examMatchesSearch(exam, searchTerm.toLowerCase())
-                                        ? currentMatchIndex >= 0 &&
-                                          searchMatches[currentMatchIndex]?.examdetails_id === exam.examdetails_id
-                                          ? "0 0 8px 2px rgba(37, 99, 235, 0.5)"
-                                          : "0 0 4px 1px rgba(251, 191, 36, 0.4)"
-                                        : "none"
+                                      gap: "2px", 
+                                      outline: draggedExamId === exam.examdetails_id
+                                        ? "3px dashed #ff6b6b"
+                                        : draggedOverExamId === exam.examdetails_id
+                                          ? "3px solid #4CAF50"
+                                          : selectedSwap?.examdetails_id === exam.examdetails_id
+                                            ? "10px solid blue"
+                                            : searchTerm && examMatchesSearch(exam, searchTerm.toLowerCase())
+                                              ? currentMatchIndex >= 0 &&
+                                                searchMatches[currentMatchIndex]?.examdetails_id === exam.examdetails_id
+                                                ? "3px solid #2563eb"
+                                                : "2px solid #fbbf24"
+                                              : "none",
+                                      boxShadow: draggedExamId === exam.examdetails_id
+                                        ? "0 0 8px 2px rgba(255, 107, 107, 0.5)"
+                                        : draggedOverExamId === exam.examdetails_id
+                                          ? "0 0 8px 2px rgba(76, 175, 80, 0.5)"
+                                          : searchTerm && examMatchesSearch(exam, searchTerm.toLowerCase())
+                                            ? currentMatchIndex >= 0 &&
+                                              searchMatches[currentMatchIndex]?.examdetails_id === exam.examdetails_id
+                                              ? "0 0 8px 2px rgba(37, 99, 235, 0.5)"
+                                              : "0 0 4px 1px rgba(251, 191, 36, 0.4)"
+                                            : "none",
+                                      opacity: draggedExamId === exam.examdetails_id ? 0.6 : 1
                                     }}
                                   >
                                     <p><strong>{exam.course_id}</strong></p>
@@ -2011,16 +2369,16 @@ const SchedulerView: React.FC<SchedulerViewProps> = ({ user }) => {
                                                 minHeight: '25px',
                                                 maxHeight: '80px',
                                                 overflowY: 'auto',
-                                                color: '#092C4C' 
+                                                color: '#092C4C'
                                               }),
-                                              option: (provided, state) => ({ 
-                                                ...provided, 
+                                              option: (provided, state) => ({
+                                                ...provided,
                                                 fontSize: '10px',
                                                 color: state.isSelected ? 'white' : '#092C4C', // Dropdown option text color
-                                                backgroundColor: state.isSelected 
-                                                  ? '#092C4C' 
-                                                  : state.isFocused 
-                                                    ? '#e5e7eb' 
+                                                backgroundColor: state.isSelected
+                                                  ? '#092C4C'
+                                                  : state.isFocused
+                                                    ? '#e5e7eb'
                                                     : 'white'
                                               }),
                                               valueContainer: (provided) => ({
@@ -2067,27 +2425,6 @@ const SchedulerView: React.FC<SchedulerViewProps> = ({ user }) => {
                                       ) : (
                                         <span style={{ marginLeft: '5px', display: 'block', marginTop: '2px' }}>
                                           {getProctorDisplay(exam)}
-                                          {activeProctorEdit === -1 && (
-                                            <div
-                                              style={{
-                                                position: "fixed",
-                                                top: "140px",
-                                                left: "50%",
-                                                transform: "translateX(-50%)",
-                                                backgroundColor: "#3b82f6",
-                                                color: "white",
-                                                padding: "10px 20px",
-                                                borderRadius: "8px",
-                                                boxShadow: "0 4px 10px rgba(0,0,0,0.3)",
-                                                zIndex: 1200,
-                                                textAlign: "center",
-                                                fontWeight: "500",
-                                                fontSize: "14px"
-                                              }}
-                                            >
-                                              👆 Click on any schedule's proctor section to edit
-                                            </div>
-                                          )}
                                         </span>
                                       )}
                                     </div>
@@ -2203,11 +2540,21 @@ const SchedulerView: React.FC<SchedulerViewProps> = ({ user }) => {
                 >
                   <div className="scheduler-view-container">
                     <div className="header" style={{ textAlign: "center", marginBottom: "20px" }}>
-                      <img
-                        src={footerData?.logo_url || "/logo/USTPlogo.png"}
-                        alt="School Logo"
-                        style={{ width: '200px', height: '160px', marginBottom: '5px' }}
-                      />
+                      <div style={{ display: 'flex', justifyContent: 'center', alignItems: 'center', gap: '16px', marginBottom: '5px' }}>
+                        {(footerData?.logo_urls && footerData.logo_urls.length > 0
+                          ? footerData.logo_urls
+                          : footerData?.logo_url
+                            ? [footerData.logo_url]
+                            : ["/logo/USTPlogo.png"]
+                        ).map((url, idx) => (
+                          <img
+                            key={idx}
+                            src={url}
+                            alt={`School Logo ${idx + 1}`}
+                            style={{ width: '160px', height: '130px', objectFit: 'contain' }}
+                          />
+                        ))}
+                      </div>
                       <div style={{ fontSize: '30px', color: '#333', marginBottom: '-10px', fontFamily: 'serif' }}>
                         University of Science and Technology of Southern Philippines
                       </div>
@@ -2290,7 +2637,29 @@ const SchedulerView: React.FC<SchedulerViewProps> = ({ user }) => {
                                 return matches;
                               });
 
-                              if (!exam) return <td key={room}></td>;
+                              if (!exam) return (
+                                <td
+                                  key={room}
+                                  onDragOver={handleDragOver}
+                                  onDragEnter={() => setHoveredCellId(key)}
+                                  onDragLeave={() => setHoveredCellId(null)}
+                                  onDrop={() => {
+                                    const cellStartTime = `${date}T${slot.start24}:00`;
+                                    const cellEndTime = `${date}T${slot.end24}:00`;
+                                    handleDropToCell(date, String(room), cellStartTime, cellEndTime);
+                                    setHoveredCellId(null);
+                                  }}
+                                  style={{
+                                    backgroundColor: hoveredCellId === key && draggedExamId && swapMode ? '#e0f7fa' : '#f5f5f5',
+                                    border: hoveredCellId === key && draggedExamId && swapMode ? '3px dashed #0288d1' : '1px solid #ddd',
+                                    cursor: draggedExamId && swapMode ? 'pointer' : 'default',
+                                    transition: 'all 0.2s ease',
+                                    minHeight: '80px',
+                                    padding: '8px',
+                                    boxSizing: 'border-box'
+                                  }}
+                                ></td>
+                              );
 
                               // Extract time directly from ISO string
                               const examStartTimeStr = exam.exam_start_time!.slice(11, 16);
@@ -2320,34 +2689,51 @@ const SchedulerView: React.FC<SchedulerViewProps> = ({ user }) => {
                                 <td key={room} rowSpan={rowSpan}>
                                   <div
                                     data-exam-id={exam.examdetails_id}
+                                    draggable={swapMode}
+                                    onDragStart={() => handleDragStart(exam.examdetails_id!)}
+                                    onDragOver={handleDragOver}
+                                    onDragEnter={() => handleDragEnter(exam.examdetails_id!)}
+                                    onDrop={() => handleDrop(exam.examdetails_id!)}
+                                    onDragLeave={() => setDraggedOverExamId(null)}
                                     onClick={() => handleScheduleClick(exam)}
                                     style={{
                                       backgroundColor: courseColorMap[exam.course_id || ""] || "#ccc",
                                       color: "white",
-                                      padding: "8px",
+                                      padding: "6px 8px",
                                       borderRadius: "6px",
-                                      fontSize: "12px",
-                                      minHeight: "80px",
-                                      maxHeight: "200px",
-                                      overflowY: "auto",
-                                      cursor: swapMode ? "pointer" : "default",
+                                      fontSize: "11px",
+                                      height: "100%",      
+                                      minHeight: "60px",
+                                      boxSizing: "border-box",
+                                      overflowY: "hidden",
+                                      cursor: swapMode ? "grab" : "default",
                                       display: "flex",
                                       flexDirection: "column",
                                       justifyContent: "flex-start",
-                                      outline: selectedSwap?.examdetails_id === exam.examdetails_id
-                                        ? "10px solid blue"
-                                        : searchTerm && examMatchesSearch(exam, searchTerm.toLowerCase())
-                                          ? currentMatchIndex >= 0 &&
-                                            searchMatches[currentMatchIndex]?.examdetails_id === exam.examdetails_id
-                                            ? "3px solid #2563eb"
-                                            : "2px solid #fbbf24"
-                                          : "none",
-                                      boxShadow: searchTerm && examMatchesSearch(exam, searchTerm.toLowerCase())
-                                        ? currentMatchIndex >= 0 &&
-                                          searchMatches[currentMatchIndex]?.examdetails_id === exam.examdetails_id
-                                          ? "0 0 8px 2px rgba(37, 99, 235, 0.5)"
-                                          : "0 0 4px 1px rgba(251, 191, 36, 0.4)"
-                                        : "none"
+                                      gap: "2px", 
+                                      outline: draggedExamId === exam.examdetails_id
+                                        ? "3px dashed #ff6b6b"
+                                        : draggedOverExamId === exam.examdetails_id
+                                          ? "3px solid #4CAF50"
+                                          : selectedSwap?.examdetails_id === exam.examdetails_id
+                                            ? "10px solid blue"
+                                            : searchTerm && examMatchesSearch(exam, searchTerm.toLowerCase())
+                                              ? currentMatchIndex >= 0 &&
+                                                searchMatches[currentMatchIndex]?.examdetails_id === exam.examdetails_id
+                                                ? "3px solid #2563eb"
+                                                : "2px solid #fbbf24"
+                                              : "none",
+                                      boxShadow: draggedExamId === exam.examdetails_id
+                                        ? "0 0 8px 2px rgba(255, 107, 107, 0.5)"
+                                        : draggedOverExamId === exam.examdetails_id
+                                          ? "0 0 8px 2px rgba(76, 175, 80, 0.5)"
+                                          : searchTerm && examMatchesSearch(exam, searchTerm.toLowerCase())
+                                            ? currentMatchIndex >= 0 &&
+                                              searchMatches[currentMatchIndex]?.examdetails_id === exam.examdetails_id
+                                              ? "0 0 8px 2px rgba(37, 99, 235, 0.5)"
+                                              : "0 0 4px 1px rgba(251, 191, 36, 0.4)"
+                                            : "none",
+                                      opacity: draggedExamId === exam.examdetails_id ? 0.6 : 1
                                     }}
                                   >
                                     <p><strong>{exam.course_id}</strong></p>
@@ -2425,16 +2811,16 @@ const SchedulerView: React.FC<SchedulerViewProps> = ({ user }) => {
                                                 minHeight: '25px',
                                                 maxHeight: '80px',
                                                 overflowY: 'auto',
-                                                color: '#092C4C' 
+                                                color: '#092C4C'
                                               }),
-                                              option: (provided, state) => ({ 
-                                                ...provided, 
+                                              option: (provided, state) => ({
+                                                ...provided,
                                                 fontSize: '10px',
-                                                color: state.isSelected ? 'white' : '#092C4C', 
-                                                backgroundColor: state.isSelected 
-                                                  ? '#092C4C' 
-                                                  : state.isFocused 
-                                                    ? '#e5e7eb' 
+                                                color: state.isSelected ? 'white' : '#092C4C',
+                                                backgroundColor: state.isSelected
+                                                  ? '#092C4C'
+                                                  : state.isFocused
+                                                    ? '#e5e7eb'
                                                     : 'white'
                                               }),
                                               multiValue: (provided) => ({
@@ -2476,27 +2862,6 @@ const SchedulerView: React.FC<SchedulerViewProps> = ({ user }) => {
                                       ) : (
                                         <span style={{ marginLeft: '5px', display: 'block', marginTop: '2px' }}>
                                           {getProctorDisplay(exam)}
-                                          {activeProctorEdit === -1 && (
-                                            <div
-                                              style={{
-                                                position: "fixed",
-                                                top: "140px",
-                                                left: "50%",
-                                                transform: "translateX(-50%)",
-                                                backgroundColor: "#3b82f6",
-                                                color: "white",
-                                                padding: "10px 20px",
-                                                borderRadius: "8px",
-                                                boxShadow: "0 4px 10px rgba(0,0,0,0.3)",
-                                                zIndex: 1200,
-                                                textAlign: "center",
-                                                fontWeight: "500",
-                                                fontSize: "14px"
-                                              }}
-                                            >
-                                              👆 Click on any schedule's proctor section to edit
-                                            </div>
-                                          )}
                                         </span>
                                       )}
                                     </div>

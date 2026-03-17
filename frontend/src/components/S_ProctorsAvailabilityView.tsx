@@ -1470,7 +1470,7 @@ const SchedulerAvailability: React.FC<ProctorSetAvailabilityProps> = ({ user }) 
         <div className="modal-overlay">
           <div className="modal">
             <h3>Remarks</h3>
-            <div>{selectedRemarks}</div>
+            <div style={{ color: "#092C4C" }}>{selectedRemarks}</div>
             <div className="modal-actions">
               <button type="button" onClick={() => setShowRemarksModal(false)}>Close</button>
             </div>

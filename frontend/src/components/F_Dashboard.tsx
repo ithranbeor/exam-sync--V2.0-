@@ -24,6 +24,7 @@ import ProctorMonitoring from './S_ProctorMonitoring.tsx';
 import ProctorAttendance from './P_ProctorAttendance.tsx';
 import MiniExamDateCalendar from './F_MiniExamDateCalendar.tsx';
 import ProctorCourseDetails from './P_ProctorAssignedExams.tsx';
+import MiniPlotSchedule from './MiniPlotSchedule.tsx';
 
 const iconStyle = { className: 'icon', size: 20 };
 
@@ -196,7 +197,7 @@ const DashboardFaculty = () => {
     new Map(
       roles
         .flatMap(role => roleSidebarMap[role] || [])
-        .filter(item => item.key !== 'notification') 
+        .filter(item => item.key !== 'notification')
         .map(item => [item.key, item])
     ).values()
   );
@@ -386,9 +387,29 @@ const DashboardFaculty = () => {
               <div className="full-width-section">
                 <h2>Shortcut</h2>
                 <div className="try-things-grid">
-                  {roles.includes('proctor') &&
-                    <div className="try-thing-card"><ProctorCourseDetails user={user} /></div>}
-                  <div className="try-thing-card"><MiniExamDateCalendar user={user} /></div>
+
+                  {/* Proctor: Assigned Proctoring with fixed height + scroll */}
+                  {roles.includes('proctor') && (
+                    <div className="try-thing-card" style={{ display: 'flex', flexDirection: 'column', overflow: 'hidden' }}>
+                      <ProctorCourseDetails user={user} />
+                    </div>
+                  )}
+
+                  {/* Exam Date Calendar — always shown */}
+                  <div className="try-thing-card">
+                    <MiniExamDateCalendar user={user} />
+                  </div>
+
+                  {/* Scheduler / Admin: Mini Plot Schedule preview */}
+                  {(roles.includes('scheduler') || roles.includes('admin')) && (
+                    <div className="try-thing-card">
+                      <MiniPlotSchedule
+                        user={user}
+                        onOpenPlotter={() => handleMenuClick('plot-Schedule')}
+                      />
+                    </div>
+                  )}
+
                 </div>
               </div>
             </div>
