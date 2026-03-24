@@ -125,12 +125,33 @@ class DjangoSession(models.Model):
         db_table = 'django_session'
 
 class TblAvailability(models.Model):
+    AVAILABILITY_TYPE_CHOICES = [
+        ('availability', 'Regular Availability'),
+        ('change_request', 'Change Request'),
+    ]
+    
+    STATUS_CHOICES = [
+        ('available', 'Available'),
+        ('unavailable', 'Unavailable'),
+    ]
+    
     availability_id = models.AutoField(primary_key=True)
     days = ArrayField(models.DateField(), blank=False)  # array of dates
     time_slots = ArrayField(models.CharField(max_length=50), blank=False)  # array of time slots
     status = models.CharField(max_length=20)
     remarks = models.TextField(blank=True, null=True)
     user = models.ForeignKey('TblUsers', on_delete=models.CASCADE)
+    type = models.CharField(
+        max_length=20,
+        choices=AVAILABILITY_TYPE_CHOICES,
+        default='availability'  # ✅ NEW: Distinguish regular availability from change requests
+    )
+    requested_status = models.CharField(
+        max_length=20,
+        choices=STATUS_CHOICES,
+        blank=True,
+        null=True  # ✅ NEW: For change requests, stores what the proctor is requesting
+    )
 
     class Meta:
         managed = True
@@ -138,6 +159,8 @@ class TblAvailability(models.Model):
         indexes = [
             models.Index(fields=['user']),
             models.Index(fields=['status']),
+            models.Index(fields=['type']),  # ✅ NEW: Index for filtering by type
+            models.Index(fields=['type', 'status']),  # ✅ NEW: Combined index for change request queries
         ]
 
 

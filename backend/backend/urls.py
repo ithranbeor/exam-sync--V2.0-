@@ -114,6 +114,8 @@ urlpatterns = [
     path('api/tbl_schedule_footer/<int:pk>/', views.tbl_schedule_footer_detail, name='tbl_schedule_footer_detail'),
     path('api/upload-schedule-logo/', views.upload_schedule_logo, name='upload_schedule_logo'),
 
+    path('api/users/bulk/', views.users_bulk),
+
     # ── Redirect all non-API, non-utility routes to the React frontend ──
     # Fixed: also excludes health/ and debug/ from being redirected
     re_path(r'^(?!api/|health/|debug/).*$', RedirectView.as_view(url='https://exam-sync-frontend.onrender.com/', permanent=False)),

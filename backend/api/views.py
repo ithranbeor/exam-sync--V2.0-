@@ -1786,9 +1786,10 @@ def tbl_modality_detail(request, pk):
 def tbl_availability_list(request):
     if request.method == 'GET':
         user_id = request.GET.get('user_id')
-        user_ids = request.GET.get('user_ids')  
+        user_ids = request.GET.get('user_ids')
         college_id = request.GET.get('college_id')
         status_param = request.GET.get('status')
+        type_param = request.GET.get('type')
         days = request.GET.getlist('days[]') or request.GET.getlist('days')
 
         availabilities = TblAvailability.objects.select_related('user').all()
@@ -1799,11 +1800,19 @@ def tbl_availability_list(request):
             user_id_list = [int(uid.strip()) for uid in user_ids.split(',') if uid.strip().isdigit()]
             availabilities = availabilities.filter(user__user_id__in=user_id_list)
 
+        # ✅ FIX: Filter by college through TblUserRole, not directly on TblAvailability
         if college_id:
-            availabilities = availabilities.filter(user__college_id=college_id)
+            proctor_ids = TblUserRole.objects.filter(
+                college_id=college_id,
+                role_id=5  # proctor role
+            ).values_list('user_id', flat=True).distinct()
+            availabilities = availabilities.filter(user__user_id__in=proctor_ids)
 
         if status_param:
             availabilities = availabilities.filter(status=status_param)
+
+        if type_param:
+            availabilities = availabilities.filter(type=type_param)
 
         if days:
             availabilities = availabilities.filter(days__overlap=days)
@@ -3051,6 +3060,8 @@ def tbl_user_role_list(request):
     if request.method == 'GET':
         user_id = request.GET.get('user_id')
         role_id = request.GET.get('role_id')
+        college_id = request.GET.get('college_id')  # ← ADD THIS
+
         queryset = TblUserRole.objects.select_related(
             'role',
             'college',
@@ -3063,6 +3074,9 @@ def tbl_user_role_list(request):
             queryset = queryset.filter(user_id=user_id)
         if role_id:
             queryset = queryset.filter(role_id=role_id)
+        if college_id:                                # ← ADD THIS
+            queryset = queryset.filter(college_id=college_id)
+
         serializer = TblUserRoleSerializer(queryset, many=True)
         return Response(serializer.data)
         
@@ -3245,3 +3259,29 @@ def upload_schedule_logo(request):
             'error': 'Failed to process image',
             'detail': str(e)
         }, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+
+# views.py
+@api_view(['GET'])
+@permission_classes([AllowAny])
+def users_bulk(request):
+    """
+    GET /api/users/bulk/?ids=1,2,3,4
+    Returns multiple users in one request
+    """
+    ids_param = request.GET.get('ids', '')
+    if not ids_param:
+        return Response([], status=status.HTTP_200_OK)
+    
+    try:
+        user_ids = [int(i.strip()) for i in ids_param.split(',') if i.strip().isdigit()]
+    except ValueError:
+        return Response({'error': 'Invalid IDs'}, status=status.HTTP_400_BAD_REQUEST)
+    
+    if not user_ids:
+        return Response([], status=status.HTTP_200_OK)
+
+    users = TblUsers.objects.filter(user_id__in=user_ids).values(
+        'user_id', 'first_name', 'last_name', 'middle_name',
+        'email_address', 'status', 'avatar_url'
+    )
+    return Response(list(users))

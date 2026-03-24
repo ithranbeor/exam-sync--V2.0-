@@ -26,7 +26,7 @@ const ProctorSetAvailability: React.FC<ProctorSetAvailabilityProps> = ({ user })
   const [selectedTimeSlots, setSelectedTimeSlots] = useState<AvailabilityTimeSlot[]>([]);
   const [selectedOriginalDay, setSelectedOriginalDay] = useState<string>('');
   const [selectedOriginalTimeSlot, setSelectedOriginalTimeSlot] = useState<string>('');
-  const [availableDays, setAvailableDays] = useState<string[]>([]);
+  const [_availableDays, setAvailableDays] = useState<string[]>([]);
   const [dayToTimeSlots, setDayToTimeSlots] = useState<Record<string, string[]>>({});
   const [availabilityStatus, setAvailabilityStatus] = useState('available');
   const [remarks, setRemarks] = useState('');
@@ -49,6 +49,55 @@ const ProctorSetAvailability: React.FC<ProctorSetAvailabilityProps> = ({ user })
   const [_confirmPendingSubmit, setConfirmPendingSubmit] = useState<'availability' | 'change' | null>(null);
 
   const today = new Date();
+
+  // ✅ Helper to check if a date string (YYYY-MM-DD) is in the past
+  const isPastDate = (dateStr: string): boolean => {
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
+    const date = new Date(dateStr);
+    return date < today;
+  };
+
+  async function resolveProctorCollegeId(userId: number): Promise<number | null> {
+    try {
+      const { data: roles } = await api.get(`/tbl_user_role`, { params: { user_id: userId } });
+      if (!Array.isArray(roles) || roles.length === 0) return null;
+      const proctorRole = roles.find((r: any) => r.role === 5 || r.role_id === 5);
+      let college_id = proctorRole?.college ?? proctorRole?.college_id ?? null;
+      if (!college_id) {
+        const { data: userData } = await api.get(`/tbl_users/${userId}`);
+        college_id = userData?.college_id ?? null;
+      }
+      return college_id ?? null;
+    } catch { return null; }
+  }
+
+  async function notifySchedulersInCollege(collegeId: number, message: string, type: string) {
+    try {
+      const { data: schedulerRoles } = await api.get(`/tbl_user_role`, {
+        params: { role_id: 3, college_id: collegeId }
+      });
+      if (!Array.isArray(schedulerRoles) || schedulerRoles.length === 0) return;
+
+      const ids: number[] = Array.from(
+        new Set(schedulerRoles.map((r: any) => r.user_id ?? r.user).filter(Boolean))
+      );
+      if (ids.length === 0) return;
+
+      await Promise.allSettled(
+        ids.map(id =>
+          api.post(`/notifications/create/`, {
+            user_id: id,
+            message,
+            type,
+            is_seen: false,
+          })
+        )
+      );
+    } catch (err) {
+      console.error('Failed to notify schedulers:', err);
+    }
+  }
 
   useEffect(() => {
     const fetchAvailability = async () => {
@@ -268,7 +317,7 @@ const ProctorSetAvailability: React.FC<ProctorSetAvailabilityProps> = ({ user })
       const existingSlots = daySlotMapCopy[day] || [];
       for (const slot of selectedTimeSlots) {
         if (existingSlots.includes(slot)) {
-          isRedundant = true; 
+          isRedundant = true;
         } else {
           totalSlots++;
         }
@@ -333,6 +382,17 @@ const ProctorSetAvailability: React.FC<ProctorSetAvailabilityProps> = ({ user })
         });
         setAvailableDays(prev => Array.from(new Set([...prev, ...selectedDates])));
 
+        const collegeId = _collegeId ?? await resolveProctorCollegeId(userId);
+        if (collegeId) {
+          const proctorName = (user as any)?.full_name
+            ?? `${(user as any)?.first_name ?? ''} ${(user as any)?.last_name ?? ''}`.trim()
+            ?? `Proctor #${userId}`;
+          const dateLabels = selectedDates
+            .map(d => new Date(d).toLocaleDateString('en-US', { month: 'short', day: 'numeric' }))
+            .join(', ');
+          await notifySchedulersInCollege(collegeId, `${proctorName} has set their availability for: ${dateLabels}.`, 'availability_set');
+        }
+
         setSelectedDates([]);
         setSelectedTimeSlots([]);
         setAvailabilityStatus('available');
@@ -380,18 +440,43 @@ const ProctorSetAvailability: React.FC<ProctorSetAvailabilityProps> = ({ user })
     const userId = user?.user_id;
 
     try {
+      // Resolve college ID first if not already cached
+      let collegeId = _collegeId;
+      if (!collegeId) {
+        collegeId = await resolveProctorCollegeId(userId);
+        if (collegeId) setCollegeId(collegeId);
+      }
+
       const data = {
         user_id: userId,
         days: selectedDays,
         time_slots: selectedSlots,
-        status: changeStatus,
+        status: 'pending',
+        requested_status: changeStatus,
         remarks: reason || null,
+        type: 'change_request',
+        // Note: college_id is determined by backend through user's role association
       };
 
       const response = await api.post('/tbl_availability/', data);
 
       if (response.status >= 200 && response.status < 300) {
-        toast.success('Change request submitted successfully!');
+        toast.success('Change request submitted! Awaiting scheduler approval.');
+
+        if (collegeId) {
+          const proctorName = (user as any)?.full_name
+            ?? `${(user as any)?.first_name ?? ''} ${(user as any)?.last_name ?? ''}`.trim()
+            ?? `Proctor #${userId}`;
+          const dateLabels = selectedDays
+            .map(d => new Date(d).toLocaleDateString('en-US', { month: 'short', day: 'numeric' }))
+            .join(', ');
+          await notifySchedulersInCollege(
+            collegeId,
+            `${proctorName} requested a change to "${changeStatus}" on ${dateLabels} (${selectedSlots.join(', ')}). Please review.`,
+            'change_request'
+          );
+        }
+
         setReason('');
         setChangeStatus('unavailable');
         setSelectedOriginalDay('');
@@ -418,28 +503,28 @@ const ProctorSetAvailability: React.FC<ProctorSetAvailabilityProps> = ({ user })
           <div className="subtitle">
             (Choose your availability for the exam schedule)
           </div>
-            {hasApprovedSchedule ? (
-              <div
-                style={{
-                  textAlign: 'center',
-                  padding: '40px 20px',
-                  color: '#666',
-                  fontSize: '14px',
-                  border: '1px dashed #ccc',
-                  borderRadius: '8px',
-                  margin: '20px 0',
-                  backgroundColor: '#f9f9f9'
-                }}
-              >
-                <p style={{ marginBottom: '10px', fontWeight: 'bold', color: '#092C4C' }}>
-                  Availability setting is locked
-                </p>
-                <p>
-                  You can no longer modify your availability because the exam schedule has already been approved.
-                </p>
-              </div>
-            ) : (
-              <form onSubmit={handleSubmitAvailability} className="availability-form">
+          {hasApprovedSchedule ? (
+            <div
+              style={{
+                textAlign: 'center',
+                padding: '40px 20px',
+                color: '#666',
+                fontSize: '14px',
+                border: '1px dashed #ccc',
+                borderRadius: '8px',
+                margin: '20px 0',
+                backgroundColor: '#f9f9f9'
+              }}
+            >
+              <p style={{ marginBottom: '10px', fontWeight: 'bold', color: '#092C4C' }}>
+                Availability setting is locked
+              </p>
+              <p>
+                You can no longer modify your availability because the exam schedule has already been approved.
+              </p>
+            </div>
+          ) : (
+            <form onSubmit={handleSubmitAvailability} className="availability-form">
 
               {/* Day Picker */}
               <div className="form-group">
@@ -750,25 +835,31 @@ const ProctorSetAvailability: React.FC<ProctorSetAvailabilityProps> = ({ user })
                     setSelectedOriginalDay(days.join(','));
                     setSelectedOriginalTimeSlot('');
                   }}
-                  options={availableDays.map(day => ({
-                    value: day,
-                    label: new Date(day).toLocaleDateString('en-US', {
-                      month: 'long',
-                      day: 'numeric',
-                      year: 'numeric',
-                    }),
-                  }))}
+                  options={allowedDates
+                    .filter(day => !isPastDate(day)) // ✅ Filter out past dates
+                    .map(day => ({
+                      value: day,
+                      label: new Date(day).toLocaleDateString('en-US', {
+                        month: 'long',
+                        day: 'numeric',
+                        year: 'numeric',
+                      }),
+                    }))}
                   isMulti
                   placeholder="Select one or more days"
-                  isDisabled={isSubmitting || availableDays.length === 0}
+                  isDisabled={isSubmitting || allowedDates.length === 0}
                   classNamePrefix="react-select"
                   isSearchable
                 />
               </div>
 
-              {/* Select Original Time Slots */}
+              {/* Select Original Time Slots - Show both unavailable and alternative available slots */}
               <div className="form-group">
-                <label htmlFor="originalTimeSlots">Select Time Slot(s)</label>
+                <label htmlFor="originalTimeSlots">
+                  {changeStatus === 'unavailable'
+                    ? 'Select Time Slot(s) - Unavailable Hours'
+                    : 'Select Time Slot(s)'}
+                </label>
                 <Select
                   id="originalTimeSlots"
                   value={
@@ -786,10 +877,11 @@ const ProctorSetAvailability: React.FC<ProctorSetAvailabilityProps> = ({ user })
                         new Set(
                           selectedOriginalDay
                             .split(',')
+                            .filter(d => !isPastDate(d))
                             .flatMap(day => dayToTimeSlots[day] || [])
                         )
                       ).map(slot => ({ value: slot, label: slot }))
-                      : []
+                      : Object.values(AvailabilityTimeSlot).map(slot => ({ value: slot, label: slot }))
                   }
                   placeholder={
                     selectedOriginalDay ? 'Select one or more time slots' : 'Select days first'
@@ -821,6 +913,42 @@ const ProctorSetAvailability: React.FC<ProctorSetAvailabilityProps> = ({ user })
                   isSearchable={false}
                 />
               </div>
+
+              {/* ✅ NEW: Show available alternative time slots when "unavailable" is selected */}
+              {changeStatus === 'unavailable' && selectedOriginalDay && selectedOriginalTimeSlot && (
+                <div className="form-group" style={{ backgroundColor: '#e7f3ff', padding: '12px', borderRadius: '6px', borderLeft: '4px solid #092C4C' }}>
+                  <label style={{ fontWeight: 'bold', color: '#092C4C', marginBottom: '8px', display: 'block' }}>
+                    💡 Alternative Available Time Slots
+                  </label>
+                  <p style={{ fontSize: '13px', color: '#555', marginBottom: '8px' }}>
+                    You marked as unavailable for: <strong>{selectedOriginalTimeSlot.split(',').join(', ')}</strong>
+                  </p>
+                  <p style={{ fontSize: '13px', color: '#555', marginBottom: '8px' }}>
+                    Consider offering these alternative time slots on the same dates:
+                  </p>
+                  <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap' }}>
+                    {Object.values(AvailabilityTimeSlot)
+                      .filter(slot => !selectedOriginalTimeSlot.split(',').includes(slot))
+                      .map((altSlot) => (
+                        <span
+                          key={altSlot}
+                          style={{
+                            backgroundColor: '#092C4C',
+                            color: '#fff',
+                            padding: '6px 12px',
+                            borderRadius: '4px',
+                            fontSize: '12px',
+                          }}
+                        >
+                          {altSlot}
+                        </span>
+                      ))}
+                  </div>
+                  <p style={{ fontSize: '11px', color: '#666', marginTop: '8px', fontStyle: 'italic' }}>
+                    You can submit another change request to offer these slots after this request is processed.
+                  </p>
+                </div>
+              )}
 
               {/* Reason */}
               <div className="form-group">

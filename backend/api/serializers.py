@@ -523,11 +523,15 @@ class TblAvailabilitySerializer(serializers.ModelSerializer):
             'remarks',
             'user',
             'user_id',  # ✅ Now available for both read and write
+            'type',  # ✅ NEW: Field to distinguish regular availability from change requests
+            'requested_status',  # ✅ NEW: What the proctor is requesting in a change request
         ]
 
     def create(self, validated_data):
         user_id = validated_data.pop('user_id')
         user = TblUsers.objects.get(user_id=user_id)
+        # ✅ NEW: Ensure type defaults to 'availability' if not specified
+        validated_data.setdefault('type', 'availability')
         return TblAvailability.objects.create(user=user, **validated_data)
 
     def update(self, instance, validated_data):
