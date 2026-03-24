@@ -1845,7 +1845,7 @@ def tbl_availability_list(request):
             status=status.HTTP_200_OK
         )
 
-@api_view(['GET', 'PUT', 'DELETE'])
+@api_view(['GET', 'PUT', 'PATCH', 'DELETE'])
 @permission_classes([AllowAny])
 def tbl_availability_detail(request, availability_id):
     try:
@@ -1858,6 +1858,14 @@ def tbl_availability_detail(request, availability_id):
         return Response(serializer.data)
 
     elif request.method == 'PUT':
+        serializer = TblAvailabilitySerializer(availability, data=request.data, partial=True)
+        if serializer.is_valid():
+            serializer.save()
+            return Response(serializer.data)
+        return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
+
+    elif request.method == 'PATCH':
+        # ✅ NEW: Support PATCH for partial updates
         serializer = TblAvailabilitySerializer(availability, data=request.data, partial=True)
         if serializer.is_valid():
             serializer.save()

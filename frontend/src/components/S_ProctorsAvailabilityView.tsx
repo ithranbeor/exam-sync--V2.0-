@@ -538,35 +538,52 @@ const SchedulerAvailability: React.FC<ProctorSetAvailabilityProps> = ({ user }) 
       if (crFilter !== 'all') params.status = crFilter;
       const { data } = await api.get(`/tbl_availability/`, { params });
       if (!Array.isArray(data)) { setChangeRequests([]); return; }
-      const enriched: ChangeRequest[] = await Promise.all(
-        data.map(async (item: any) => {
-          let proctor_name = item.proctor_name ?? '';
-          if (!proctor_name && item.user_id) {
-            const cached = userCache.get(item.user_id);
-            if (cached) {
-              proctor_name = `${cached.first_name ?? ''} ${cached.last_name ?? ''}`.trim();
-            } else {
-              try {
-                const { data: ud } = await api.get(`/tbl_users/${item.user_id}`);
-                proctor_name = `${ud?.first_name ?? ''} ${ud?.last_name ?? ''}`.trim();
-                setUserCache(prev => new Map(prev).set(item.user_id, ud));
-              } catch { proctor_name = `Proctor #${item.user_id}`; }
-            }
+
+      // Collect any user IDs NOT yet in cache
+      const missingIds = [...new Set(
+        data.map((item: any) => item.user_id).filter(
+          (id: number) => id && !userCache.has(id)
+        )
+      )];
+
+      // Bulk fetch missing users in ONE request
+      if (missingIds.length > 0) {
+        try {
+          const { data: bulkUsers } = await api.get(`/users/bulk/`, {
+            params: { ids: missingIds.join(',') }
+          });
+          if (Array.isArray(bulkUsers)) {
+            setUserCache(prev => {
+              const updated = new Map(prev);
+              bulkUsers.forEach((u: any) => updated.set(u.user_id, u));
+              return updated;
+            });
+            // Also update local reference for use below
+            bulkUsers.forEach((u: any) => userCache.set(u.user_id, u));
           }
-          return {
-            id: item.id ?? item.availability_id,
-            user_id: item.user_id,
-            proctor_name,
-            days: Array.isArray(item.days) ? item.days : [],
-            time_slots: Array.isArray(item.time_slots) ? item.time_slots : [],
-            status: item.status ?? 'pending',
-            requested_status: item.requested_status ?? null,
-            remarks: item.remarks ?? null,
-            created_at: item.created_at,
-            type: item.type,
-          };
-        })
-      );
+        } catch { /* silent */ }
+      }
+
+      const enriched: ChangeRequest[] = data.map((item: any) => {
+        const cached = userCache.get(item.user_id);
+        const proctor_name = cached
+          ? `${cached.first_name ?? ''} ${cached.last_name ?? ''}`.trim()
+          : `Proctor #${item.user_id}`;
+
+        return {
+          id: item.id ?? item.availability_id,
+          user_id: item.user_id,
+          proctor_name,
+          days: Array.isArray(item.days) ? item.days : [],
+          time_slots: Array.isArray(item.time_slots) ? item.time_slots : [],
+          status: item.status ?? 'pending',
+          requested_status: item.requested_status ?? null,
+          remarks: item.remarks ?? null,
+          created_at: item.created_at,
+          type: item.type,
+        };
+      });
+
       setChangeRequests(enriched);
       if (crFilter === 'all') setPendingCrCount(enriched.filter(r => r.status === 'pending').length);
     } catch (err) {

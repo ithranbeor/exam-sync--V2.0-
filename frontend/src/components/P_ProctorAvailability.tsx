@@ -503,169 +503,147 @@ const ProctorSetAvailability: React.FC<ProctorSetAvailabilityProps> = ({ user })
           <div className="subtitle">
             (Choose your availability for the exam schedule)
           </div>
-          {hasApprovedSchedule ? (
-            <div
-              style={{
-                textAlign: 'center',
-                padding: '40px 20px',
-                color: '#666',
-                fontSize: '14px',
-                border: '1px dashed #ccc',
-                borderRadius: '8px',
-                margin: '20px 0',
-                backgroundColor: '#f9f9f9'
-              }}
-            >
-              <p style={{ marginBottom: '10px', fontWeight: 'bold', color: '#092C4C' }}>
-                Availability setting is locked
-              </p>
-              <p>
-                You can no longer modify your availability because the exam schedule has already been approved.
-              </p>
-            </div>
-          ) : (
-            <form onSubmit={handleSubmitAvailability} className="availability-form">
+          <form onSubmit={handleSubmitAvailability} className="availability-form">
 
-              {/* Day Picker */}
-              <div className="form-group">
-                <label htmlFor="day">Day(s)</label>
-                <div className="custom-select-wrapper">
-                  <input
-                    type="text"
-                    id="day"
-                    value={
-                      loadingAllowedDates
-                        ? 'Loading...'
-                        : selectedDates.length > 0
-                          ? selectedDates.map(d => new Date(d).toLocaleDateString('en-US')).join(', ')
-                          : 'Click to select dates'
-                    }
-                    readOnly
-                    onClick={() => {
-                      if (!loadingAllowedDates && allowedDates.length > 0 && !isSubmitting) {
-                        setShowDatePicker(!showDatePicker);
-                      }
-                    }}
-                    className="date-input-field"
-                    style={{
-                      cursor: loadingAllowedDates || isSubmitting ? 'not-allowed' : 'pointer',
-                      color: loadingAllowedDates ? '#6c757d' : 'black',
-                    }}
-                  />
-                  <span
-                    className="dropdown-arrow"
-                    onClick={() => {
-                      if (!loadingAllowedDates && allowedDates.length > 0 && !isSubmitting) {
-                        setShowDatePicker(!showDatePicker);
-                      }
-                    }}
-                  >
-                    &#9660;
-                  </span>
-
-                  {showDatePicker && !loadingAllowedDates && (
-                    <div className="date-picker">
-                      <div className="date-picker-header">
-                        <button type="button" onClick={goToPreviousMonth}><FaChevronLeft /></button>
-                        <span>{currentMonth.toLocaleDateString('en-US', { month: 'long', year: 'numeric' })}</span>
-                        <button type="button" onClick={goToNextMonth}><FaChevronRight /></button>
-                      </div>
-                      <div className="date-picker-grid">
-                        {['S', 'M', 'T', 'W', 'T', 'F', 'S'].map((d, i) => (
-                          <div key={i} className="day-name">{d}</div>
-                        ))}
-                        {getCalendarDays().map((day, index) => {
-                          const dayDate = day ? new Date(currentMonth.getFullYear(), currentMonth.getMonth(), day, 12) : null;
-                          const isoDate = dayDate ? dayDate.toISOString().split('T')[0] : '';
-                          const isAllowed = allowedDates.includes(isoDate) && !isSubmitting;
-                          const isSelected = selectedDates.includes(isoDate);
-                          const isToday = dayDate && dayDate.toDateString() === today.toDateString();
-
-                          return (
-                            <div
-                              key={index}
-                              className={`calendar-day ${day ? 'selectable' : ''} ${isSelected ? 'selected' : ''} ${isToday ? 'today' : ''} ${isAllowed ? 'allowed' : 'disabled'}`}
-                              onClick={() => isAllowed && handleDateSelect(day)}
-                              style={{ pointerEvents: isAllowed ? 'auto' : 'none', opacity: isAllowed ? 1 : 0.3 }}
-                            >
-                              {day}
-                            </div>
-                          );
-                        })}
-                      </div>
-                      <div className="date-picker-footer">
-                        <button type="button" onClick={() => setShowDatePicker(false)}>Done</button>
-                      </div>
-                    </div>
-                  )}
-                </div>
-              </div>
-
-              {/* Time Slot */}
-              <div className="form-group">
-                <label htmlFor="timeSlot">Time Slot(s)</label>
-                <Select
-                  id="timeSlot"
-                  value={selectedTimeSlots.map(slot => ({ value: slot, label: slot }))}
-                  onChange={(options) =>
-                    setSelectedTimeSlots(options ? options.map(o => o.value as AvailabilityTimeSlot) : [])
+            {/* Day Picker */}
+            <div className="form-group">
+              <label htmlFor="day">Day(s)</label>
+              <div className="custom-select-wrapper">
+                <input
+                  type="text"
+                  id="day"
+                  value={
+                    loadingAllowedDates
+                      ? 'Loading...'
+                      : selectedDates.length > 0
+                        ? selectedDates.map(d => new Date(d).toLocaleDateString('en-US')).join(', ')
+                        : 'Click to select dates'
                   }
-                  options={Object.values(AvailabilityTimeSlot).map(slot => ({ value: slot, label: slot }))}
-                  isMulti
-                  isDisabled={isSubmitting}
-                  classNamePrefix="react-select"
-                  placeholder="Select Time Slot(s)"
-                  isSearchable
-                />
-              </div>
-
-              {/* Remarks */}
-              <div className="form-group">
-                <label htmlFor="remarks">Remarks</label>
-                <textarea
-                  id="remarks"
-                  value={remarks}
-                  onChange={(e) => setRemarks(e.target.value)}
-                  placeholder="Type here..."
-                  disabled={isSubmitting}
-                />
-              </div>
-
-              <div style={{ textAlign: 'center', marginTop: '20px' }}>
-                <button type="button" className="submit-button" onClick={handleSubmitAvailability} disabled={isSubmitting}>
-                  {isSubmitting ? 'Submitting...' : 'Submit'}
-                </button>
-              </div>
-
-              <div style={{ textAlign: 'center', marginTop: '10px' }}>
-                <span
+                  readOnly
+                  onClick={() => {
+                    if (!loadingAllowedDates && allowedDates.length > 0 && !isSubmitting) {
+                      setShowDatePicker(!showDatePicker);
+                    }
+                  }}
+                  className="date-input-field"
                   style={{
-                    display: 'inline-block',
-                    color: '#092C4C',
-                    cursor: 'pointer',
-                    textDecoration: 'none',
-                    border: '2px solid #092C4C',
-                    padding: '8px 16px',
-                    borderRadius: '8px',
-                    fontSize: '0.95em',
-                    fontWeight: '500',
-                    transition: 'all 0.2s ease'
+                    cursor: loadingAllowedDates || isSubmitting ? 'not-allowed' : 'pointer',
+                    color: loadingAllowedDates ? '#6c757d' : 'black',
                   }}
-                  onMouseEnter={(e) => {
-                    e.currentTarget.style.backgroundColor = '#092C4C';
-                    e.currentTarget.style.color = 'white';
+                />
+                <span
+                  className="dropdown-arrow"
+                  onClick={() => {
+                    if (!loadingAllowedDates && allowedDates.length > 0 && !isSubmitting) {
+                      setShowDatePicker(!showDatePicker);
+                    }
                   }}
-                  onMouseLeave={(e) => {
-                    e.currentTarget.style.backgroundColor = 'transparent';
-                    e.currentTarget.style.color = '#092C4C';
-                  }}
-                  onClick={() => setShowModal(true)}
                 >
-                  Click here to view all submitted availabilities
+                  &#9660;
                 </span>
+
+                {showDatePicker && !loadingAllowedDates && (
+                  <div className="date-picker">
+                    <div className="date-picker-header">
+                      <button type="button" onClick={goToPreviousMonth}><FaChevronLeft /></button>
+                      <span>{currentMonth.toLocaleDateString('en-US', { month: 'long', year: 'numeric' })}</span>
+                      <button type="button" onClick={goToNextMonth}><FaChevronRight /></button>
+                    </div>
+                    <div className="date-picker-grid">
+                      {['S', 'M', 'T', 'W', 'T', 'F', 'S'].map((d, i) => (
+                        <div key={i} className="day-name">{d}</div>
+                      ))}
+                      {getCalendarDays().map((day, index) => {
+                        const dayDate = day ? new Date(currentMonth.getFullYear(), currentMonth.getMonth(), day, 12) : null;
+                        const isoDate = dayDate ? dayDate.toISOString().split('T')[0] : '';
+                        const isAllowed = allowedDates.includes(isoDate) && !isSubmitting;
+                        const isSelected = selectedDates.includes(isoDate);
+                        const isToday = dayDate && dayDate.toDateString() === today.toDateString();
+
+                        return (
+                          <div
+                            key={index}
+                            className={`calendar-day ${day ? 'selectable' : ''} ${isSelected ? 'selected' : ''} ${isToday ? 'today' : ''} ${isAllowed ? 'allowed' : 'disabled'}`}
+                            onClick={() => isAllowed && handleDateSelect(day)}
+                            style={{ pointerEvents: isAllowed ? 'auto' : 'none', opacity: isAllowed ? 1 : 0.3 }}
+                          >
+                            {day}
+                          </div>
+                        );
+                      })}
+                    </div>
+                    <div className="date-picker-footer">
+                      <button type="button" onClick={() => setShowDatePicker(false)}>Done</button>
+                    </div>
+                  </div>
+                )}
               </div>
-            </form>
-          )}
+            </div>
+
+            {/* Time Slot */}
+            <div className="form-group">
+              <label htmlFor="timeSlot">Time Slot(s)</label>
+              <Select
+                id="timeSlot"
+                value={selectedTimeSlots.map(slot => ({ value: slot, label: slot }))}
+                onChange={(options) =>
+                  setSelectedTimeSlots(options ? options.map(o => o.value as AvailabilityTimeSlot) : [])
+                }
+                options={Object.values(AvailabilityTimeSlot).map(slot => ({ value: slot, label: slot }))}
+                isMulti
+                isDisabled={isSubmitting}
+                classNamePrefix="react-select"
+                placeholder="Select Time Slot(s)"
+                isSearchable
+              />
+            </div>
+
+            {/* Remarks */}
+            <div className="form-group">
+              <label htmlFor="remarks">Remarks</label>
+              <textarea
+                id="remarks"
+                value={remarks}
+                onChange={(e) => setRemarks(e.target.value)}
+                placeholder="Type here..."
+                disabled={isSubmitting}
+              />
+            </div>
+
+            <div style={{ textAlign: 'center', marginTop: '20px' }}>
+              <button type="button" className="submit-button" onClick={handleSubmitAvailability} disabled={isSubmitting}>
+                {isSubmitting ? 'Submitting...' : 'Submit'}
+              </button>
+            </div>
+
+            <div style={{ textAlign: 'center', marginTop: '10px' }}>
+              <span
+                style={{
+                  display: 'inline-block',
+                  color: '#092C4C',
+                  cursor: 'pointer',
+                  textDecoration: 'none',
+                  border: '2px solid #092C4C',
+                  padding: '8px 16px',
+                  borderRadius: '8px',
+                  fontSize: '0.95em',
+                  fontWeight: '500',
+                  transition: 'all 0.2s ease'
+                }}
+                onMouseEnter={(e) => {
+                  e.currentTarget.style.backgroundColor = '#092C4C';
+                  e.currentTarget.style.color = 'white';
+                }}
+                onMouseLeave={(e) => {
+                  e.currentTarget.style.backgroundColor = 'transparent';
+                  e.currentTarget.style.color = '#092C4C';
+                }}
+                onClick={() => setShowModal(true)}
+              >
+                Click here to view all submitted availabilities
+              </span>
+            </div>
+          </form>
         </div>
 
         {/* Modal for viewing submissions */}
@@ -789,185 +767,163 @@ const ProctorSetAvailability: React.FC<ProctorSetAvailabilityProps> = ({ user })
         <div className="availability-card">
           <div className="card-header-request">Request Change of Availability</div>
           <div className="subtitle">
-            {hasApprovedSchedule
-              ? '(only available after the release of exam schedule)'
-              : '(waiting for schedule approval from your dean)'}
+            (Request a change to your availability)
           </div>
 
-          {!hasApprovedSchedule ? (
-            <div style={{
-              textAlign: 'center',
-              padding: '40px 20px',
-              color: '#666',
-              fontSize: '14px',
-              border: '1px dashed #ccc',
-              borderRadius: '8px',
-              margin: '20px 0',
-              backgroundColor: '#f9f9f9'
-            }}>
-              <p style={{ marginBottom: '10px', fontWeight: 'bold', color: '#092C4C' }}>
-                Change requests are currently unavailable
-              </p>
-              <p>
-                This feature will be enabled once your college's exam schedule has been approved by the dean.
-              </p>
-            </div>
-          ) : (
-            <form onSubmit={handleSubmitChangeRequest} className="availability-form">
-              {/* Select Original Schedule (Days) */}
-              <div className="form-group">
-                <label htmlFor="originalDays">Select Schedule Day(s)</label>
-                <Select
-                  id="originalDays"
-                  value={selectedOriginalDay
-                    .split(',')
-                    .filter(Boolean)
-                    .map(day => ({
-                      value: day,
-                      label: new Date(day).toLocaleDateString('en-US', {
-                        month: 'long',
-                        day: 'numeric',
-                        year: 'numeric',
-                      }),
-                    }))}
-                  onChange={(selectedOptions) => {
-                    const days = selectedOptions?.map(o => o.value) || [];
-                    setSelectedOriginalDay(days.join(','));
-                    setSelectedOriginalTimeSlot('');
-                  }}
-                  options={allowedDates
-                    .filter(day => !isPastDate(day)) // ✅ Filter out past dates
-                    .map(day => ({
-                      value: day,
-                      label: new Date(day).toLocaleDateString('en-US', {
-                        month: 'long',
-                        day: 'numeric',
-                        year: 'numeric',
-                      }),
-                    }))}
-                  isMulti
-                  placeholder="Select one or more days"
-                  isDisabled={isSubmitting || allowedDates.length === 0}
-                  classNamePrefix="react-select"
-                  isSearchable
-                />
-              </div>
-
-              {/* Select Original Time Slots - Show both unavailable and alternative available slots */}
-              <div className="form-group">
-                <label htmlFor="originalTimeSlots">
-                  {changeStatus === 'unavailable'
-                    ? 'Select Time Slot(s) - Unavailable Hours'
-                    : 'Select Time Slot(s)'}
-                </label>
-                <Select
-                  id="originalTimeSlots"
-                  value={
-                    selectedOriginalTimeSlot
-                      ? selectedOriginalTimeSlot.split(',').map(slot => ({ value: slot, label: slot }))
-                      : []
-                  }
-                  onChange={(selectedOptions) => {
-                    const slots = selectedOptions?.map(o => o.value) || [];
-                    setSelectedOriginalTimeSlot(slots.join(','));
-                  }}
-                  options={
-                    selectedOriginalDay
-                      ? Array.from(
-                        new Set(
-                          selectedOriginalDay
-                            .split(',')
-                            .filter(d => !isPastDate(d))
-                            .flatMap(day => dayToTimeSlots[day] || [])
-                        )
-                      ).map(slot => ({ value: slot, label: slot }))
-                      : Object.values(AvailabilityTimeSlot).map(slot => ({ value: slot, label: slot }))
-                  }
-                  placeholder={
-                    selectedOriginalDay ? 'Select one or more time slots' : 'Select days first'
-                  }
-                  isDisabled={!selectedOriginalDay || isSubmitting}
-                  isMulti
-                  classNamePrefix="react-select"
-                  isSearchable
-                />
-              </div>
-
-              {/* Change Status */}
-              <div className="form-group">
-                <label htmlFor="changeStatus">New Status</label>
-                <Select
-                  id="changeStatus"
-                  value={{
-                    value: changeStatus,
-                    label: changeStatus.charAt(0).toUpperCase() + changeStatus.slice(1),
-                  }}
-                  onChange={(selected) => setChangeStatus(selected?.value || 'unavailable')}
-                  options={availabilityOptions.map(opt => ({
-                    value: opt,
-                    label: opt.charAt(0).toUpperCase() + opt.slice(1),
+          <form onSubmit={handleSubmitChangeRequest} className="availability-form">
+            {/* Select Original Schedule (Days) */}
+            <div className="form-group">
+              <label htmlFor="originalDays">Select Schedule Day(s)</label>
+              <Select
+                id="originalDays"
+                value={selectedOriginalDay
+                  .split(',')
+                  .filter(Boolean)
+                  .map(day => ({
+                    value: day,
+                    label: new Date(day).toLocaleDateString('en-US', {
+                      month: 'long',
+                      day: 'numeric',
+                      year: 'numeric',
+                    }),
                   }))}
-                  isDisabled={isSubmitting}
-                  classNamePrefix="react-select"
-                  placeholder="Select Status"
-                  isSearchable={false}
-                />
-              </div>
+                onChange={(selectedOptions) => {
+                  const days = selectedOptions?.map(o => o.value) || [];
+                  setSelectedOriginalDay(days.join(','));
+                  setSelectedOriginalTimeSlot('');
+                }}
+                options={allowedDates
+                  .filter(day => !isPastDate(day)) // ✅ Filter out past dates
+                  .map(day => ({
+                    value: day,
+                    label: new Date(day).toLocaleDateString('en-US', {
+                      month: 'long',
+                      day: 'numeric',
+                      year: 'numeric',
+                    }),
+                  }))}
+                isMulti
+                placeholder="Select one or more days"
+                isDisabled={isSubmitting || allowedDates.length === 0}
+                classNamePrefix="react-select"
+                isSearchable
+              />
+            </div>
 
-              {/* ✅ NEW: Show available alternative time slots when "unavailable" is selected */}
-              {changeStatus === 'unavailable' && selectedOriginalDay && selectedOriginalTimeSlot && (
-                <div className="form-group" style={{ backgroundColor: '#e7f3ff', padding: '12px', borderRadius: '6px', borderLeft: '4px solid #092C4C' }}>
-                  <label style={{ fontWeight: 'bold', color: '#092C4C', marginBottom: '8px', display: 'block' }}>
-                    💡 Alternative Available Time Slots
-                  </label>
-                  <p style={{ fontSize: '13px', color: '#555', marginBottom: '8px' }}>
-                    You marked as unavailable for: <strong>{selectedOriginalTimeSlot.split(',').join(', ')}</strong>
-                  </p>
-                  <p style={{ fontSize: '13px', color: '#555', marginBottom: '8px' }}>
-                    Consider offering these alternative time slots on the same dates:
-                  </p>
-                  <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap' }}>
-                    {Object.values(AvailabilityTimeSlot)
-                      .filter(slot => !selectedOriginalTimeSlot.split(',').includes(slot))
-                      .map((altSlot) => (
-                        <span
-                          key={altSlot}
-                          style={{
-                            backgroundColor: '#092C4C',
-                            color: '#fff',
-                            padding: '6px 12px',
-                            borderRadius: '4px',
-                            fontSize: '12px',
-                          }}
-                        >
-                          {altSlot}
-                        </span>
-                      ))}
-                  </div>
-                  <p style={{ fontSize: '11px', color: '#666', marginTop: '8px', fontStyle: 'italic' }}>
-                    You can submit another change request to offer these slots after this request is processed.
-                  </p>
+            {/* Select Original Time Slots - Show both unavailable and alternative available slots */}
+            <div className="form-group">
+              <label htmlFor="originalTimeSlots">
+                {changeStatus === 'unavailable'
+                  ? 'Select Time Slot(s) - Unavailable Hours'
+                  : 'Select Time Slot(s)'}
+              </label>
+              <Select
+                id="originalTimeSlots"
+                value={
+                  selectedOriginalTimeSlot
+                    ? selectedOriginalTimeSlot.split(',').map(slot => ({ value: slot, label: slot }))
+                    : []
+                }
+                onChange={(selectedOptions) => {
+                  const slots = selectedOptions?.map(o => o.value) || [];
+                  setSelectedOriginalTimeSlot(slots.join(','));
+                }}
+                options={
+                  selectedOriginalDay
+                    ? Array.from(
+                      new Set(
+                        selectedOriginalDay
+                          .split(',')
+                          .filter(d => !isPastDate(d))
+                          .flatMap(day => dayToTimeSlots[day] || [])
+                      )
+                    ).map(slot => ({ value: slot, label: slot }))
+                    : Object.values(AvailabilityTimeSlot).map(slot => ({ value: slot, label: slot }))
+                }
+                placeholder={
+                  selectedOriginalDay ? 'Select one or more time slots' : 'Select days first'
+                }
+                isDisabled={!selectedOriginalDay || isSubmitting}
+                isMulti
+                classNamePrefix="react-select"
+                isSearchable
+              />
+            </div>
+
+            {/* Change Status */}
+            <div className="form-group">
+              <label htmlFor="changeStatus">New Status</label>
+              <Select
+                id="changeStatus"
+                value={{
+                  value: changeStatus,
+                  label: changeStatus.charAt(0).toUpperCase() + changeStatus.slice(1),
+                }}
+                onChange={(selected) => setChangeStatus(selected?.value || 'unavailable')}
+                options={availabilityOptions.map(opt => ({
+                  value: opt,
+                  label: opt.charAt(0).toUpperCase() + opt.slice(1),
+                }))}
+                isDisabled={isSubmitting}
+                classNamePrefix="react-select"
+                placeholder="Select Status"
+                isSearchable={false}
+              />
+            </div>
+
+            {/* ✅ NEW: Show available alternative time slots when "unavailable" is selected */}
+            {changeStatus === 'unavailable' && selectedOriginalDay && selectedOriginalTimeSlot && (
+              <div className="form-group" style={{ backgroundColor: '#e7f3ff', padding: '12px', borderRadius: '6px', borderLeft: '4px solid #092C4C' }}>
+                <label style={{ fontWeight: 'bold', color: '#092C4C', marginBottom: '8px', display: 'block' }}>
+                  💡 Alternative Available Time Slots
+                </label>
+                <p style={{ fontSize: '13px', color: '#555', marginBottom: '8px' }}>
+                  You marked as unavailable for: <strong>{selectedOriginalTimeSlot.split(',').join(', ')}</strong>
+                </p>
+                <p style={{ fontSize: '13px', color: '#555', marginBottom: '8px' }}>
+                  Consider offering these alternative time slots on the same dates:
+                </p>
+                <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap' }}>
+                  {Object.values(AvailabilityTimeSlot)
+                    .filter(slot => !selectedOriginalTimeSlot.split(',').includes(slot))
+                    .map((altSlot) => (
+                      <span
+                        key={altSlot}
+                        style={{
+                          backgroundColor: '#092C4C',
+                          color: '#fff',
+                          padding: '6px 12px',
+                          borderRadius: '4px',
+                          fontSize: '12px',
+                        }}
+                      >
+                        {altSlot}
+                      </span>
+                    ))}
                 </div>
-              )}
-
-              {/* Reason */}
-              <div className="form-group">
-                <label htmlFor="reason">Reason/s</label>
-                <textarea
-                  id="reason"
-                  value={reason}
-                  onChange={(e) => setReason(e.target.value)}
-                  placeholder="Type here..."
-                  disabled={isSubmitting}
-                />
+                <p style={{ fontSize: '11px', color: '#666', marginTop: '8px', fontStyle: 'italic' }}>
+                  You can submit another change request to offer these slots after this request is processed.
+                </p>
               </div>
+            )}
 
-              {/* Submit */}
-              <button type="button" className="submit-button" onClick={handleSubmitChangeRequest} disabled={isSubmitting}>
-                {isSubmitting ? 'Submitting...' : 'Submit'}
-              </button>
-            </form>
-          )}
+            {/* Reason */}
+            <div className="form-group">
+              <label htmlFor="reason">Reason/s</label>
+              <textarea
+                id="reason"
+                value={reason}
+                onChange={(e) => setReason(e.target.value)}
+                placeholder="Type here..."
+                disabled={isSubmitting}
+              />
+            </div>
+
+            {/* Submit */}
+            <button type="button" className="submit-button" onClick={handleSubmitChangeRequest} disabled={isSubmitting}>
+              {isSubmitting ? 'Submitting...' : 'Submit'}
+            </button>
+          </form>
         </div>
       </div>
       <ToastContainer position="top-right" autoClose={3000} hideProgressBar />

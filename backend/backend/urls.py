@@ -19,6 +19,7 @@ urlpatterns = [
     path('api/users/', views.users_list, name='users_list'),
     path('api/create-account/', views.create_account_with_password, name='create_account_with_password'),
     path('api/users/<int:user_id>/', views.user_detail, name='user_detail'),
+    path('api/tbl_users/<int:user_id>/', views.user_detail, name='tbl_user_detail'),  # ✅ NEW: Alias for compatibility
     path('api/user-roles/<int:user_id>/roles/', views.user_roles, name='user_roles'),
     path('api/auth/request-password-change/', views.request_password_change, name='request_password_change'),
     path('api/auth/confirm-password-change/', views.confirm_password_change, name='confirm_password_change'),
