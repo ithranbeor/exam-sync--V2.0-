@@ -37,7 +37,7 @@ const ProctorSetAvailability: React.FC<ProctorSetAvailabilityProps> = ({ user })
   const [allowedDates, setAllowedDates] = useState<string[]>([]);
   const [_collegeId, setCollegeId] = useState<number | null>(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
-  const [hasApprovedSchedule, setHasApprovedSchedule] = useState(false);
+  const [_hasApprovedSchedule, setHasApprovedSchedule] = useState(false);
   const [availabilityList, setAvailabilityList] = useState<
     { days: string[]; time_slots: string[]; status: string; remarks?: string }[]
   >([]);

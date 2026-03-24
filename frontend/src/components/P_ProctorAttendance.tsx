@@ -55,11 +55,6 @@ const ProctorAttendance: React.FC<UserProps> = ({ user }) => {
     try {
       const { data } = await api.get(`/proctor-assigned-exams/${user.user_id}/`);
 
-      console.log('=== FETCHED CATEGORIZED EXAMS ===');
-      console.log('Ongoing:', data.ongoing?.length || 0);
-      console.log('Upcoming:', data.upcoming?.length || 0);
-      console.log('Completed:', data.completed?.length || 0);
-
       setOngoingExams(data.ongoing || []);
       setUpcomingExams(data.upcoming || []);
       setCompletedExams(data.completed || []);
@@ -77,7 +72,6 @@ const ProctorAttendance: React.FC<UserProps> = ({ user }) => {
         params: { user_id: user.user_id }
       });
 
-      console.log(`✅ Fetched ${data?.length || 0} exams available for substitution`);
       setAllExams(data || []);
     } catch (error: any) {
       console.error('Error fetching all exams:', error);
