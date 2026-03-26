@@ -373,6 +373,7 @@ class UserSerializer(serializers.ModelSerializer):
             'status', 
             'user_uuid',
             'employment_type',
+            'created_at',
         ]
 
 class TblRolesSerializer(serializers.ModelSerializer):

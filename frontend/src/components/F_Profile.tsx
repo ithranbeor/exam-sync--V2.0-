@@ -236,7 +236,7 @@ const Profile: React.FC<ProfileProps> = ({ user }) => {
   }
 
   const activeRoles = userRoles.filter(r => r.status !== 'Suspended');
-  const allRoles = userRoles;
+  const allRoles    = userRoles;
   const isSuspended = profile.status === 'Suspended';
 
   return (
@@ -321,10 +321,10 @@ const Profile: React.FC<ProfileProps> = ({ user }) => {
 
       {/* ── Stats Row ── */}
       <div className="pf-stats-row">
-        <StatCard icon={<FaIdBadge size={14} />} label="Total Roles" value={String(allRoles.length)} accent="var(--cl-accent)" />
-        <StatCard icon={<FaCheckCircle size={14} />} label="Active Roles" value={String(activeRoles.length)} accent="var(--cl-success)" />
-        <StatCard icon={<FaTimesCircle size={14} />} label="Suspended Roles" value={String(allRoles.length - activeRoles.length)} accent="var(--cl-danger)" />
-        <StatCard icon={<FaClock size={14} />} label="Account Created" value={formatDate(profile.created_at)} accent="var(--cl-warn)" />
+        <StatCard icon={<FaIdBadge size={14} />}      label="Total Roles"       value={String(allRoles.length)}                       accent="var(--cl-accent)" />
+        <StatCard icon={<FaCheckCircle size={14} />}  label="Active Roles"      value={String(activeRoles.length)}                    accent="var(--cl-success)" />
+        <StatCard icon={<FaTimesCircle size={14} />}  label="Suspended Roles"   value={String(allRoles.length - activeRoles.length)}  accent="var(--cl-danger)" />
+        <StatCard icon={<FaClock size={14} />}        label="Account Created"   value={formatDate(profile.created_at)}                accent="var(--cl-warn)" />
       </div>
 
       {/* ── Personal Details Card ── */}
@@ -344,11 +344,11 @@ const Profile: React.FC<ProfileProps> = ({ user }) => {
 
         <div className="pf-fields-grid">
           {[
-            { label: 'User ID', name: 'user_id' },
-            { label: 'First Name', name: 'first_name' },
-            { label: 'Middle Name', name: 'middle_name' },
-            { label: 'Last Name', name: 'last_name' },
-            { label: 'Contact No.', name: 'contact_number' },
+            { label: 'User ID',      name: 'user_id'        },
+            { label: 'First Name',   name: 'first_name'     },
+            { label: 'Middle Name',  name: 'middle_name'    },
+            { label: 'Last Name',    name: 'last_name'      },
+            { label: 'Contact No.',  name: 'contact_number' },
           ].map(f => (
             <div key={f.name} className="cl-field">
               <label>{f.label}</label>
@@ -467,7 +467,7 @@ const Profile: React.FC<ProfileProps> = ({ user }) => {
             <div className="pf-security-item-desc">
               {profile.created_at
                 ? <>This account was created on <strong>{formatDateTime(profile.created_at)}</strong>.</>
-                : <span style={{ color: 'var(--cl-text-muted)', fontStyle: 'italic' }}>Account creation date is not available.</span>}
+                : 'Creation date not available.'}
             </div>
           </div>
         </div>
