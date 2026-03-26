@@ -514,7 +514,7 @@ class TblUsers(models.Model):
     middle_name = models.CharField(max_length=50, blank=True, null=True)
     email_address = models.CharField(unique=True, max_length=50)
     contact_number = models.CharField(max_length=20, blank=True, null=True)
-    created_at = models.DateTimeField(blank=True, null=True)
+    created_at = models.DateTimeField(auto_now_add=True)
     avatar_url = models.CharField(blank=True, null=True)
     status = models.TextField(blank=True, null=True)
     user_uuid = models.UUIDField(blank=True, null=True)

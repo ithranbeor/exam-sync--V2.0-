@@ -418,687 +418,412 @@ const Buildings: React.FC = () => {
   };
 
   return (
-    <div className="colleges-container">
-      <div className="colleges-header">
-        <div className="search-bar" style={{ marginLeft: 'auto' }}>
-          <input
-            type="text"
-            placeholder="Search Building Name"
-            value={searchTerm}
-            onChange={(e) => setSearchTerm(e.target.value)}
-          />
-          <button type="button" className="search-button"><FaSearch /></button>
+    <div className="cl-page">
+
+      {/* ── Page Header ── */}
+      <div className="cl-page-header">
+        <div className="cl-page-header-left">
+          <div className="cl-page-icon">
+            <svg width="22" height="22" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.8}>
+              <path strokeLinecap="round" strokeLinejoin="round" d="M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16m14 0h2m-2 0h-5m-9 0H3m2 0h5M9 7h1m-1 4h1m4-4h1m-1 4h1m-5 10v-5a1 1 0 011-1h2a1 1 0 011 1v5m-4 0h4" />
+            </svg>
+          </div>
+          <div className="cl-page-title">
+            <h1>Buildings</h1>
+            <p>{buildings.length} building{buildings.length !== 1 ? 's' : ''} · {filtered.length} showing</p>
+          </div>
+        </div>
+
+        <div className="cl-page-actions">
+          {/* Search */}
+          <div className="cl-search-bar">
+            <FaSearch className="cl-search-icon" />
+            <input
+              type="text"
+              placeholder="Search buildings…"
+              value={searchTerm}
+              onChange={e => setSearchTerm(e.target.value)}
+            />
+          </div>
+
+          <button
+            type="button"
+            className="cl-btn primary"
+            onClick={() => { setEditMode(false); setNewBuilding({ building_id: '', building_name: '' }); setShowModal(true); }}
+          >
+            <FaPlus style={{ fontSize: '11px' }} /> Add
+          </button>
+          <button type="button" className="cl-btn" onClick={() => setShowImport(true)}>
+            <FaFileImport style={{ fontSize: '11px' }} /> Import
+          </button>
+          <button
+            type="button"
+            className="cl-btn danger"
+            onClick={handleBulkDelete}
+            disabled={isBulkDeleting || selectedBuildingIds.size === 0}
+            title={selectedBuildingIds.size > 0 ? `Delete ${selectedBuildingIds.size} selected` : 'Select rows to delete'}
+          >
+            <FaTrash style={{ fontSize: '11px' }} />
+            {selectedBuildingIds.size > 0 && <span>({selectedBuildingIds.size})</span>}
+          </button>
         </div>
       </div>
 
-      <div className="colleges-actions">
-        <div style={{ display: 'flex', alignItems: 'center', gap: 8, width: '100%' }}>
-          <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+      {/* ── Toolbar ── */}
+      <div className="cl-toolbar">
+        <div className="cl-toolbar-left">
+
+          {/* Sort dropdown */}
+          <div style={{ position: 'relative' }} data-sort-dropdown>
             <button
               type="button"
-              className="action-button add-new with-label"
-              onClick={() => {
-                setEditMode(false);
-                setNewBuilding({ building_id: '', building_name: '' });
-                setShowModal(true);
-              }}
+              className="cl-toolbar-btn"
+              onClick={() => setShowSortDropdown(!showSortDropdown)}
             >
-              <FaPlus /><span className="btn-label">Add</span>
+              <FaSort style={{ fontSize: '11px' }} />
+              Sort{sortBy !== 'none' ? `: ${sortBy === 'building_id' ? 'ID' : sortBy === 'building_name' ? 'Name' : 'Rooms'}` : ''}
+              <FaChevronDown style={{ fontSize: '9px', marginLeft: '2px' }} />
             </button>
+            {showSortDropdown && (
+              <div className="cl-dropdown">
+                {[
+                  { value: 'none', label: 'None' },
+                  { value: 'building_id', label: 'Building ID' },
+                  { value: 'building_name', label: 'Building Name' },
+                  { value: 'room_count', label: 'Room Count' },
+                ].map(opt => (
+                  <button
+                    key={opt.value}
+                    type="button"
+                    className={`cl-dropdown-item${sortBy === opt.value ? ' active' : ''}`}
+                    onClick={() => { setSortBy(opt.value); setShowSortDropdown(false); }}
+                  >
+                    {opt.label}
+                  </button>
+                ))}
+              </div>
+            )}
+          </div>
+
+          {/* Rows per page dropdown */}
+          <div style={{ position: 'relative' }} data-items-per-page-dropdown>
             <button
               type="button"
-              className="action-button import with-label"
-              onClick={() => setShowImport(true)}
+              className="cl-toolbar-btn"
+              onClick={() => setShowItemsPerPageDropdown(!showItemsPerPageDropdown)}
             >
-              <FaFileImport /><span className="btn-label">Import</span>
+              <FaChevronDown style={{ fontSize: '9px' }} />
+              Rows: {itemsPerPage === 'all' ? 'All' : itemsPerPage}
             </button>
-            <div style={{ position: 'relative' }} data-sort-dropdown>
-              <button
-                type="button"
-                className="action-button with-label sort-by-button"
-                onClick={() => setShowSortDropdown(!showSortDropdown)}
-                title="Sort by"
-              >
-                <FaSort />
-                <span className="btn-label">Sort by</span>
-              </button>
-              {showSortDropdown && (
-                <div
-                  style={{
-                    position: 'absolute',
-                    top: '100%',
-                    left: 0,
-                    marginTop: '4px',
-                    backgroundColor: 'white',
-                    border: '1px solid #ddd',
-                    borderRadius: '8px',
-                    boxShadow: '0 2px 8px rgba(0,0,0,0.15)',
-                    zIndex: 1000,
-                    minWidth: '150px'
-                  }}
-                >
+            {showItemsPerPageDropdown && (
+              <div className="cl-dropdown" style={{ minWidth: '200px' }}>
+                {[10, 20, 30].map(n => (
                   <button
+                    key={n}
                     type="button"
-                    onClick={() => {
-                      setSortBy('none');
-                      setShowSortDropdown(false);
-                    }}
-                    style={{
-                      width: '100%',
-                      padding: '8px 12px',
-                      textAlign: 'left',
-                      border: 'none',
-                      backgroundColor: sortBy === 'none' ? '#f0f0f0' : 'white',
-                      color: '#000',
-                      cursor: 'pointer',
-                      fontSize: '14px'
-                    }}
-                    onMouseEnter={(e) => {
-                      if (sortBy !== 'none') e.currentTarget.style.backgroundColor = '#f5f5f5';
-                    }}
-                    onMouseLeave={(e) => {
-                      if (sortBy !== 'none') e.currentTarget.style.backgroundColor = 'white';
-                    }}
+                    className={`cl-dropdown-item${itemsPerPage === n ? ' active' : ''}`}
+                    onClick={() => handleItemsPerPageChange(n)}
                   >
-                    None
+                    {n}
                   </button>
+                ))}
+                <div className="cl-dropdown-divider" />
+                <div className="cl-dropdown-custom">
+                  <input
+                    type="number"
+                    className="cl-custom-input"
+                    value={customItemsPerPage}
+                    onChange={e => setCustomItemsPerPage(e.target.value)}
+                    placeholder="Custom…"
+                    min="1"
+                    onKeyDown={e => { if (e.key === 'Enter') handleCustomItemsPerPage(); }}
+                  />
                   <button
                     type="button"
-                    onClick={() => {
-                      setSortBy('building_id');
-                      setShowSortDropdown(false);
-                    }}
-                    style={{
-                      width: '100%',
-                      padding: '8px 12px',
-                      textAlign: 'left',
-                      border: 'none',
-                      backgroundColor: sortBy === 'building_id' ? '#f0f0f0' : 'white',
-                      color: '#000',
-                      cursor: 'pointer',
-                      fontSize: '14px',
-                      borderTop: '1px solid #eee'
-                    }}
-                    onMouseEnter={(e) => {
-                      if (sortBy !== 'building_id') e.currentTarget.style.backgroundColor = '#f5f5f5';
-                    }}
-                    onMouseLeave={(e) => {
-                      if (sortBy !== 'building_id') e.currentTarget.style.backgroundColor = 'white';
-                    }}
+                    className="cl-btn primary"
+                    style={{ padding: '5px 10px', fontSize: '11px', height: 'auto' }}
+                    onClick={handleCustomItemsPerPage}
                   >
-                    Building ID
-                  </button>
-                  <button
-                    type="button"
-                    onClick={() => {
-                      setSortBy('building_name');
-                      setShowSortDropdown(false);
-                    }}
-                    style={{
-                      width: '100%',
-                      padding: '8px 12px',
-                      textAlign: 'left',
-                      border: 'none',
-                      backgroundColor: sortBy === 'building_name' ? '#f0f0f0' : 'white',
-                      color: '#000',
-                      cursor: 'pointer',
-                      fontSize: '14px',
-                      borderTop: '1px solid #eee'
-                    }}
-                    onMouseEnter={(e) => {
-                      if (sortBy !== 'building_name') e.currentTarget.style.backgroundColor = '#f5f5f5';
-                    }}
-                    onMouseLeave={(e) => {
-                      if (sortBy !== 'building_name') e.currentTarget.style.backgroundColor = 'white';
-                    }}
-                  >
-                    Building Name
-                  </button>
-                  <button
-                    type="button"
-                    onClick={() => {
-                      setSortBy('room_count');
-                      setShowSortDropdown(false);
-                    }}
-                    style={{
-                      width: '100%',
-                      padding: '8px 12px',
-                      textAlign: 'left',
-                      border: 'none',
-                      backgroundColor: sortBy === 'room_count' ? '#f0f0f0' : 'white',
-                      color: '#000',
-                      cursor: 'pointer',
-                      fontSize: '14px',
-                      borderTop: '1px solid #eee'
-                    }}
-                    onMouseEnter={(e) => {
-                      if (sortBy !== 'room_count') e.currentTarget.style.backgroundColor = '#f5f5f5';
-                    }}
-                    onMouseLeave={(e) => {
-                      if (sortBy !== 'room_count') e.currentTarget.style.backgroundColor = 'white';
-                    }}
-                  >
-                    Room Count
+                    Apply
                   </button>
                 </div>
-              )}
-            </div>
-            <div style={{ position: 'relative' }} data-items-per-page-dropdown>
-              <button
-                type="button"
-                className="action-button with-label show-rows-button"
-                onClick={() => setShowItemsPerPageDropdown(!showItemsPerPageDropdown)}
-              >
-                <FaChevronDown size={12} />
-                <span className="btn-label">Show rows: {itemsPerPage === 'all' ? 'All' : itemsPerPage}</span>
-              </button>
-              {showItemsPerPageDropdown && (
-                <div
-                  style={{
-                    position: 'absolute',
-                    top: '100%',
-                    left: 0,
-                    marginTop: '4px',
-                    backgroundColor: 'white',
-                    border: '1px solid #ddd',
-                    borderRadius: '8px',
-                    boxShadow: '0 2px 8px rgba(0,0,0,0.15)',
-                    zIndex: 1000,
-                    minWidth: '240px',
-                    padding: '8px'
-                  }}
+                <button
+                  type="button"
+                  className={`cl-dropdown-item${itemsPerPage === 'all' ? ' active' : ''}`}
+                  onClick={() => handleItemsPerPageChange('all')}
                 >
-                  <button
-                    type="button"
-                    onClick={() => handleItemsPerPageChange(10)}
-                    style={{
-                      width: '100%',
-                      padding: '8px 12px',
-                      textAlign: 'left',
-                      border: 'none',
-                      backgroundColor: itemsPerPage === 10 ? '#f0f0f0' : 'white',
-                      color: '#000',
-                      cursor: 'pointer',
-                      fontSize: '14px',
-                      borderRadius: '4px'
-                    }}
-                    onMouseEnter={(e) => {
-                      if (itemsPerPage !== 10) e.currentTarget.style.backgroundColor = '#f5f5f5';
-                    }}
-                    onMouseLeave={(e) => {
-                      if (itemsPerPage !== 10) e.currentTarget.style.backgroundColor = 'white';
-                    }}
-                  >
-                    10
-                  </button>
-                  <button
-                    type="button"
-                    onClick={() => handleItemsPerPageChange(20)}
-                    style={{
-                      width: '100%',
-                      padding: '8px 12px',
-                      textAlign: 'left',
-                      border: 'none',
-                      backgroundColor: itemsPerPage === 20 ? '#f0f0f0' : 'white',
-                      color: '#000',
-                      cursor: 'pointer',
-                      fontSize: '14px',
-                      borderRadius: '4px',
-                      borderTop: '1px solid #eee'
-                    }}
-                    onMouseEnter={(e) => {
-                      if (itemsPerPage !== 20) e.currentTarget.style.backgroundColor = '#f5f5f5';
-                    }}
-                    onMouseLeave={(e) => {
-                      if (itemsPerPage !== 20) e.currentTarget.style.backgroundColor = 'white';
-                    }}
-                  >
-                    20
-                  </button>
-                  <button
-                    type="button"
-                    onClick={() => handleItemsPerPageChange(30)}
-                    style={{
-                      width: '100%',
-                      padding: '8px 12px',
-                      textAlign: 'left',
-                      border: 'none',
-                      backgroundColor: itemsPerPage === 30 ? '#f0f0f0' : 'white',
-                      color: '#000',
-                      cursor: 'pointer',
-                      fontSize: '14px',
-                      borderRadius: '4px',
-                      borderTop: '1px solid #eee'
-                    }}
-                    onMouseEnter={(e) => {
-                      if (itemsPerPage !== 30) e.currentTarget.style.backgroundColor = '#f5f5f5';
-                    }}
-                    onMouseLeave={(e) => {
-                      if (itemsPerPage !== 30) e.currentTarget.style.backgroundColor = 'white';
-                    }}
-                  >
-                    30
-                  </button>
-                  <div style={{ borderTop: '1px solid #eee', marginTop: '4px', paddingTop: '8px' }}>
-                    <div style={{ display: 'flex', gap: '4px', marginBottom: '4px' }}>
-                      <div style={{ position: 'relative', flex: 1, display: 'flex', alignItems: 'center' }}>
-                        <input
-                          type="number"
-                          data-custom-input
-                          className="custom-number-input"
-                          value={customItemsPerPage}
-                          onChange={(e) => setCustomItemsPerPage(e.target.value)}
-                          placeholder="Custom Number"
-                          min="1"
-                          style={{
-                            width: '100%',
-                            padding: '6px 32px 6px 8px',
-                            border: '1px solid #0A3765',
-                            borderRadius: '4px',
-                            fontSize: '14px',
-                            backgroundColor: '#ffffff',
-                            color: '#333',
-                            outline: 'none'
-                          }}
-                          onFocus={(e) => {
-                            e.target.style.borderColor = '#0d4a7a';
-                            e.target.style.boxShadow = '0 0 0 2px rgba(10, 55, 101, 0.1)';
-                          }}
-                          onBlur={(e) => {
-                            e.target.style.borderColor = '#0A3765';
-                            e.target.style.boxShadow = 'none';
-                          }}
-                          onKeyDown={(e) => {
-                            if (e.key === 'Enter') {
-                              handleCustomItemsPerPage();
-                            }
-                          }}
-                        />
-                        <div style={{ position: 'absolute', right: '2px', display: 'flex', flexDirection: 'column', height: 'calc(100% - 4px)', gap: '0px', justifyContent: 'center', alignItems: 'center' }}>
-                          <button
-                            type="button"
-                            onClick={() => {
-                              const current = parseInt(customItemsPerPage) || 1;
-                              setCustomItemsPerPage(String(current + 1));
-                            }}
-                            style={{
-                              height: 'auto',
-                              background: 'transparent',
-                              border: 'none',
-                              color: '#0A3765',
-                              cursor: 'pointer',
-                              display: 'flex',
-                              alignItems: 'center',
-                              justifyContent: 'center',
-                              fontSize: '10px',
-                              fontWeight: 'bold',
-                              padding: '0',
-                              width: '16px',
-                              lineHeight: '1',
-                              transition: 'color 0.2s',
-                              borderRadius: '0',
-                              boxSizing: 'border-box'
-                            }}
-                            onMouseEnter={(e) => {
-                              e.currentTarget.style.color = '#0d4a7a';
-                            }}
-                            onMouseLeave={(e) => {
-                              e.currentTarget.style.color = '#0A3765';
-                            }}
-                          >
-                            ^
-                          </button>
-                          <button
-                            type="button"
-                            onClick={() => {
-                              const current = parseInt(customItemsPerPage) || 1;
-                              if (current > 1) {
-                                setCustomItemsPerPage(String(current - 1));
-                              }
-                            }}
-                            style={{
-                              height: 'auto',
-                              background: 'transparent',
-                              border: 'none',
-                              color: '#0A3765',
-                              cursor: 'pointer',
-                              display: 'flex',
-                              alignItems: 'center',
-                              justifyContent: 'center',
-                              fontSize: '10px',
-                              fontWeight: 'bold',
-                              padding: '0',
-                              width: '16px',
-                              lineHeight: '1',
-                              transition: 'color 0.2s',
-                              borderRadius: '0',
-                              boxSizing: 'border-box'
-                            }}
-                            onMouseEnter={(e) => {
-                              e.currentTarget.style.color = '#0d4a7a';
-                            }}
-                            onMouseLeave={(e) => {
-                              e.currentTarget.style.color = '#0A3765';
-                            }}
-                          >
-                            v
-                          </button>
-                        </div>
-                      </div>
-                      <button
-                        type="button"
-                        onClick={handleCustomItemsPerPage}
-                        style={{
-                          padding: '6px 12px',
-                          backgroundColor: '#0A3765',
-                          color: 'white',
-                          border: 'none',
-                          borderRadius: '4px',
-                          cursor: 'pointer',
-                          fontSize: '12px'
-                        }}
-                      >
-                        Apply
-                      </button>
+                  Show All
+                </button>
+              </div>
+            )}
+          </div>
+
+        </div>
+
+        {/* Pagination */}
+        <div className="cl-pagination">
+          <button
+            type="button"
+            className="cl-page-btn"
+            onClick={() => setCurrentPage(p => Math.max(1, p - 1))}
+            disabled={currentPage <= 1 || totalItems === 0}
+          >
+            <FaChevronLeft style={{ fontSize: '10px' }} />
+          </button>
+          <span className="cl-page-info">
+            {totalItems === 0 ? '0 / 0' : `${currentPage} / ${totalPages}`}
+          </span>
+          <button
+            type="button"
+            className="cl-page-btn"
+            onClick={() => setCurrentPage(p => Math.min(totalPages, p + 1))}
+            disabled={currentPage >= totalPages || totalItems === 0}
+          >
+            <FaChevronRight style={{ fontSize: '10px' }} />
+          </button>
+        </div>
+      </div>
+
+      {/* ── Table Card ── */}
+      <div className="cl-table-card">
+        <div className="cl-table-scroll-wrapper">
+          <button
+            type="button"
+            className="cl-scroll-btn left"
+            onClick={() => scrollTable('left')}
+            disabled={!canScrollLeft}
+          >
+            <FaChevronLeft />
+          </button>
+          <button
+            type="button"
+            className="cl-scroll-btn right"
+            onClick={() => scrollTable('right')}
+            disabled={!canScrollRight}
+          >
+            <FaChevronRight />
+          </button>
+
+          <div className="cl-table-container" ref={tableContainerRef}>
+            <table className="cl-table">
+              <thead>
+                <tr>
+                  <th style={{ width: '52px' }}>#</th>
+                  <th>Building ID</th>
+                  <th>Building Name</th>
+                  <th style={{ width: '110px' }}>Rooms</th>
+                  <th style={{ width: '160px' }}>
+                    <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+                      <span>Actions</span>
+                      <input
+                        type="checkbox"
+                        checked={isAllSelected}
+                        onChange={toggleSelectAll}
+                        disabled={loading || buildings.length === 0}
+                        title="Select all"
+                        style={{ cursor: 'pointer' }}
+                      />
                     </div>
-                    <button
-                      type="button"
-                      onClick={() => handleItemsPerPageChange('all')}
-                      style={{
-                        width: '100%',
-                        padding: '8px 12px',
-                        textAlign: 'left',
-                        border: 'none',
-                        backgroundColor: itemsPerPage === 'all' ? '#f0f0f0' : 'white',
-                        color: '#000',
-                        cursor: 'pointer',
-                        fontSize: '14px',
-                        borderRadius: '4px',
-                        marginTop: '4px'
-                      }}
-                      onMouseEnter={(e) => {
-                        if (itemsPerPage !== 'all') e.currentTarget.style.backgroundColor = '#f5f5f5';
-                      }}
-                      onMouseLeave={(e) => {
-                        if (itemsPerPage !== 'all') e.currentTarget.style.backgroundColor = 'white';
-                      }}
-                    >
-                      Show All
-                    </button>
-                  </div>
-                </div>
-              )}
-            </div>
-          </div>
-          <div style={{ marginLeft: 'auto', display: 'flex', alignItems: 'center', gap: 8 }}>
-            <button
-              type="button"
-              className="action-button delete"
-              onClick={handleBulkDelete}
-              disabled={isBulkDeleting || selectedBuildingIds.size === 0}
-              title={selectedBuildingIds.size > 0 ? `Delete ${selectedBuildingIds.size} selected` : 'Delete selected'}
-            >
-              <FaTrash />
-            </button>
-          </div>
-        </div>
-      </div>
-
-      <div className="pagination-controls">
-        <button
-          type="button"
-          className="pagination-arrow-btn"
-          onClick={() => setCurrentPage((prev) => Math.max(1, prev - 1))}
-          disabled={currentPage <= 1 || totalItems === 0}
-        >
-          {"<"}
-        </button>
-        <span className="pagination-page-number">
-          {totalItems === 0 ? '0/0' : `${currentPage}/${totalPages}`}
-        </span>
-        <button
-          type="button"
-          className="pagination-arrow-btn"
-          onClick={() => setCurrentPage((prev) => Math.min(totalPages, prev + 1))}
-          disabled={currentPage >= totalPages || totalItems === 0}
-        >
-          {">"}
-        </button>
-      </div>
-
-      <div className="table-scroll-wrapper">
-        <div className="table-scroll-hint">
-          <FaChevronLeft /> Swipe or use buttons to scroll <FaChevronRight />
-        </div>
-        <button
-          type="button"
-          className="table-scroll-buttons scroll-left"
-          onClick={() => scrollTable('left')}
-          disabled={!canScrollLeft}
-          aria-label="Scroll left"
-        >
-          <FaChevronLeft />
-        </button>
-        <button
-          type="button"
-          className="table-scroll-buttons scroll-right"
-          onClick={() => scrollTable('right')}
-          disabled={!canScrollRight}
-          aria-label="Scroll right"
-        >
-          <FaChevronRight />
-        </button>
-        <div className="colleges-table-container" ref={tableContainerRef}>
-          <table className="colleges-table">
-            <thead>
-              <tr>
-                <th>#</th>
-                <th>Building #</th>
-                <th>Building Name</th>
-                <th>Room Count</th>
-                <th>
-                  <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-                    <span>Actions</span>
-                    <input
-                      type="checkbox"
-                      checked={isAllSelected}
-                      onChange={toggleSelectAll}
-                      disabled={loading || buildings.length === 0}
-                      aria-label="Select all"
-                      title="Select all"
-                      style={{ marginLeft: 'auto' }}
-                    />
-                  </div>
-                </th>
-              </tr>
-            </thead>
-            <tbody>
-              {loading ? (
-                <tr>
-                  <td colSpan={5} style={{ textAlign: 'center', padding: '20px' }}>
-                    Loading buidlings...
-                  </td>
+                  </th>
                 </tr>
-              ) : filtered.length === 0 ? (
-                <tr>
-                  <td colSpan={5} style={{ textAlign: 'center', padding: '20px' }}>
-                    No buildings found.
-                  </td>
-                </tr>
-              ) : (
-                paginatedBuildings.map((b, index) => {
-                  const isSelected = selectedBuildingIds.has(b.building_id);
-                  return (
-                    <tr
-                      key={b.building_id}
-                      style={{
-                        backgroundColor: isSelected ? '#f8d7da' : 'transparent',
-                      }}
-                    >
-                      <td>{(currentPage - 1) * effectiveItemsPerPage + index + 1}</td>
-                      <td>{b.building_id}</td>
-                      <td>{b.building_name}</td>
-                      <td>{roomCounts[b.building_id] || 0}</td>
-                      <td className="action-buttons" style={{ display: 'flex', alignItems: 'center', gap: 8   }}>
-                        <button
-                          type="button"
-                          className="icon-button view-button"
-                          title="View Rooms"
-                          onClick={() => openRoomModal(b.building_id)}
-                        >
-                          <FaEye /> View
-                        </button>
-                        <button
-                          type="button"
-                          className="icon-button edit-button"
-                          onClick={() => {
-                            setEditMode(true);
-                            setNewBuilding(b);
-                            setShowModal(true);
-                          }}
-                        >
-                          <FaEdit /> Edit
-                        </button>
-                        <input
-                          type="checkbox"
-                          checked={selectedBuildingIds.has(b.building_id)}
-                          onChange={() => toggleSelect(b.building_id)}
-                          aria-label={`Select ${b.building_name}`}
-                          style={{ marginLeft: 'auto' }}
-                        />
-                      </td>
-                    </tr>
-                  );
-                })
-              )}
-            </tbody>
-          </table>
+              </thead>
+              <tbody>
+                {loading ? (
+                  <tr>
+                    <td colSpan={5} className="cl-table-empty">
+                      <div className="cl-spinner" />
+                      Loading buildings…
+                    </td>
+                  </tr>
+                ) : filtered.length === 0 ? (
+                  <tr>
+                    <td colSpan={5} className="cl-table-empty">No buildings found.</td>
+                  </tr>
+                ) : (
+                  paginatedBuildings.map((b, index) => {
+                    const isSelected = selectedBuildingIds.has(b.building_id);
+                    return (
+                      <tr key={b.building_id} className={isSelected ? 'selected' : ''}>
+                        <td className="cl-td-num">{(currentPage - 1) * effectiveItemsPerPage + index + 1}</td>
+                        <td><span className="cl-id-badge">{b.building_id}</span></td>
+                        <td>{b.building_name}</td>
+                        <td>
+                          <span className="cl-room-count-badge">{roomCounts[b.building_id] || 0}</span>
+                        </td>
+                        <td>
+                          <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+                            <button
+                              type="button"
+                              className="cl-icon-btn view"
+                              onClick={() => openRoomModal(b.building_id)}
+                            >
+                              <FaEye style={{ fontSize: '10px' }} /> View
+                            </button>
+                            <button
+                              type="button"
+                              className="cl-icon-btn edit"
+                              onClick={() => { setEditMode(true); setNewBuilding(b); setShowModal(true); }}
+                            >
+                              <FaEdit style={{ fontSize: '10px' }} /> Edit
+                            </button>
+                            <input
+                              type="checkbox"
+                              checked={isSelected}
+                              onChange={() => toggleSelect(b.building_id)}
+                              aria-label={`Select ${b.building_name}`}
+                              style={{ marginLeft: 'auto', cursor: 'pointer' }}
+                            />
+                          </div>
+                        </td>
+                      </tr>
+                    );
+                  })
+                )}
+              </tbody>
+            </table>
+          </div>
         </div>
       </div>
 
-      {/* Add/Edit Modal */}
+      {/* ════ ADD / EDIT MODAL ════ */}
       {showModal && (
-        <div className="modal-overlay">
-          <div className="modal">
-            <h3 style={{ textAlign: 'center' }}>
-              {editMode ? 'Edit Building' : 'Add New Building'}
-            </h3>
-            <div className="input-group">
-              <label>Building ID</label>
-              <input
-                type="text"
-                disabled={editMode}
-                value={newBuilding.building_id}
-                onChange={(e) =>
-                  setNewBuilding({ ...newBuilding, building_id: e.target.value })
-                }
-              />
+        <div className="cl-modal-overlay" onClick={() => { setShowModal(false); setEditMode(false); }}>
+          <div className="cl-modal" onClick={e => e.stopPropagation()}>
+            <div className="cl-modal-header">
+              <h3>{editMode ? 'Edit Building' : 'Add New Building'}</h3>
             </div>
-            <div className="input-group">
-              <label>Building Name</label>
-              <input
-                type="text"
-                value={newBuilding.building_name}
-                onChange={(e) =>
-                  setNewBuilding({ ...newBuilding, building_name: e.target.value })
-                }
-              />
+            <div className="cl-modal-body">
+              <div className="cl-field">
+                <label>Building ID</label>
+                <input
+                  type="text"
+                  className="cl-input"
+                  disabled={editMode}
+                  value={newBuilding.building_id}
+                  onChange={e => setNewBuilding({ ...newBuilding, building_id: e.target.value })}
+                  placeholder="e.g. BLDG. 09"
+                />
+              </div>
+              <div className="cl-field">
+                <label>Building Name</label>
+                <input
+                  type="text"
+                  className="cl-input"
+                  value={newBuilding.building_name}
+                  onChange={e => setNewBuilding({ ...newBuilding, building_name: e.target.value })}
+                  placeholder="e.g. ICT Building"
+                />
+              </div>
             </div>
-            <div className="modal-actions">
-              <button type="button" onClick={handleSubmit}>Save</button>
-              <button type="button" onClick={() => setShowModal(false)}>Cancel</button>
+            <div className="cl-modal-footer">
+              <button type="button" className="cl-btn" onClick={() => { setShowModal(false); setEditMode(false); }}>Cancel</button>
+              <button type="button" className="cl-btn primary" onClick={handleSubmit}>Save</button>
             </div>
           </div>
         </div>
       )}
 
-      {/* Import Modal */}
+      {/* ════ IMPORT MODAL ════ */}
       {showImport && (
-        <div className="modal-overlay">
-          <div className="modal">
-            <h3 style={{ textAlign: 'center' }}>Import Buildings</h3>
-            <p style={{ fontSize: '12px', color: '#666', marginBottom: '10px' }}>
-              Each building must have a unique Building ID and Name.
-            </p>
-            <input type="file" accept=".xlsx,.xls" onChange={handleImportFile} disabled={isImporting} />
-            <div className="modal-actions">
+        <div className="cl-modal-overlay" onClick={() => setShowImport(false)}>
+          <div className="cl-modal" onClick={e => e.stopPropagation()}>
+            <div className="cl-modal-header">
+              <h3>Import Buildings</h3>
+              <p>Upload an .xlsx file using the template below.</p>
+            </div>
+            <div className="cl-modal-body">
+              <p className="cl-import-hint">Each building must have a unique Building ID and Name.</p>
+              <input
+                type="file"
+                accept=".xlsx,.xls"
+                onChange={handleImportFile}
+                disabled={isImporting}
+                className="cl-file-input"
+              />
               <button
                 type="button"
-                className="modal-button download"
+                className="cl-btn"
                 onClick={downloadTemplate}
                 disabled={isImporting}
+                style={{ width: '100%', justifyContent: 'center', marginTop: '8px' }}
               >
-                <FaDownload style={{ marginRight: 5 }} /> Download Template
+                <FaDownload style={{ fontSize: '11px' }} /> Download Template
               </button>
-              <button type="button" onClick={() => setShowImport(false)} disabled={isImporting}>
-                {isImporting ? "Importing…" : "Close"}
+            </div>
+            <div className="cl-modal-footer">
+              <button type="button" className="cl-btn primary" onClick={() => setShowImport(false)} disabled={isImporting}>
+                {isImporting ? 'Importing…' : 'Done'}
               </button>
             </div>
           </div>
         </div>
       )}
 
-      {/* Room List Modal */}
+      {/* ════ ROOM LIST MODAL ════ */}
       {showRoomModal && (
-        <div className="modal-overlay">
-          <div className="modal room-modal">
-            <h3>Rooms in {selectedBuildingName}</h3>
-            <div className="room-modal-table-container">
-              <table className="accounts-table">
-                <thead>
-                  <tr>
-                    <th>Room #</th>
-                    <th>Room Name</th>
-                    <th>Type</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {selectedBuildingRooms.map((room) => (
-                    <tr key={room.room_id}>
-                      <td>{room.room_id}</td>
-                      <td>{room.room_name}</td>
-                      <td>{room.room_type}</td>
-                    </tr>
-                  ))}
-                  {selectedBuildingRooms.length === 0 && (
-                    <tr><td colSpan={3}>No rooms found.</td></tr>
-                  )}
-                </tbody>
-              </table>
+        <div className="cl-modal-overlay" onClick={() => { setShowRoomModal(false); setSelectedBuildingName(''); setSelectedBuildingRooms([]); }}>
+          <div className="cl-modal" onClick={e => e.stopPropagation()} style={{ maxWidth: '560px' }}>
+            <div className="cl-modal-header">
+              <h3>Rooms in {selectedBuildingName}</h3>
+              <p>{selectedBuildingRooms.length} room{selectedBuildingRooms.length !== 1 ? 's' : ''}</p>
             </div>
-            <div className="modal-actions">
-              <button type="button" onClick={() => setShowRoomModal(false)}>Close</button>
+            <div className="cl-modal-body" style={{ padding: '16px 24px' }}>
+              {selectedBuildingRooms.length === 0 ? (
+                <div style={{ textAlign: 'center', color: 'var(--cl-text-muted)', padding: '24px 0', fontSize: '13px' }}>
+                  No rooms found in this building.
+                </div>
+              ) : (
+                <table className="cl-table" style={{ fontSize: '12.5px' }}>
+                  <thead>
+                    <tr>
+                      <th>Room ID</th>
+                      <th>Room Name</th>
+                      <th>Type</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {selectedBuildingRooms.map(room => (
+                      <tr key={room.room_id}>
+                        <td><span className="cl-id-badge">{room.room_id}</span></td>
+                        <td>{room.room_name}</td>
+                        <td>
+                          <span className={`cl-room-type-badge ${room.room_type === 'Lecture' ? 'lecture' : 'lab'}`}>
+                            {room.room_type}
+                          </span>
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              )}
+            </div>
+            <div className="cl-modal-footer">
+              <button type="button" className="cl-btn primary" onClick={() => { setShowRoomModal(false); setSelectedBuildingName(''); setSelectedBuildingRooms([]); }}>
+                Close
+              </button>
             </div>
           </div>
         </div>
       )}
 
-      {/* Delete Confirmation Modal */}
+      {/* ════ DELETE CONFIRM MODAL ════ */}
       {showDeleteConfirm && (
-        <div className="modal-overlay" onClick={() => setShowDeleteConfirm(false)}>
-          <div className="modal delete-confirm-modal" onClick={(e) => e.stopPropagation()}>
-            <h3>Are you sure to delete this Building?</h3>
-            <p className="delete-confirm-message">
-              {deleteCount === 1 
-                ? 'Delete this one building' 
-                : `Delete these ${deleteCount} buildings`}
-            </p>
-            <div className="modal-actions">
-              <button 
-                type="button" 
-                className="modal-button confirm-delete"
-                onClick={confirmDelete}
-                disabled={isBulkDeleting}
-              >
-                {isBulkDeleting ? 'Deleting...' : 'Delete'}
-              </button>
-              <button 
-                type="button" 
-                className="modal-button cancel-delete"
-                onClick={() => setShowDeleteConfirm(false)}
-                disabled={isBulkDeleting}
-              >
-                Cancel
+        <div className="cl-modal-overlay" onClick={() => setShowDeleteConfirm(false)}>
+          <div className="cl-modal" onClick={e => e.stopPropagation()} style={{ maxWidth: '380px' }}>
+            <div className="cl-modal-header">
+              <h3>Confirm Deletion</h3>
+            </div>
+            <div className="cl-modal-body">
+              <p style={{ fontSize: '13.5px', color: 'var(--cl-text-secondary)', lineHeight: 1.7, margin: 0 }}>
+                {deleteCount === 1
+                  ? 'You are about to delete 1 building. This action cannot be undone.'
+                  : `You are about to delete ${deleteCount} buildings. This action cannot be undone.`}
+              </p>
+            </div>
+            <div className="cl-modal-footer">
+              <button type="button" className="cl-btn" onClick={() => setShowDeleteConfirm(false)} disabled={isBulkDeleting}>Cancel</button>
+              <button type="button" className="cl-btn danger-fill" onClick={confirmDelete} disabled={isBulkDeleting}>
+                {isBulkDeleting ? 'Deleting…' : 'Yes, Delete'}
               </button>
             </div>
           </div>

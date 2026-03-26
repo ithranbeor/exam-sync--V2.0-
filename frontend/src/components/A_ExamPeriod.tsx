@@ -122,6 +122,70 @@ const ExamPeriodComponent: React.FC = () => {
     };
   }, [showSortDropdown, showItemsPerPageDropdown]);
 
+  const selectStyles = {
+    control: (b: any) => ({
+      ...b,
+      fontSize: '13px',
+      minHeight: '36px',
+      borderColor: 'var(--cl-border)',
+      borderRadius: '6px',
+      backgroundColor: '#fff',
+    }),
+
+    menu: (b: any) => ({
+      ...b,
+      backgroundColor: '#fff',
+    }),
+
+    menuList: (b: any) => ({
+      ...b,
+      backgroundColor: '#fff',
+    }),
+
+    option: (b: any, state: any) => ({
+      ...b,
+      color: '#0C1B2A',
+      backgroundColor: state.isFocused ? '#f1f5f9' : '#fff',
+    }),
+
+    input: (b: any) => ({
+      ...b,
+      color: '#0C1B2A',
+    }),
+
+    singleValue: (b: any) => ({
+      ...b,
+      color: '#0C1B2A',
+    }),
+
+    placeholder: (b: any) => ({
+      ...b,
+      color: '#6b7280',
+    }),
+
+    multiValueLabel: (b: any) => ({
+      ...b,
+      color: '#0C1B2A',
+    }),
+
+    multiValueRemove: (b: any) => ({
+      ...b,
+      color: '#0C1B2A',
+      ':hover': {
+        backgroundColor: '#e2e8f0',
+        color: '#000',
+      },
+    }),
+
+    clearIndicator: (b: any) => ({
+      ...b,
+      color: '#0C1B2A',
+      ':hover': {
+        color: '#000',
+      },
+    }),
+  };
+
   const fetchAll = async () => {
     setLoading(true);
     try {
@@ -519,699 +583,234 @@ const ExamPeriodComponent: React.FC = () => {
   }
 
   return (
-    <div className="colleges-container">
-      <div className="colleges-header">
-        <div style={{ display: 'flex', alignItems: 'center', gap: 12, marginLeft: 'auto' }}>
-          <div className="search-bar">
+    <div className="cl-page">
+
+      {/* ── Page Header ── */}
+      <div className="cl-page-header">
+        <div className="cl-page-header-left">
+          <div className="cl-page-icon">
+            <svg width="22" height="22" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.8}>
+              <path strokeLinecap="round" strokeLinejoin="round" d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z" />
+            </svg>
+          </div>
+          <div className="cl-page-title">
+            <h1>Exam Periods</h1>
+            <p>{examPeriods.length} record{examPeriods.length !== 1 ? 's' : ''} · {filtered.length} showing</p>
+          </div>
+        </div>
+
+        <div className="cl-page-actions">
+          <div className="cl-search-bar">
+            <FaSearch className="cl-search-icon" />
             <input
               type="text"
-              placeholder="Search exam periods..."
+              placeholder="Search exam periods…"
               value={search}
-              onChange={(e) => setSearch(e.target.value)}
+              onChange={e => setSearch(e.target.value)}
             />
-            <button type="button" className="search-button">
-              <FaSearch />
-            </button>
           </div>
-        </div>
-      </div>
 
-      <div className="colleges-actions" style={{ display: 'flex', width: '100%', alignItems: 'center', flexWrap: 'wrap', gap: 8 }}>
-        <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-          <button type='button' className="action-button add-new with-label" onClick={() => {
-            setEditMode(false);
-            setNewExam({
-              start_date: '',
-              end_date: '',
-              academic_year: '',
-              exam_category: '',
-              term_id: 0,
-              department_id: '',
-              college_id: null,
-            });
-            setSelectedDates([]);
-            setActiveDate(new Date());
-            setShowModal(true);
-          }}><FaPlus /><span className="btn-label">Add</span></button>
-          <div style={{ position: 'relative' }} data-sort-dropdown>
-            <button
-              type='button'
-              className="action-button with-label sort-by-button"
-              onClick={() => setShowSortDropdown(!showSortDropdown)}
-              title="Sort by"
-            >
-              <FaSort />
-              <span className="btn-label">Sort by</span>
-            </button>
-            {showSortDropdown && (
-              <div
-                style={{
-                  position: 'absolute',
-                  top: '100%',
-                  left: 0,
-                  marginTop: '4px',
-                  backgroundColor: 'white',
-                  border: '1px solid #ddd',
-                  borderRadius: '8px',
-                  boxShadow: '0 2px 8px rgba(0,0,0,0.15)',
-                  zIndex: 1000,
-                  minWidth: '150px'
-                }}
-              >
-                <button
-                  type="button"
-                  onClick={() => {
-                    setSortBy('none');
-                    setShowSortDropdown(false);
-                  }}
-                  style={{
-                    width: '100%',
-                    padding: '8px 12px',
-                    textAlign: 'left',
-                    border: 'none',
-                    backgroundColor: sortBy === 'none' ? '#f0f0f0' : 'white',
-                    color: '#000',
-                    cursor: 'pointer',
-                    fontSize: '14px'
-                  }}
-                  onMouseEnter={(e) => {
-                    if (sortBy !== 'none') e.currentTarget.style.backgroundColor = '#f5f5f5';
-                  }}
-                  onMouseLeave={(e) => {
-                    if (sortBy !== 'none') e.currentTarget.style.backgroundColor = 'white';
-                  }}
-                >
-                  None
-                </button>
-                <button
-                  type="button"
-                  onClick={() => {
-                    setSortBy('start_date');
-                    setShowSortDropdown(false);
-                  }}
-                  style={{
-                    width: '100%',
-                    padding: '8px 12px',
-                    textAlign: 'left',
-                    border: 'none',
-                    backgroundColor: sortBy === 'start_date' ? '#f0f0f0' : 'white',
-                    color: '#000',
-                    cursor: 'pointer',
-                    fontSize: '14px',
-                    borderTop: '1px solid #eee'
-                  }}
-                  onMouseEnter={(e) => {
-                    if (sortBy !== 'start_date') e.currentTarget.style.backgroundColor = '#f5f5f5';
-                  }}
-                  onMouseLeave={(e) => {
-                    if (sortBy !== 'start_date') e.currentTarget.style.backgroundColor = 'white';
-                  }}
-                >
-                  Start Date
-                </button>
-                <button
-                  type="button"
-                  onClick={() => {
-                    setSortBy('end_date');
-                    setShowSortDropdown(false);
-                  }}
-                  style={{
-                    width: '100%',
-                    padding: '8px 12px',
-                    textAlign: 'left',
-                    border: 'none',
-                    backgroundColor: sortBy === 'end_date' ? '#f0f0f0' : 'white',
-                    color: '#000',
-                    cursor: 'pointer',
-                    fontSize: '14px',
-                    borderTop: '1px solid #eee'
-                  }}
-                  onMouseEnter={(e) => {
-                    if (sortBy !== 'end_date') e.currentTarget.style.backgroundColor = '#f5f5f5';
-                  }}
-                  onMouseLeave={(e) => {
-                    if (sortBy !== 'end_date') e.currentTarget.style.backgroundColor = 'white';
-                  }}
-                >
-                  End Date
-                </button>
-                <button
-                  type="button"
-                  onClick={() => {
-                    setSortBy('academic_year');
-                    setShowSortDropdown(false);
-                  }}
-                  style={{
-                    width: '100%',
-                    padding: '8px 12px',
-                    textAlign: 'left',
-                    border: 'none',
-                    backgroundColor: sortBy === 'academic_year' ? '#f0f0f0' : 'white',
-                    color: '#000',
-                    cursor: 'pointer',
-                    fontSize: '14px',
-                    borderTop: '1px solid #eee'
-                  }}
-                  onMouseEnter={(e) => {
-                    if (sortBy !== 'academic_year') e.currentTarget.style.backgroundColor = '#f5f5f5';
-                  }}
-                  onMouseLeave={(e) => {
-                    if (sortBy !== 'academic_year') e.currentTarget.style.backgroundColor = 'white';
-                  }}
-                >
-                  Academic Year
-                </button>
-                <button
-                  type="button"
-                  onClick={() => {
-                    setSortBy('exam_category');
-                    setShowSortDropdown(false);
-                  }}
-                  style={{
-                    width: '100%',
-                    padding: '8px 12px',
-                    textAlign: 'left',
-                    border: 'none',
-                    backgroundColor: sortBy === 'exam_category' ? '#f0f0f0' : 'white',
-                    color: '#000',
-                    cursor: 'pointer',
-                    fontSize: '14px',
-                    borderTop: '1px solid #eee'
-                  }}
-                  onMouseEnter={(e) => {
-                    if (sortBy !== 'exam_category') e.currentTarget.style.backgroundColor = '#f5f5f5';
-                  }}
-                  onMouseLeave={(e) => {
-                    if (sortBy !== 'exam_category') e.currentTarget.style.backgroundColor = 'white';
-                  }}
-                >
-                  Exam Category
-                </button>
-                <button
-                  type="button"
-                  onClick={() => {
-                    setSortBy('term');
-                    setShowSortDropdown(false);
-                  }}
-                  style={{
-                    width: '100%',
-                    padding: '8px 12px',
-                    textAlign: 'left',
-                    border: 'none',
-                    backgroundColor: sortBy === 'term' ? '#f0f0f0' : 'white',
-                    color: '#000',
-                    cursor: 'pointer',
-                    fontSize: '14px',
-                    borderTop: '1px solid #eee'
-                  }}
-                  onMouseEnter={(e) => {
-                    if (sortBy !== 'term') e.currentTarget.style.backgroundColor = '#f5f5f5';
-                  }}
-                  onMouseLeave={(e) => {
-                    if (sortBy !== 'term') e.currentTarget.style.backgroundColor = 'white';
-                  }}
-                >
-                  Term
-                </button>
-                <button
-                  type="button"
-                  onClick={() => {
-                    setSortBy('department');
-                    setShowSortDropdown(false);
-                  }}
-                  style={{
-                    width: '100%',
-                    padding: '8px 12px',
-                    textAlign: 'left',
-                    border: 'none',
-                    backgroundColor: sortBy === 'department' ? '#f0f0f0' : 'white',
-                    color: '#000',
-                    cursor: 'pointer',
-                    fontSize: '14px',
-                    borderTop: '1px solid #eee'
-                  }}
-                  onMouseEnter={(e) => {
-                    if (sortBy !== 'department') e.currentTarget.style.backgroundColor = '#f5f5f5';
-                  }}
-                  onMouseLeave={(e) => {
-                    if (sortBy !== 'department') e.currentTarget.style.backgroundColor = 'white';
-                  }}
-                >
-                  Department
-                </button>
-                <button
-                  type="button"
-                  onClick={() => {
-                    setSortBy('college');
-                    setShowSortDropdown(false);
-                  }}
-                  style={{
-                    width: '100%',
-                    padding: '8px 12px',
-                    textAlign: 'left',
-                    border: 'none',
-                    backgroundColor: sortBy === 'college' ? '#f0f0f0' : 'white',
-                    color: '#000',
-                    cursor: 'pointer',
-                    fontSize: '14px',
-                    borderTop: '1px solid #eee'
-                  }}
-                  onMouseEnter={(e) => {
-                    if (sortBy !== 'college') e.currentTarget.style.backgroundColor = '#f5f5f5';
-                  }}
-                  onMouseLeave={(e) => {
-                    if (sortBy !== 'college') e.currentTarget.style.backgroundColor = 'white';
-                  }}
-                >
-                  College
-                </button>
-              </div>
-            )}
-          </div>
-          <div style={{ position: 'relative' }} data-items-per-page-dropdown>
-            <button
-              type="button"
-              className="action-button with-label show-rows-button"
-              onClick={() => setShowItemsPerPageDropdown(!showItemsPerPageDropdown)}
-            >
-              <FaChevronDown size={12} />
-              <span className="btn-label">Show rows: {itemsPerPage === 'all' ? 'All' : itemsPerPage}</span>
-            </button>
-            {showItemsPerPageDropdown && (
-              <div
-                style={{
-                  position: 'absolute',
-                  top: '100%',
-                  left: 0,
-                  marginTop: '4px',
-                  backgroundColor: 'white',
-                  border: '1px solid #ddd',
-                  borderRadius: '8px',
-                  boxShadow: '0 2px 8px rgba(0,0,0,0.15)',
-                  zIndex: 1000,
-                  minWidth: '240px',
-                  padding: '8px'
-                }}
-              >
-                <button
-                  type="button"
-                  onClick={() => handleItemsPerPageChange(10)}
-                  style={{
-                    width: '100%',
-                    padding: '8px 12px',
-                    textAlign: 'left',
-                    border: 'none',
-                    backgroundColor: itemsPerPage === 10 ? '#f0f0f0' : 'white',
-                    color: '#000',
-                    cursor: 'pointer',
-                    fontSize: '14px',
-                    borderRadius: '4px'
-                  }}
-                  onMouseEnter={(e) => {
-                    if (itemsPerPage !== 10) e.currentTarget.style.backgroundColor = '#f5f5f5';
-                  }}
-                  onMouseLeave={(e) => {
-                    if (itemsPerPage !== 10) e.currentTarget.style.backgroundColor = 'white';
-                  }}
-                >
-                  10
-                </button>
-                <button
-                  type="button"
-                  onClick={() => handleItemsPerPageChange(20)}
-                  style={{
-                    width: '100%',
-                    padding: '8px 12px',
-                    textAlign: 'left',
-                    border: 'none',
-                    backgroundColor: itemsPerPage === 20 ? '#f0f0f0' : 'white',
-                    color: '#000',
-                    cursor: 'pointer',
-                    fontSize: '14px',
-                    borderRadius: '4px',
-                    borderTop: '1px solid #eee'
-                  }}
-                  onMouseEnter={(e) => {
-                    if (itemsPerPage !== 20) e.currentTarget.style.backgroundColor = '#f5f5f5';
-                  }}
-                  onMouseLeave={(e) => {
-                    if (itemsPerPage !== 20) e.currentTarget.style.backgroundColor = 'white';
-                  }}
-                >
-                  20
-                </button>
-                <button
-                  type="button"
-                  onClick={() => handleItemsPerPageChange(30)}
-                  style={{
-                    width: '100%',
-                    padding: '8px 12px',
-                    textAlign: 'left',
-                    border: 'none',
-                    backgroundColor: itemsPerPage === 30 ? '#f0f0f0' : 'white',
-                    color: '#000',
-                    cursor: 'pointer',
-                    fontSize: '14px',
-                    borderRadius: '4px',
-                    borderTop: '1px solid #eee'
-                  }}
-                  onMouseEnter={(e) => {
-                    if (itemsPerPage !== 30) e.currentTarget.style.backgroundColor = '#f5f5f5';
-                  }}
-                  onMouseLeave={(e) => {
-                    if (itemsPerPage !== 30) e.currentTarget.style.backgroundColor = 'white';
-                  }}
-                >
-                  30
-                </button>
-                <div style={{ borderTop: '1px solid #eee', marginTop: '4px', paddingTop: '8px' }}>
-                  <div style={{ display: 'flex', gap: '4px', marginBottom: '4px' }}>
-                    <div style={{ position: 'relative', flex: 1, display: 'flex', alignItems: 'center' }}>
-                      <input
-                        type="number"
-                        data-custom-input
-                        className="custom-number-input"
-                        value={customItemsPerPage}
-                        onChange={(e) => setCustomItemsPerPage(e.target.value)}
-                        placeholder="Custom Number"
-                        min="1"
-                        style={{
-                          width: '100%',
-                          padding: '6px 32px 6px 8px',
-                          border: '1px solid #0A3765',
-                          borderRadius: '4px',
-                          fontSize: '14px',
-                          backgroundColor: '#ffffff',
-                          color: '#333',
-                          outline: 'none'
-                        }}
-                        onFocus={(e) => {
-                          e.target.style.borderColor = '#0d4a7a';
-                          e.target.style.boxShadow = '0 0 0 2px rgba(10, 55, 101, 0.1)';
-                        }}
-                        onBlur={(e) => {
-                          e.target.style.borderColor = '#0A3765';
-                          e.target.style.boxShadow = 'none';
-                        }}
-                        onKeyDown={(e) => {
-                          if (e.key === 'Enter') {
-                            handleCustomItemsPerPage();
-                          }
-                        }}
-                      />
-                      <div style={{ position: 'absolute', right: '2px', display: 'flex', flexDirection: 'column', height: 'calc(100% - 4px)', gap: '0px', justifyContent: 'center', alignItems: 'center' }}>
-                        <button
-                          type="button"
-                          onClick={() => {
-                            const current = parseInt(customItemsPerPage) || 1;
-                            setCustomItemsPerPage(String(current + 1));
-                          }}
-                          style={{
-                            height: 'auto',
-                            background: 'transparent',
-                            border: 'none',
-                            color: '#0A3765',
-                            cursor: 'pointer',
-                            display: 'flex',
-                            alignItems: 'center',
-                            justifyContent: 'center',
-                            fontSize: '10px',
-                            fontWeight: 'bold',
-                            padding: '0',
-                            width: '16px',
-                            lineHeight: '1',
-                            transition: 'color 0.2s',
-                            borderRadius: '0',
-                            boxSizing: 'border-box'
-                          }}
-                          onMouseEnter={(e) => {
-                            e.currentTarget.style.color = '#0d4a7a';
-                          }}
-                          onMouseLeave={(e) => {
-                            e.currentTarget.style.color = '#0A3765';
-                          }}
-                        >
-                          ^
-                        </button>
-                        <button
-                          type="button"
-                          onClick={() => {
-                            const current = parseInt(customItemsPerPage) || 1;
-                            if (current > 1) {
-                              setCustomItemsPerPage(String(current - 1));
-                            }
-                          }}
-                          style={{
-                            height: 'auto',
-                            background: 'transparent',
-                            border: 'none',
-                            color: '#0A3765',
-                            cursor: 'pointer',
-                            display: 'flex',
-                            alignItems: 'center',
-                            justifyContent: 'center',
-                            fontSize: '10px',
-                            fontWeight: 'bold',
-                            padding: '0',
-                            width: '16px',
-                            lineHeight: '1',
-                            transition: 'color 0.2s',
-                            borderRadius: '0',
-                            boxSizing: 'border-box'
-                          }}
-                          onMouseEnter={(e) => {
-                            e.currentTarget.style.color = '#0d4a7a';
-                          }}
-                          onMouseLeave={(e) => {
-                            e.currentTarget.style.color = '#0A3765';
-                          }}
-                        >
-                          v
-                        </button>
-                      </div>
-                    </div>
-                    <button
-                      type="button"
-                      onClick={handleCustomItemsPerPage}
-                      style={{
-                        padding: '6px 12px',
-                        backgroundColor: '#0A3765',
-                        color: 'white',
-                        border: 'none',
-                        borderRadius: '4px',
-                        cursor: 'pointer',
-                        fontSize: '12px'
-                      }}
-                    >
-                      Apply
-                    </button>
-                  </div>
-                  <button
-                    type="button"
-                    onClick={() => handleItemsPerPageChange('all')}
-                    style={{
-                      width: '100%',
-                      padding: '8px 12px',
-                      textAlign: 'left',
-                      border: 'none',
-                      backgroundColor: itemsPerPage === 'all' ? '#f0f0f0' : 'white',
-                      color: '#000',
-                      cursor: 'pointer',
-                      fontSize: '14px',
-                      borderRadius: '4px',
-                      marginTop: '4px'
-                    }}
-                    onMouseEnter={(e) => {
-                      if (itemsPerPage !== 'all') e.currentTarget.style.backgroundColor = '#f5f5f5';
-                    }}
-                    onMouseLeave={(e) => {
-                      if (itemsPerPage !== 'all') e.currentTarget.style.backgroundColor = 'white';
-                    }}
-                  >
-                    Show All
-                  </button>
-                </div>
-              </div>
-            )}
-          </div>
           <button
             type="button"
-            className="action-button with-label filter-toggle"
-            onClick={() => setShowFilters(prev => !prev)}
+            className="cl-btn primary"
+            onClick={() => {
+              setEditMode(false);
+              setNewExam({ start_date: '', end_date: '', academic_year: '', exam_category: '', term_id: 0, department_id: '', college_id: null });
+              setSelectedDates([]);
+              setActiveDate(new Date());
+              setShowModal(true);
+            }}
           >
-            <span className="btn-label">{showFilters ? 'Hide Filters' : 'Show Filters'}</span>
+            <FaPlus style={{ fontSize: '11px' }} /> Add
           </button>
-        </div>
-        <div style={{ marginLeft: 'auto' }}>
           <button
-            type='button'
-            className="action-button delete"
+            type="button"
+            className="cl-btn danger"
             onClick={handleBulkDelete}
+            disabled={selectedExamIds.size === 0}
+            title={selectedExamIds.size > 0 ? `Delete ${selectedExamIds.size} selected` : 'Select rows to delete'}
           >
-            <FaTrash />
+            <FaTrash style={{ fontSize: '11px' }} />
+            {selectedExamIds.size > 0 && <span>({selectedExamIds.size})</span>}
           </button>
         </div>
       </div>
 
-      <div className="pagination-controls">
-        <button
-          type="button"
-          className="pagination-arrow-btn"
-          onClick={() => setCurrentPage((prev) => Math.max(1, prev - 1))}
-          disabled={currentPage <= 1 || totalItems === 0}
-        >
-          {"<"}
-        </button>
-        <span className="pagination-page-number">
-          {totalItems === 0 ? '0/0' : `${currentPage}/${totalPages}`}
-        </span>
-        <button
-          type="button"
-          className="pagination-arrow-btn"
-          onClick={() => setCurrentPage((prev) => Math.min(totalPages, prev + 1))}
-          disabled={currentPage >= totalPages || totalItems === 0}
-        >
-          {">"}
-        </button>
+      {/* ── Toolbar ── */}
+      <div className="cl-toolbar">
+        <div className="cl-toolbar-left">
+
+          {/* Sort dropdown */}
+          <div style={{ position: 'relative' }} data-sort-dropdown>
+            <button type="button" className="cl-toolbar-btn" onClick={() => setShowSortDropdown(!showSortDropdown)}>
+              <FaSort style={{ fontSize: '11px' }} />
+              Sort{sortBy !== 'none' ? `: ${sortBy.replace('_', ' ')}` : ''}
+              <FaChevronDown style={{ fontSize: '9px', marginLeft: '2px' }} />
+            </button>
+            {showSortDropdown && (
+              <div className="cl-dropdown">
+                {[
+                  { value: 'none', label: 'None' },
+                  { value: 'start_date', label: 'Start Date' },
+                  { value: 'end_date', label: 'End Date' },
+                  { value: 'academic_year', label: 'Academic Year' },
+                  { value: 'exam_category', label: 'Exam Category' },
+                  { value: 'term', label: 'Term' },
+                  { value: 'department', label: 'Department' },
+                  { value: 'college', label: 'College' },
+                ].map(opt => (
+                  <button key={opt.value} type="button" className={`cl-dropdown-item${sortBy === opt.value ? ' active' : ''}`} onClick={() => { setSortBy(opt.value); setShowSortDropdown(false); }}>
+                    {opt.label}
+                  </button>
+                ))}
+              </div>
+            )}
+          </div>
+
+          {/* Rows per page */}
+          <div style={{ position: 'relative' }} data-items-per-page-dropdown>
+            <button type="button" className="cl-toolbar-btn" onClick={() => setShowItemsPerPageDropdown(!showItemsPerPageDropdown)}>
+              <FaChevronDown style={{ fontSize: '9px' }} />
+              Rows: {itemsPerPage === 'all' ? 'All' : itemsPerPage}
+            </button>
+            {showItemsPerPageDropdown && (
+              <div className="cl-dropdown" style={{ minWidth: '200px' }}>
+                {[10, 20, 30].map(n => (
+                  <button key={n} type="button" className={`cl-dropdown-item${itemsPerPage === n ? ' active' : ''}`} onClick={() => handleItemsPerPageChange(n)}>{n}</button>
+                ))}
+                <div className="cl-dropdown-divider" />
+                <div className="cl-dropdown-custom">
+                  <input type="number" className="cl-custom-input" value={customItemsPerPage} onChange={e => setCustomItemsPerPage(e.target.value)} placeholder="Custom…" min="1" onKeyDown={e => { if (e.key === 'Enter') handleCustomItemsPerPage(); }} />
+                  <button type="button" className="cl-btn primary" style={{ padding: '5px 10px', fontSize: '11px', height: 'auto' }} onClick={handleCustomItemsPerPage}>Apply</button>
+                </div>
+                <button type="button" className={`cl-dropdown-item${itemsPerPage === 'all' ? ' active' : ''}`} onClick={() => handleItemsPerPageChange('all')}>Show All</button>
+              </div>
+            )}
+          </div>
+
+          {/* Filters toggle */}
+          <button type="button" className="cl-toolbar-btn" onClick={() => setShowFilters(p => !p)}>
+            {showFilters ? 'Hide Filters' : 'Show Filters'}
+          </button>
+
+        </div>
+
+        {/* Pagination */}
+        <div className="cl-pagination">
+          <button type="button" className="cl-page-btn" onClick={() => setCurrentPage(p => Math.max(1, p - 1))} disabled={currentPage <= 1 || totalItems === 0}>
+            <FaChevronLeft style={{ fontSize: '10px' }} />
+          </button>
+          <span className="cl-page-info">{totalItems === 0 ? '0 / 0' : `${currentPage} / ${totalPages}`}</span>
+          <button type="button" className="cl-page-btn" onClick={() => setCurrentPage(p => Math.min(totalPages, p + 1))} disabled={currentPage >= totalPages || totalItems === 0}>
+            <FaChevronRight style={{ fontSize: '10px' }} />
+          </button>
+        </div>
       </div>
 
+      {/* ── Filters Row ── */}
       {showFilters && (
-        <div className="advanced-filters">
-          <select value={filterYear} onChange={(e) => setFilterYear(e.target.value)}>
+        <div className="cl-filters-row">
+          <select className="cl-toolbar-btn" value={filterYear} onChange={e => setFilterYear(e.target.value)}>
             <option value="">All Years</option>
             {academicYears.map(y => <option key={y} value={y}>{y}</option>)}
           </select>
-
-          <select value={filterCategory} onChange={(e) => setFilterCategory(e.target.value)}>
+          <select className="cl-toolbar-btn" value={filterCategory} onChange={e => setFilterCategory(e.target.value)}>
             <option value="">All Categories</option>
             {examCategories.map(c => <option key={c} value={c}>{c}</option>)}
           </select>
-
-          <select value={filterTerm} onChange={(e) => setFilterTerm(e.target.value)}>
+          <select className="cl-toolbar-btn" value={filterTerm} onChange={e => setFilterTerm(e.target.value)}>
             <option value="">All Terms</option>
             {terms.map(t => <option key={t.term_id} value={t.term_id.toString()}>{t.term_name}</option>)}
           </select>
-
-          <select value={filterDept} onChange={(e) => setFilterDept(e.target.value)}>
+          <select className="cl-toolbar-btn" value={filterDept} onChange={e => setFilterDept(e.target.value)}>
             <option value="">All Departments</option>
             {departments.map(d => <option key={d.department_id} value={d.department_id}>{d.department_name}</option>)}
           </select>
-
-          <select value={filterCollege} onChange={(e) => setFilterCollege(e.target.value)}>
+          <select className="cl-toolbar-btn" value={filterCollege} onChange={e => setFilterCollege(e.target.value)}>
             <option value="">All Colleges</option>
             {colleges.map(c => <option key={c.college_id} value={c.college_id}>{c.college_name}</option>)}
           </select>
         </div>
       )}
 
-      <div className="table-scroll-wrapper">
-        <div className="table-scroll-hint">
-          <FaChevronLeft /> Swipe or use buttons to scroll <FaChevronRight />
-        </div>
-        <button
-          type="button"
-          className="table-scroll-buttons scroll-left"
-          onClick={() => scrollTable('left')}
-          disabled={!canScrollLeft}
-          aria-label="Scroll left"
-        >
-          <FaChevronLeft />
-        </button>
-        <button
-          type="button"
-          className="table-scroll-buttons scroll-right"
-          onClick={() => scrollTable('right')}
-          disabled={!canScrollRight}
-          aria-label="Scroll right"
-        >
-          <FaChevronRight />
-        </button>
-        <div className="colleges-table-container" ref={tableContainerRef}>
-          <table className="colleges-table">
-            <thead>
-              <tr>
-                <th>#</th>
-                <th>Start</th>
-                <th>End</th>
-                <th>Academic Year</th>
-                <th>Exam Category</th>
-                <th>Term</th>
-                <th>Department</th>
-                <th>College</th>
-                <th>
-                  <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-                    <span>Actions</span>
-                    <input
-                      type="checkbox"
-                      checked={isAllSelected}
-                      onChange={toggleSelectAll}
-                      disabled={loading || filtered.length === 0}
-                      aria-label="Select all exam periods"
-                      title="Select all"
-                      style={{ marginLeft: 'auto' }}
-                    />
-                  </div>
-                </th>
-              </tr>
-            </thead>
-            <tbody>
-              {loading ? (
+      {/* ── Table Card ── */}
+      <div className="cl-table-card">
+        <div className="cl-table-scroll-wrapper">
+          <button type="button" className="cl-scroll-btn left" onClick={() => scrollTable('left')} disabled={!canScrollLeft}><FaChevronLeft /></button>
+          <button type="button" className="cl-scroll-btn right" onClick={() => scrollTable('right')} disabled={!canScrollRight}><FaChevronRight /></button>
+
+          <div className="cl-table-container" ref={tableContainerRef}>
+            <table className="cl-table">
+              <thead>
                 <tr>
-                  <td colSpan={9} style={{ textAlign: 'center', padding: '20px' }}>
-                    Loading exam periods...
-                  </td>
+                  <th style={{ width: '52px' }}>#</th>
+                  <th>Start</th>
+                  <th>End</th>
+                  <th>Academic Year</th>
+                  <th>Category</th>
+                  <th>Term</th>
+                  <th>Department</th>
+                  <th>College</th>
+                  <th style={{ width: '120px' }}>
+                    <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+                      <span>Actions</span>
+                      <input type="checkbox" checked={isAllSelected} onChange={toggleSelectAll} disabled={loading || filtered.length === 0} title="Select all" style={{ cursor: 'pointer' }} />
+                    </div>
+                  </th>
                 </tr>
-              ) : filtered.length === 0 ? (
-                <tr>
-                  <td colSpan={9} style={{ textAlign: 'center', padding: '20px' }}>
-                    No exam periods found.
-                  </td>
-                </tr>
-              ) : (
-                paginatedExamPeriods.map((e, i) => {
-                  const isSelected = !!e.examperiod_id && selectedExamIds.has(e.examperiod_id);
-                  return (
-                    <tr
-                      key={e.examperiod_id}
-                      style={{
-                        backgroundColor: isSelected ? '#f8d7da' : 'transparent',
-                      }}
-                    >
-                      <td>{(currentPage - 1) * effectiveItemsPerPage + i + 1}</td>
-                      <td>{new Date(e.start_date).toLocaleDateString()}</td>
-                      <td>{new Date(e.end_date).toLocaleDateString()}</td>
-                      <td>{e.academic_year}</td>
-                      <td>{e.exam_category}</td>
-                      <td>{terms.find(t => t.term_id === e.term_id)?.term_name}</td>
-                      <td>{e.department_id}</td>
-                      <td>{e.college_id}</td>
-                      <td className="action-buttons" style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-                        <button type='button' className="icon-button edit-button" onClick={() => {
-                          setEditMode(true);
-                          setNewExam(e);
-                          const startDate = new Date(e.start_date);
-                          setSelectedDates([startDate]);
-                          setActiveDate(startDate);
-                          setShowModal(true);
-                        }}><FaEdit /> Edit
-                        </button>
-                        <input
-                          type="checkbox"
-                          checked={!!e.examperiod_id && selectedExamIds.has(e.examperiod_id)}
-                          onChange={() => toggleSelect(e.examperiod_id)}
-                          aria-label="Select exam period"
-                          style={{ marginLeft: 'auto' }}
-                        />
-                      </td>
-                    </tr>
-                  );
-                })
-              )}
-            </tbody>
-          </table>
+              </thead>
+              <tbody>
+                {loading ? (
+                  <tr><td colSpan={9} className="cl-table-empty"><div className="cl-spinner" />Loading exam periods…</td></tr>
+                ) : filtered.length === 0 ? (
+                  <tr><td colSpan={9} className="cl-table-empty">No exam periods found.</td></tr>
+                ) : (
+                  paginatedExamPeriods.map((e, i) => {
+                    const isSelected = !!e.examperiod_id && selectedExamIds.has(e.examperiod_id);
+                    return (
+                      <tr key={e.examperiod_id} className={isSelected ? 'selected' : ''}>
+                        <td className="cl-td-num">{(currentPage - 1) * effectiveItemsPerPage + i + 1}</td>
+                        <td>{new Date(e.start_date).toLocaleDateString()}</td>
+                        <td>{new Date(e.end_date).toLocaleDateString()}</td>
+                        <td><span className="cl-id-badge">{e.academic_year}</span></td>
+                        <td>
+                          <span className={`cl-room-type-badge ${e.exam_category === 'Midterm' ? 'lecture' : 'lab'}`}>
+                            {e.exam_category}
+                          </span>
+                        </td>
+                        <td>{terms.find(t => t.term_id === e.term_id)?.term_name ?? '—'}</td>
+                        <td style={{ fontSize: '12px', color: 'var(--cl-text-muted)' }}>{e.department_id || '—'}</td>
+                        <td style={{ fontSize: '12px', color: 'var(--cl-text-muted)' }}>{e.college_id || '—'}</td>
+                        <td>
+                          <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                            <button
+                              type="button"
+                              className="cl-icon-btn edit"
+                              onClick={() => {
+                                setEditMode(true);
+                                setNewExam(e);
+                                const startDate = new Date(e.start_date);
+                                setSelectedDates([startDate]);
+                                setActiveDate(startDate);
+                                setShowModal(true);
+                              }}
+                            >
+                              <FaEdit style={{ fontSize: '11px' }} /> Edit
+                            </button>
+                            <input type="checkbox" checked={isSelected} onChange={() => toggleSelect(e.examperiod_id)} aria-label="Select exam period" style={{ marginLeft: 'auto', cursor: 'pointer' }} />
+                          </div>
+                        </td>
+                      </tr>
+                    );
+                  })
+                )}
+              </tbody>
+            </table>
+          </div>
         </div>
       </div>
 
+      {/* ════ ADD / EDIT MODAL (Calendar layout kept exactly as-is) ════ */}
       {showModal && (
         <div className="examperiod-overlay">
           <div className="examperiod-modal">
@@ -1223,60 +822,34 @@ const ExamPeriodComponent: React.FC = () => {
               {/* Left side - Calendar */}
               <div className="examperiod-calendar-section">
                 <label className="examperiod-label">Select Exam Duration</label>
-
-                {/* Month and Year Dropdowns */}
                 <div className="examperiod-date-selectors">
                   <div className="examperiod-date-selector-group">
                     <label className="examperiod-date-selector-label">Month</label>
                     <select
                       className="examperiod-date-selector"
                       value={activeDate.getMonth()}
-                      onChange={(e) => {
-                        const newDate = new Date(activeDate);
-                        newDate.setMonth(parseInt(e.target.value));
-                        setActiveDate(newDate);
-                      }}
+                      onChange={e => { const d = new Date(activeDate); d.setMonth(parseInt(e.target.value)); setActiveDate(d); }}
                     >
-                      {[
-                        'January', 'February', 'March', 'April', 'May', 'June',
-                        'July', 'August', 'September', 'October', 'November', 'December'
-                      ].map((month, index) => (
-                        <option key={month} value={index}>
-                          {month}
-                        </option>
+                      {['January','February','March','April','May','June','July','August','September','October','November','December'].map((month, index) => (
+                        <option key={month} value={index}>{month}</option>
                       ))}
                     </select>
                   </div>
-
                   <div className="examperiod-date-selector-group">
                     <label className="examperiod-date-selector-label">Year</label>
                     <select
                       className="examperiod-date-selector"
                       value={activeDate.getFullYear()}
-                      onChange={(e) => {
-                        const newDate = new Date(activeDate);
-                        newDate.setFullYear(parseInt(e.target.value));
-                        setActiveDate(newDate);
-                      }}
+                      onChange={e => { const d = new Date(activeDate); d.setFullYear(parseInt(e.target.value)); setActiveDate(d); }}
                     >
                       {(() => {
                         const currentYear = new Date().getFullYear();
                         const baseYears = Array.from({ length: 10 }, (_, i) => currentYear - 2 + i);
-
-                        // Get unique years from selected dates
                         const selectedYears = new Set<number>();
-                        selectedDates.forEach(date => {
-                          selectedYears.add(date.getFullYear());
-                        });
-
-                        // Combine base years with selected years and sort
+                        selectedDates.forEach(date => selectedYears.add(date.getFullYear()));
                         const allYears = new Set([...baseYears, ...selectedYears]);
-                        const sortedYears = Array.from(allYears).sort((a, b) => a - b);
-
-                        return sortedYears.map(year => (
-                          <option key={year} value={year}>
-                            {year}
-                          </option>
+                        return Array.from(allYears).sort((a, b) => a - b).map(year => (
+                          <option key={year} value={year}>{year}</option>
                         ));
                       })()}
                     </select>
@@ -1284,49 +857,24 @@ const ExamPeriodComponent: React.FC = () => {
                 </div>
 
                 <Calendar
-                  calendarType="gregory"  
+                  calendarType="gregory"
                   value={undefined}
                   activeStartDate={activeDate}
-                  onActiveStartDateChange={({ activeStartDate }) => {
-                    if (activeStartDate) {
-                      setActiveDate(activeStartDate);
-                    }
-                  }}
-                  onClickDay={(date) => {
+                  onActiveStartDateChange={({ activeStartDate }) => { if (activeStartDate) setActiveDate(activeStartDate); }}
+                  onClickDay={date => {
                     const normalizedDate = new Date(date);
                     normalizedDate.setHours(0, 0, 0, 0);
-
                     const dateString = toLocalDateString(normalizedDate);
-                    const exists = selectedDates.some(d => {
-                      const normalizedD = new Date(d);
-                      normalizedD.setHours(0, 0, 0, 0);
-                      return toLocalDateString(normalizedD) === dateString;
-                    });
-
+                    const exists = selectedDates.some(d => { const nd = new Date(d); nd.setHours(0,0,0,0); return toLocalDateString(nd) === dateString; });
                     if (exists) {
-                      setSelectedDates(prev =>
-                        prev.filter(d => {
-                          const normalizedD = new Date(d);
-                          normalizedD.setHours(0, 0, 0, 0);
-                          return toLocalDateString(normalizedD) !== dateString;
-                        })
-                      );
+                      setSelectedDates(prev => prev.filter(d => { const nd = new Date(d); nd.setHours(0,0,0,0); return toLocalDateString(nd) !== dateString; }));
                     } else {
-                      setSelectedDates(prev => {
-                        const updated = [...prev, normalizedDate];
-                        setActiveDate(normalizedDate);
-                        return updated;
-                      });
+                      setSelectedDates(prev => { const updated = [...prev, normalizedDate]; setActiveDate(normalizedDate); return updated; });
                     }
                   }}
                   tileClassName={({ date }) => {
-                    // Normalize dates for comparison
                     const dateString = toLocalDateString(date);
-                    const isSelected = selectedDates.some(d => {
-                      const normalizedD = new Date(d);
-                      normalizedD.setHours(0, 0, 0, 0);
-                      return toLocalDateString(normalizedD) === dateString;
-                    });
+                    const isSelected = selectedDates.some(d => { const nd = new Date(d); nd.setHours(0,0,0,0); return toLocalDateString(nd) === dateString; });
                     return isSelected ? 'examperiod-selected-day' : undefined;
                   }}
                 />
@@ -1340,127 +888,104 @@ const ExamPeriodComponent: React.FC = () => {
                     className="examperiod-select"
                     classNamePrefix="examperiod"
                     options={academicYears.map(y => ({ value: y, label: y }))}
-                    value={newExam.academic_year
-                      ? { value: newExam.academic_year, label: newExam.academic_year }
-                      : null}
-                    onChange={opt =>
-                      setNewExam({ ...newExam, academic_year: opt?.value ?? '' })
-                    }
+                    value={newExam.academic_year ? { value: newExam.academic_year, label: newExam.academic_year } : null}
+                    onChange={opt => setNewExam({ ...newExam, academic_year: opt?.value ?? '' })}
                     placeholder="Select Year"
                     isClearable
+                    styles={selectStyles}
                   />
                 </div>
-
-                {/* Exam Category */}
                 <div className="examperiod-input-group">
                   <label className="examperiod-label">Exam Term</label>
                   <Select
                     className="examperiod-select"
                     classNamePrefix="examperiod"
                     options={examCategories.map(c => ({ value: c, label: c }))}
-                    value={newExam.exam_category
-                      ? { value: newExam.exam_category, label: newExam.exam_category }
-                      : null}
-                    onChange={opt =>
-                      setNewExam({ ...newExam, exam_category: opt?.value ?? '' })
-                    }
+                    value={newExam.exam_category ? { value: newExam.exam_category, label: newExam.exam_category } : null}
+                    onChange={opt => setNewExam({ ...newExam, exam_category: opt?.value ?? '' })}
                     placeholder="Select Exam Term"
                     isClearable
+                    styles={selectStyles}
                   />
                 </div>
-
                 <div className="examperiod-input-group">
                   <label className="examperiod-label">Semester</label>
                   <Select
                     className="examperiod-select"
                     classNamePrefix="examperiod"
-                    options={terms
-                      .sort((a, b) => a.term_name.localeCompare(b.term_name))
-                      .map(t => ({ value: t.term_id, label: t.term_name }))}
-                    value={newExam.term_id
-                      ? { value: newExam.term_id, label: terms.find(t => t.term_id === newExam.term_id)?.term_name || '' }
-                      : null}
-                    onChange={opt =>
-                      setNewExam({ ...newExam, term_id: opt?.value ?? 0 })
-                    }
+                    options={terms.sort((a, b) => a.term_name.localeCompare(b.term_name)).map(t => ({ value: t.term_id, label: t.term_name }))}
+                    value={newExam.term_id ? { value: newExam.term_id, label: terms.find(t => t.term_id === newExam.term_id)?.term_name || '' } : null}
+                    onChange={opt => setNewExam({ ...newExam, term_id: opt?.value ?? 0 })}
                     placeholder="Select Semester"
                     isClearable
+                    styles={selectStyles}
                   />
                 </div>
-
                 <div className="examperiod-input-group">
                   <label className="examperiod-label">College</label>
                   <Select
                     className="examperiod-select"
                     classNamePrefix="examperiod"
-                    options={colleges
-                      .sort((a, b) => a.college_name.localeCompare(b.college_name))
-                      .map(c => ({ value: c.college_id, label: c.college_name }))}
-                    value={newExam.college_id
-                      ? { value: newExam.college_id, label: colleges.find(c => c.college_id === newExam.college_id)?.college_name || '' }
-                      : null}
-                    onChange={opt =>
-                      setNewExam({ ...newExam, college_id: opt?.value || null })
-                    }
+                    options={colleges.sort((a, b) => a.college_name.localeCompare(b.college_name)).map(c => ({ value: c.college_id, label: c.college_name }))}
+                    value={newExam.college_id ? { value: newExam.college_id, label: colleges.find(c => c.college_id === newExam.college_id)?.college_name || '' } : null}
+                    onChange={opt => setNewExam({ ...newExam, college_id: opt?.value || null })}
                     placeholder="Optional"
                     isClearable
                     menuPlacement="top"
+                    styles={selectStyles}
                   />
                 </div>
               </div>
             </div>
 
             <div className="examperiod-actions">
-              <button type="button" onClick={handleSubmit} disabled={isSubmitting}>
-                {isSubmitting ? 'Saving...' : 'Save'}
+              <button type="button" className="cl-btn" onClick={() => setShowModal(false)}>Cancel</button>
+              <button type="button" className="cl-btn primary" onClick={handleSubmit} disabled={isSubmitting}>
+                {isSubmitting ? 'Saving…' : 'Save'}
               </button>
-              <button type="button" onClick={() => setShowModal(false)}>Cancel</button>
             </div>
           </div>
         </div>
       )}
 
+      {/* ════ IMPORT MODAL ════ */}
       {showImport && (
-        <div className="modal-overlay">
-          <div className="modal">
-            <h3>Import Exam Periods</h3>
-            <input type="file" accept=".xlsx, .xls" onChange={handleImport} />
-            <button type='button' onClick={() => setShowImport(false)}>Close</button>
-          </div>
-        </div>
-      )}
-
-      {/* Delete Confirmation Modal */}
-      {showDeleteConfirm && (
-        <div className="modal-overlay" onClick={() => setShowDeleteConfirm(false)}>
-          <div className="modal delete-confirm-modal" onClick={(e) => e.stopPropagation()}>
-            <h3>Are you sure to delete this Exam Period?</h3>
-            <p className="delete-confirm-message">
-              {deleteCount === 1 
-                ? 'Delete this one exam period' 
-                : `Delete these ${deleteCount} exam periods`}
-            </p>
-            <div className="modal-actions">
-              <button 
-                type="button" 
-                className="modal-button confirm-delete"
-                onClick={confirmDelete}
-              >
-                Delete
-              </button>
-              <button 
-                type="button" 
-                className="modal-button cancel-delete"
-                onClick={() => setShowDeleteConfirm(false)}
-              >
-                Cancel
-              </button>
+        <div className="cl-modal-overlay" onClick={() => setShowImport(false)}>
+          <div className="cl-modal" onClick={e => e.stopPropagation()}>
+            <div className="cl-modal-header">
+              <h3>Import Exam Periods</h3>
+            </div>
+            <div className="cl-modal-body">
+              <input type="file" accept=".xlsx,.xls" onChange={handleImport} className="cl-file-input" />
+            </div>
+            <div className="cl-modal-footer">
+              <button type="button" className="cl-btn primary" onClick={() => setShowImport(false)}>Close</button>
             </div>
           </div>
         </div>
       )}
 
-      <ToastContainer />
+      {/* ════ DELETE CONFIRM MODAL ════ */}
+      {showDeleteConfirm && (
+        <div className="cl-modal-overlay" onClick={() => setShowDeleteConfirm(false)}>
+          <div className="cl-modal" onClick={e => e.stopPropagation()} style={{ maxWidth: '380px' }}>
+            <div className="cl-modal-header">
+              <h3>Confirm Deletion</h3>
+            </div>
+            <div className="cl-modal-body">
+              <p style={{ fontSize: '13.5px', color: 'var(--cl-text-secondary)', lineHeight: 1.7, margin: 0 }}>
+                {deleteCount === 1 ? 'You are about to delete 1 exam period. This cannot be undone.' : `You are about to delete ${deleteCount} exam periods. This cannot be undone.`}
+              </p>
+            </div>
+            <div className="cl-modal-footer">
+              <button type="button" className="cl-btn" onClick={() => setShowDeleteConfirm(false)}>Cancel</button>
+              <button type="button" className="cl-btn danger-fill" onClick={confirmDelete}>Yes, Delete</button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      <ToastContainer position="top-right" autoClose={3000} />
     </div>
   );
 };

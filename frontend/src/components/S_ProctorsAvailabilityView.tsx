@@ -103,6 +103,11 @@ const SchedulerAvailability: React.FC<ProctorSetAvailabilityProps> = ({ user }) 
   const [schedulerCollegeId, setSchedulerCollegeId] = useState<number | null>(null);
   const [pendingCrCount, setPendingCrCount] = useState(0);
 
+  const [editingCrId, setEditingCrId] = useState<number | null>(null);
+  const [editingCrStatus, setEditingCrStatus] = useState<string>('pending');
+  const [showCrDeleteConfirm, setShowCrDeleteConfirm] = useState(false);
+  const [deletingCrId, setDeletingCrId] = useState<number | null>(null);
+
   const MultiValue = (props: any) => {
     if (props.data.value === 'all') return null;
     return <components.MultiValue {...props} />;
@@ -273,6 +278,62 @@ const SchedulerAvailability: React.FC<ProctorSetAvailabilityProps> = ({ user }) 
     const month = String(date.getMonth() + 1).padStart(2, '0');
     const day = String(date.getDate()).padStart(2, '0');
     return `${year}-${month}-${day}`;
+  };
+
+  const handleCrDelete = async (crId: number) => {
+    setDeletingCrId(crId);
+    setShowCrDeleteConfirm(true);
+  };
+
+  const confirmCrDelete = async () => {
+    if (!deletingCrId) return;
+    setProcessingCrId(deletingCrId);
+    setShowCrDeleteConfirm(false);
+    try {
+      await api.delete(`/tbl_availability/${deletingCrId}/`);
+      toast.success('Change request deleted.');
+      setChangeRequests(prev => prev.filter(r => r.id !== deletingCrId));
+      if (showCrDetailModal && selectedCr?.id === deletingCrId) {
+        setShowCrDetailModal(false);
+        setSelectedCr(null);
+      }
+      setPendingCrCount(prev => {
+        const deleted = changeRequests.find(r => r.id === deletingCrId);
+        return deleted?.status === 'pending' ? Math.max(0, prev - 1) : prev;
+      });
+    } catch (err: any) {
+      toast.error(`Failed to delete: ${err?.message ?? 'Unknown error'}`);
+    } finally {
+      setProcessingCrId(null);
+      setDeletingCrId(null);
+    }
+  };
+
+  const handleCrEditSave = async () => {
+    if (!editingCrId) return;
+    setProcessingCrId(editingCrId);
+    try {
+      await api.patch(`/tbl_availability/${editingCrId}/`, { status: editingCrStatus });
+      toast.success('Change request updated.');
+      setChangeRequests(prev =>
+        prev.map(r => r.id === editingCrId ? { ...r, status: editingCrStatus } : r)
+      );
+      if (showCrDetailModal && selectedCr?.id === editingCrId) {
+        setSelectedCr(prev => prev ? { ...prev, status: editingCrStatus } : null);
+      }
+      // Update pending count
+      const oldCr = changeRequests.find(r => r.id === editingCrId);
+      if (oldCr?.status === 'pending' && editingCrStatus !== 'pending') {
+        setPendingCrCount(prev => Math.max(0, prev - 1));
+      } else if (oldCr?.status !== 'pending' && editingCrStatus === 'pending') {
+        setPendingCrCount(prev => prev + 1);
+      }
+      setEditingCrId(null);
+    } catch (err: any) {
+      toast.error(`Failed to update: ${err?.message ?? 'Unknown error'}`);
+    } finally {
+      setProcessingCrId(null);
+    }
   };
 
   const fetchAllowedDates = async () => {
@@ -472,18 +533,6 @@ const SchedulerAvailability: React.FC<ProctorSetAvailabilityProps> = ({ user }) 
     }
   };
 
-  const toggleSelect = (id: number) => {
-    setSelectedAvailabilityIds((prev) => {
-      const next = new Set(prev);
-      if (next.has(id)) {
-        next.delete(id);
-      } else {
-        next.add(id);
-      }
-      return next;
-    });
-  };
-
   // Resolve scheduler college
   useEffect(() => {
     const resolveCollege = async () => {
@@ -618,27 +667,122 @@ const SchedulerAvailability: React.FC<ProctorSetAvailabilityProps> = ({ user }) 
             });
 
             if (Array.isArray(existingAvailability) && existingAvailability.length > 0) {
-              const matchingEntries = existingAvailability.filter((entry: any) => {
+
+              // Filter out change_request type entries — only touch real availability records
+              const realAvailability = existingAvailability.filter(
+                (entry: any) => !entry.type || entry.type !== 'change_request'
+              );
+
+              // Find entries that contain the specific requested days AND slots
+              // An entry qualifies only if it contains at least one of the requested days
+              // AND at least one of the requested slots — then we surgically update only
+              // the matching day+slot combinations by splitting if needed
+              const matchingEntries = realAvailability.filter((entry: any) => {
                 const entryDays: string[] = Array.isArray(entry.days) ? entry.days : [];
                 const entrySlots: string[] = Array.isArray(entry.time_slots) ? entry.time_slots : [];
-                const daysMatch = cr.days.some(d => entryDays.includes(d));
-                const slotsMatch = cr.time_slots.some(s => entrySlots.includes(s));
-                return daysMatch && slotsMatch;
+
+                const hasMatchingDay = cr.days.some(d => entryDays.includes(d));
+                const hasMatchingSlot = cr.time_slots.some(s => entrySlots.includes(s));
+
+                return hasMatchingDay && hasMatchingSlot;
               });
 
               if (matchingEntries.length === 0) {
                 toast.warn('No matching availability entries found to update.');
               } else {
-                const updateResults = await Promise.allSettled(
-                  matchingEntries.map((entry: any) =>
-                    api.patch(`/tbl_availability/${entry.availability_id}/`, {
-                      status: targetStatus,
-                    })
-                  )
-                );
+                // For each matching entry, we need to surgically update ONLY the
+                // requested day+slot combinations, leaving others intact
+                const updatePromises: Promise<any>[] = [];
+
+                for (const entry of matchingEntries) {
+                  const entryDays: string[] = Array.isArray(entry.days) ? entry.days : [];
+                  const entrySlots: string[] = Array.isArray(entry.time_slots) ? entry.time_slots : [];
+
+                  // Identify which days and slots in this entry are affected by the request
+                  const affectedDays = entryDays.filter(d => cr.days.includes(d));
+                  const unaffectedDays = entryDays.filter(d => !cr.days.includes(d));
+                  const affectedSlots = entrySlots.filter(s => cr.time_slots.includes(s));
+                  const unaffectedSlots = entrySlots.filter(s => !cr.time_slots.includes(s));
+
+                  const isFullMatch =
+                    unaffectedDays.length === 0 && unaffectedSlots.length === 0;
+
+                  if (isFullMatch) {
+                    // Entire entry matches — just update status directly
+                    updatePromises.push(
+                      api.patch(`/tbl_availability/${entry.availability_id}/`, {
+                        status: targetStatus,
+                      })
+                    );
+                  } else {
+                    // Partial match — need to split:
+                    // 1. Delete the original combined entry
+                    // 2. Re-create the affected portion with new status
+                    // 3. Re-create the unaffected portions with original status
+
+                    updatePromises.push(
+                      (async () => {
+                        // Delete original
+                        await api.delete(`/tbl_availability/${entry.availability_id}/`);
+
+                        const createPromises: Promise<any>[] = [];
+
+                        // Create affected combinations with new targetStatus
+                        for (const day of affectedDays) {
+                          for (const slot of affectedSlots) {
+                            createPromises.push(
+                              api.post('/tbl_availability/', {
+                                user_id: cr.user_id,
+                                days: [day],
+                                time_slots: [slot],
+                                status: targetStatus,
+                                remarks: entry.remarks || null,
+                              })
+                            );
+                          }
+                        }
+
+                        // Re-create unaffected day+slot combinations with original status
+                        // Case 1: unaffected days with ALL original slots
+                        for (const day of unaffectedDays) {
+                          for (const slot of entrySlots) {
+                            createPromises.push(
+                              api.post('/tbl_availability/', {
+                                user_id: cr.user_id,
+                                days: [day],
+                                time_slots: [slot],
+                                status: entry.status,
+                                remarks: entry.remarks || null,
+                              })
+                            );
+                          }
+                        }
+
+                        // Case 2: affected days with unaffected slots (keep original status)
+                        for (const day of affectedDays) {
+                          for (const slot of unaffectedSlots) {
+                            createPromises.push(
+                              api.post('/tbl_availability/', {
+                                user_id: cr.user_id,
+                                days: [day],
+                                time_slots: [slot],
+                                status: entry.status,
+                                remarks: entry.remarks || null,
+                              })
+                            );
+                          }
+                        }
+
+                        await Promise.allSettled(createPromises);
+                      })()
+                    );
+                  }
+                }
+
+                const updateResults = await Promise.allSettled(updatePromises);
                 const failed = updateResults.filter(r => r.status === 'rejected').length;
                 if (failed > 0) {
-                  toast.warn(`${failed} availability entr${failed === 1 ? 'y' : 'ies'} failed to update.`);
+                  toast.warn(`${failed} entr${failed === 1 ? 'y' : 'ies'} failed to update.`);
                 }
               }
             } else {
@@ -717,7 +861,7 @@ const SchedulerAvailability: React.FC<ProctorSetAvailabilityProps> = ({ user }) 
 
   useEffect(() => {
     setCurrentPage(1);
-  }, [searchTerm, sortBy]);
+  }, [searchTerm, sortBy, entries]);
 
   const isNumeric = (str: string): boolean => {
     return !isNaN(Number(str)) && !isNaN(parseFloat(str));
@@ -771,13 +915,71 @@ const SchedulerAvailability: React.FC<ProctorSetAvailabilityProps> = ({ user }) 
     return filtered;
   }, [entries, searchTerm, sortBy]);
 
-  const totalItems = filteredEntries.length;
+  const mergedEntries = useMemo(() => {
+    // Group entries: merge same user + same date + same status into one display row
+    // but keep unavailable entries separate (never merge across status boundaries)
+    const groups: Map<string, Availability & { _ids: number[] }> = new Map();
+
+    filteredEntries.forEach(entry => {
+      entry.days.forEach(day => {
+        entry.time_slots.forEach(slot => {
+          // Key: user + day + status — unavailable gets its own key per slot
+          // available entries on the same day get merged together
+          const key = entry.status === 'available'
+            ? `${entry.user_id}_${day}_available`
+            : `${entry.user_id}_${day}_${slot}_unavailable`; // keep unavailable separate per slot
+
+          if (groups.has(key)) {
+            const existing = groups.get(key)!;
+            if (!existing.time_slots.includes(slot as AvailabilityTimeSlot)) {
+              existing.time_slots = [...existing.time_slots, slot as AvailabilityTimeSlot];
+            }
+            existing._ids.push(entry.availability_id);
+          } else {
+            groups.set(key, {
+              ...entry,
+              days: [day],
+              time_slots: [slot as AvailabilityTimeSlot],
+              // Use the first availability_id as the display id
+              availability_id: entry.availability_id,
+              _ids: [entry.availability_id],
+            });
+          }
+        });
+      });
+    });
+
+    // Sort time slots within each group in correct order
+    const slotOrder = Object.values(AvailabilityTimeSlot);
+    const result = Array.from(groups.values()).map(group => ({
+      ...group,
+      time_slots: [...group.time_slots].sort(
+        (a, b) => slotOrder.indexOf(a) - slotOrder.indexOf(b)
+      ) as AvailabilityTimeSlot[],
+    }));
+
+    // Sort final result by proctor name → date → status
+    result.sort((a, b) => {
+      const nameCompare = (a.user_fullname || '').localeCompare(b.user_fullname || '');
+      if (nameCompare !== 0) return nameCompare;
+      const dayCompare = (a.days[0] || '').localeCompare(b.days[0] || '');
+      if (dayCompare !== 0) return dayCompare;
+      // available before unavailable
+      if (a.status === 'available' && b.status !== 'available') return -1;
+      if (a.status !== 'available' && b.status === 'available') return 1;
+      return 0;
+    });
+
+    return result;
+  }, [filteredEntries]);
+
+  const totalItems = mergedEntries.length;
 
   const effectiveItemsPerPage = useMemo(() => {
     if (totalItems === 0) return 1;
 
     if (itemsPerPage === 'all') {
-      return 20;
+      return totalItems;
     }
 
     return itemsPerPage;
@@ -790,11 +992,11 @@ const SchedulerAvailability: React.FC<ProctorSetAvailabilityProps> = ({ user }) 
 
   const paginatedEntries = useMemo(() => {
     if (totalItems === 0) return [];
-    return filteredEntries.slice(
+    return mergedEntries.slice(
       (currentPage - 1) * effectiveItemsPerPage,
       currentPage * effectiveItemsPerPage,
     );
-  }, [filteredEntries, currentPage, effectiveItemsPerPage, totalItems]);
+  }, [mergedEntries, currentPage, effectiveItemsPerPage, totalItems]);
 
   useEffect(() => {
     if (currentPage > totalPages) {
@@ -802,15 +1004,21 @@ const SchedulerAvailability: React.FC<ProctorSetAvailabilityProps> = ({ user }) 
     }
   }, [currentPage, totalPages]);
 
-  const isAllSelected = filteredEntries.length > 0 && filteredEntries.every((entry) => selectedAvailabilityIds.has(entry.availability_id));
+  const isAllSelected = mergedEntries.length > 0 && mergedEntries.every(
+    (entry) => {
+      const ids = (entry as Availability & { _ids: number[] })._ids ?? [entry.availability_id];
+      return ids.every(id => selectedAvailabilityIds.has(id));
+    }
+  );
 
   const toggleSelectAll = () => {
     setSelectedAvailabilityIds(() => {
-      if (isAllSelected) {
-        return new Set();
-      }
+      if (isAllSelected) return new Set();
       const all = new Set<number>();
-      filteredEntries.forEach((entry) => all.add(entry.availability_id));
+      mergedEntries.forEach((entry) => {
+        const ids = (entry as Availability & { _ids: number[] })._ids ?? [entry.availability_id];
+        ids.forEach(id => all.add(id));
+      });
       return all;
     });
   };
@@ -1446,7 +1654,7 @@ const SchedulerAvailability: React.FC<ProctorSetAvailabilityProps> = ({ user }) 
                           type="checkbox"
                           checked={isAllSelected}
                           onChange={toggleSelectAll}
-                          disabled={loading || filteredEntries.length === 0}
+                          disabled={loading || mergedEntries.length === 0}
                           aria-label="Select all"
                           title="Select all"
                           style={{ marginLeft: 'auto' }}
@@ -1456,7 +1664,7 @@ const SchedulerAvailability: React.FC<ProctorSetAvailabilityProps> = ({ user }) 
                   </tr>
                 </thead>
                 <tbody>
-                  {filteredEntries.length === 0 && !isSubmitting ? (
+                  {mergedEntries.length === 0 && !isSubmitting ? (
                     <tr>
                       <td colSpan={7} style={{ textAlign: 'center', padding: '20px' }}>
                         {loading ? 'Loading availability...' : 'No availability found.'}
@@ -1464,47 +1672,34 @@ const SchedulerAvailability: React.FC<ProctorSetAvailabilityProps> = ({ user }) 
                     </tr>
                   ) : (
                     paginatedEntries.map((entry, idx) => {
-                      const isSelected = selectedAvailabilityIds.has(entry.availability_id);
+                      const mergedEntry = entry as Availability & { _ids: number[] };
+                      const isSelected = mergedEntry._ids?.every(id => selectedAvailabilityIds.has(id));
+
                       return (
                         <tr
-                          key={entry.availability_id}
-                          style={{
-                            backgroundColor: isSelected ? '#ffcccc' : 'transparent',
-                          }}
+                          key={`${entry.user_id}_${entry.days[0]}_${entry.status}_${entry.time_slots[0]}`}
+                          style={{ backgroundColor: isSelected ? '#ffcccc' : 'transparent' }}
                         >
                           <td>{(currentPage - 1) * effectiveItemsPerPage + idx + 1}</td>
                           <td>{entry.user_fullname}</td>
                           <td>{entry.days?.map(d => new Date(d).toLocaleDateString()).join(', ')}</td>
                           <td>{entry.time_slots?.join(', ')}</td>
                           <td>
-                            <span
-                              style={{
-                                padding: '4px 8px',
-                                borderRadius: '999px',
-                                color: 'white',
-                                backgroundColor: entry.status === 'available' ? 'green' : 'red',
-                                fontSize: '0.8rem',
-                                textTransform: 'capitalize',
-                              }}
-                            >
+                            <span style={{
+                              padding: '4px 8px', borderRadius: '999px', color: 'white',
+                              backgroundColor: entry.status === 'available' ? 'green' : 'red',
+                              fontSize: '0.8rem', textTransform: 'capitalize',
+                            }}>
                               {entry.status}
                             </span>
                           </td>
                           <td>
                             {entry.remarks ? (
-                              <button
-                                type="button"
-                                className="icon-button view-button"
-                                onClick={() => {
-                                  setSelectedRemarks(entry.remarks!);
-                                  setShowRemarksModal(true);
-                                }}
-                              >
+                              <button type="button" className="icon-button view-button"
+                                onClick={() => { setSelectedRemarks(entry.remarks!); setShowRemarksModal(true); }}>
                                 <FaEye />
                               </button>
-                            ) : (
-                              '—'
-                            )}
+                            ) : '—'}
                           </td>
                           <td className="action-buttons" style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
                             <button type="button" className="icon-button" onClick={() => openEditModal(entry)}>
@@ -1512,8 +1707,19 @@ const SchedulerAvailability: React.FC<ProctorSetAvailabilityProps> = ({ user }) 
                             </button>
                             <input
                               type="checkbox"
-                              checked={selectedAvailabilityIds.has(entry.availability_id)}
-                              onChange={() => toggleSelect(entry.availability_id)}
+                              checked={isSelected}
+                              onChange={() => {
+                                setSelectedAvailabilityIds(prev => {
+                                  const next = new Set(prev);
+                                  const ids = mergedEntry._ids ?? [entry.availability_id];
+                                  if (isSelected) {
+                                    ids.forEach(id => next.delete(id));
+                                  } else {
+                                    ids.forEach(id => next.add(id));
+                                  }
+                                  return next;
+                                });
+                              }}
                               aria-label={`Select ${entry.user_fullname}`}
                               style={{ marginLeft: 'auto' }}
                             />
@@ -1766,16 +1972,22 @@ const SchedulerAvailability: React.FC<ProctorSetAvailabilityProps> = ({ user }) 
 
           {!crLoading && filteredCr.map(req => (
             <div key={req.id}
-              onClick={() => { setSelectedCr(req); setShowCrDetailModal(true); }}
+              onClick={() => {
+                if (editingCrId !== req.id) {
+                  setSelectedCr(req);
+                  setShowCrDetailModal(true);
+                }
+              }}
               style={{
                 background: '#fff',
                 border: req.status === 'pending' ? '1.5px solid #fbbf24' : '1px solid #e5e7eb',
                 borderLeft: req.status === 'pending' ? '4px solid #f59e0b' : req.status === 'approved' ? '4px solid #10b981' : '4px solid #ef4444',
-                borderRadius: 10, padding: '14px 18px', marginBottom: 10, cursor: 'pointer',
+                borderRadius: 10, padding: '14px 18px', marginBottom: 10,
+                cursor: editingCrId === req.id ? 'default' : 'pointer',
                 boxShadow: req.status === 'pending' ? '0 2px 8px rgba(245,158,11,0.10)' : '0 1px 4px rgba(0,0,0,0.06)',
                 transition: 'box-shadow 0.2s',
               }}
-              onMouseEnter={e => (e.currentTarget.style.boxShadow = '0 4px 16px rgba(0,0,0,0.10)')}
+              onMouseEnter={e => { if (editingCrId !== req.id) e.currentTarget.style.boxShadow = '0 4px 16px rgba(0,0,0,0.10)'; }}
               onMouseLeave={e => (e.currentTarget.style.boxShadow = req.status === 'pending' ? '0 2px 8px rgba(245,158,11,0.10)' : '0 1px 4px rgba(0,0,0,0.06)')}
             >
               <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', flexWrap: 'wrap', gap: 8 }}>
@@ -1794,26 +2006,129 @@ const SchedulerAvailability: React.FC<ProctorSetAvailabilityProps> = ({ user }) 
                   <div style={{ fontSize: 13, color: '#4b5563', display: 'flex', flexWrap: 'wrap', gap: '4px 16px' }}>
                     <span><strong>Days:</strong> {req.days.map(formatDate).join(', ')}</span>
                     <span><strong>Slots:</strong> {req.time_slots.join(', ')}</span>
+                    {req.requested_status && (
+                      <span><strong>Requested:</strong> {req.requested_status}</span>
+                    )}
                   </div>
                   {req.remarks && <div style={{ marginTop: 6, fontSize: 13, color: '#6b7280', fontStyle: 'italic' }}>"{req.remarks}"</div>}
                   {req.created_at && <div style={{ marginTop: 4, fontSize: 11, color: '#9ca3af' }}>Submitted: {new Date(req.created_at).toLocaleString('en-US')}</div>}
+
+                  {/* Inline edit form */}
+                  {editingCrId === req.id && (
+                    <div
+                      style={{ marginTop: 12, padding: '10px 12px', backgroundColor: '#f8fafc', borderRadius: 8, border: '1px solid #e2e8f0' }}
+                      onClick={e => e.stopPropagation()}
+                    >
+                      <label style={{ fontSize: 13, fontWeight: 600, color: '#374151', display: 'block', marginBottom: 6 }}>
+                        Change Status:
+                      </label>
+                      <div style={{ display: 'flex', gap: 8, alignItems: 'center', flexWrap: 'wrap' }}>
+                        {(['pending', 'approved', 'rejected'] as const).map(s => (
+                          <button
+                            key={s}
+                            type="button"
+                            onClick={() => setEditingCrStatus(s)}
+                            style={{
+                              padding: '5px 14px', borderRadius: 16, border: '1.5px solid',
+                              borderColor: editingCrStatus === s ? '#092C4C' : '#d1d5db',
+                              backgroundColor: editingCrStatus === s ? '#092C4C' : 'white',
+                              color: editingCrStatus === s ? 'white' : '#374151',
+                              fontSize: 12, fontWeight: 600, cursor: 'pointer',
+                            }}
+                          >
+                            {s.charAt(0).toUpperCase() + s.slice(1)}
+                          </button>
+                        ))}
+                        <div style={{ marginLeft: 'auto', display: 'flex', gap: 6 }}>
+                          <button
+                            type="button"
+                            onClick={handleCrEditSave}
+                            disabled={processingCrId === req.id}
+                            style={{ padding: '5px 14px', borderRadius: 7, border: 'none', backgroundColor: '#092C4C', color: '#fff', fontWeight: 600, fontSize: 12, cursor: 'pointer', opacity: processingCrId === req.id ? 0.6 : 1 }}
+                          >
+                            {processingCrId === req.id ? 'Saving...' : 'Save'}
+                          </button>
+                          <button
+                            type="button"
+                            onClick={() => setEditingCrId(null)}
+                            style={{ padding: '5px 14px', borderRadius: 7, border: '1px solid #d1d5db', backgroundColor: 'white', color: '#374151', fontWeight: 600, fontSize: 12, cursor: 'pointer' }}
+                          >
+                            Cancel
+                          </button>
+                        </div>
+                      </div>
+                    </div>
+                  )}
                 </div>
-                {req.status === 'pending' && (
-                  <div style={{ display: 'flex', gap: 6 }} onClick={e => e.stopPropagation()}>
-                    <button onClick={() => handleCrAction(req.id, 'approved')} disabled={processingCrId === req.id}
-                      style={{ display: 'flex', alignItems: 'center', gap: 4, padding: '7px 14px', borderRadius: 7, border: 'none', backgroundColor: '#10b981', color: '#fff', fontWeight: 600, fontSize: 13, cursor: 'pointer', opacity: processingCrId === req.id ? 0.6 : 1 }}>
-                      <FaCheckCircle size={12} /> Approve
-                    </button>
-                    <button onClick={() => handleCrAction(req.id, 'rejected')} disabled={processingCrId === req.id}
-                      style={{ display: 'flex', alignItems: 'center', gap: 4, padding: '7px 14px', borderRadius: 7, border: 'none', backgroundColor: '#ef4444', color: '#fff', fontWeight: 600, fontSize: 13, cursor: 'pointer', opacity: processingCrId === req.id ? 0.6 : 1 }}>
-                      <FaTimesCircle size={12} /> Reject
-                    </button>
-                  </div>
-                )}
-                {req.status !== 'pending' && <span style={crStatusStyle(req.status)}>{req.status}</span>}
+
+                {/* Action buttons */}
+                <div style={{ display: 'flex', gap: 6, flexDirection: 'column', alignItems: 'flex-end' }} onClick={e => e.stopPropagation()}>
+                  {req.status === 'pending' && editingCrId !== req.id && (
+                    <div style={{ display: 'flex', gap: 6 }}>
+                      <button onClick={() => handleCrAction(req.id, 'approved')} disabled={processingCrId === req.id}
+                        style={{ display: 'flex', alignItems: 'center', gap: 4, padding: '7px 14px', borderRadius: 7, border: 'none', backgroundColor: '#10b981', color: '#fff', fontWeight: 600, fontSize: 13, cursor: 'pointer', opacity: processingCrId === req.id ? 0.6 : 1 }}>
+                        <FaCheckCircle size={12} /> Approve
+                      </button>
+                      <button onClick={() => handleCrAction(req.id, 'rejected')} disabled={processingCrId === req.id}
+                        style={{ display: 'flex', alignItems: 'center', gap: 4, padding: '7px 14px', borderRadius: 7, border: 'none', backgroundColor: '#ef4444', color: '#fff', fontWeight: 600, fontSize: 13, cursor: 'pointer', opacity: processingCrId === req.id ? 0.6 : 1 }}>
+                        <FaTimesCircle size={12} /> Reject
+                      </button>
+                    </div>
+                  )}
+                  {editingCrId !== req.id && (
+                    <div style={{ display: 'flex', gap: 6 }}>
+                      <button
+                        type="button"
+                        onClick={() => { setEditingCrId(req.id); setEditingCrStatus(req.status); }}
+                        disabled={processingCrId === req.id}
+                        title="Edit status"
+                        style={{ display: 'flex', alignItems: 'center', gap: 4, padding: '6px 12px', borderRadius: 7, border: '1px solid #d1d5db', backgroundColor: 'white', color: '#092C4C', fontWeight: 600, fontSize: 12, cursor: 'pointer' }}
+                      >
+                        <FaPenAlt size={11} /> Edit
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => handleCrDelete(req.id)}
+                        disabled={processingCrId === req.id}
+                        title="Delete request"
+                        style={{ display: 'flex', alignItems: 'center', gap: 4, padding: '6px 12px', borderRadius: 7, border: 'none', backgroundColor: '#fee2e2', color: '#ef4444', fontWeight: 600, fontSize: 12, cursor: 'pointer' }}
+                      >
+                        <FaTrash size={11} /> Delete
+                      </button>
+                    </div>
+                  )}
+                </div>
               </div>
             </div>
           ))}
+        </div>
+      )}
+
+      {showCrDeleteConfirm && (
+        <div className="modal-overlay" onClick={() => setShowCrDeleteConfirm(false)}>
+          <div className="modal delete-confirm-modal" onClick={e => e.stopPropagation()}>
+            <h3>Delete Change Request?</h3>
+            <p className="delete-confirm-message">
+              This will permanently remove the change request. This action cannot be undone.
+            </p>
+            <div className="modal-actions">
+              <button
+                type="button"
+                className="modal-button confirm-delete"
+                onClick={confirmCrDelete}
+                disabled={processingCrId === deletingCrId}
+              >
+                {processingCrId === deletingCrId ? 'Deleting...' : 'Delete'}
+              </button>
+              <button
+                type="button"
+                className="modal-button cancel-delete"
+                onClick={() => { setShowCrDeleteConfirm(false); setDeletingCrId(null); }}
+              >
+                Cancel
+              </button>
+            </div>
+          </div>
         </div>
       )}
 

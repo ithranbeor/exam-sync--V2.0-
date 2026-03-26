@@ -4,7 +4,7 @@ import '../styles/B_BayanihanModality.css';
 import { ToastContainer, toast } from 'react-toastify';
 import 'react-toastify/dist/ReactToastify.css';
 import Select from 'react-select';
-import { FaTrash, FaPlus } from 'react-icons/fa';
+import { FaPlus, FaPenAlt } from 'react-icons/fa';
 
 interface UserProps {
   user: {
@@ -813,37 +813,6 @@ const BayanihanModality: React.FC<UserProps> = ({ user }) => {
     return timeslots;
   }, [roomStatus]);
 
-  const RoomTimeslots: React.FC<{ roomId: string }> = ({ roomId }) => {
-    useEffect(() => {
-      fetchRoomOccupancy(roomId);
-    }, [roomId]);
-
-    const slots = getRoomTimeslots(roomId);
-
-    if (!roomStatus[roomId]) {
-      return <div style={{ textAlign: 'center', padding: '1rem' }}>Loading occupancy...</div>;
-    }
-
-    return (
-      <div className="occupancy-timeslots">
-        {slots.map((slot, i) => (
-          <div
-            key={i}
-            className={`timeslot-entry ${slot.occupied ? "occupied" : "vacant"}`}
-          >
-            <div className="timeslot-status">
-              {slot.occupied ? "Occupied" : "Available"}
-            </div>
-            <div className="timeslot-time">
-              {slot.start.toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })} -{" "}
-              {slot.end.toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })}
-            </div>
-          </div>
-        ))}
-      </div>
-    );
-  };
-
   const filteredRoomOptions = roomOptions;
 
   const filteredAndSortedRooms = useMemo(() => {
@@ -857,774 +826,572 @@ const BayanihanModality: React.FC<UserProps> = ({ user }) => {
       });
   }, [filteredRoomOptions, selectedBuilding, form.roomType]);
 
+  const selectStyles = {
+    control: (base: any) => ({ ...base, fontSize: '13px', minHeight: '36px', borderColor: '#DDE3EC', borderRadius: '6px' }),
+    placeholder: (base: any) => ({ ...base, color: '#8A9BB0' }),
+    menuPortal: (base: any) => ({ ...base, zIndex: 99999, fontSize: '13px', color: '#4b5e72' }),
+  };
+
+  // Inline occupancy display (replaces internal RoomTimeslots)
+  const RoomTimeslotsInline: React.FC<{ roomId: string }> = ({ roomId }) => {
+    useEffect(() => {
+      fetchRoomOccupancy(roomId);
+    }, [roomId]);
+
+    const slots = getRoomTimeslots(roomId);
+
+    if (!roomStatus[roomId]) {
+      return <div style={{ textAlign: 'center', padding: '1rem', color: 'var(--bm-text-muted)', fontSize: '13px' }}>Loading occupancy…</div>;
+    }
+
+    return (
+      <>
+        {slots.map((slot, i) => (
+          <div key={i} className={`bm-timeslot ${slot.occupied ? 'occupied' : 'vacant'}`}>
+            <span>{slot.start.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })} – {slot.end.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}</span>
+            <span className="status">{slot.occupied ? 'Occupied' : 'Available'}</span>
+          </div>
+        ))}
+      </>
+    );
+  };
+
   return (
-    <div className="set-availability-container">
-      <div className="availability-sections">
-        <div className="availability-card">
-          <div className="card-header-set">Modality Submission</div>
-          <p className="subtitle">Please fill in all fields before submitting.</p>
+    <div className="bm-page">
 
-          {loadingRooms ? (
-            <div style={{
-              backgroundColor: '#e3f2fd',
-              border: '1px solid #2196F3',
-              padding: '12px',
-              borderRadius: '4px',
-              marginBottom: '20px',
-              color: '#1565C0',
-              textAlign: 'center'
-            }}>
-              Loading available rooms...
-            </div>
-          ) : availableRoomIds.length === 0 ? (
-            <div style={{
-              backgroundColor: '#fff3cd',
-              border: '1px solid #ffc107',
-              padding: '12px',
-              borderRadius: '4px',
-              marginBottom: '20px',
-              color: '#856404'
-            }}>
-              ⚠️ No rooms are currently available for selection. Please contact the administrator to set up available rooms in the Room Management page.
-            </div>
-          ) : null}
+      {/* ── Page Header ── */}
+      <div className="bm-page-header">
+        <div className="bm-page-header-left">
+          <div className="bm-page-icon">
+            <svg width="22" height="22" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.8}>
+              <path strokeLinecap="round" strokeLinejoin="round" d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2" />
+            </svg>
+          </div>
+          <div className="bm-page-title">
+            <h1>Modality Submission</h1>
+            <p>Fill in all fields before submitting</p>
+          </div>
+        </div>
 
-          <form className="availability-form" onSubmit={handleSubmit}>
-            <div className="availability-grid">
-
-              <div className="form-group">
-                <label>Modality Type</label>
-                <Select
-                  options={[
-                    { value: 'Hands-on (Laboratory)', label: 'Hands-on (Laboratory)' },
-                    { value: 'Written (Lecture)', label: 'Written (Lecture)' },
-                    { value: 'Written (Laboratory)', label: 'Written (Laboratory)' },
-                  ]}
-                  value={form.modality ? { value: form.modality, label: form.modality } : null}
-                  onChange={selected => setForm(prev => ({
-                    ...prev,
-                    modality: selected?.value || '',
-                    course: '',     
-                    sections: [], 
-                    rooms: []       
-                  }))}
-                  placeholder="Select modality..."
-                  isClearable
-                />
-              </div>
-
-              {/* PROGRAM */}
-              <div className="form-group">
-                <label>Program</label>
-                <Select
-                  options={programOptions
-                    .slice() 
-                    .sort((a, b) => a.program_id.localeCompare(b.program_id, undefined, { numeric: true }))
-                    .map(p => ({ value: p.program_id, label: `${p.program_id} - ${p.program_name}` }))
-                  }
-                  value={programOptions
-                    .filter(p => p.program_id === form.program)
-                    .map(p => ({ value: p.program_id, label: `${p.program_id} - ${p.program_name}` }))
-                  }
-                  onChange={selected => setForm(prev => ({ ...prev, program: selected?.value || '', course: '', sections: [] }))}
-                  placeholder="Select program..."
-                  isClearable
-                />
-              </div>
-
-              {/* COURSE */}
-              <div className="form-group">
-                <label>Course</label>
-                <Select
-                  isDisabled={!form.program}
-                  options={filteredCourseOptions.map(c => {
-                    const hasModalityForType = userModalities.some(m =>
-                      m.course_id === c.course_id &&
-                      m.modality_type === form.modality
-                    );
-
-                    return {
-                      value: c.course_id,
-                      label: `${c.course_id} (${c.course_name})`,
-                      isDisabled: hasModalityForType && form.modality !== ''
-                    };
-                  })}
-                  value={form.course ? {
-                    value: form.course,
-                    label: `${filteredCourseOptions.find(c => c.course_id === form.course)?.course_id} (${filteredCourseOptions.find(c => c.course_id === form.course)?.course_name})`
-                  } : null}
-                  onChange={selected => {
-                    const courseId = selected?.value || "";
-
-                    const availableSections = sectionOptions
-                      .filter(s => s.course_id === courseId)
-                      .filter(s => {
-                        const hasModalityForThisCourse = userModalities.some(m =>
-                          m.course_id === courseId && 
-                          (
-                            (Array.isArray(m.sections) && m.sections.includes(s.section_name)) ||
-                            (typeof m.sections === 'string' && m.sections.split(',').map((sec: string) => sec.trim()).includes(s.section_name))
-                          )
-                        );
-                        return !hasModalityForThisCourse; 
-                      })
-                      .map(s => s.section_name)
-                      .sort((a, b) => a.localeCompare(b));
-
-                    setForm(prev => ({
-                      ...prev,
-                      course: courseId,
-                      sections: availableSections,  
-                      rooms: []
-                    }));
-                  }}
-                  placeholder="Select course..."
-                  isClearable
-                  styles={{
-                    option: (base, state) => ({
-                      ...base,
-                      backgroundColor: state.isDisabled ? '#f5f5f5' : state.isFocused ? '#e3f2fd' : 'white',
-                      color: state.isDisabled ? '#999' : '#333',
-                      cursor: state.isDisabled ? 'not-allowed' : 'pointer',
-                      '&:hover': {
-                        backgroundColor: state.isDisabled ? '#f5f5f5' : '#e3f2fd'
-                      }
-                    })
-                  }}
-                />
-                {form.modality && (
-                  <small style={{ marginTop: "4px", display: "block", color: "#666" }}>
-                    Grayed out courses already have a {form.modality} modality submitted
-                  </small>
-                )}
-              </div>
-
-              {/* SECTIONS */}
-              <div className="form-group full-width">
-                <label>Sections</label>
-
-                {form.course ? (
-                  <Select
-                    isMulti
-                    isDisabled={false}
-                    closeMenuOnSelect={false}
-                    hideSelectedOptions={false}
-
-                    options={filteredSectionOptions
-                      .map(s => {
-                        const hasModalityForCourse = userModalities.some(m =>
-                          m.course_id === form.course && 
-                          (
-                            (Array.isArray(m.sections) && m.sections.includes(s.value)) ||
-                            (typeof m.sections === 'string' && m.sections.split(',').map((sec: string) => sec.trim()).includes(s.value))
-                          )
-                        );
-
-                        return {
-                          value: s.value,
-                          label: s.label,
-                          isDisabled: hasModalityForCourse 
-                        };
-                      })
-                      .sort((a, b) => a.label.localeCompare(b.label))
-                    }
-
-                    value={form.sections
-                      .sort((a, b) => a.localeCompare(b))
-                      .map(sec => ({ value: sec, label: sec }))
-                    }
-
-                    onChange={(selectedOptions) => {
-                      const selectedSections = selectedOptions
-                        ? selectedOptions.map(opt => opt.value)
-                        : [];
-
-                      setForm(prev => ({
-                        ...prev,
-                        sections: selectedSections,
-                        rooms: []
-                      }));
-                    }}
-
-                    styles={{
-                      multiValue: (base) => ({
-                        ...base,
-                        backgroundColor: "#e0f2fe",
-                        borderRadius: "6px",
-                        padding: "2px 4px"
-                      }),
-                      control: (base) => ({
-                        ...base,
-                        backgroundColor: "#fff"
-                      }),
-                      valueContainer: (base) => ({
-                        ...base,
-                        maxHeight: "120px",
-                        overflowY: "auto"
-                      }),
-                      option: (base, state) => ({
-                        ...base,
-                        backgroundColor: state.isDisabled ? '#f5f5f5' : state.isFocused ? '#e3f2fd' : 'white',
-                        color: state.isDisabled ? '#999' : '#333',
-                        cursor: state.isDisabled ? 'not-allowed' : 'pointer',
-                        '&:hover': {
-                          backgroundColor: state.isDisabled ? '#f5f5f5' : '#e3f2fd'
-                        }
-                      })
-                    }}
-                  />
-                ) : (
-                  <p style={{ color: "#888" }}>Select a course first</p>
-                )}
-
-                {form.course && form.sections.length > 0 && (
-                  <small style={{ marginTop: "4px", display: "block", color: "#666" }}>
-                    {form.sections.length} section(s) selected. You can add or remove sections as needed.
-                  </small>
-                )}
-
-                {form.modality && form.course && (
-                  <small style={{ marginTop: "4px", display: "block", color: "#666" }}>
-                    Grayed out sections already have a modality submitted for this course
-                  </small>
-                )}
-              </div>
-
-              <div className="form-group">
-                <label>Room Location</label>
-                <button
-                  type="button"
-                  className="open-modal-btn"
-                  disabled={
-                    !form.roomType ||
-                    form.roomType === "No Room" ||
-                    availableRoomIds.length === 0 ||
-                    loadingRooms ||
-                    form.sections.length === 0
-                  }
-                  onClick={() => setShowRoomModal(true)}
-                >
-                  {loadingRooms ? 'Loading...' : 'Select Room'}
-                </button>
-
-                {form.sections.length === 0 && (
-                  <small style={{ marginTop: "4px", display: "block", color: "#666" }}>
-                    Please select sections first
-                  </small>
-                )}
-
-                {form.rooms.length > 0 && (
-                  <div className="selected-rooms">
-                    {form.rooms
-                      .slice()
-                      .sort((a, b) => a.localeCompare(b, undefined, { numeric: true }))
-                      .map((roomId) => {
-                        const r = roomOptions.find(r => r.room_id === roomId);
-                        return (
-                          <div key={roomId} className="room-card">
-                            {r?.room_id}
-                          </div>
-                        );
-                      })
-                    }
-                  </div>
-                )}
-              </div>
-
-              {/* REMARKS */}
-              <div className="form-group">
-                <label>Remarks</label>
-                <textarea
-                  name="remarks"
-                  value={form.remarks}
-                  onChange={handleChange}
-                  placeholder="Enter any notes or remarks here..."
-                />
-              </div>
-            </div>
-            {calculateRoomAssignments.length > 0 && (
-              <div style={{
-                marginTop: '20px',
-                padding: '15px',
-                backgroundColor: '#e3f2fd',
-                borderRadius: '8px',
-                border: '2px solid #0a2841ff'
-              }}>
-                <h4 style={{ marginBottom: '10px', color: '#092C4C' }}>
-                  Room Assignment Preview
-                </h4>
-                <div style={{
-                  maxHeight: '240px', 
-                  overflowY: 'auto',
-                  paddingRight: '5px'
-                }}>
-                  {calculateRoomAssignments.map((assignment, idx) => {
-                    const isUnassigned = assignment.roomId === '⚠️ NOT ASSIGNED';
-                    const room = roomOptions.find(r => r.room_id === assignment.roomId);
-                    const isOverCapacity = !isUnassigned && assignment.totalStudents > (room?.room_capacity || 0);
-
-                    return (
-                      <div key={idx} style={{
-                        marginBottom: '10px',
-                        padding: '10px',
-                        backgroundColor: isUnassigned ? '#ffebee' : (isOverCapacity ? '#fff3cd' : 'white'),
-                        borderRadius: '4px',
-                        border: isUnassigned ? '2px solid #d32f2f' : (isOverCapacity ? '2px solid #ffc107' : '1px solid #ddd'),
-                        color: '#333'
-                      }}>
-                        <strong>
-                          {isUnassigned ? '⚠️ NOT ASSIGNED TO ANY ROOM' : `Room ${assignment.roomId}`}
-                        </strong>
-                        {!isUnassigned && ` (Capacity: ${room?.room_capacity || 'N/A'})`}
-                        {assignment.isNightClass && (
-                          <span style={{
-                            marginLeft: '8px',
-                            padding: '2px 8px',
-                            backgroundColor: '#1a237e',
-                            color: 'white',
-                            borderRadius: '12px',
-                            fontSize: '12px',
-                            fontWeight: 'bold'
-                          }}>
-                            NIGHT CLASS
-                          </span>
-                        )}
-                        <br />
-                        <span style={{ fontSize: '14px' }}>
-                          Sections: {assignment.sections.join(', ')}
-                        </span>
-                        <br />
-                        <span style={{
-                          fontSize: '14px',
-                          color: isUnassigned ? '#d32f2f' : (isOverCapacity ? '#d32f2f' : '#4caf50'),
-                          fontWeight: 'bold'
-                        }}>
-                          Total Students: {assignment.totalStudents}
-                          {isUnassigned && ' ⚠️ NEEDS ROOM ASSIGNMENT'}
-                          {!isUnassigned && isOverCapacity && ' ⚠️ OVER CAPACITY'}
-                        </span>
-                      </div>
-                    );
-                  })}
-                </div>
-              </div>
-            )}
-            <div style={{ display: 'flex', justifyContent: 'center', gap: '12px', marginTop: '12px' }}>
-              <button type="submit" disabled={isSubmitting || calculateRoomAssignments.length === 0}
-                className="action-button add-new with-label"
-                style={{
-                  padding: '10px 16px',
-                  borderRadius: '8px',
-                  cursor: isSubmitting || calculateRoomAssignments.length === 0 ? 'not-allowed' : 'pointer',
-                  backgroundColor: '#144f1fff',
-                  color: 'white',
-                  border: 'none'
-                }}
-              >
-                <FaPlus style={{ color: 'white', fontSize: '18px' }} />
-                <span className="btn-label">Add</span>
-              </button>
-
-              {/* Delete button: placed beside Add and uses similar label + icon */}
-              <button
-                type="button"
-                onClick={() => setShowDeleteConfirm(true)}
-                className="action-button delete with-label"
-                title="Delete all modalities"
-                style={{
-                  padding: '10px 16px',
-                  borderRadius: '8px',
-                  cursor: 'pointer',
-                  backgroundColor: '#dc3545',
-                  color: 'white',
-                  border: 'none',
-                  display: 'inline-flex',
-                  alignItems: 'center'
-                }}
-              >
-                <FaTrash style={{ color: 'white', fontSize: '18px' }} />
-                <span className="btn-label">Delete</span>
-              </button>
-            </div>
-          </form>
+        <div className="bm-page-actions">
+          <button
+            type="button"
+            className="bm-btn danger"
+            onClick={() => setShowDeleteConfirm(true)}
+          >
+            <FaPenAlt style={{ fontSize: '12px' }} />
+            Manage Modalities
+          </button>
+          <button
+            type="button"
+            className="bm-btn primary"
+            onClick={handleSubmit as any}
+            disabled={isSubmitting || calculateRoomAssignments.length === 0}
+          >
+            <FaPlus style={{ fontSize: '12px' }} />
+            {isSubmitting ? 'Submitting…' : 'Submit Modality'}
+          </button>
         </div>
       </div>
 
-      {/* ROOM MODAL */}
-      {showRoomModal && (
-        <div className="modal-overlay">
-          <div className="modal-contents-modality">
-            <div className="modal-actions">
-              <button type="button" className="close-modal" onClick={() => setShowRoomModal(false)}>
-                Done
-              </button>
-            </div>
-            <h3>Select Room</h3>
+      {/* ── Main Layout ── */}
+      <div className="bm-layout">
 
-            <Select
-              options={buildingOptions.map(b => ({
-                value: b.id,
-                label: `${b.name} (${b.id})`,
-              }))}
-              value={
-                selectedBuilding
-                  ? { value: selectedBuilding, label: `${buildingOptions.find(b => b.id === selectedBuilding)?.name} (${selectedBuilding})` }
-                  : null
-              }
-              onChange={(selected) => setSelectedBuilding(selected?.value || null)}
-              placeholder="-- Select Building --"
-              isClearable
-            />
-            {calculateRoomAssignments.length > 0 && (
-              <div style={{
-                margin: '15px 0',
-                padding: '12px',
-                backgroundColor: '#f8f9fa',
-                borderRadius: '6px',
-                border: '1px solid #dee2e6'
-              }}>
-                <h4 style={{ marginBottom: '10px', fontSize: '14px', color: '#495057' }}>
-                  Assignment Preview:
-                </h4>
-                <div style={{
-                  maxHeight: '150px',
-                  overflowY: 'auto',
-                  fontSize: '13px'
-                }}>
-                  {calculateRoomAssignments.map((assignment, idx) => {
-                    const isUnassigned = assignment.roomId === '⚠️ NOT ASSIGNED';
-                    const room = roomOptions.find(r => r.room_id === assignment.roomId);
-                    const isOverCapacity = !isUnassigned && assignment.totalStudents > (room?.room_capacity || 0);
+        {/* ── Sidebar ── */}
+        <aside className="bm-sidebar">
 
-                    return (
-                      <div key={idx} style={{
-                        padding: '8px',
-                        marginBottom: '6px',
-                        backgroundColor: isUnassigned ? '#ffebee' : (isOverCapacity ? '#fff3cd' : 'white'),
-                        borderRadius: '4px',
-                        border: isUnassigned ? '2px solid #d32f2f' : (isOverCapacity ? '1px solid #ffc107' : '1px solid #e0e0e0')
-                      }}>
-                        <strong style={{ color: isUnassigned ? '#d32f2f' : '#212529' }}>
-                          {isUnassigned ? '⚠️ NOT ASSIGNED' : `Room ${assignment.roomId}`}
-                        </strong>
-                        {!isUnassigned && ` (${assignment.totalStudents}/${room?.room_capacity || 'N/A'})`}
-                        {assignment.isNightClass && (
-                          <span style={{
-                            marginLeft: '6px',
-                            padding: '1px 6px',
-                            backgroundColor: '#1a237e',
-                            color: 'white',
-                            borderRadius: '10px',
-                            fontSize: '10px',
-                            fontWeight: 'bold'
-                          }}>
-                            NIGHT
-                          </span>
-                        )}
-                        <br />
-                        <small style={{ color: '#6c757d' }}>
-                          {assignment.sections.join(', ')}
-                        </small>
+          {/* Room Assignment Preview */}
+          {calculateRoomAssignments.length > 0 && (
+            <div className="bm-sidebar-card">
+              <div className="bm-sidebar-card-header"><h4>Assignment Preview</h4></div>
+              <div className="bm-sidebar-card-body" style={{ padding: '10px 12px', gap: '6px' }}>
+                {calculateRoomAssignments.map((assignment, idx) => {
+                  const isUnassigned = assignment.roomId === '⚠️ NOT ASSIGNED';
+                  const room = roomOptions.find(r => r.room_id === assignment.roomId);
+                  const isOverCapacity = !isUnassigned && assignment.totalStudents > (room?.room_capacity || 0);
+                  return (
+                    <div
+                      key={idx}
+                      className={`bm-assignment-row ${isUnassigned ? 'unassigned' : isOverCapacity ? 'overcapacity' : 'ok'}`}
+                    >
+                      <div className="bm-assignment-room">
+                        {isUnassigned ? '⚠️ Not Assigned' : `Room ${assignment.roomId}`}
+                        {assignment.isNightClass && <span className="bm-night-badge">Night</span>}
                       </div>
-                    );
-                  })}
+                      <div className="bm-assignment-meta">
+                        {!isUnassigned && `${assignment.totalStudents}/${room?.room_capacity ?? 'N/A'} students`}
+                      </div>
+                      <div className="bm-assignment-sections">
+                        {assignment.sections.join(', ')}
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+            </div>
+          )}
+
+          {/* Info card */}
+          <div className="bm-sidebar-card">
+            <div className="bm-sidebar-card-header"><h4>Status</h4></div>
+            <div className="bm-sidebar-card-body">
+              <div className="bm-stats-grid">
+                <div className="bm-stat-box">
+                  <div className="bm-stat-num">{form.sections.length}</div>
+                  <div className="bm-stat-label">Sections</div>
+                </div>
+                <div className="bm-stat-box">
+                  <div className="bm-stat-num">{form.rooms.length}</div>
+                  <div className="bm-stat-label">Rooms</div>
+                </div>
+                <div className="bm-stat-box">
+                  <div className="bm-stat-num">{userModalities.length}</div>
+                  <div className="bm-stat-label">Submitted</div>
+                </div>
+                <div className="bm-stat-box">
+                  <div className="bm-stat-num">{calculateRoomAssignments.length}</div>
+                  <div className="bm-stat-label">Groups</div>
                 </div>
               </div>
-            )}
 
-            <div className="room-grid">
-              {filteredAndSortedRooms.map(r => {
-                const isDisabled = r.room_type !== form.roomType;
-                const isSelected = form.rooms.includes(r.room_id);
-
-                return (
-                  <div
-                    key={r.room_id}
-                    className={`room-box ${isSelected ? "selected" : ""} ${isDisabled ? "disabled" : ""}`}
-                    onClick={() => {
-                      if (isDisabled) return;
-                      setForm(prev => ({
-                        ...prev,
-                        rooms: isSelected
-                          ? prev.rooms.filter(id => id !== r.room_id)
-                          : [...prev.rooms, r.room_id],
-                      }));
-                    }}
-                  >
-                    <div className="room-label">
-                      {r.room_id} <small>({r.room_type})</small>
-                    </div>
-                    <div className="room-label">
-                      Capacity: {r.room_capacity}
-                    </div>
-
-                    {!isDisabled && (
-                      <button
-                        type="button"
-                        className="view-occupancy"
-                        onClick={(e) => {
-                          e.stopPropagation();
-                          setOccupancyModal({ visible: true, roomId: r.room_id });
-                        }}
-                      >
-                        <small>View Vacancy</small>
-                      </button>
-                    )}
-                  </div>
-                );
-              })}
-
-              {filteredAndSortedRooms.length === 0 && (
-                <div className="no-rooms">No available rooms for this room type</div>
+              {loadingRooms && (
+                <div className="bm-info-banner info">Loading available rooms…</div>
+              )}
+              {!loadingRooms && availableRoomIds.length === 0 && (
+                <div className="bm-info-banner warn">
+                  No rooms available. Contact the administrator to set up rooms.
+                </div>
               )}
             </div>
           </div>
-        </div>
-      )}
 
-      {/* OCCUPANCY MODAL */}
-      {occupancyModal.visible && occupancyModal.roomId && (
-        <div className="modal-overlay">
-          <div className="modal-contents-modality">
-            <h3>Room Occupancy</h3>
-            <RoomTimeslots roomId={occupancyModal.roomId} />
-            <div className="modal-actions">
-              <button
-                type="button"
-                className="close-modal"
-                onClick={() => setOccupancyModal({ visible: false, roomId: null })}
-              >
-                Close
-              </button>
+        </aside>
+
+        {/* ── Form Content ── */}
+        <div className="bm-content">
+          <div className="bm-form-card">
+            <div className="bm-form-card-header">
+              <h3>Modality Details</h3>
+            </div>
+            <div className="bm-form-card-body">
+              <form className="bm-form-grid" onSubmit={handleSubmit}>
+
+                {/* Modality Type */}
+                <div className="bm-field">
+                  <label>Modality Type</label>
+                  <Select
+                    options={[
+                      { value: 'Hands-on (Laboratory)', label: 'Hands-on (Laboratory)' },
+                      { value: 'Written (Lecture)', label: 'Written (Lecture)' },
+                      { value: 'Written (Laboratory)', label: 'Written (Laboratory)' },
+                    ]}
+                    value={form.modality ? { value: form.modality, label: form.modality } : null}
+                    onChange={selected => setForm(prev => ({
+                      ...prev,
+                      modality: selected?.value || '',
+                      course: '',
+                      sections: [],
+                      rooms: []
+                    }))}
+                    placeholder="Select modality…"
+                    isClearable
+                    menuPortalTarget={document.body}
+                    styles={selectStyles}
+                  />
+                </div>
+
+                {/* Program */}
+                <div className="bm-field">
+                  <label>Program</label>
+                  <Select
+                    options={programOptions
+                      .slice()
+                      .sort((a, b) => a.program_id.localeCompare(b.program_id, undefined, { numeric: true }))
+                      .map(p => ({ value: p.program_id, label: `${p.program_id} - ${p.program_name}` }))}
+                    value={programOptions
+                      .filter(p => p.program_id === form.program)
+                      .map(p => ({ value: p.program_id, label: `${p.program_id} - ${p.program_name}` }))}
+                    onChange={selected => setForm(prev => ({ ...prev, program: selected?.value || '', course: '', sections: [] }))}
+                    placeholder="Select program…"
+                    isClearable
+                    menuPortalTarget={document.body}
+                    styles={selectStyles}
+                  />
+                </div>
+
+                {/* Course */}
+                <div className="bm-field">
+                  <label>Course</label>
+                  <Select
+                    isDisabled={!form.program}
+                    options={filteredCourseOptions.map(c => {
+                      const hasModalityForType = userModalities.some(m =>
+                        m.course_id === c.course_id && m.modality_type === form.modality
+                      );
+                      return {
+                        value: c.course_id,
+                        label: `${c.course_id} (${c.course_name})`,
+                        isDisabled: hasModalityForType && form.modality !== ''
+                      };
+                    })}
+                    value={form.course ? {
+                      value: form.course,
+                      label: `${filteredCourseOptions.find(c => c.course_id === form.course)?.course_id} (${filteredCourseOptions.find(c => c.course_id === form.course)?.course_name})`
+                    } : null}
+                    onChange={selected => {
+                      const courseId = selected?.value || '';
+                      const availableSections = sectionOptions
+                        .filter(s => s.course_id === courseId)
+                        .filter(s => {
+                          const hasModalityForThisCourse = userModalities.some(m =>
+                            m.course_id === courseId &&
+                            (
+                              (Array.isArray(m.sections) && m.sections.includes(s.section_name)) ||
+                              (typeof m.sections === 'string' && m.sections.split(',').map((sec: string) => sec.trim()).includes(s.section_name))
+                            )
+                          );
+                          return !hasModalityForThisCourse;
+                        })
+                        .map(s => s.section_name)
+                        .sort((a, b) => a.localeCompare(b));
+                      setForm(prev => ({ ...prev, course: courseId, sections: availableSections, rooms: [] }));
+                    }}
+                    placeholder="Select course…"
+                    isClearable
+                    styles={{
+                      ...selectStyles,
+                      option: (base, state) => ({
+                        ...base,
+                        backgroundColor: state.isDisabled ? '#F5F7FA' : state.isFocused ? '#EBF4FF' : 'white',
+                        color: state.isDisabled ? '#8A9BB0' : '#0C1B2A',
+                        cursor: state.isDisabled ? 'not-allowed' : 'pointer',
+                      })
+                    }}
+                  />
+                  {form.modality && (
+                    <small className="bm-hint">Grayed out courses already have a {form.modality} modality submitted</small>
+                  )}
+                </div>
+
+                {/* Remarks */}
+                <div className="bm-field">
+                  <label>Remarks</label>
+                  <textarea
+                    name="remarks"
+                    value={form.remarks}
+                    onChange={handleChange}
+                    placeholder="Enter any notes or remarks…"
+                    className="bm-textarea"
+                  />
+                </div>
+
+                {/* Sections — full width */}
+                <div className="bm-field bm-full-width">
+                  <label>Sections</label>
+                  {form.course ? (
+                    <Select
+                      isMulti
+                      closeMenuOnSelect={false}
+                      hideSelectedOptions={false}
+                      options={filteredSectionOptions
+                        .map(s => {
+                          const hasModality = userModalities.some(m =>
+                            m.course_id === form.course &&
+                            (
+                              (Array.isArray(m.sections) && m.sections.includes(s.value)) ||
+                              (typeof m.sections === 'string' && m.sections.split(',').map((sec: string) => sec.trim()).includes(s.value))
+                            )
+                          );
+                          return { value: s.value, label: s.label, isDisabled: hasModality };
+                        })
+                        .sort((a, b) => a.label.localeCompare(b.label))}
+                      value={form.sections.sort((a, b) => a.localeCompare(b)).map(sec => ({ value: sec, label: sec }))}
+                      onChange={selectedOptions => {
+                        setForm(prev => ({
+                          ...prev,
+                          sections: selectedOptions ? selectedOptions.map(opt => opt.value) : [],
+                          rooms: []
+                        }));
+                      }}
+                      styles={{
+                        ...selectStyles,
+                        multiValue: (base) => ({ ...base, backgroundColor: '#0d4993', borderRadius: '6px' }),
+                        multiValueLabel: (base) => ({ ...base, color: '#ffffff', fontWeight: 600, fontSize: '11px' }),
+                        valueContainer: (base) => ({ ...base, maxHeight: '100px', overflowY: 'auto' }),
+                        option: (base, state) => ({
+                          ...base,
+                          backgroundColor: state.isDisabled ? '#F5F7FA' : state.isFocused ? '#c8c8c9' : 'white',
+                          color: state.isDisabled ? '#8A9BB0' : '#0d4993',
+                          cursor: state.isDisabled ? 'not-allowed' : 'pointer',
+                        })
+                      }}
+                    />
+                  ) : (
+                    <div className="bm-placeholder-text">Select a course first</div>
+                  )}
+                  {form.course && form.sections.length > 0 && (
+                    <small className="bm-hint">{form.sections.length} section(s) selected</small>
+                  )}
+                </div>
+
+                {/* Room Location — full width */}
+                <div className="bm-field bm-full-width">
+                  <label>Room Location</label>
+                  <div className="bm-room-selector-row">
+                    <button
+                      type="button"
+                      className="bm-btn primary"
+                      disabled={!form.roomType || form.roomType === 'No Room' || availableRoomIds.length === 0 || loadingRooms || form.sections.length === 0}
+                      onClick={() => setShowRoomModal(true)}
+                      style={{ width: 'fit-content' }}
+                    >
+                      {loadingRooms ? 'Loading…' : 'Select Rooms'}
+                    </button>
+                    {form.sections.length === 0 && (
+                      <small className="bm-hint">Please select sections first</small>
+                    )}
+                  </div>
+                  {form.rooms.length > 0 && (
+                    <div className="bm-selected-rooms">
+                      {form.rooms
+                        .slice()
+                        .sort((a, b) => a.localeCompare(b, undefined, { numeric: true }))
+                        .map(roomId => (
+                          <span key={roomId} className="bm-chip">
+                            {roomId}
+                            <button
+                              type="button"
+                              className="bm-chip-remove"
+                              onClick={() => setForm(prev => ({ ...prev, rooms: prev.rooms.filter(r => r !== roomId) }))}
+                            >✕</button>
+                          </span>
+                        ))}
+                    </div>
+                  )}
+                </div>
+
+              </form>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      {/* ════ ROOM MODAL ════ */}
+      {showRoomModal && (
+        <div className="bm-modal-overlay" onClick={() => setShowRoomModal(false)}>
+          <div className="bm-modal" onClick={e => e.stopPropagation()} style={{ maxWidth: '680px' }}>
+            <div className="bm-modal-header">
+              <h3>Select Rooms</h3>
+              <p>Showing {form.roomType} rooms · {form.rooms.length} selected</p>
+            </div>
+            <div className="bm-modal-body">
+              <div style={{ marginBottom: '12px' }}>
+                <Select
+                  options={buildingOptions.map(b => ({ value: b.id, label: `${b.name} (${b.id})` }))}
+                  value={selectedBuilding ? { value: selectedBuilding, label: `${buildingOptions.find(b => b.id === selectedBuilding)?.name} (${selectedBuilding})` } : null}
+                  onChange={selected => setSelectedBuilding(selected?.value || null)}
+                  placeholder="Filter by building…"
+                  isClearable
+                  styles={selectStyles}
+                />
+              </div>
+
+              {calculateRoomAssignments.length > 0 && (
+                <div className="bm-modal-preview">
+                  <div className="bm-modal-preview-title">Assignment Preview</div>
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: '6px', maxHeight: '120px', overflowY: 'auto' }}>
+                    {calculateRoomAssignments.map((assignment, idx) => {
+                      const isUnassigned = assignment.roomId === '⚠️ NOT ASSIGNED';
+                      const room = roomOptions.find(r => r.room_id === assignment.roomId);
+                      const isOverCapacity = !isUnassigned && assignment.totalStudents > (room?.room_capacity || 0);
+                      return (
+                        <div key={idx} className={`bm-assignment-row ${isUnassigned ? 'unassigned' : isOverCapacity ? 'overcapacity' : 'ok'}`}>
+                          <div className="bm-assignment-room">
+                            {isUnassigned ? '⚠️ Not Assigned' : `Room ${assignment.roomId}`}
+                            {!isUnassigned && ` (${assignment.totalStudents}/${room?.room_capacity ?? 'N/A'})`}
+                            {assignment.isNightClass && <span className="bm-night-badge">Night</span>}
+                          </div>
+                          <div className="bm-assignment-sections">{assignment.sections.join(', ')}</div>
+                        </div>
+                      );
+                    })}
+                  </div>
+                </div>
+              )}
+
+              <div className="bm-room-grid">
+                {filteredAndSortedRooms.map(r => {
+                  const isDisabled = r.room_type !== form.roomType;
+                  const isSelected = form.rooms.includes(r.room_id);
+                  return (
+                    <div
+                      key={r.room_id}
+                      className={`bm-room-box${isSelected ? ' selected' : ''}${isDisabled ? ' disabled' : ''}`}
+                      onClick={() => {
+                        if (isDisabled) return;
+                        setForm(prev => ({
+                          ...prev,
+                          rooms: isSelected ? prev.rooms.filter(id => id !== r.room_id) : [...prev.rooms, r.room_id]
+                        }));
+                      }}
+                    >
+                      <div className="bm-room-check">{isSelected ? '✓' : ''}</div>
+                      <div className="bm-room-id">{r.room_id}</div>
+                      <span className="bm-room-type-label">{r.room_type === 'Laboratory' ? 'Lab' : r.room_type}</span>
+                      <span className="bm-room-type-label">Cap: {r.room_capacity}</span>
+                      {!isDisabled && (
+                        <button
+                          type="button"
+                          className="bm-vacancy-btn"
+                          onClick={e => {
+                            e.stopPropagation();
+                            setOccupancyModal({ visible: true, roomId: r.room_id });
+                          }}
+                        >
+                          Vacancy
+                        </button>
+                      )}
+                    </div>
+                  );
+                })}
+                {filteredAndSortedRooms.length === 0 && (
+                  <div className="bm-grid-empty">No available rooms for this room type.</div>
+                )}
+              </div>
+            </div>
+            <div className="bm-modal-footer">
+              <button type="button" className="bm-btn primary" onClick={() => setShowRoomModal(false)}>Done</button>
             </div>
           </div>
         </div>
       )}
 
-      <ToastContainer position="top-right" autoClose={2000} />
-      {/* DELETE MODALITIES MODAL */}
+      {/* ════ OCCUPANCY MODAL ════ */}
+      {occupancyModal.visible && occupancyModal.roomId && (
+        <div className="bm-modal-overlay" onClick={() => setOccupancyModal({ visible: false, roomId: null })}>
+          <div className="bm-modal" onClick={e => e.stopPropagation()}>
+            <div className="bm-modal-header">
+              <h3>Room Occupancy</h3>
+              <p>{occupancyModal.roomId}</p>
+            </div>
+            <div className="bm-modal-body">
+              <div className="bm-timeslots">
+                {/* RoomTimeslots component rendered inline */}
+                <RoomTimeslotsInline roomId={occupancyModal.roomId} />
+              </div>
+            </div>
+            <div className="bm-modal-footer">
+              <button type="button" className="bm-btn" onClick={() => setOccupancyModal({ visible: false, roomId: null })}>Close</button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* ════ DELETE MODALITIES MODAL ════ */}
       {showDeleteConfirm && (
-        <div className="modal-overlay">
-          <div className="modal-contents-modality" style={{ maxWidth: '800px', maxHeight: '80vh', overflow: 'auto' }}>
-            <h3>Modalities</h3>
+        <div className="bm-modal-overlay" onClick={() => setShowDeleteConfirm(false)}>
+          <div className="bm-modal" onClick={e => e.stopPropagation()} style={{ maxWidth: '760px' }}>
+            <div className="bm-modal-header">
+              <h3>Manage Modalities</h3>
+              <p>{userModalities.length} modality/modalities on record</p>
+            </div>
+            <div className="bm-modal-body">
+              {userModalities.length === 0 ? (
+                <div className="bm-grid-empty">You haven't created any modalities yet.</div>
+              ) : (
+                <>
+                  <div className="bm-delete-controls">
+                    <label className="bm-select-all-label">
+                      <input
+                        type="checkbox"
+                        checked={selectedForDelete.length === userModalities.length}
+                        onChange={toggleSelectAll}
+                      />
+                      <strong>Select All ({userModalities.length})</strong>
+                    </label>
+                    <span className="bm-hint">{selectedForDelete.length} selected</span>
+                  </div>
 
-            {userModalities.length === 0 ? (
-              <>
-                <div style={{ textAlign: 'center', padding: '2rem', color: '#666' }}>
-                  You haven't created any modalities yet.
-                </div>
-
-                <div style={{
-                  marginTop: '1rem',
-                  display: 'flex',
-                  justifyContent: 'center'
-                }}>
-                  <button
-                    type="button"
-                    className="close-modal"
-                    onClick={() => setShowDeleteConfirm(false)}
-                    style={{
-                      backgroundColor: '#6c757d',
-                      color: 'white',
-                      padding: '10px 20px',
-                      border: 'none',
-                      borderRadius: '4px',
-                      cursor: 'pointer'
-                    }}
-                  >
-                    Close
-                  </button>
-                </div>
-              </>
-            ) : (
-              <>
-                <div style={{ marginBottom: '1rem', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                  <label style={{ display: 'flex', alignItems: 'center', cursor: 'pointer' }}>
-                    <input
-                      type="checkbox"
-                      checked={selectedForDelete.length === userModalities.length}
-                      onChange={toggleSelectAll}
-                      style={{ marginRight: '8px' }}
-                    />
-                    <strong>Select All ({userModalities.length})</strong>
-                  </label>
-
-                  <span style={{ color: '#666', fontSize: '14px' }}>
-                    {selectedForDelete.length} selected
-                  </span>
-                </div>
-
-                {/* ✅ REMOVED: Duplicate cancel button that was here */}
-
-                <div style={{
-                  maxHeight: '400px',
-                  overflowY: 'auto',
-                  border: '1px solid #ddd',
-                  borderRadius: '4px',
-                  padding: '10px'
-                }}>
-                  {userModalities.map((modality) => {
-                    const course = courseOptions.find(c => c.course_id === modality.course_id);
-                    const program = programOptions.find(p => p.program_id === modality.program_id);
-
-                    return (
-                      <div
-                        key={modality.modality_id}
-                        style={{
-                          padding: '12px',
-                          marginBottom: '8px',
-                          border: '1px solid #e0e0e0',
-                          borderRadius: '4px',
-                          backgroundColor: selectedForDelete.includes(modality.modality_id) ? '#fff3cd' : 'white',
-                          cursor: 'pointer',
-                          transition: 'all 0.2s'
-                        }}
-                        onClick={() => toggleSelectModality(modality.modality_id)}
-                      >
-                        <label style={{ display: 'flex', alignItems: 'start', cursor: 'pointer' }}>
+                  <div className="bm-modality-list">
+                    {userModalities.map(modality => {
+                      const course = courseOptions.find(c => c.course_id === modality.course_id);
+                      const program = programOptions.find(p => p.program_id === modality.program_id);
+                      const isSelected = selectedForDelete.includes(modality.modality_id);
+                      return (
+                        <div
+                          key={modality.modality_id}
+                          className={`bm-modality-row${isSelected ? ' selected' : ''}`}
+                          onClick={() => toggleSelectModality(modality.modality_id)}
+                        >
                           <input
                             type="checkbox"
-                            checked={selectedForDelete.includes(modality.modality_id)}
+                            checked={isSelected}
                             onChange={() => toggleSelectModality(modality.modality_id)}
-                            style={{ marginRight: '12px', marginTop: '4px' }}
-                            onClick={(e) => e.stopPropagation()}
+                            onClick={e => e.stopPropagation()}
+                            style={{ flexShrink: 0 }}
                           />
-
-                          <div style={{ flex: 1 }}>
-                            <div style={{ fontWeight: 'bold', marginBottom: '4px' }}>
-                              {modality.section_name || 'No Section'}
+                          <div className="bm-modality-info">
+                            <div className="bm-modality-title">
+                              <span className="bm-type-badge">{modality.modality_type}</span>
+                              <span className="bm-type-badge lab">{modality.room_type}</span>
                             </div>
-
-                            <div style={{ fontSize: '14px', color: '#666' }}>
-                              <div><strong>Course:</strong> {course?.course_id || 'N/A'} - {course?.course_name || 'Unknown'}</div>
-                              <div><strong>Program:</strong> {program?.program_id || 'N/A'} - {program?.program_name || 'Unknown'}</div>
-                              <div><strong>Modality:</strong> {modality.modality_type}</div>
-                              <div><strong>Room Type:</strong> {modality.room_type}</div>
-                              <div>
-                                <strong>Section/s:</strong> {Array.isArray(modality.sections)
-                                  ? modality.sections.join(", ")
-                                  : modality.sections}
-                              </div>
-                              {modality.possible_rooms && modality.possible_rooms.length > 0 && (
-                                <div>
-                                  <strong>Possible Rooms:</strong> {modality.possible_rooms.join(', ')}
-                                </div>
+                            <div className="bm-modality-meta">
+                              <span><strong>Course:</strong> {course?.course_id ?? 'N/A'} – {course?.course_name ?? 'Unknown'}</span>
+                              <span><strong>Program:</strong> {program?.program_id ?? 'N/A'} – {program?.program_name ?? 'Unknown'}</span>
+                              <span><strong>Sections:</strong> {Array.isArray(modality.sections) ? modality.sections.join(', ') : modality.sections}</span>
+                              {modality.possible_rooms?.length > 0 && (
+                                <span><strong>Rooms:</strong> {modality.possible_rooms.join(', ')}</span>
                               )}
                               {modality.modality_remarks && (
-                                <div><strong>Remarks:</strong> {modality.modality_remarks}</div>
+                                <span><strong>Remarks:</strong> {modality.modality_remarks}</span>
                               )}
                             </div>
                           </div>
-                        </label>
-                      </div>
-                    );
-                  })}
-                </div>
-
-                <div style={{
-                  marginTop: '1rem',
-                  display: 'flex',
-                  gap: '10px',
-                  justifyContent: 'flex-end',
-                  flexWrap: 'wrap'
-                }}>
-                  <button
-                    type="button"
-                    className="close-modal"
-                    onClick={() => {
-                      setShowDeleteConfirm(false);
-                      setSelectedForDelete([]);
-                    }}
-                    disabled={isDeleting}
-                    style={{
-                      backgroundColor: '#6c757d',
-                      color: 'white',
-                      padding: '10px 20px',
-                      border: 'none',
-                      borderRadius: '4px',
-                      cursor: isDeleting ? 'not-allowed' : 'pointer',
-                      opacity: isDeleting ? 0.6 : 1
-                    }}
-                  >
-                    Cancel
-                  </button>
-
-                  <button
-                    type="button"
-                    onClick={handleDeleteAll}
-                    disabled={isDeleting || userModalities.length === 0}
-                    style={{
-                      backgroundColor: '#dc3545',
-                      color: 'white',
-                      padding: '10px 20px',
-                      border: 'none',
-                      borderRadius: '4px',
-                      cursor: isDeleting || userModalities.length === 0 ? 'not-allowed' : 'pointer',
-                      opacity: isDeleting || userModalities.length === 0 ? 0.6 : 1
-                    }}
-                  >
-                    {isDeleting ? 'Deleting...' : 'Delete All'}
-                  </button>
-
-                  <button
-                    type="button"
-                    onClick={handleDeleteSelected}
-                    disabled={isDeleting || selectedForDelete.length === 0}
-                    style={{
-                      backgroundColor: '#ffc107',
-                      color: '#000',
-                      padding: '10px 20px',
-                      border: 'none',
-                      borderRadius: '4px',
-                      cursor: isDeleting || selectedForDelete.length === 0 ? 'not-allowed' : 'pointer',
-                      opacity: isDeleting || selectedForDelete.length === 0 ? 0.6 : 1,
-                      fontWeight: 'bold'
-                    }}
-                  >
-                    {isDeleting ? (
-                      <span className="spinner"></span>
-                    ) : (
-                      `Delete Selected (${selectedForDelete.length})`
-                    )}
-                  </button>
-                </div>
-              </>
-            )}
-          </div>
-        </div>
-      )}
-
-      {/* Final Delete Confirmation Modal */}
-      {showFinalDeleteConfirm && (
-        <div className="modal-overlay" onClick={() => setShowFinalDeleteConfirm(false)}>
-          <div className="modal delete-confirm-modal" onClick={(e) => e.stopPropagation()}>
-            <h3>Are you sure to delete?</h3>
-            <p className="delete-confirm-message">
-              {deleteMode === 'all' 
-                ? `You are about to delete ALL ${userModalities.length} modality/modalities. This action cannot be undone.`
-                : `You are about to delete ${selectedForDelete.length} selected modality/modalities. This action cannot be undone.`}
-            </p>
-            <div className="modal-actions">
-              <button 
-                type="button" 
-                className="modal-button confirm-delete"
-                onClick={handleFinalConfirm}
-                disabled={isDeleting}
-              >
-                {isDeleting ? 'Deleting...' : 'Delete'}
+                        </div>
+                      );
+                    })}
+                  </div>
+                </>
+              )}
+            </div>
+            <div className="bm-modal-footer">
+              <button type="button" className="bm-btn" onClick={() => { setShowDeleteConfirm(false); setSelectedForDelete([]); }} disabled={isDeleting}>Cancel</button>
+              <button type="button" className="bm-btn danger" onClick={handleDeleteSelected} disabled={isDeleting || selectedForDelete.length === 0}>
+                {isDeleting ? 'Deleting…' : `Delete Selected (${selectedForDelete.length})`}
               </button>
-              <button 
-                type="button" 
-                className="modal-button cancel-delete"
-                onClick={() => setShowFinalDeleteConfirm(false)}
-                disabled={isDeleting}
-              >
-                Cancel
+              <button type="button" className="bm-btn danger-fill" onClick={handleDeleteAll} disabled={isDeleting || userModalities.length === 0}>
+                {isDeleting ? 'Deleting…' : 'Delete All'}
               </button>
             </div>
           </div>
         </div>
       )}
+
+      {/* ════ FINAL DELETE CONFIRM ════ */}
+      {showFinalDeleteConfirm && (
+        <div className="bm-modal-overlay" onClick={() => setShowFinalDeleteConfirm(false)}>
+          <div className="bm-modal" onClick={e => e.stopPropagation()} style={{ maxWidth: '400px' }}>
+            <div className="bm-modal-header">
+              <h3>Confirm Deletion</h3>
+            </div>
+            <div className="bm-modal-body">
+              <p style={{ fontSize: '13.5px', color: 'var(--bm-text-secondary)', lineHeight: 1.7, margin: 0 }}>
+                {deleteMode === 'all'
+                  ? `You are about to delete ALL ${userModalities.length} modality/modalities. This action cannot be undone.`
+                  : `You are about to delete ${selectedForDelete.length} selected modality/modalities. This action cannot be undone.`}
+              </p>
+            </div>
+            <div className="bm-modal-footer">
+              <button type="button" className="bm-btn" onClick={() => setShowFinalDeleteConfirm(false)} disabled={isDeleting}>Cancel</button>
+              <button type="button" className="bm-btn danger-fill" onClick={handleFinalConfirm} disabled={isDeleting}>
+                {isDeleting ? 'Deleting…' : 'Yes, Delete'}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      <ToastContainer position="top-right" autoClose={3000} />
     </div>
   );
 };

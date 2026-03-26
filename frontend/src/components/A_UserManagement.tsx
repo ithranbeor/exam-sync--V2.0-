@@ -1,12 +1,17 @@
 import React, { useEffect, useState, useRef, useMemo, useCallback } from 'react';
-import { FaSearch, FaPen, FaTrash, FaCalendarAlt, FaLock, FaLockOpen, FaDownload, FaPlus, FaFileImport, FaTimes, FaChevronLeft, FaChevronRight, FaSort, FaChevronDown } from 'react-icons/fa';
+import {
+  FaSearch, FaPen, FaTrash, FaLock, FaLockOpen,
+  FaDownload, FaPlus, FaFileImport, FaTimes, FaSort,
+  FaChevronDown, FaEye,
+} from 'react-icons/fa';
 import { api } from '../lib/apiClient.ts';
 import { ToastContainer, toast } from 'react-toastify';
 import * as XLSX from 'xlsx';
 import 'react-toastify/dist/ReactToastify.css';
-import '../styles/A_Accounts.css';
-import '../styles/colleges.css';
+import '../styles/A_Colleges.css';
 import { useEscapeKey } from '../hooks/useEscapeKey.ts';
+
+// ── Interfaces ────────────────────────────────────────────────────────────────
 
 interface UserAccount {
   user_id: number;
@@ -54,13 +59,6 @@ type UserRole = {
   status?: string | null;
 };
 
-interface UserManagementProps {
-  user?: {
-    id: number;
-    email: string;
-  } | null;
-}
-
 interface NewAccountRole {
   role_id: number;
   college_id: string | null;
@@ -69,42 +67,52 @@ interface NewAccountRole {
   date_ended: string | null;
 }
 
-export const UserManagement: React.FC<UserManagementProps> = ({ }) => {
+interface UserManagementProps {
+  user?: { id: number; email: string } | null;
+}
+
+// ── Component ─────────────────────────────────────────────────────────────────
+
+export const UserManagement: React.FC<UserManagementProps> = () => {
+  // ── Data ──────────────────────────────────────────────────────────────────
   const [accounts, setAccounts] = useState<UserAccount[]>([]);
   const [roles, setRoles] = useState<Role[]>([]);
   const [colleges, setColleges] = useState<College[]>([]);
   const [departments, setDepartments] = useState<Department[]>([]);
   const [userRoles, setUserRoles] = useState<UserRole[]>([]);
 
+  // ── UI state ──────────────────────────────────────────────────────────────
   const [searchTerm, setSearchTerm] = useState('');
   const [selectedCollege, setSelectedCollege] = useState<string>('');
   const [loading, setLoading] = useState(true);
   const [importLoading, setImportLoading] = useState(false);
+  const [isBulkDeleting, setIsBulkDeleting] = useState(false);
+  const [isSaving, setIsSaving] = useState(false);
+  const [sortBy, setSortBy] = useState<string>('none');
+  const [showSortDropdown, setShowSortDropdown] = useState(false);
+  const [currentPage, setCurrentPage] = useState(1);
+  const [itemsPerPage, setItemsPerPage] = useState<number | 'all'>(20);
+  const [showItemsPerPageDropdown, setShowItemsPerPageDropdown] = useState(false);
+  const [customItemsPerPage, setCustomItemsPerPage] = useState<string>('');
 
-  // Modals
+  // ── Selection ─────────────────────────────────────────────────────────────
+  const [selectedAccountIds, setSelectedAccountIds] = useState<Set<number>>(new Set());
+
+  // ── Modals ─────────────────────────────────────────────────────────────────
   const [showDetailsModal, setShowDetailsModal] = useState(false);
   const [showAccountModal, setShowAccountModal] = useState(false);
   const [showAddRoleModal, setShowAddRoleModal] = useState(false);
   const [showImportAccountsModal, setShowImportAccountsModal] = useState(false);
   const [showImportRolesModal, setShowImportRolesModal] = useState(false);
+  const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
+  const [deleteCount, setDeleteCount] = useState(0);
 
+  // ── Edit state ─────────────────────────────────────────────────────────────
   const [isEditMode, setIsEditMode] = useState(false);
   const [selectedUserId, setSelectedUserId] = useState<number | null>(null);
   const [editingRole, setEditingRole] = useState<UserRole | null>(null);
-  const [isBulkDeletingAccounts, setIsBulkDeletingAccounts] = useState(false);
-  const [selectedAccountIds, setSelectedAccountIds] = useState<Set<number>>(new Set());
-  const [canScrollLeft, setCanScrollLeft] = useState(false);
-  const [canScrollRight, setCanScrollRight] = useState(false);
-  const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
-  const [deleteCount, setDeleteCount] = useState(0);
-  const tableContainerRef = useRef<HTMLDivElement>(null);
-  const [sortBy, setSortBy] = useState<string>('none');
-  const [showSortDropdown, setShowSortDropdown] = useState(false);
-  const [currentPage, setCurrentPage] = useState(1);
-  const [itemsPerPage, setItemsPerPage] = useState<number | 'all'>('all');
-  const [showItemsPerPageDropdown, setShowItemsPerPageDropdown] = useState(false);
-  const [customItemsPerPage, setCustomItemsPerPage] = useState<string>('');
 
+  // ── Forms ──────────────────────────────────────────────────────────────────
   const [newAccount, setNewAccount] = useState<UserAccount>({
     user_id: 0,
     first_name: '',
@@ -116,32 +124,56 @@ export const UserManagement: React.FC<UserManagementProps> = ({ }) => {
     created_at: new Date().toISOString(),
     employment_type: null,
   });
-
   const [newAccountRoles, setNewAccountRoles] = useState<NewAccountRole[]>([]);
-
   const [newRole, setNewRole] = useState<Partial<UserRole>>({});
+
+  const sortRef = useRef<HTMLDivElement>(null);
+  const itemsRef = useRef<HTMLDivElement>(null);
+
+  // ── ESC handlers ──────────────────────────────────────────────────────────
+  useEscapeKey(() => setShowDetailsModal(false), showDetailsModal);
+  useEscapeKey(() => { setShowAccountModal(false); setIsEditMode(false); }, showAccountModal);
+  useEscapeKey(() => { setShowAddRoleModal(false); setEditingRole(null); setNewRole({}); }, showAddRoleModal);
+  useEscapeKey(() => setShowImportAccountsModal(false), showImportAccountsModal);
+  useEscapeKey(() => setShowImportRolesModal(false), showImportRolesModal);
+  useEscapeKey(() => setShowDeleteConfirm(false), showDeleteConfirm);
+  useEscapeKey(() => { setEditingRole(null); }, !!editingRole);
+
+  // ── Helpers ───────────────────────────────────────────────────────────────
 
   const getAllowedFields = (roleId: number | undefined) => {
     const roleName = roles.find(r => r.role_id === roleId)?.role_name;
     switch (roleName) {
-      case "Bayanihan Leader":
-        return { college: false, department: true };
-      case "Dean":
-        return { college: true, department: false };
-      case "Admin":
-        return { college: false, department: false };
-      case "Scheduler":
-        return { college: true, department: false };
-      case "Proctor":
-        return { college: true, department: true };
-      default:
-        return { college: true, department: true };
+      case 'Bayanihan Leader': return { college: false, department: true };
+      case 'Dean':             return { college: true,  department: false };
+      case 'Admin':            return { college: false, department: false };
+      case 'Scheduler':        return { college: true,  department: false };
+      case 'Proctor':          return { college: true,  department: true };
+      default:                 return { college: true,  department: true };
     }
   };
 
-  // Fetch all data
-  const fetchData = async () => {
-    setLoading(true);
+  const excelSerialToDate = (serial: string | number): string | null => {
+    if (!serial) return null;
+    const num = Number(serial);
+    if (isNaN(num) && /^\d{4}-\d{2}-\d{2}$/.test(String(serial))) return String(serial);
+    if (isNaN(num)) return null;
+    const date = new Date(new Date(1899, 11, 30).getTime() + num * 86400000);
+    return `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}-${String(date.getDate()).padStart(2, '0')}`;
+  };
+
+  const isNumeric = (s: string) => !isNaN(Number(s)) && !isNaN(parseFloat(s));
+  const smartSort = (a: string, b: string) => {
+    if (isNumeric(a) && isNumeric(b)) return parseFloat(a) - parseFloat(b);
+    if (isNumeric(a)) return -1;
+    if (isNumeric(b)) return 1;
+    return a.localeCompare(b);
+  };
+
+  // ── Fetch ──────────────────────────────────────────────────────────────────
+
+  const fetchData = async (silent = false) => {
+    if (!silent) setLoading(true);
     try {
       const [accountsRes, rolesRes, collegesRes, departmentsRes, userRolesRes] = await Promise.all([
         api.get<UserAccount[]>('/accounts/'),
@@ -151,334 +183,153 @@ export const UserManagement: React.FC<UserManagementProps> = ({ }) => {
         api.get('/tbl_user_role'),
       ]);
 
-      setAccounts(accountsRes.data);
-      const rolesData = rolesRes.data;
-      const collegesData = collegesRes.data;
-      const departmentsData = departmentsRes.data;
+      const rolesData: Role[]       = rolesRes.data;
+      const collegesData: College[] = collegesRes.data;
+      const deptsData: Department[] = departmentsRes.data;
 
+      setAccounts(accountsRes.data);
       setRoles(rolesData);
       setColleges(collegesData);
-      setDepartments(departmentsData);
+      setDepartments(deptsData);
 
-      const today = new Date().toISOString().split("T")[0];
-
-      const normalized = userRolesRes.data.map((r: any) => {
-        let computedStatus = r.status ?? "Active";
-        if (r.date_ended && r.date_ended < today) {
-          computedStatus = "Suspended";
-        }
-
-        const roleData = rolesData.find((role: any) => role.role_id === r.role);
-        const collegData = collegesData.find((college: any) => college.college_id === r.college);
-        const deptData = departmentsData.find((dept: any) => dept.department_id === r.department);
-
+      const today = new Date().toISOString().split('T')[0];
+      const normalized: UserRole[] = userRolesRes.data.map((r: any) => {
+        let computedStatus = r.status ?? 'Active';
+        if (r.date_ended && r.date_ended < today) computedStatus = 'Suspended';
         return {
           ...r,
           status: computedStatus,
-          role_name: roleData?.role_name || null,
-          college_id: r.college,
-          college_name: collegData?.college_name || null,
-          department_id: r.department,
-          department_name: deptData?.department_name || null,
+          role_name:       rolesData.find((role: Role) => role.role_id === r.role)?.role_name || null,
+          college_id:      r.college,
+          college_name:    collegesData.find((c: College) => c.college_id === r.college)?.college_name || null,
+          department_id:   r.department,
+          department_name: deptsData.find((d: Department) => d.department_id === r.department)?.department_name || null,
         };
       });
-
       setUserRoles(normalized);
 
-      if (collegesData.length > 0 && !selectedCollege) {
-        setSelectedCollege(collegesData[0].college_id);
-      }
+      if (collegesData.length > 0 && !selectedCollege) setSelectedCollege('');
 
+      // Sync stale statuses
       const rolesToUpdate = normalized.filter((r: any) => {
-        const dbStatus = userRolesRes.data.find((orig: any) => orig.user_role_id === r.user_role_id)?.status ?? "Active";
-        return dbStatus !== r.status;
+        const orig = userRolesRes.data.find((o: any) => o.user_role_id === r.user_role_id)?.status ?? 'Active';
+        return orig !== r.status;
       });
-
-      await Promise.all(
-        rolesToUpdate.map((role: any) =>
-          api.put(`/tbl_user_role/${role.user_role_id}/`, { status: role.status })
-        )
-      );
-    } catch (err: any) {
-      console.error(err);
+      await Promise.all(rolesToUpdate.map((r: any) => api.put(`/tbl_user_role/${r.user_role_id}/`, { status: r.status })));
+    } catch {
       toast.error('Error fetching data');
     } finally {
       setLoading(false);
     }
   };
 
-  useEscapeKey(() => {
-    if (showDetailsModal) {
-      setShowDetailsModal(false);
-    }
-  }, showDetailsModal);
+  useEffect(() => { fetchData(); }, []);
 
-  useEscapeKey(() => {
-    if (showAccountModal) {
-      setShowAccountModal(false);
-      setIsEditMode(false);
-      setSelectedUserId(null);
-      setNewAccount({
-        user_id: 0,
-        first_name: '',
-        last_name: '',
-        middle_name: '',
-        email_address: '',
-        contact_number: '',
-        status: 'Active',
-        created_at: new Date().toISOString(),
-      });
-    }
-  }, showAccountModal);
-
-  useEscapeKey(() => {
-    if (showAddRoleModal) {
-      setShowAddRoleModal(false);
-      setEditingRole(null);
-      setNewRole({});
-    }
-  }, showAddRoleModal);
-
-  useEscapeKey(() => {
-    if (showImportAccountsModal) {
-      setShowImportAccountsModal(false);
-    }
-  }, showImportAccountsModal);
-
-  useEscapeKey(() => {
-    if (showImportRolesModal) {
-      setShowImportRolesModal(false);
-    }
-  }, showImportRolesModal);
-
-  useEscapeKey(() => {
-    if (showDeleteConfirm) {
-      setShowDeleteConfirm(false);
-    }
-  }, showDeleteConfirm);
-
+  // Close dropdowns on outside click
   useEffect(() => {
-    fetchData();
-  }, []);
-
-  useEffect(() => {
-    const handleClickOutside = (event: MouseEvent) => {
-      const target = event.target as HTMLElement;
-      if (showSortDropdown && !target.closest('[data-sort-dropdown]')) {
+    const handler = (e: MouseEvent) => {
+      if (showSortDropdown && sortRef.current && !sortRef.current.contains(e.target as Node))
         setShowSortDropdown(false);
-      }
-      if (showItemsPerPageDropdown && !target.closest('[data-items-per-page-dropdown]')) {
+      if (showItemsPerPageDropdown && itemsRef.current && !itemsRef.current.contains(e.target as Node))
         setShowItemsPerPageDropdown(false);
-      }
     };
-
-    if (showSortDropdown || showItemsPerPageDropdown) {
-      document.addEventListener('mousedown', handleClickOutside);
-    }
-
-    return () => {
-      document.removeEventListener('mousedown', handleClickOutside);
-    };
+    document.addEventListener('mousedown', handler);
+    return () => document.removeEventListener('mousedown', handler);
   }, [showSortDropdown, showItemsPerPageDropdown]);
 
-  const isNumeric = (str: string): boolean => {
-    return !isNaN(Number(str)) && !isNaN(parseFloat(str));
-  };
+  // ── CRUD: Account ──────────────────────────────────────────────────────────
 
-  const smartSort = (a: string, b: string): number => {
-    const aIsNumeric = isNumeric(a);
-    const bIsNumeric = isNumeric(b);
-
-    if (aIsNumeric && bIsNumeric) {
-      return parseFloat(a) - parseFloat(b);
-    } else if (aIsNumeric && !bIsNumeric) {
-      return -1;
-    } else if (!aIsNumeric && bIsNumeric) {
-      return 1;
-    } else {
-      return a.localeCompare(b);
-    }
-  };
-
-  // Handle Account Save (Add/Edit)
   const handleSaveAccount = async () => {
     const { user_id, first_name, last_name, email_address, contact_number, employment_type, status, middle_name } = newAccount;
-
-    if (!(newAccount.user_id > 0) || !first_name || !last_name || !email_address || !contact_number) {
-      toast.error('Please fill all required fields including User ID');
-      return;
+    if (!(user_id > 0) || !first_name || !last_name || !email_address || !contact_number) {
+      toast.error('Please fill all required fields including User ID'); return;
     }
-
-    // Validate roles when adding new account
     if (!isEditMode && newAccountRoles.length === 0) {
-      toast.error('Please add at least one role for the new account');
-      return;
+      toast.error('Please add at least one role'); return;
     }
-
-    // Validate each role
     for (const role of newAccountRoles) {
-      if (!role.role_id) {
-        toast.error('Please select a role for all role entries');
-        return;
-      }
-
-      if (!role.college_id && !role.department_id) {
-        toast.error('Each role must have either a college or department assigned');
-        return;
-      }
+      if (!role.role_id) { toast.error('Please select a role for all entries'); return; }
     }
-
+    setIsSaving(true);
     try {
       if (isEditMode) {
-        await api.put(`/accounts/${user_id}/`, {
-          first_name,
-          last_name,
-          middle_name,
-          email_address,
-          contact_number,
-          status,
-          employment_type
-        });
+        await api.put(`/accounts/${user_id}/`, { first_name, last_name, middle_name, email_address, contact_number, status, employment_type });
         toast.success('Account updated successfully!');
       } else {
         const defaultPassword = `${last_name}@${user_id}`;
-
-        // Create account
-        await api.post('/create-account/', {
-          user_id,
-          first_name,
-          last_name,
-          middle_name,
-          email_address,
-          contact_number,
-          status,
-          employment_type,
-          password: defaultPassword,
-          created_at: new Date().toISOString(),
-        });
-
-        // Add roles
+        await api.post('/create-account/', { user_id, first_name, last_name, middle_name, email_address, contact_number, status, employment_type, password: defaultPassword, created_at: new Date().toISOString() });
         for (const role of newAccountRoles) {
-          await api.post("/tbl_user_role/CRUD/", {
-            user: user_id,
-            role: role.role_id,
-            college: role.college_id || null,
-            department: role.department_id || null,
-            date_start: role.date_start || null,
-            date_ended: role.date_ended || null,
-            status: "Active",
-          });
+          await api.post('/tbl_user_role/CRUD/', { user: user_id, role: role.role_id, college: role.college_id || null, department: role.department_id || null, date_start: role.date_start || null, date_ended: role.date_ended || null, status: 'Active' });
         }
-
-        toast.success(`Account created with ${newAccountRoles.length} role(s)! Default password: ${last_name}@${user_id}`);
+        toast.success(`Account created! Default password: ${last_name}@${user_id}`);
       }
-
       setShowAccountModal(false);
       setNewAccountRoles([]);
-      await fetchData(); 
+      await fetchData(true);
     } catch (err: any) {
-      console.error(err);
       toast.error(err.response?.data?.detail || 'Error saving account');
+    } finally {
+      setIsSaving(false);
     }
   };
 
-  // Handle Account Delete
   const handleDeleteAccount = async (id: number) => {
     if (!globalThis.confirm('Are you sure you want to delete this account?')) return;
-
     try {
-      const userRolesToDelete = userRoles.filter(r => r.user === id);
-      await Promise.all(
-        userRolesToDelete.map(role => api.delete(`/tbl_user_role/${role.user_role_id}/`))
-      );
-
+      await Promise.all(userRoles.filter(r => r.user === id).map(r => api.delete(`/tbl_user_role/${r.user_role_id}/`)));
       await api.delete(`/accounts/${id}/`);
-      toast.success('Account and associated roles deleted');
-      fetchData();
-      setSelectedAccountIds(prev => {
-        const next = new Set(prev);
-        next.delete(id);
-        return next;
-      });
-    } catch (err: any) {
-      console.error(err);
-      toast.error('Error deleting account');
-    }
+      toast.success('Account deleted');
+      setShowDetailsModal(false);
+      fetchData(true);
+    } catch { toast.error('Error deleting account'); }
   };
 
-  const handleBulkDeleteSelected = () => {
-    const ids = Array.from(selectedAccountIds);
-    if (ids.length === 0) {
-      toast.info('No accounts selected');
-      return;
-    }
-    setDeleteCount(ids.length);
+  const handleBulkDelete = () => {
+    if (selectedAccountIds.size === 0) { toast.info('No accounts selected'); return; }
+    setDeleteCount(selectedAccountIds.size);
     setShowDeleteConfirm(true);
   };
 
   const confirmDelete = async () => {
-    const ids = Array.from(selectedAccountIds);
     setShowDeleteConfirm(false);
-    setIsBulkDeletingAccounts(true);
+    setIsBulkDeleting(true);
     try {
-      await Promise.all(
-        ids.map(async (id) => {
-          const userRolesToDelete = userRoles.filter(r => r.user === id);
-          await Promise.all(
-            userRolesToDelete.map(role => api.delete(`/tbl_user_role/${role.user_role_id}/`))
-          );
-          await api.delete(`/accounts/${id}/`);
-        })
-      );
-
-      toast.success(`Deleted ${ids.length} account(s) and their roles`);
+      await Promise.all(Array.from(selectedAccountIds).map(async id => {
+        await Promise.all(userRoles.filter(r => r.user === id).map(r => api.delete(`/tbl_user_role/${r.user_role_id}/`)));
+        await api.delete(`/accounts/${id}/`);
+      }));
+      toast.success(`Deleted ${selectedAccountIds.size} account(s)`);
       setSelectedAccountIds(new Set());
-      fetchData();
-    } catch (err) {
-      console.error(err);
-      toast.error('Error deleting selected accounts');
-    } finally {
-      setIsBulkDeletingAccounts(false);
-    }
+      fetchData(true);
+    } catch { toast.error('Error deleting accounts'); }
+    finally { setIsBulkDeleting(false); }
   };
 
-  const handleAddRole = async () => {
-    if (!newRole.role_id) {
-      toast.error("Role is required.");
-      return;
-    }
+  // ── CRUD: Role ─────────────────────────────────────────────────────────────
 
+  const handleAddRole = async () => {
+    if (!newRole.role_id) { toast.error('Role is required.'); return; }
     try {
-      const payload = {
+      const { data, status } = await api.post('/tbl_user_role/CRUD/', {
         user: newRole.user || selectedUserId,
         role: newRole.role_id,
         college: newRole.college_id || null,
         department: newRole.department_id || null,
         date_start: newRole.date_start || null,
         date_ended: newRole.date_ended || null,
-        status: "Active",
-      };
-
-      const { data, status } = await api.post("/tbl_user_role/CRUD/", payload);
-
-      if (!data || status !== 201) {
-        toast.error("Failed to add role.");
-        return;
-      }
-
-      toast.success("Role added successfully.");
+        status: 'Active',
+      });
+      if (!data || status !== 201) { toast.error('Failed to add role.'); return; }
+      toast.success('Role added successfully.');
       setUserRoles(prev => [...prev, data]);
       setShowAddRoleModal(false);
       setNewRole({});
-    } catch (err) {
-      console.error(err);
-      toast.error("Failed to add role.");
-    }
+      fetchData(true);
+    } catch { toast.error('Failed to add role.'); }
   };
 
   const handleUpdateRole = async () => {
     if (!editingRole) return;
-
     try {
       await api.put(`/tbl_user_role/${editingRole.user_role_id}/`, {
         role: editingRole.role,
@@ -487,77 +338,50 @@ export const UserManagement: React.FC<UserManagementProps> = ({ }) => {
         date_start: editingRole.date_start,
         date_ended: editingRole.date_ended,
       });
-
-      toast.success("Role updated successfully.");
+      toast.success('Role updated successfully.');
       setEditingRole(null);
-      fetchData();
-    } catch (err) {
-      console.error(err);
-      toast.error("Failed to update role.");
-    }
+      fetchData(true);
+    } catch { toast.error('Failed to update role.'); }
   };
 
   const toggleUserRoleStatus = async (user_role_id: number, currentStatus: string) => {
-    const newStatus = currentStatus === "Suspended" ? "Active" : "Suspended";
-
+    const newStatus = currentStatus === 'Suspended' ? 'Active' : 'Suspended';
     try {
-      const { data, status } = await api.put(`/tbl_user_role/${user_role_id}/`, {
-        status: newStatus,
-      });
-
-      if (!data || status !== 200) {
-        toast.error(`Failed to ${newStatus === "Active" ? "reactivate" : "suspend"} role.`);
-        return;
-      }
-
-      toast.success(`Role ${newStatus === "Active" ? "reactivated" : "suspended"}.`);
-      fetchData();
-    } catch (err) {
-      console.error(err);
-      toast.error(`Failed to ${newStatus === "Active" ? "reactivate" : "suspend"} role.`);
-    }
+      const { data, status } = await api.put(`/tbl_user_role/${user_role_id}/`, { status: newStatus });
+      if (!data || status !== 200) { toast.error('Failed to update role status.'); return; }
+      toast.success(`Role ${newStatus === 'Active' ? 'reactivated' : 'suspended'}.`);
+      fetchData(true);
+    } catch { toast.error('Failed to update role status.'); }
   };
 
   const handleDeleteRole = async (user_role_id: number) => {
     if (!confirm('Are you sure you want to delete this role?')) return;
-
     try {
       const response = await api.delete(`/tbl_user_role/${user_role_id}/`);
       if (response.status === 200 || response.status === 204) {
-        toast.success("Role deleted successfully.");
+        toast.success('Role deleted.');
         setUserRoles(prev => prev.filter(r => r.user_role_id !== user_role_id));
-      } else {
-        toast.error("Failed to delete role.");
-      }
-    } catch (err) {
-      console.error(err);
-      toast.error("Failed to delete role.");
-    }
+      } else { toast.error('Failed to delete role.'); }
+    } catch { toast.error('Failed to delete role.'); }
   };
+
+  // ── Import ────────────────────────────────────────────────────────────────
 
   const handleImportAccounts = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (!file) return;
-
     const reader = new FileReader();
     reader.onload = async evt => {
       setImportLoading(true);
-      toast.info('Importing accounts... Please wait.', { autoClose: false, toastId: 'import-progress' });
-
+      toast.info('Importing accounts...', { autoClose: false, toastId: 'import-progress' });
       const data = new Uint8Array(evt.target?.result as ArrayBuffer);
       const wb = XLSX.read(data, { type: 'array' });
-      const ws = wb.Sheets[wb.SheetNames[0]];
-      const json: any[] = XLSX.utils.sheet_to_json(ws, { defval: '' });
-
-      let successCount = 0;
-      let updatedCount = 0;
-      let errorCount = 0;
+      const json: any[] = XLSX.utils.sheet_to_json(wb.Sheets[wb.SheetNames[0]], { defval: '' });
+      let successCount = 0, updatedCount = 0, errorCount = 0;
       const errors: string[] = [];
-
-      for (let rowIndex = 0; rowIndex < json.length; rowIndex++) {
-        const row = json[rowIndex];
-        const rowNumber = rowIndex + 2;
-
+      for (let i = 0; i < json.length; i++) {
+        const row = json[i];
+        const rowNum = i + 2;
         try {
           const user_id = Number(row.user_id ?? row.id);
           const first_name = String(row.first_name ?? '').trim();
@@ -566,272 +390,85 @@ export const UserManagement: React.FC<UserManagementProps> = ({ }) => {
           const email_address = String(row.email_address ?? '').trim();
           const contact_number = String(row.contact_number ?? '').trim();
           const status = String(row.status ?? 'Active');
-
-          if (!user_id) {
-            errors.push(`Row ${rowNumber}: Missing user_id`);
-            errorCount++;
-            continue;
+          if (!user_id || !first_name || !last_name || !email_address || !contact_number) {
+            errors.push(`Row ${rowNum}: Missing required fields`); errorCount++; continue;
           }
-          if (!first_name) {
-            errors.push(`Row ${rowNumber}: Missing first_name for user ${user_id}`);
-            errorCount++;
-            continue;
-          }
-          if (!last_name) {
-            errors.push(`Row ${rowNumber}: Missing last_name for user ${user_id}`);
-            errorCount++;
-            continue;
-          }
-          if (!email_address) {
-            errors.push(`Row ${rowNumber}: Missing email_address for user ${user_id}`);
-            errorCount++;
-            continue;
-          }
-          if (!contact_number) {
-            errors.push(`Row ${rowNumber}: Missing contact_number for user ${user_id}`);
-            errorCount++;
-            continue;
-          }
-
-          const existingAccount = accounts.find(acc => acc.user_id === user_id);
-          const defaultPassword = `${last_name}@${user_id}`;
-
-          if (existingAccount) {
-            const updateData: any = {};
-            if (first_name) updateData.first_name = first_name;
-            if (last_name) updateData.last_name = last_name;
-            if (middle_name) updateData.middle_name = middle_name;
-            if (email_address) updateData.email_address = email_address;
-            if (contact_number) updateData.contact_number = contact_number;
-            if (status) updateData.status = status;
-
-            await api.put(`/accounts/${user_id}/`, updateData);
+          const existing = accounts.find(a => a.user_id === user_id);
+          if (existing) {
+            await api.put(`/accounts/${user_id}/`, { first_name, last_name, middle_name, email_address, contact_number, status });
             updatedCount++;
           } else {
-            await api.post('/create-account/', {
-              user_id,
-              first_name,
-              last_name,
-              middle_name,
-              email_address,
-              contact_number,
-              status,
-              password: defaultPassword,
-              created_at: new Date().toISOString(),
-            });
+            await api.post('/create-account/', { user_id, first_name, last_name, middle_name, email_address, contact_number, status, password: `${last_name}@${user_id}`, created_at: new Date().toISOString() });
             successCount++;
           }
-
           const rolesStr = String(row.roles ?? '').trim();
-          const collegesStr = String(row.colleges ?? '').trim();
-          const departmentsStr = String(row.departments ?? '').trim();
-          const dateStartsStr = String(row.date_starts ?? '').trim();
-          const dateEndedsStr = String(row.date_endeds ?? '').trim();
-
           if (rolesStr) {
-            const roleIds = rolesStr.split(';').map(r => Number(r.trim())).filter(r => r > 0);
-            const collegeIds = collegesStr.split(';').map(c => c.trim());
-            const departmentIds = departmentsStr.split(';').map(d => d.trim());
-            const dateStarts = dateStartsStr.split(';').map(d => excelSerialToDate(d.trim()));
-            const dateEndeds = dateEndedsStr.split(';').map(d => excelSerialToDate(d.trim()));
-
-            if (roleIds.length !== collegeIds.length || roleIds.length !== departmentIds.length) {
-              errors.push(`Row ${rowNumber}: Mismatch in role data counts (roles: ${roleIds.length}, colleges: ${collegeIds.length}, departments: ${departmentIds.length})`);
-              continue;
-            }
-
-            for (let i = 0; i < roleIds.length; i++) {
-              const roleId = roleIds[i];
-              const collegeId = collegeIds[i] || null;
-              const departmentId = departmentIds[i] || null;
-              const dateStart = dateStarts[i];
-              const dateEnded = dateEndeds[i];
-
-              const roleExists = roles.find(r => r.role_id === roleId);
-              if (!roleExists) {
-                errors.push(`Row ${rowNumber}: Invalid role ID ${roleId} for user ${user_id}`);
-                continue;
-              }
-
-              if (!collegeId && !departmentId) {
-                errors.push(`Row ${rowNumber}: Role ${roleId} for user ${user_id} must have either college or department`);
-                continue;
-              }
-
-              if (collegeId && !colleges.find(c => c.college_id === collegeId)) {
-                errors.push(`Row ${rowNumber}: Invalid college ID "${collegeId}" for user ${user_id}`);
-                continue;
-              }
-
-              if (departmentId && !departments.find(d => d.department_id === departmentId)) {
-                errors.push(`Row ${rowNumber}: Invalid department ID "${departmentId}" for user ${user_id}`);
-                continue;
-              }
-
-              if (dateStart && !/^\d{4}-\d{2}-\d{2}$/.test(dateStart)) {
-                errors.push(`Row ${rowNumber}: Invalid date_start format for user ${user_id}, role ${roleId}`);
-                continue;
-              }
-              if (dateEnded && !/^\d{4}-\d{2}-\d{2}$/.test(dateEnded)) {
-                errors.push(`Row ${rowNumber}: Invalid date_ended format for user ${user_id}, role ${roleId}`);
-                continue;
-              }
-
-              const existingRole = userRoles.find(ur =>
-                ur.user === user_id &&
-                ur.role === roleId &&
-                ur.college === collegeId &&
-                ur.department === departmentId
-              );
-
-              if (existingRole) {
-                if (dateStart || dateEnded) {
-                  try {
-                    await api.put(`/tbl_user_role/${existingRole.user_role_id}/`, {
-                      date_start: dateStart || existingRole.date_start,
-                      date_ended: dateEnded || existingRole.date_ended,
-                    });
-                  } catch (updateErr: any) {
-                    const errorMsg = updateErr.response?.data?.detail || updateErr.response?.data?.error || updateErr.message || 'Unknown error';
-                    errors.push(`Row ${rowNumber}: Failed to update role ${roleId} for user ${user_id} - ${errorMsg}`);
-                  }
-                }
-                continue;
-              }
-
+            const roleIds = rolesStr.split(';').map((r: string) => Number(r.trim())).filter((r: number) => r > 0);
+            const collegeIds = String(row.colleges ?? '').trim().split(';').map((c: string) => c.trim());
+            const deptIds = String(row.departments ?? '').trim().split(';').map((d: string) => d.trim());
+            const dateStarts = String(row.date_starts ?? '').trim().split(';').map((d: string) => excelSerialToDate(d.trim()));
+            const dateEndeds = String(row.date_endeds ?? '').trim().split(';').map((d: string) => excelSerialToDate(d.trim()));
+            for (let j = 0; j < roleIds.length; j++) {
+              const existingRole = userRoles.find(ur => ur.user === user_id && ur.role === roleIds[j] && ur.college === (collegeIds[j] || null) && ur.department === (deptIds[j] || null));
+              if (existingRole) continue;
               try {
-                await api.post("/tbl_user_role/CRUD/", {
-                  user: user_id,
-                  role: roleId,
-                  college: collegeId,
-                  department: departmentId,
-                  date_start: dateStart,
-                  date_ended: dateEnded,
-                  status: "Active",
-                });
-              } catch (roleErr: any) {
-                const errorMsg = roleErr.response?.data?.detail || roleErr.response?.data?.error || roleErr.message || 'Unknown error';
-                errors.push(`Row ${rowNumber}: Failed to add role ${roleId} for user ${user_id} - ${errorMsg}`);
+                await api.post('/tbl_user_role/CRUD/', { user: user_id, role: roleIds[j], college: collegeIds[j] || null, department: deptIds[j] || null, date_start: dateStarts[j] || null, date_ended: dateEndeds[j] || null, status: 'Active' });
+              } catch (err: any) {
+                errors.push(`Row ${rowNum}: Role ${roleIds[j]} - ${err.response?.data?.detail || err.message}`);
               }
             }
           }
         } catch (err: any) {
-          const errorMsg = err.response?.data?.detail || err.response?.data?.error || err.message || 'Unknown error';
-          errors.push(`Row ${rowNumber}: ${errorMsg}`);
+          errors.push(`Row ${rowNum}: ${err.response?.data?.detail || err.message}`);
           errorCount++;
         }
       }
-
       toast.dismiss('import-progress');
-
-      const messages: string[] = [];
-      if (successCount > 0) messages.push(`${successCount} new account(s) created`);
-      if (updatedCount > 0) messages.push(`${updatedCount} account(s) updated`);
-      if (errorCount > 0) messages.push(`${errorCount} account(s) failed`);
-
-      if (messages.length > 0) {
-        toast.success(messages.join(', '));
-      }
-
+      const msgs = [successCount > 0 && `${successCount} created`, updatedCount > 0 && `${updatedCount} updated`, errorCount > 0 && `${errorCount} failed`].filter(Boolean).join(', ');
+      if (msgs) toast.success(msgs);
       if (errors.length > 0) {
         console.error('Import errors:', errors);
-        toast.error(
-          <div style={{ maxHeight: '300px', overflowY: 'auto' }}>
-            <strong>Import errors:</strong>
-            <ul style={{ margin: '10px 0', paddingLeft: '20px', fontSize: '12px' }}>
-              {errors.slice(0, 10).map((error, idx) => (
-                <li key={idx}>{error}</li>
-              ))}
-            </ul>
-          </div>,
-          { autoClose: 10000 }
-        );
+        toast.error(<div style={{ maxHeight: '200px', overflowY: 'auto', fontSize: '12px' }}><strong>Errors:</strong><ul style={{ paddingLeft: '16px', marginTop: '6px' }}>{errors.slice(0, 10).map((e, i) => <li key={i}>{e}</li>)}</ul></div>, { autoClose: 10000 });
       }
-
-      await fetchData();
+      await fetchData(true);
       setImportLoading(false);
       setShowImportAccountsModal(false);
     };
-
     reader.readAsArrayBuffer(file);
   };
 
   const handleImportRoles = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (!file) return;
-
     const reader = new FileReader();
     reader.onload = async (evt) => {
       setImportLoading(true);
-      toast.info('Importing roles... Please wait.', { autoClose: false, toastId: 'import-roles-progress' });
-
+      toast.info('Importing roles...', { autoClose: false, toastId: 'import-roles' });
       const data = new Uint8Array(evt.target?.result as ArrayBuffer);
-      const wb = XLSX.read(data, { type: "array" });
-      const ws = wb.Sheets[wb.SheetNames[0]];
-      const json: any[] = XLSX.utils.sheet_to_json(ws);
-
-      let successCount = 0;
-      let errorCount = 0;
-
+      const wb = XLSX.read(data, { type: 'array' });
+      const json: any[] = XLSX.utils.sheet_to_json(wb.Sheets[wb.SheetNames[0]]);
+      let successCount = 0, errorCount = 0;
       for (const row of json) {
         const { user, role, college, department, date_start, date_ended } = row;
-
-        if (!user || !role) {
-          console.warn('Skipping invalid row:', row);
-          errorCount++;
-          continue;
-        }
-
+        if (!user || !role) { errorCount++; continue; }
         try {
-          const convertedDateStart = excelSerialToDate(date_start);
-          const convertedDateEnded = excelSerialToDate(date_ended);
-
-          const existingRole = userRoles.find(ur =>
-            ur.user === user &&
-            ur.role === role &&
-            ur.college === (college || null) &&
-            ur.department === (department || null)
-          );
-
-          if (existingRole) {
-            if (convertedDateStart || convertedDateEnded) {
-              await api.put(`/tbl_user_role/${existingRole.user_role_id}/`, {
-                date_start: convertedDateStart || existingRole.date_start,
-                date_ended: convertedDateEnded || existingRole.date_ended,
-              });
-            }
+          const ds = excelSerialToDate(date_start), de = excelSerialToDate(date_ended);
+          const existing = userRoles.find(ur => ur.user === user && ur.role === role && ur.college === (college || null) && ur.department === (department || null));
+          if (existing) {
+            if (ds || de) await api.put(`/tbl_user_role/${existing.user_role_id}/`, { date_start: ds || existing.date_start, date_ended: de || existing.date_ended });
           } else {
-            await api.post("/tbl_user_role/CRUD/", {
-              user,
-              role,
-              college: college || null,
-              department: department || null,
-              date_start: convertedDateStart || null,
-              date_ended: convertedDateEnded || null,
-              status: "Active",
-            });
+            await api.post('/tbl_user_role/CRUD/', { user, role, college: college || null, department: department || null, date_start: ds || null, date_ended: de || null, status: 'Active' });
           }
           successCount++;
-        } catch (err) {
-          console.error(err);
-          errorCount++;
-        }
+        } catch { errorCount++; }
       }
-
-      toast.dismiss('import-roles-progress');
-
-      if (successCount > 0) {
-        toast.success(`Successfully imported ${successCount} role(s)`);
-      }
-      if (errorCount > 0) {
-        toast.warning(`Failed to import ${errorCount} role(s)`);
-      }
-
-      await fetchData();
+      toast.dismiss('import-roles');
+      if (successCount > 0) toast.success(`Imported ${successCount} role(s)`);
+      if (errorCount > 0) toast.warning(`Failed: ${errorCount} role(s)`);
+      await fetchData(true);
       setImportLoading(false);
       setShowImportRolesModal(false);
     };
-
     reader.readAsArrayBuffer(file);
   };
 
@@ -839,22 +476,7 @@ export const UserManagement: React.FC<UserManagementProps> = ({ }) => {
     const ws = XLSX.utils.aoa_to_sheet([
       ['user_id', 'first_name', 'last_name', 'middle_name', 'email_address', 'contact_number', 'status', 'roles', 'colleges', 'departments', 'date_starts', 'date_endeds'],
       [2025000001, 'Juan', 'Dela Cruz', 'A.', 'juan@example.com', '09123456789', 'Active', '1;2', 'CITC;CITC', 'DIT;', '2025-01-01', '2025-12-31'],
-      [2025000002, 'Maria', 'Santos', 'B.', 'maria@example.com', '09987654321', 'Active', '3', '', 'DIT', '2025-01-01', '2025-12-31'],
     ]);
-
-    XLSX.utils.sheet_add_aoa(ws, [
-      [''],
-      ['INSTRUCTIONS:'],
-      ['- Multiple roles can be added by separating values with semicolons (;)'],
-      ['- roles: Use role IDs (e.g., 1;2;3 for three roles)'],
-      ['- Roles: 1 (Dean), 3 (Scheduler), 4 (Bayanihan Leader), 5 (Proctor)'],
-      ['- colleges: Use college IDs or leave empty (e.g., CITC;CAS)'],
-      ['- departments: Use department IDs or leave empty (e.g., DIT;DCIT;)'],
-      ['- Each role must have either a college OR department (or both)'],
-      ['- date_starts and date_endeds: Use format YYYY-MM-DD or leave empty'],
-      ['- Make sure the number of values in roles, colleges, departments, date_starts, and date_endeds match']
-    ], { origin: 'A5' });
-
     const wb = XLSX.utils.book_new();
     XLSX.utils.book_append_sheet(wb, ws, 'ImportTemplate');
     XLSX.writeFile(wb, 'Accounts_Import_Template.xlsx');
@@ -864,28 +486,17 @@ export const UserManagement: React.FC<UserManagementProps> = ({ }) => {
     const ws = XLSX.utils.aoa_to_sheet([
       ['user', 'role', 'college', 'department', 'date_start', 'date_ended'],
       [2025000001, 1, 'CITC', 'DIT', '2025-01-01', '2025-12-31'],
-      [2025000001, 2, 'CITC', '', '2025-01-01', '2025-12-31']
     ]);
-
-    XLSX.utils.sheet_add_aoa(ws, [
-      [''],
-      ['INSTRUCTIONS:'],
-      ['- user: User ID number'],
-      ['- role: Role ID number'],
-      ['- college: College ID (can be empty if department is provided)'],
-      ['- department: Department ID (can be empty if college is provided)'],
-      ['- Each role must have either college OR department (or both)'],
-      ['- date_start and date_ended: Use format YYYY-MM-DD or leave empty']
-    ], { origin: 'A5' });
-
     const wb = XLSX.utils.book_new();
     XLSX.utils.book_append_sheet(wb, ws, 'RolesTemplate');
     XLSX.writeFile(wb, 'UserRoles_Import_Template.xlsx');
   };
 
-  const getUserRoles = useCallback((userId: number) => {
-    return userRoles.filter(r => r.user === userId);
-  }, [userRoles]);
+  // ── Filtering / Sorting / Pagination ──────────────────────────────────────
+
+  const getUserRoles = useCallback((userId: number) => userRoles.filter(r => r.user === userId), [userRoles]);
+
+  useEffect(() => { setCurrentPage(1); }, [searchTerm, sortBy, selectedCollege]);
 
   const filteredAccounts = useMemo(() => {
     let filtered = accounts.filter(account => {
@@ -893,81 +504,39 @@ export const UserManagement: React.FC<UserManagementProps> = ({ }) => {
       const userId = account.user_id.toString();
       const email = account.email_address.toLowerCase();
       const search = searchTerm.toLowerCase();
-
       const accountRoles = getUserRoles(account.user_id);
       const roleNames = accountRoles.map(r => r.role_name?.toLowerCase() || '').join(' ');
-
-      const matchesSearch = !searchTerm ||
-        userId.includes(search) ||
-        fullName.includes(search) ||
-        email.includes(search) ||
-        roleNames.includes(search);
-
-      const matchesCollege = !selectedCollege ||
-        accountRoles.some(r => r.college_id === selectedCollege);
-
+      const matchesSearch = !searchTerm || userId.includes(search) || fullName.includes(search) || email.includes(search) || roleNames.includes(search);
+      const matchesCollege = !selectedCollege || accountRoles.some(r => r.college_id === selectedCollege);
       return matchesSearch && matchesCollege;
     });
-
     if (sortBy !== 'none') {
       filtered = [...filtered].sort((a, b) => {
-        if (sortBy === 'user_id') {
-          return a.user_id - b.user_id;
-        } else if (sortBy === 'name') {
-          const aName = `${a.last_name}, ${a.first_name} ${a.middle_name || ''}`.toLowerCase();
-          const bName = `${b.last_name}, ${b.first_name} ${b.middle_name || ''}`.toLowerCase();
-          return smartSort(aName, bName);
-        } else if (sortBy === 'email') {
-          return smartSort(a.email_address.toLowerCase(), b.email_address.toLowerCase());
-        } else if (sortBy === 'status') {
-          return smartSort(a.status.toLowerCase(), b.status.toLowerCase());
-        } else if (sortBy === 'created_at') {
-          return new Date(a.created_at).getTime() - new Date(b.created_at).getTime();
-        }
+        if (sortBy === 'user_id') return a.user_id - b.user_id;
+        if (sortBy === 'name') return smartSort(`${a.last_name} ${a.first_name}`.toLowerCase(), `${b.last_name} ${b.first_name}`.toLowerCase());
+        if (sortBy === 'email') return smartSort(a.email_address.toLowerCase(), b.email_address.toLowerCase());
+        if (sortBy === 'status') return smartSort(a.status.toLowerCase(), b.status.toLowerCase());
+        if (sortBy === 'created_at') return new Date(a.created_at).getTime() - new Date(b.created_at).getTime();
         return 0;
       });
     }
-
     return filtered;
   }, [accounts, searchTerm, selectedCollege, getUserRoles, sortBy]);
 
-  useEffect(() => {
-    setSelectedAccountIds(prev => {
-      const next = new Set<number>();
-      filteredAccounts.forEach(acc => {
-        if (prev.has(acc.user_id)) {
-          next.add(acc.user_id);
-        }
-      });
-      return next;
-    });
-  }, [filteredAccounts]);
-
-  useEffect(() => {
-    setCurrentPage(1);
-  }, [searchTerm, sortBy, selectedCollege]);
+  const totalPages = Math.max(1, itemsPerPage === 'all' ? 1 : Math.ceil(filteredAccounts.length / itemsPerPage));
 
   const paginatedAccounts = useMemo(() => {
-    if (itemsPerPage === 'all') {
-      return filteredAccounts;
-    }
+    if (itemsPerPage === 'all') return filteredAccounts;
     return filteredAccounts.slice((currentPage - 1) * itemsPerPage, currentPage * itemsPerPage);
   }, [filteredAccounts, currentPage, itemsPerPage]);
 
-  const isAllSelected = (() => {
-    if (filteredAccounts.length === 0) return false;
-    return filteredAccounts.every(acc => selectedAccountIds.has(acc.user_id));
-  })();
+  const isAllSelected = filteredAccounts.length > 0 && filteredAccounts.every(a => selectedAccountIds.has(a.user_id));
 
   const toggleSelectAll = () => {
-    if (filteredAccounts.length === 0) return;
     setSelectedAccountIds(prev => {
       const next = new Set(prev);
-      if (isAllSelected) {
-        filteredAccounts.forEach(acc => next.delete(acc.user_id));
-      } else {
-        filteredAccounts.forEach(acc => next.add(acc.user_id));
-      }
+      if (isAllSelected) filteredAccounts.forEach(a => next.delete(a.user_id));
+      else filteredAccounts.forEach(a => next.add(a.user_id));
       return next;
     });
   };
@@ -975,1024 +544,559 @@ export const UserManagement: React.FC<UserManagementProps> = ({ }) => {
   const toggleSelectAccount = (userId: number) => {
     setSelectedAccountIds(prev => {
       const next = new Set(prev);
-      if (next.has(userId)) {
-        next.delete(userId);
-      } else {
-        next.add(userId);
-      }
+      next.has(userId) ? next.delete(userId) : next.add(userId);
       return next;
     });
   };
 
-  const handleItemsPerPageChange = (value: number | 'all') => {
-    setItemsPerPage(value);
-    setShowItemsPerPageDropdown(false);
-    setCurrentPage(1);
-  };
-
   const handleCustomItemsPerPage = () => {
-    const numValue = parseInt(customItemsPerPage, 10);
-    if (!isNaN(numValue) && numValue > 0) {
-      setItemsPerPage(numValue);
+    const n = parseInt(customItemsPerPage, 10);
+    if (!isNaN(n) && n > 0) {
+      setItemsPerPage(n);
       setCustomItemsPerPage('');
       setShowItemsPerPageDropdown(false);
       setCurrentPage(1);
-    } else {
-      toast.error('Please enter a valid positive number.');
-    }
+    } else { toast.error('Please enter a valid positive number.'); }
   };
 
-  useEffect(() => {
-    const checkScroll = () => {
-      const container = tableContainerRef.current;
-      if (!container) return;
+  // New account role helpers
+  const addNewAccountRole = () => setNewAccountRoles(prev => [...prev, { role_id: 0, college_id: null, department_id: null, date_start: null, date_ended: null }]);
+  const removeNewAccountRole = (i: number) => setNewAccountRoles(prev => prev.filter((_, idx) => idx !== i));
+  const updateNewAccountRole = (i: number, field: keyof NewAccountRole, value: any) =>
+    setNewAccountRoles(prev => prev.map((r, idx) => idx === i ? { ...r, [field]: value } : r));
 
-      const { scrollLeft, scrollWidth, clientWidth } = container;
-      setCanScrollLeft(scrollLeft > 0);
-      setCanScrollRight(scrollLeft < scrollWidth - clientWidth - 1);
+  // Totals for header subtitle
+  const totalActive = accounts.filter(a => a.status === 'Active').length;
+  const totalRolesCount = userRoles.length;
 
-      container.classList.toggle('scrollable-left', scrollLeft > 0);
-      container.classList.toggle('scrollable-right', scrollLeft < scrollWidth - clientWidth - 1);
-    };
-
-    const container = tableContainerRef.current;
-    if (container) {
-      checkScroll();
-      container.addEventListener('scroll', checkScroll);
-      window.addEventListener('resize', checkScroll);
-    }
-
-    return () => {
-      if (container) {
-        container.removeEventListener('scroll', checkScroll);
-        window.removeEventListener('resize', checkScroll);
-      }
-    };
-  }, [accounts, searchTerm, selectedCollege, loading]);
-
-  const scrollTable = (direction: 'left' | 'right') => {
-    const container = tableContainerRef.current;
-    if (!container) return;
-
-    const scrollAmount = container.clientWidth * 0.8;
-    const scrollTo = direction === 'left'
-      ? container.scrollLeft - scrollAmount
-      : container.scrollLeft + scrollAmount;
-
-    container.scrollTo({
-      left: scrollTo,
-      behavior: 'smooth'
-    });
-  };
-
-  // Add new account role
-  const addNewAccountRole = () => {
-    setNewAccountRoles(prev => [...prev, {
-      role_id: 0,
-      college_id: null,
-      department_id: null,
-      date_start: null,
-      date_ended: null
-    }]);
-  };
-
-  // Remove account role
-  const removeNewAccountRole = (index: number) => {
-    setNewAccountRoles(prev => prev.filter((_, i) => i !== index));
-  };
-
-  // Update account role
-  const updateNewAccountRole = (index: number, field: keyof NewAccountRole, value: any) => {
-    setNewAccountRoles(prev => prev.map((role, i) =>
-      i === index ? { ...role, [field]: value } : role
-    ));
-  };
-
-  const excelSerialToDate = (serial: string | number): string | null => {
-    if (!serial) return null;
-
-    const num = Number(serial);
-
-    if (isNaN(num) && /^\d{4}-\d{2}-\d{2}$/.test(String(serial))) {
-      return String(serial);
-    }
-
-    if (isNaN(num)) return null;
-
-    const excelEpoch = new Date(1899, 11, 30); 
-    const date = new Date(excelEpoch.getTime() + num * 24 * 60 * 60 * 1000);
-
-    const year = date.getFullYear();
-    const month = String(date.getMonth() + 1).padStart(2, '0');
-    const day = String(date.getDate()).padStart(2, '0');
-
-    return `${year}-${month}-${day}`;
-  };
+  // ── Render ────────────────────────────────────────────────────────────────
 
   return (
-    <div className="colleges-container accounts-container">
-      <div className="colleges-header">
-        <div className="search-bar" style={{ marginLeft: 'auto' }}>
-          <input
-            type="text"
-            placeholder="Search by ID, name, email, or role..."
-            value={searchTerm}
-            onChange={(e) => setSearchTerm(e.target.value)}
-          />
-          <button type="button" className="search-button"><FaSearch /></button>
+    <div className="cl-page">
+
+      {/* ── Page Header ── */}
+      <div className="cl-page-header">
+        <div className="cl-page-header-left">
+          <div className="cl-page-icon">
+            <svg width="22" height="22" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.8}>
+              <path strokeLinecap="round" strokeLinejoin="round" d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0z" />
+            </svg>
+          </div>
+          <div className="cl-page-title">
+            <h1>User Management</h1>
+            <p>{accounts.length} accounts · {totalActive} active · {totalRolesCount} role assignments</p>
+          </div>
+        </div>
+
+        <div className="cl-page-actions">
+          <div className="cl-search-bar">
+            <FaSearch className="cl-search-icon" />
+            <input
+              type="text"
+              placeholder="Search by ID, name, email, role…"
+              value={searchTerm}
+              onChange={e => setSearchTerm(e.target.value)}
+            />
+          </div>
+
+          {/* College filter */}
+          <select
+            value={selectedCollege}
+            onChange={e => setSelectedCollege(e.target.value)}
+            style={{
+              height: '36px',
+              padding: '0 12px',
+              border: '1.5px solid var(--cl-border)',
+              borderRadius: 'var(--cl-radius-sm)',
+              fontSize: '12.5px',
+              fontFamily: 'var(--cl-font)',
+              color: 'var(--cl-text-secondary)',
+              background: 'var(--cl-surface)',
+              boxShadow: 'var(--cl-shadow-sm)',
+              cursor: 'pointer',
+              outline: 'none',
+              minWidth: '160px',
+              maxWidth: '260px',
+            }}
+          >
+            <option value="">All Colleges</option>
+            {colleges.map(c => (
+              <option key={c.college_id} value={c.college_id}>{c.college_name}</option>
+            ))}
+          </select>
+
+          <button
+            type="button"
+            className="cl-btn primary"
+            onClick={() => {
+              setIsEditMode(false);
+              setNewAccount({ user_id: 0, first_name: '', last_name: '', middle_name: '', email_address: '', contact_number: '', status: 'Active', created_at: new Date().toISOString() });
+              setNewAccountRoles([{ role_id: 0, college_id: null, department_id: null, date_start: null, date_ended: null }]);
+              setShowAccountModal(true);
+            }}
+          >
+            <FaPlus style={{ fontSize: '11px' }} /> Add Account
+          </button>
+
+          <button type="button" className="cl-btn" onClick={() => setShowImportAccountsModal(true)}>
+            <FaFileImport style={{ fontSize: '11px' }} /> Import
+          </button>
+
+          <button
+            type="button"
+            className="cl-btn danger"
+            onClick={handleBulkDelete}
+            disabled={isBulkDeleting || selectedAccountIds.size === 0}
+            title={selectedAccountIds.size > 0 ? `Delete ${selectedAccountIds.size} selected` : 'Select accounts to delete'}
+          >
+            <FaTrash style={{ fontSize: '11px' }} />
+            {selectedAccountIds.size > 0 && <span>({selectedAccountIds.size})</span>}
+          </button>
         </div>
       </div>
 
-      <div className="colleges-actions">
-        <div style={{ display: 'flex', alignItems: 'center', gap: 8, width: '100%' }}>
-          <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+      {/* ── Toolbar ── */}
+      <div className="cl-toolbar">
+        <div className="cl-toolbar-left">
+          {/* Sort */}
+          <div ref={sortRef} style={{ position: 'relative' }}>
             <button
               type="button"
-              className="action-button add-new with-label"
-              onClick={() => {
-                setIsEditMode(false);
-                setShowAccountModal(true);
-                setNewAccount({
-                  user_id: 0,
-                  first_name: '',
-                  last_name: '',
-                  middle_name: '',
-                  email_address: '',
-                  contact_number: '',
-                  status: 'Active',
-                  created_at: new Date().toISOString(),
-                });
-                setNewAccountRoles([{
-                  role_id: 0,
-                  college_id: null,
-                  department_id: null,
-                  date_start: null,
-                  date_ended: null
-                }]);
-              }}
+              className="cl-toolbar-btn"
+              onClick={() => setShowSortDropdown(v => !v)}
             >
-              <FaPlus /><span className="btn-label">Add</span>
+              <FaSort style={{ fontSize: '11px' }} />
+              Sort{sortBy !== 'none' ? `: ${sortBy === 'user_id' ? 'ID' : sortBy === 'name' ? 'Name' : sortBy === 'email' ? 'Email' : sortBy === 'status' ? 'Status' : 'Created'}` : ''}
+              <FaChevronDown style={{ fontSize: '9px', marginLeft: '2px' }} />
             </button>
+            {showSortDropdown && (
+              <div className="cl-dropdown">
+                {[
+                  { value: 'none',       label: 'None' },
+                  { value: 'user_id',    label: 'User ID' },
+                  { value: 'name',       label: 'Name' },
+                  { value: 'email',      label: 'Email' },
+                  { value: 'status',     label: 'Status' },
+                  { value: 'created_at', label: 'Created Date' },
+                ].map(opt => (
+                  <button
+                    key={opt.value}
+                    type="button"
+                    className={`cl-dropdown-item${sortBy === opt.value ? ' active' : ''}`}
+                    onClick={() => { setSortBy(opt.value); setShowSortDropdown(false); }}
+                  >
+                    {opt.label}
+                  </button>
+                ))}
+              </div>
+            )}
+          </div>
 
+          {/* Items per page */}
+          <div ref={itemsRef} style={{ position: 'relative' }}>
             <button
               type="button"
-              className="action-button import with-label"
-              onClick={() => setShowImportAccountsModal(true)}
+              className="cl-toolbar-btn"
+              onClick={() => setShowItemsPerPageDropdown(v => !v)}
             >
-              <FaFileImport /><span className="btn-label">Import</span>
+              <FaChevronDown style={{ fontSize: '9px' }} />
+              Show: {itemsPerPage === 'all' ? 'All' : itemsPerPage}
             </button>
-            <div style={{ position: 'relative' }} data-sort-dropdown>
-              <button
-                type='button'
-                className="action-button with-label sort-by-button"
-                onClick={() => setShowSortDropdown(!showSortDropdown)}
-                title="Sort by"
-              >
-                <FaSort />
-                <span className="btn-label">Sort by</span>
-              </button>
-              {showSortDropdown && (
-                <div
-                  style={{
-                    position: 'absolute',
-                    top: '100%',
-                    left: 0,
-                    marginTop: '4px',
-                    backgroundColor: 'white',
-                    border: '1px solid #ddd',
-                    borderRadius: '8px',
-                    boxShadow: '0 2px 8px rgba(0,0,0,0.15)',
-                    zIndex: 1000,
-                    minWidth: '150px'
-                  }}
+            {showItemsPerPageDropdown && (
+              <div className="cl-dropdown" style={{ minWidth: '180px' }}>
+                {[10, 20, 30].map(n => (
+                  <button
+                    key={n}
+                    type="button"
+                    className={`cl-dropdown-item${itemsPerPage === n ? ' active' : ''}`}
+                    onClick={() => { setItemsPerPage(n); setCurrentPage(1); setShowItemsPerPageDropdown(false); }}
+                  >
+                    {n} rows
+                  </button>
+                ))}
+                <div className="cl-dropdown-divider" />
+                <div className="cl-dropdown-custom">
+                  <input
+                    type="number"
+                    className="cl-custom-input"
+                    value={customItemsPerPage}
+                    onChange={e => setCustomItemsPerPage(e.target.value)}
+                    placeholder="Custom…"
+                    min="1"
+                    onKeyDown={e => e.key === 'Enter' && handleCustomItemsPerPage()}
+                  />
+                  <button
+                    type="button"
+                    className="cl-btn primary"
+                    style={{ height: '30px', padding: '0 10px', fontSize: '12px' }}
+                    onClick={handleCustomItemsPerPage}
+                  >
+                    Go
+                  </button>
+                </div>
+                <button
+                  type="button"
+                  className={`cl-dropdown-item${itemsPerPage === 'all' ? ' active' : ''}`}
+                  onClick={() => { setItemsPerPage('all'); setCurrentPage(1); setShowItemsPerPageDropdown(false); }}
                 >
-                  <button
-                    type="button"
-                    onClick={() => {
-                      setSortBy('none');
-                      setShowSortDropdown(false);
-                    }}
-                    style={{
-                      width: '100%',
-                      padding: '8px 12px',
-                      textAlign: 'left',
-                      border: 'none',
-                      backgroundColor: sortBy === 'none' ? '#f0f0f0' : 'white',
-                      color: '#000',
-                      cursor: 'pointer',
-                      fontSize: '14px'
-                    }}
-                    onMouseEnter={(e) => {
-                      if (sortBy !== 'none') e.currentTarget.style.backgroundColor = '#f5f5f5';
-                    }}
-                    onMouseLeave={(e) => {
-                      if (sortBy !== 'none') e.currentTarget.style.backgroundColor = 'white';
-                    }}
-                  >
-                    None
-                  </button>
-                  <button
-                    type="button"
-                    onClick={() => {
-                      setSortBy('user_id');
-                      setShowSortDropdown(false);
-                    }}
-                    style={{
-                      width: '100%',
-                      padding: '8px 12px',
-                      textAlign: 'left',
-                      border: 'none',
-                      backgroundColor: sortBy === 'user_id' ? '#f0f0f0' : 'white',
-                      color: '#000',
-                      cursor: 'pointer',
-                      fontSize: '14px',
-                      borderTop: '1px solid #eee'
-                    }}
-                    onMouseEnter={(e) => {
-                      if (sortBy !== 'user_id') e.currentTarget.style.backgroundColor = '#f5f5f5';
-                    }}
-                    onMouseLeave={(e) => {
-                      if (sortBy !== 'user_id') e.currentTarget.style.backgroundColor = 'white';
-                    }}
-                  >
-                    User ID
-                  </button>
-                  <button
-                    type="button"
-                    onClick={() => {
-                      setSortBy('name');
-                      setShowSortDropdown(false);
-                    }}
-                    style={{
-                      width: '100%',
-                      padding: '8px 12px',
-                      textAlign: 'left',
-                      border: 'none',
-                      backgroundColor: sortBy === 'name' ? '#f0f0f0' : 'white',
-                      color: '#000',
-                      cursor: 'pointer',
-                      fontSize: '14px',
-                      borderTop: '1px solid #eee'
-                    }}
-                    onMouseEnter={(e) => {
-                      if (sortBy !== 'name') e.currentTarget.style.backgroundColor = '#f5f5f5';
-                    }}
-                    onMouseLeave={(e) => {
-                      if (sortBy !== 'name') e.currentTarget.style.backgroundColor = 'white';
-                    }}
-                  >
-                    Name
-                  </button>
-                  <button
-                    type="button"
-                    onClick={() => {
-                      setSortBy('email');
-                      setShowSortDropdown(false);
-                    }}
-                    style={{
-                      width: '100%',
-                      padding: '8px 12px',
-                      textAlign: 'left',
-                      border: 'none',
-                      backgroundColor: sortBy === 'email' ? '#f0f0f0' : 'white',
-                      color: '#000',
-                      cursor: 'pointer',
-                      fontSize: '14px',
-                      borderTop: '1px solid #eee'
-                    }}
-                    onMouseEnter={(e) => {
-                      if (sortBy !== 'email') e.currentTarget.style.backgroundColor = '#f5f5f5';
-                    }}
-                    onMouseLeave={(e) => {
-                      if (sortBy !== 'email') e.currentTarget.style.backgroundColor = 'white';
-                    }}
-                  >
-                    Email
-                  </button>
-                  <button
-                    type="button"
-                    onClick={() => {
-                      setSortBy('status');
-                      setShowSortDropdown(false);
-                    }}
-                    style={{
-                      width: '100%',
-                      padding: '8px 12px',
-                      textAlign: 'left',
-                      border: 'none',
-                      backgroundColor: sortBy === 'status' ? '#f0f0f0' : 'white',
-                      color: '#000',
-                      cursor: 'pointer',
-                      fontSize: '14px',
-                      borderTop: '1px solid #eee'
-                    }}
-                    onMouseEnter={(e) => {
-                      if (sortBy !== 'status') e.currentTarget.style.backgroundColor = '#f5f5f5';
-                    }}
-                    onMouseLeave={(e) => {
-                      if (sortBy !== 'status') e.currentTarget.style.backgroundColor = 'white';
-                    }}
-                  >
-                    Status
-                  </button>
-                  <button
-                    type="button"
-                    onClick={() => {
-                      setSortBy('created_at');
-                      setShowSortDropdown(false);
-                    }}
-                    style={{
-                      width: '100%',
-                      padding: '8px 12px',
-                      textAlign: 'left',
-                      border: 'none',
-                      backgroundColor: sortBy === 'created_at' ? '#f0f0f0' : 'white',
-                      color: '#000',
-                      cursor: 'pointer',
-                      fontSize: '14px',
-                      borderTop: '1px solid #eee'
-                    }}
-                    onMouseEnter={(e) => {
-                      if (sortBy !== 'created_at') e.currentTarget.style.backgroundColor = '#f5f5f5';
-                    }}
-                    onMouseLeave={(e) => {
-                      if (sortBy !== 'created_at') e.currentTarget.style.backgroundColor = 'white';
-                    }}
-                  >
-                    Created Date
-                  </button>
-                </div>
-              )}
-            </div>
-            <div style={{ position: 'relative' }} data-items-per-page-dropdown>
-              <button
-                type="button"
-                className="action-button with-label show-rows-button"
-                onClick={() => setShowItemsPerPageDropdown(!showItemsPerPageDropdown)}
-              >
-                <FaChevronDown size={12} />
-                <span className="btn-label">Show rows: {itemsPerPage === 'all' ? 'All' : itemsPerPage}</span>
-              </button>
-              {showItemsPerPageDropdown && (
-                <div
-                  style={{
-                    position: 'absolute',
-                    top: '100%',
-                    left: 0,
-                    marginTop: '4px',
-                    backgroundColor: 'white',
-                    border: '1px solid #ddd',
-                    borderRadius: '8px',
-                    boxShadow: '0 2px 8px rgba(0,0,0,0.15)',
-                    zIndex: 1000,
-                    minWidth: '240px',
-                    padding: '8px'
-                  }}
-                >
-                  <button
-                    type="button"
-                    onClick={() => handleItemsPerPageChange(10)}
-                    style={{
-                      width: '100%',
-                      padding: '8px 12px',
-                      textAlign: 'left',
-                      border: 'none',
-                      backgroundColor: itemsPerPage === 10 ? '#f0f0f0' : 'white',
-                      color: '#000',
-                      cursor: 'pointer',
-                      fontSize: '14px',
-                      borderRadius: '4px'
-                    }}
-                    onMouseEnter={(e) => {
-                      if (itemsPerPage !== 10) e.currentTarget.style.backgroundColor = '#f5f5f5';
-                    }}
-                    onMouseLeave={(e) => {
-                      if (itemsPerPage !== 10) e.currentTarget.style.backgroundColor = 'white';
-                    }}
-                  >
-                    10
-                  </button>
-                  <button
-                    type="button"
-                    onClick={() => handleItemsPerPageChange(20)}
-                    style={{
-                      width: '100%',
-                      padding: '8px 12px',
-                      textAlign: 'left',
-                      border: 'none',
-                      backgroundColor: itemsPerPage === 20 ? '#f0f0f0' : 'white',
-                      color: '#000',
-                      cursor: 'pointer',
-                      fontSize: '14px',
-                      borderRadius: '4px',
-                      borderTop: '1px solid #eee'
-                    }}
-                    onMouseEnter={(e) => {
-                      if (itemsPerPage !== 20) e.currentTarget.style.backgroundColor = '#f5f5f5';
-                    }}
-                    onMouseLeave={(e) => {
-                      if (itemsPerPage !== 20) e.currentTarget.style.backgroundColor = 'white';
-                    }}
-                  >
-                    20
-                  </button>
-                  <button
-                    type="button"
-                    onClick={() => handleItemsPerPageChange(30)}
-                    style={{
-                      width: '100%',
-                      padding: '8px 12px',
-                      textAlign: 'left',
-                      border: 'none',
-                      backgroundColor: itemsPerPage === 30 ? '#f0f0f0' : 'white',
-                      color: '#000',
-                      cursor: 'pointer',
-                      fontSize: '14px',
-                      borderRadius: '4px',
-                      borderTop: '1px solid #eee'
-                    }}
-                    onMouseEnter={(e) => {
-                      if (itemsPerPage !== 30) e.currentTarget.style.backgroundColor = '#f5f5f5';
-                    }}
-                    onMouseLeave={(e) => {
-                      if (itemsPerPage !== 30) e.currentTarget.style.backgroundColor = 'white';
-                    }}
-                  >
-                    30
-                  </button>
-                  <div style={{ borderTop: '1px solid #eee', marginTop: '4px', paddingTop: '8px' }}>
-                    <div style={{ display: 'flex', gap: '4px', marginBottom: '4px' }}>
-                      <div style={{ position: 'relative', flex: 1, display: 'flex', alignItems: 'center' }}>
-                        <input
-                          type="number"
-                          data-custom-input
-                          className="custom-number-input"
-                          value={customItemsPerPage}
-                          onChange={(e) => setCustomItemsPerPage(e.target.value)}
-                          placeholder="Custom Number"
-                          min="1"
-                          style={{
-                            width: '100%',
-                            padding: '6px 32px 6px 8px',
-                            border: '1px solid #0A3765',
-                            borderRadius: '4px',
-                            fontSize: '14px',
-                            backgroundColor: '#ffffff',
-                            color: '#333',
-                            outline: 'none'
-                          }}
-                          onFocus={(e) => {
-                            e.target.style.borderColor = '#0d4a7a';
-                            e.target.style.boxShadow = '0 0 0 2px rgba(10, 55, 101, 0.1)';
-                          }}
-                          onBlur={(e) => {
-                            e.target.style.borderColor = '#0A3765';
-                            e.target.style.boxShadow = 'none';
-                          }}
-                          onKeyDown={(e) => {
-                            if (e.key === 'Enter') {
-                              handleCustomItemsPerPage();
-                            }
-                          }}
-                        />
-                        <div style={{ position: 'absolute', right: '2px', display: 'flex', flexDirection: 'column', height: 'calc(100% - 4px)', gap: '0px', justifyContent: 'center', alignItems: 'center' }}>
-                          <button
-                            type="button"
-                            onClick={() => {
-                              const current = parseInt(customItemsPerPage) || 1;
-                              setCustomItemsPerPage(String(current + 1));
-                            }}
-                            style={{
-                              height: 'auto',
-                              background: 'transparent',
-                              border: 'none',
-                              color: '#0A3765',
-                              cursor: 'pointer',
-                              display: 'flex',
-                              alignItems: 'center',
-                              justifyContent: 'center',
-                              fontSize: '10px',
-                              fontWeight: 'bold',
-                              padding: '0',
-                              width: '16px',
-                              lineHeight: '1',
-                              transition: 'color 0.2s',
-                              borderRadius: '0',
-                              boxSizing: 'border-box'
-                            }}
-                            onMouseEnter={(e) => {
-                              e.currentTarget.style.color = '#0d4a7a';
-                            }}
-                            onMouseLeave={(e) => {
-                              e.currentTarget.style.color = '#0A3765';
-                            }}
-                          >
-                            ^
-                          </button>
-                          <button
-                            type="button"
-                            onClick={() => {
-                              const current = parseInt(customItemsPerPage) || 1;
-                              if (current > 1) {
-                                setCustomItemsPerPage(String(current - 1));
-                              }
-                            }}
-                            style={{
-                              height: 'auto',
-                              background: 'transparent',
-                              border: 'none',
-                              color: '#0A3765',
-                              cursor: 'pointer',
-                              display: 'flex',
-                              alignItems: 'center',
-                              justifyContent: 'center',
-                              fontSize: '10px',
-                              fontWeight: 'bold',
-                              padding: '0',
-                              width: '16px',
-                              lineHeight: '1',
-                              transition: 'color 0.2s',
-                              borderRadius: '0',
-                              boxSizing: 'border-box'
-                            }}
-                            onMouseEnter={(e) => {
-                              e.currentTarget.style.color = '#0d4a7a';
-                            }}
-                            onMouseLeave={(e) => {
-                              e.currentTarget.style.color = '#0A3765';
-                            }}
-                          >
-                            v
-                          </button>
-                        </div>
-                      </div>
-                      <button
-                        type="button"
-                        onClick={handleCustomItemsPerPage}
-                        style={{
-                          padding: '6px 12px',
-                          backgroundColor: '#0A3765',
-                          color: 'white',
-                          border: 'none',
-                          borderRadius: '4px',
-                          cursor: 'pointer',
-                          fontSize: '12px'
-                        }}
-                      >
-                        Apply
-                      </button>
-                    </div>
-                    <button
-                      type="button"
-                      onClick={() => handleItemsPerPageChange('all')}
-                      style={{
-                        width: '100%',
-                        padding: '8px 12px',
-                        textAlign: 'left',
-                        border: 'none',
-                        backgroundColor: itemsPerPage === 'all' ? '#f0f0f0' : 'white',
-                        color: '#000',
-                        cursor: 'pointer',
-                        fontSize: '14px',
-                        borderRadius: '4px',
-                        marginTop: '4px'
-                      }}
-                      onMouseEnter={(e) => {
-                        if (itemsPerPage !== 'all') e.currentTarget.style.backgroundColor = '#f5f5f5';
-                      }}
-                      onMouseLeave={(e) => {
-                        if (itemsPerPage !== 'all') e.currentTarget.style.backgroundColor = 'white';
-                      }}
-                    >
-                      Show All
-                    </button>
-                  </div>
-                </div>
-              )}
-            </div>
+                  Show All
+                </button>
+              </div>
+            )}
           </div>
+        </div>
 
-          <div className="input-group" style={{ marginBottom: 0, marginLeft: '16px' }}>
-            <select
-              value={selectedCollege}
-              onChange={(e) => setSelectedCollege(e.target.value)}
-              style={{
-                backgroundColor: 'white',
-                color: '#333',
-                padding: '8px 15px',
-                fontSize: '0.9rem',
-                borderRadius: '8px',
-                border: '1px solid #ccc',
-                width: '400px',
-                maxWidth: '400px'
-              }}
-            >
-              <option value="">All Colleges</option>
-              {colleges.map(college => (
-                <option key={college.college_id} value={college.college_id}>
-                  {college.college_name}
-                </option>
-              ))}
-            </select>
-          </div>
-
-          <div style={{ marginLeft: 'auto', display: 'flex', alignItems: 'center', gap: 8 }}>
-            <button
-              type="button"
-              className="action-button delete"
-              onClick={handleBulkDeleteSelected}
-              disabled={isBulkDeletingAccounts || selectedAccountIds.size === 0}
-              title={selectedAccountIds.size > 0 ? `Delete ${selectedAccountIds.size} selected` : 'Delete selected'}
-            >
-              <FaTrash />
-            </button>
-          </div>
+        <div className="cl-pagination">
+          <button
+            type="button"
+            className="cl-page-btn"
+            onClick={() => setCurrentPage(p => Math.max(1, p - 1))}
+            disabled={currentPage <= 1}
+          >←</button>
+          <span className="cl-page-info">{currentPage} / {totalPages}</span>
+          <button
+            type="button"
+            className="cl-page-btn"
+            onClick={() => setCurrentPage(p => Math.min(totalPages, p + 1))}
+            disabled={currentPage >= totalPages}
+          >→</button>
         </div>
       </div>
 
-      <div className="table-scroll-wrapper">
-        <div className="table-scroll-hint">
-          <FaChevronLeft /> Swipe or use buttons to scroll <FaChevronRight />
-        </div>
-        <button
-          type="button"
-          className="table-scroll-buttons scroll-left"
-          onClick={() => scrollTable('left')}
-          disabled={!canScrollLeft}
-          aria-label="Scroll left"
-        >
-          <FaChevronLeft />
-        </button>
-        <button
-          type="button"
-          className="table-scroll-buttons scroll-right"
-          onClick={() => scrollTable('right')}
-          disabled={!canScrollRight}
-          aria-label="Scroll right"
-        >
-          <FaChevronRight />
-        </button>
-        <div className="colleges-table-container" ref={tableContainerRef}>
-          <table className="accounts-table colleges-table">
-            <thead>
-              <tr>
-                <th>#</th>
-                <th>ID</th>
-                <th>Full Name</th>
-                <th>Email</th>
-                <th>Contact</th>
-                <th>Role/s</th>
-                <th>Employment Type</th>
-                <th>Status</th>
-                <th>Created</th>
-                <th>
-                  <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-                    <span>Actions</span>
-                    <input
-                      type="checkbox"
-                      checked={isAllSelected}
-                      onChange={toggleSelectAll}
-                      disabled={loading || filteredAccounts.length === 0}
-                      aria-label="Select all accounts"
-                      title="Select all"
-                      style={{ marginLeft: 'auto' }}
-                    />
-                  </div>
-                </th>
-              </tr>
-            </thead>
-            <tbody>
-              {loading ? (
-                <tr>
-                  <td colSpan={10} style={{ textAlign: "center", padding: "20px" }}>
-                    Loading users...
-                  </td>
-                </tr>
-              ) : filteredAccounts.length === 0 ? (
-                <tr>
-                  <td colSpan={10} style={{ textAlign: "center", padding: "20px" }}>
-                    No users found.
-                  </td>
-                </tr>
-              ) : (
-                paginatedAccounts.map((account, index) => {
-                  const accountRoles = getUserRoles(account.user_id);
-                  const isSelected = selectedAccountIds.has(account.user_id);
-
-                  return (
-                    <tr
-                      key={account.user_id}
-                      style={{
-                        backgroundColor: isSelected ? '#ffcccc' : 'transparent',
-                      }}
-                    >
-                      <td>{itemsPerPage === 'all' ? index + 1 : (currentPage - 1) * itemsPerPage + index + 1}</td>
-                      <td>{account.user_id}</td>
-                      <td>{account.last_name}, {account.first_name} {account.middle_name ?? ''}</td>
-                      <td>{account.email_address}</td>
-                      <td>{account.contact_number}</td>
-                      <td>
-                        {accountRoles.length > 0 ? (
-                          <pre style={{ whiteSpace: 'pre-wrap', margin: 0, fontSize: '0.85em' }}>
-                            {accountRoles
-                              .map(role => {
-                                const office = [role.college_id, role.department_id].filter(Boolean).join(' / ');
-                                return `${role.role_name}${office ? ` - ${office}` : ''}`;
-                              })
-                              .join('\n')}
-                          </pre>
-                        ) : '-'}
-                      </td>
-                      {/* ✅ NEW CELL */}
-                      <td>
-                        {account.employment_type ? (
-                          <span style={{
-                            padding: '3px 8px',
-                            borderRadius: '4px',
-                            fontSize: '0.85em',
-                            fontWeight: 500,
-                            backgroundColor: account.employment_type === 'full-time' ? '#e3f2fd' : '#fff3e0',
-                            color: account.employment_type === 'full-time' ? '#1976d2' : '#f57c00'
-                          }}>
-                            {account.employment_type === 'full-time' ? 'Full-time' : 'Part-time'}
-                          </span>
-                        ) : '-'}
-                      </td>
-                      <td style={{ color: account.status === 'Suspended' ? 'red' : 'green', fontWeight: 'bold' }}>
-                        {account.status}
-                      </td>
-                      <td>{new Date(account.created_at).toLocaleDateString()}</td>
-                      <td className="action-buttons" style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-                        <button
-                          type="button"
-                          className="action-button import"
-                          style={{ fontSize: '0.85em', padding: '5px 10px' }}
-                          onClick={() => {
-                            setSelectedUserId(account.user_id);
-                            setShowDetailsModal(true);
-                          }}
-                        >
-                          View
-                        </button>
-                        <input
-                          type="checkbox"
-                          checked={selectedAccountIds.has(account.user_id)}
-                          onChange={() => toggleSelectAccount(account.user_id)}
-                          aria-label={`Select account ${account.user_id}`}
-                          style={{ marginLeft: 'auto' }}
-                        />
-                      </td>
-                    </tr>
-                  );
-                })
-              )}
-            </tbody>
-          </table>
-        </div>
-      </div>
-
-      {/* User Details Modal */}
-      {showDetailsModal && selectedUserId !== null && (
-        <div className="modal-overlay">
-          <div className="user-details-modal fixed-modal">
-            <h3 className="modal-title">User Details</h3>
-
-            {(() => {
-              const account = accounts.find(a => a.user_id === selectedUserId);
-              if (!account) return null;
-
-              return (
-                <div className="account-summary-card horizontal-layout">
-                  <div className="account-column">
-                    <p><strong className="account-label">User ID:</strong> {account.user_id}</p>
-                    <p><strong className="account-label">Full Name:</strong> {account.last_name}, {account.first_name} {account.middle_name || ''}</p>
-                    <p><strong className="account-label">Email:</strong> {account.email_address}</p>
-                  </div>
-                  <div className="account-column">
-                    <p><strong className="account-label">Contact:</strong> {account.contact_number}</p>
-                    {/* ✅ NEW: Show employment type */}
-                    <p>
-                      <strong className="account-label">Employment:</strong>{' '}
-                      {account.employment_type ? (
-                        <span style={{
-                          padding: '2px 6px',
-                          borderRadius: '3px',
-                          fontSize: '0.9em',
-                          backgroundColor: account.employment_type === 'full-time' ? '#e3f2fd' : '#fff3e0',
-                          color: account.employment_type === 'full-time' ? '#1976d2' : '#f57c00'
-                        }}>
-                          {account.employment_type === 'full-time' ? 'Full-time' : 'Part-time'}
-                        </span>
-                      ) : 'Not specified'}
-                    </p>
-                    <p><strong className="account-label">Status:</strong>
-                      <span className={`account-status ${account.status === 'Suspended' ? 'suspended' : 'active'}`}>
-                        {account.status}
-                      </span>
-                    </p>
-                    <div className="account-actions">
-                      <button
-                        type="button"
-                        className="icon-button edit-button"
-                        onClick={() => {
-                          setNewAccount(account);
-                          setIsEditMode(true);
-                          setShowAccountModal(true);
-                        }}
-                        title="Edit Account"
-                      >
-                        <FaPen /> Edit Account
-                      </button>
-                      <button
-                        type="button"
-                        className="icon-button delete-button"
-                        onClick={() => handleDeleteAccount(account.user_id)}
-                        title="Delete Account"
-                      >
-                        <FaTrash /> Delete Account
-                      </button>
-                    </div>
-                  </div>
-                </div>
-              );
-            })()}
-
-            <h4 className="modal-subtitle">Assigned Roles</h4>
-            <table className="accounts-table user-roles-table">
+      {/* ── Accounts Table ── */}
+      <div className="cl-table-card">
+        <div className="cl-table-scroll-wrapper">
+          <div className="cl-table-container">
+            <table className="cl-table">
               <thead>
                 <tr>
-                  <th>Role</th>
-                  <th>Office</th>
-                  <th>Start</th>
-                  <th>End</th>
-                  <th>Created At</th>
+                  <th style={{ width: '52px' }}>#</th>
+                  <th>ID</th>
+                  <th>Full Name</th>
+                  <th>Email</th>
+                  <th>Contact</th>
+                  <th>Role/s</th>
+                  <th>Employment</th>
                   <th>Status</th>
-                  <th>Actions</th>
+                  <th>Created</th>
+                  <th style={{ width: '160px' }}>
+                    <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+                      <span>Actions</span>
+                      <input
+                        type="checkbox"
+                        checked={isAllSelected}
+                        onChange={toggleSelectAll}
+                        disabled={loading || filteredAccounts.length === 0}
+                        title="Select all"
+                        style={{ cursor: 'pointer' }}
+                      />
+                    </div>
+                  </th>
                 </tr>
               </thead>
               <tbody>
-                {userRoles
-                  .filter(r => r.user === selectedUserId)
-                  .map(role => (
-                    <tr key={role.user_role_id}>
-                      <td>{role.role_name || '-'}</td>
-                      <td>{[role.college_name, role.department_name].filter(Boolean).join(' / ') || '-'}</td>
-                      <td className="role-date start">{role.date_start?.split('T')[0] || '-'}</td>
-                      <td className="role-date end">{role.date_ended?.split('T')[0] || '-'}</td>
-                      <td>{role.created_at ? new Date(role.created_at).toLocaleString('en-US', {
-                        month: '2-digit',
-                        day: '2-digit',
-                        year: 'numeric',
-                        hour: 'numeric',
-                        minute: '2-digit',
-                        hour12: true,
-                      }) : '—'}</td>
-                      <td>
-                        <span className={`role-status ${role.status === 'Suspended' ? 'suspended' : 'active'}`}>
-                          {role.status || 'Active'}
-                        </span>
-                      </td>
-                      <td className="role-actions">
-                        <button className="icon-button edit-button" onClick={() => setEditingRole(role)} title="Edit Role">
-                          <FaPen /> Edit
-                        </button>
-                        <button
-                          className={`icon-button ${role.status === 'Suspended' ? 'reactivate-button' : 'delete-button'}`}
-                          onClick={() => toggleUserRoleStatus(role.user_role_id, role.status || 'Active')}
-                          title={role.status === 'Suspended' ? 'Activate Role' : 'Deactivate Role'}
-                        >
-                          {role.status === 'Suspended' ? (
-                            <>
-                              <FaLockOpen /> Activate
-                            </>
-                          ) : (
-                            <>
-                              <FaLock /> Deactivate
-                            </>
-                          )}
-                        </button>
-                        <button
-                          className="icon-button delete-button"
-                          onClick={() => handleDeleteRole(role.user_role_id)}
-                          title="Delete Role"
-                        >
-                          <FaTrash /> Delete
-                        </button>
-                      </td>
-                    </tr>
-                  ))}
+                {loading ? (
+                  <tr>
+                    <td colSpan={10} className="cl-table-empty">
+                      <div className="cl-spinner" /> Loading users…
+                    </td>
+                  </tr>
+                ) : filteredAccounts.length === 0 ? (
+                  <tr>
+                    <td colSpan={10} className="cl-table-empty">No users found.</td>
+                  </tr>
+                ) : (
+                  paginatedAccounts.map((account, index) => {
+                    const accountRoles = getUserRoles(account.user_id);
+                    const isSelected = selectedAccountIds.has(account.user_id);
+                    const rowNum = itemsPerPage === 'all' ? index + 1 : (currentPage - 1) * (itemsPerPage as number) + index + 1;
+
+                    return (
+                      <tr key={account.user_id} className={isSelected ? 'selected' : ''}>
+                        <td className="cl-td-num">{rowNum}</td>
+                        <td><span className="cl-id-badge">{account.user_id}</span></td>
+                        <td style={{ fontWeight: 500, color: 'var(--cl-text-primary)' }}>
+                          {account.last_name}, {account.first_name} {account.middle_name ?? ''}
+                        </td>
+                        <td>{account.email_address}</td>
+                        <td>{account.contact_number}</td>
+                        <td>
+                          {accountRoles.length > 0 ? (
+                            <div style={{ display: 'flex', flexDirection: 'column', gap: '3px' }}>
+                              {accountRoles.map(role => {
+                                const office = [role.college_id, role.department_id].filter(Boolean).join(' / ');
+                                return (
+                                  <span key={role.user_role_id} style={{ fontSize: '11.5px', color: 'var(--cl-text-secondary)' }}>
+                                    <span style={{ fontWeight: 600, color: 'var(--cl-brand-light)' }}>{role.role_name}</span>
+                                    {office && <span style={{ color: 'var(--cl-text-muted)' }}> – {office}</span>}
+                                  </span>
+                                );
+                              })}
+                            </div>
+                          ) : <span style={{ color: 'var(--cl-text-muted)' }}>—</span>}
+                        </td>
+                        <td>
+                          {account.employment_type ? (
+                            <span className="cl-room-type-badge" style={{ background: account.employment_type === 'full-time' ? '#EBF4FF' : '#FFF3E0', color: account.employment_type === 'full-time' ? '#1a5a8a' : '#F57C00' }}>
+                              {account.employment_type === 'full-time' ? 'Full-time' : 'Part-time'}
+                            </span>
+                          ) : <span style={{ color: 'var(--cl-text-muted)' }}>—</span>}
+                        </td>
+                        <td>
+                          <span className="cl-room-count-badge" style={{
+                            background: account.status === 'Suspended' ? 'var(--cl-danger-soft)' : 'var(--cl-success-soft)',
+                            color: account.status === 'Suspended' ? 'var(--cl-danger)' : 'var(--cl-success)',
+                            borderColor: account.status === 'Suspended' ? 'rgba(192,57,43,0.25)' : 'rgba(4,120,87,0.25)',
+                          }}>
+                            {account.status}
+                          </span>
+                        </td>
+                        <td style={{ fontFamily: 'var(--cl-mono)', fontSize: '12px' }}>
+                          {new Date(account.created_at).toLocaleDateString()}
+                        </td>
+                        <td>
+                          <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+                            <button
+                              type="button"
+                              className="cl-icon-btn view"
+                              onClick={() => { setSelectedUserId(account.user_id); setShowDetailsModal(true); }}
+                            >
+                              <FaEye style={{ fontSize: '10px' }} /> View
+                            </button>
+                            <input
+                              type="checkbox"
+                              checked={isSelected}
+                              onChange={() => toggleSelectAccount(account.user_id)}
+                              style={{ marginLeft: 'auto', cursor: 'pointer' }}
+                            />
+                          </div>
+                        </td>
+                      </tr>
+                    );
+                  })
+                )}
               </tbody>
             </table>
-
-            <div className="modal-footer">
-              <button className="modal-button cancel" onClick={() => setShowDetailsModal(false)}>Close</button>
-              <button className="modal-button save" onClick={() => { setNewRole({ user: selectedUserId }); setShowAddRoleModal(true); }}>Add Role</button>
-            </div>
           </div>
         </div>
-      )}
+      </div>
 
-      {/* Add/Edit Account Modal */}
-      {showAccountModal && (
-        <div className="modal-overlay">
-          <div className="modal" style={{ maxWidth: '700px', maxHeight: '90vh', overflowY: 'auto' }}>
-            <h4 style={{ textAlign: 'center' }}>{isEditMode ? 'Edit Account' : 'Add New Account'}</h4>
-            {['user_id', 'first_name', 'last_name', 'middle_name', 'email_address', 'contact_number'].map((field) => (
-              <div key={field} className="input-group">
-                <label htmlFor={field}>
-                  {field === 'user_id' ? 'USER ID (Employee ID)' : field.replace('_', ' ').toUpperCase()}
-                </label>
-                <input
-                  id={field}
-                  type={field === 'user_id' ? 'text' : 'text'}
-                  value={(newAccount as any)[field] ?? ''}
-                  onChange={(e) =>
-                    setNewAccount((prev) => {
-                      let newValue;
-                      if (field === 'user_id') {
-                        const val = e.target.value.trim();
-                        newValue = val === '' ? null : Number(val);
-                      } else {
-                        newValue = e.target.value;
-                      }
-
-                      return {
-                        ...prev,
-                        [field]: newValue,
-                      };
-                    })
-                  }
-                  disabled={isEditMode && field === 'user_id'}
-                />
+      {/* ════ USER DETAILS MODAL ════ */}
+      {showDetailsModal && selectedUserId !== null && (() => {
+        const account = accounts.find(a => a.user_id === selectedUserId);
+        if (!account) return null;
+        const accountRoles = userRoles.filter(r => r.user === selectedUserId);
+        return (
+          <div className="cl-modal-overlay" onClick={() => setShowDetailsModal(false)}>
+            <div className="cl-modal" onClick={e => e.stopPropagation()} style={{ maxWidth: '820px', maxHeight: '88vh', display: 'flex', flexDirection: 'column' }}>
+              <div className="cl-modal-header" style={{ maxWidth: '100%' }}>
+                <h3>User Details</h3>
+                <p>{account.last_name}, {account.first_name} {account.middle_name || ''} · ID {account.user_id}</p>
               </div>
-            ))}
 
-            <div className="input-group">
-              <label htmlFor="employment_type">EMPLOYMENT TYPE</label>
-              <select
-                id="employment_type"
-                value={newAccount.employment_type || ''}
-                onChange={(e) => setNewAccount(prev => ({
-                  ...prev,
-                  employment_type: e.target.value ? e.target.value as 'full-time' | 'part-time' : null
-                }))}
-                style={{
-                  padding: '8px',
-                  borderRadius: '4px',
-                  border: '1px solid #ccc',
-                  width: '100%'
-                }}
-              >
-                <option value="">Not Specified</option>
-                <option value="full-time">Full-time</option>
-                <option value="part-time">Part-time</option>
-              </select>
+              <div className="cl-modal-body" style={{ maxHeight: 'none', flex: 1, overflowY: 'auto' }}>
+                {/* Account Info Grid */}
+                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '14px', padding: '4px 0 16px', borderBottom: '1.5px solid var(--cl-surface-3)' }}>
+                  {[
+                    { label: 'User ID',    value: String(account.user_id) },
+                    { label: 'Email',      value: account.email_address },
+                    { label: 'Contact',    value: account.contact_number },
+                    { label: 'Status',     value: account.status, colored: true },
+                  ].map(item => (
+                    <div key={item.label}>
+                      <div style={{ fontSize: '11px', fontWeight: 600, color: 'var(--cl-text-muted)', marginBottom: '3px', textTransform: 'uppercase', letterSpacing: '0.5px' }}>{item.label}</div>
+                      {item.colored ? (
+                        <span className="cl-room-count-badge" style={{ background: account.status === 'Suspended' ? 'var(--cl-danger-soft)' : 'var(--cl-success-soft)', color: account.status === 'Suspended' ? 'var(--cl-danger)' : 'var(--cl-success)', borderColor: account.status === 'Suspended' ? 'rgba(192,57,43,0.25)' : 'rgba(4,120,87,0.25)' }}>
+                          {account.status}
+                        </span>
+                      ) : (
+                        <div style={{ fontSize: '13px', color: 'var(--cl-text-primary)', fontWeight: 500 }}>{item.value}</div>
+                      )}
+                    </div>
+                  ))}
+                  <div>
+                    <div style={{ fontSize: '11px', fontWeight: 600, color: 'var(--cl-text-muted)', marginBottom: '3px', textTransform: 'uppercase', letterSpacing: '0.5px' }}>Employment</div>
+                    {account.employment_type ? (
+                      <span className="cl-room-type-badge" style={{ background: account.employment_type === 'full-time' ? '#EBF4FF' : '#FFF3E0', color: account.employment_type === 'full-time' ? '#1a5a8a' : '#F57C00' }}>
+                        {account.employment_type === 'full-time' ? 'Full-time' : 'Part-time'}
+                      </span>
+                    ) : <span style={{ fontSize: '13px', color: 'var(--cl-text-muted)' }}>Not specified</span>}
+                  </div>
+                </div>
+
+                {/* Roles Table */}
+                <div style={{ marginTop: '16px' }}>
+                  <div style={{ fontSize: '12px', fontWeight: 700, color: 'var(--cl-text-secondary)', marginBottom: '10px', textTransform: 'uppercase', letterSpacing: '0.5px' }}>
+                    Assigned Roles ({accountRoles.length})
+                  </div>
+                  <div style={{ overflowX: 'auto' }}>
+                    <table className="cl-table" style={{ fontSize: '12.5px', margin: 0 }}>
+                      <thead>
+                        <tr>
+                          <th>Role</th>
+                          <th>Office</th>
+                          <th>Start</th>
+                          <th>End</th>
+                          <th>Created</th>
+                          <th>Status</th>
+                          <th style={{ width: '220px' }}>Actions</th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {accountRoles.length === 0 ? (
+                          <tr><td colSpan={7} className="cl-table-empty" style={{ padding: '24px' }}>No roles assigned.</td></tr>
+                        ) : accountRoles.map(role => (
+                          <tr key={role.user_role_id}>
+                            <td><span className="cl-id-badge" style={{ fontSize: '11px' }}>{role.role_name || '—'}</span></td>
+                            <td>{[role.college_name, role.department_name].filter(Boolean).join(' / ') || '—'}</td>
+                            <td style={{ fontFamily: 'var(--cl-mono)', fontSize: '11px' }}>{role.date_start?.split('T')[0] || '—'}</td>
+                            <td style={{ fontFamily: 'var(--cl-mono)', fontSize: '11px' }}>{role.date_ended?.split('T')[0] || '—'}</td>
+                            <td style={{ fontFamily: 'var(--cl-mono)', fontSize: '11px' }}>
+                              {role.created_at ? new Date(role.created_at).toLocaleDateString() : '—'}
+                            </td>
+                            <td>
+                              <span className="cl-room-count-badge" style={{ fontSize: '11px', background: role.status === 'Suspended' ? 'var(--cl-danger-soft)' : 'var(--cl-success-soft)', color: role.status === 'Suspended' ? 'var(--cl-danger)' : 'var(--cl-success)', borderColor: role.status === 'Suspended' ? 'rgba(192,57,43,0.25)' : 'rgba(4,120,87,0.25)' }}>
+                                {role.status || 'Active'}
+                              </span>
+                            </td>
+                            <td>
+                              <div style={{ display: 'flex', gap: '4px', flexWrap: 'wrap' }}>
+                                <button type="button" className="cl-icon-btn edit" onClick={() => setEditingRole(role)}>
+                                  <FaPen style={{ fontSize: '9px' }} /> Edit
+                                </button>
+                                <button
+                                  type="button"
+                                  className="cl-icon-btn"
+                                  style={role.status === 'Suspended'
+                                    ? { color: 'var(--cl-success)', border: '1.5px solid rgba(4,120,87,0.3)', background: 'var(--cl-success-soft)' }
+                                    : { color: 'var(--cl-warn)', border: '1.5px solid rgba(180,83,9,0.3)', background: 'var(--cl-warn-soft)' }}
+                                  onClick={() => toggleUserRoleStatus(role.user_role_id, role.status || 'Active')}
+                                >
+                                  {role.status === 'Suspended' ? <><FaLockOpen style={{ fontSize: '9px' }} /> Activate</> : <><FaLock style={{ fontSize: '9px' }} /> Suspend</>}
+                                </button>
+                                <button
+                                  type="button"
+                                  className="cl-icon-btn"
+                                  style={{ color: 'var(--cl-danger)', border: '1.5px solid rgba(192,57,43,0.25)' }}
+                                  onClick={() => handleDeleteRole(role.user_role_id)}
+                                >
+                                  <FaTrash style={{ fontSize: '9px' }} />
+                                </button>
+                              </div>
+                            </td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  </div>
+                </div>
+              </div>
+
+              <div className="cl-modal-footer">
+                <button
+                  type="button"
+                  className="cl-btn danger"
+                  onClick={() => handleDeleteAccount(account.user_id)}
+                >
+                  <FaTrash style={{ fontSize: '10px' }} /> Delete Account
+                </button>
+                <button
+                  type="button"
+                  className="cl-btn"
+                  onClick={() => { setNewAccount(account); setIsEditMode(true); setShowAccountModal(true); }}
+                >
+                  <FaPen style={{ fontSize: '10px' }} /> Edit Account
+                </button>
+                <button
+                  type="button"
+                  className="cl-btn"
+                  onClick={() => { setNewRole({ user: selectedUserId ?? undefined }); setShowAddRoleModal(true); }}
+                >
+                  <FaPlus style={{ fontSize: '10px' }} /> Add Role
+                </button>
+                <button type="button" className="cl-btn primary" onClick={() => setShowDetailsModal(false)}>
+                  Close
+                </button>
+              </div>
             </div>
+          </div>
+        );
+      })()}
 
-            {!isEditMode && (
-              <>
-                <div style={{ borderTop: '2px solid #ddd', marginTop: '20px', paddingTop: '20px' }}>
-                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '15px' }}>
-                    <h4 style={{ margin: 0 }}>Roles (Required)</h4>
-                    <button
-                      type="button"
-                      className="action-button add-new with-label"
-                      style={{ fontSize: '0.85em', padding: '5px 10px' }}
-                      onClick={addNewAccountRole}
-                    >
-                      <FaPlus /> Add Role
+      {/* ════ ADD / EDIT ACCOUNT MODAL ════ */}
+      {showAccountModal && (
+        <div className="cl-modal-overlay" style={{ zIndex: 10002 }} onClick={() => { setShowAccountModal(false); setIsEditMode(false); }}>
+          <div className="cl-modal" onClick={e => e.stopPropagation()} style={{ maxWidth: '600px', maxHeight: '90vh', display: 'flex', flexDirection: 'column' }}>
+            <div className="cl-modal-header" style={{ maxWidth: '100%' }}>
+              <h3>{isEditMode ? 'Edit Account' : 'Add New Account'}</h3>
+            </div>
+            <div className="cl-modal-body" style={{ maxHeight: 'none', flex: 1, overflowY: 'auto' }}>
+              {(['user_id', 'first_name', 'last_name', 'middle_name', 'email_address', 'contact_number'] as const).map(field => (
+                <div key={field} className="cl-field">
+                  <label>{field === 'user_id' ? 'User ID (Employee ID)' : field.replace(/_/g, ' ').replace(/\b\w/g, c => c.toUpperCase())}</label>
+                  <input
+                    className="cl-input"
+                    type="text"
+                    value={(newAccount as any)[field] ?? ''}
+                    disabled={isEditMode && field === 'user_id'}
+                    onChange={e => setNewAccount(prev => ({
+                      ...prev,
+                      [field]: field === 'user_id' ? (e.target.value === '' ? null : Number(e.target.value)) : e.target.value,
+                    }))}
+                  />
+                </div>
+              ))}
+
+              <div className="cl-field">
+                <label>Employment Type</label>
+                <select
+                  className="cl-input"
+                  value={newAccount.employment_type || ''}
+                  onChange={e => setNewAccount(prev => ({ ...prev, employment_type: e.target.value ? e.target.value as 'full-time' | 'part-time' : null }))}
+                >
+                  <option value="">Not Specified</option>
+                  <option value="full-time">Full-time</option>
+                  <option value="part-time">Part-time</option>
+                </select>
+              </div>
+
+              <div className="cl-field">
+                <label>Status</label>
+                <select className="cl-input" value={newAccount.status} onChange={e => setNewAccount(prev => ({ ...prev, status: e.target.value }))}>
+                  <option value="Active">Active</option>
+                  <option value="Suspended">Suspended</option>
+                </select>
+              </div>
+
+              {/* Roles section (add only) */}
+              {!isEditMode && (
+                <div style={{ borderTop: '1.5px solid var(--cl-surface-3)', marginTop: '8px', paddingTop: '16px' }}>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '12px' }}>
+                    <div style={{ fontSize: '12px', fontWeight: 700, color: 'var(--cl-text-secondary)', textTransform: 'uppercase', letterSpacing: '0.5px' }}>
+                      Roles (Required)
+                    </div>
+                    <button type="button" className="cl-btn" style={{ height: '28px', fontSize: '11.5px', padding: '0 10px' }} onClick={addNewAccountRole}>
+                      <FaPlus style={{ fontSize: '9px' }} /> Add Role
                     </button>
                   </div>
 
                   {newAccountRoles.map((role, index) => (
-                    <div key={index} style={{ border: '1px solid #ddd', padding: '15px', marginBottom: '15px', borderRadius: '5px', position: 'relative' }}>
+                    <div key={index} style={{ border: '1.5px solid var(--cl-border)', borderRadius: 'var(--cl-radius-md)', padding: '14px', marginBottom: '12px', position: 'relative', background: 'var(--cl-surface-2)' }}>
                       <button
                         type="button"
+                        className="cl-btn danger"
+                        style={{ position: 'absolute', top: '10px', right: '10px', height: '26px', padding: '0 8px', fontSize: '11px' }}
                         onClick={() => removeNewAccountRole(index)}
-                        style={{
-                          position: 'absolute',
-                          top: '10px',
-                          right: '10px',
-                          background: '#d9534f',
-                          color: 'white',
-                          border: 'none',
-                          borderRadius: '8px',
-                          width: '50px',
-                          height: '25px',
-                          cursor: 'pointer',
-                          display: 'flex',
-                          alignItems: 'center',
-                          justifyContent: 'center'
-                        }}
                       >
-                        <FaTimes />
+                        <FaTimes style={{ fontSize: '9px' }} />
                       </button>
 
-                      <div className="input-group">
+                      <div className="cl-field">
                         <label>Role</label>
                         <select
+                          className="cl-input"
                           value={role.role_id || ''}
-                          onChange={(e) => {
+                          onChange={e => {
                             const role_id = Number(e.target.value);
                             const allowed = getAllowedFields(role_id);
                             updateNewAccountRole(index, 'role_id', role_id);
@@ -2001,442 +1105,250 @@ export const UserManagement: React.FC<UserManagementProps> = ({ }) => {
                           }}
                         >
                           <option value="">Select Role</option>
-                          {roles.map(r => (
-                            <option key={r.role_id} value={r.role_id}>{r.role_name}</option>
-                          ))}
+                          {roles.map(r => <option key={r.role_id} value={r.role_id}>{r.role_name}</option>)}
                         </select>
                       </div>
 
                       {getAllowedFields(role.role_id).college && (
-                        <div className="input-group">
+                        <div className="cl-field">
                           <label>College</label>
-                          <select
-                            value={role.college_id || ''}
-                            onChange={(e) => updateNewAccountRole(index, 'college_id', e.target.value || null)}
-                          >
+                          <select className="cl-input" value={role.college_id || ''} onChange={e => updateNewAccountRole(index, 'college_id', e.target.value || null)}>
                             <option value="">None</option>
-                            {colleges.map(c => (
-                              <option key={c.college_id} value={c.college_id}>{c.college_name}</option>
-                            ))}
+                            {colleges.map(c => <option key={c.college_id} value={c.college_id}>{c.college_name}</option>)}
                           </select>
                         </div>
                       )}
 
                       {getAllowedFields(role.role_id).department && (
-                        <div className="input-group">
+                        <div className="cl-field">
                           <label>Department</label>
-                          <select
-                            value={role.department_id || ''}
-                            onChange={(e) => updateNewAccountRole(index, 'department_id', e.target.value || null)}
-                          >
+                          <select className="cl-input" value={role.department_id || ''} onChange={e => updateNewAccountRole(index, 'department_id', e.target.value || null)}>
                             <option value="">None</option>
-                            {departments.map(d => (
-                              <option key={d.department_id} value={d.department_id}>({d.department_id}) {d.department_name}</option>
-                            ))}
+                            {departments.map(d => <option key={d.department_id} value={d.department_id}>({d.department_id}) {d.department_name}</option>)}
                           </select>
                         </div>
                       )}
 
-                      <div className="input-group">
-                        <label>Start Date</label>
-                        <div className="date-input-wrapper">
-                          <FaCalendarAlt className="calendar-icon" />
-                          <input
-                            type="date"
-                            value={role.date_start || ''}
-                            onChange={(e) => updateNewAccountRole(index, 'date_start', e.target.value || null)}
-                          />
+                      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px' }}>
+                        <div className="cl-field">
+                          <label>Start Date</label>
+                          <input type="date" className="cl-input" value={role.date_start || ''} onChange={e => updateNewAccountRole(index, 'date_start', e.target.value || null)} />
                         </div>
-                      </div>
-
-                      <div className="input-group">
-                        <label>End Date</label>
-                        <div className="date-input-wrapper">
-                          <FaCalendarAlt className="calendar-icon" />
-                          <input
-                            type="date"
-                            value={role.date_ended || ''}
-                            onChange={(e) => updateNewAccountRole(index, 'date_ended', e.target.value || null)}
-                          />
+                        <div className="cl-field">
+                          <label>End Date</label>
+                          <input type="date" className="cl-input" value={role.date_ended || ''} onChange={e => updateNewAccountRole(index, 'date_ended', e.target.value || null)} />
                         </div>
                       </div>
                     </div>
                   ))}
+
+                  <p style={{ fontSize: '11.5px', color: 'var(--cl-text-muted)', marginTop: '8px', fontFamily: 'var(--cl-mono)' }}>
+                    Default password: <strong>{newAccount.last_name || 'LastName'}@{newAccount.user_id || 'ID'}</strong>
+                  </p>
                 </div>
-
-                <p style={{ fontSize: '12px', color: '#666', marginTop: '10px' }}>
-                  Default password will be: <strong>{newAccount.last_name}@{newAccount.user_id}</strong>
-                </p>
-              </>
-            )}
-
-            <div className="modal-buttons">
-              <button type="button" className="modal-button save" onClick={handleSaveAccount}>Save</button>
-              <button type="button" className="modal-button cancel" onClick={() => setShowAccountModal(false)}>Cancel</button>
+              )}
+            </div>
+            <div className="cl-modal-footer">
+              <button type="button" className="cl-btn" onClick={() => { setShowAccountModal(false); setIsEditMode(false); }} disabled={isSaving}>Cancel</button>
+              <button type="button" className="cl-btn primary" onClick={handleSaveAccount} disabled={isSaving}>
+                {isSaving ? 'Saving…' : 'Save'}
+              </button>
             </div>
           </div>
         </div>
       )}
 
-      {/* Add Role Modal */}
+      {/* ════ ADD ROLE MODAL ════ */}
       {showAddRoleModal && (
-        <div className="modal-overlay">
-          <div className="modal" style={{ width: 600 }}>
-            <h3>Add New Role</h3>
-            <div className="input-group">
-              <label>Role</label>
-              <select
-                value={newRole.role_id ?? ''}
-                onChange={e => {
-                  const role_id = e.target.value ? Number(e.target.value) : undefined;
-                  const allowed = getAllowedFields(role_id);
-
-                  setNewRole(prev => ({
-                    ...prev,
-                    role_id,
-                    role: role_id,
-                    college_id: allowed.college ? prev.college_id : undefined,
-                    department_id: allowed.department ? prev.department_id : undefined,
-                  }));
-                }}
-              >
-                <option value="">Select Role</option>
-                {roles.map(role => (
-                  <option key={role.role_id} value={role.role_id}>{role.role_name}</option>
-                ))}
-              </select>
+        <div className="cl-modal-overlay" style={{ zIndex: 10003 }} onClick={() => { setShowAddRoleModal(false); setNewRole({}); }}>
+          <div className="cl-modal" onClick={e => e.stopPropagation()}>
+            <div className="cl-modal-header" style={{ maxWidth: '100%' }}>
+              <h3>Add New Role</h3>
             </div>
-            {getAllowedFields(newRole.role_id).college && (
-              <div className="input-group">
-                <label>College</label>
+            <div className="cl-modal-body">
+              <div className="cl-field">
+                <label>Role</label>
                 <select
-                  value={newRole.college_id || ''}
-                  onChange={e => setNewRole(prev => ({ ...prev, college_id: e.target.value || null }))}
+                  className="cl-input"
+                  value={newRole.role_id ?? ''}
+                  onChange={e => {
+                    const role_id = e.target.value ? Number(e.target.value) : undefined;
+                    const allowed = getAllowedFields(role_id);
+                    setNewRole(prev => ({ ...prev, role_id, role: role_id, college_id: allowed.college ? prev.college_id : undefined, department_id: allowed.department ? prev.department_id : undefined }));
+                  }}
                 >
-                  <option value="">None</option>
-                  {colleges.map(c => (
-                    <option key={c.college_id} value={c.college_id}>{c.college_name}</option>
-                  ))}
+                  <option value="">Select Role</option>
+                  {roles.map(r => <option key={r.role_id} value={r.role_id}>{r.role_name}</option>)}
                 </select>
               </div>
-            )}
-            {getAllowedFields(newRole.role_id).department && (
-              <div className="input-group">
-                <label>Department</label>
-                <select
-                  value={newRole.department_id || ''}
-                  onChange={e => setNewRole(prev => ({ ...prev, department_id: e.target.value || null }))}
-                >
-                  <option value="">None</option>
-                  {departments.map(d => (
-                    <option key={d.department_id} value={d.department_id}>({d.department_id}) {d.department_name}</option>
-                  ))}
-                </select>
-              </div>
-            )}
-            <div className="input-group">
-              <label>Start Date</label>
-              <div className="date-input-wrapper">
-                <FaCalendarAlt className="calendar-icon" />
-                <input
-                  type="date"
-                  value={newRole.date_start?.split('T')[0] || ''}
-                  onChange={e => setNewRole(prev => ({ ...prev, date_start: e.target.value }))}
-                />
-              </div>
-            </div>
-            <div className="input-group">
-              <label>End Date</label>
-              <div className="date-input-wrapper">
-                <FaCalendarAlt className="calendar-icon" />
-                <input
-                  type="date"
-                  value={newRole.date_ended?.split('T')[0] || ''}
-                  onChange={e => setNewRole(prev => ({ ...prev, date_ended: e.target.value }))}
-                />
+              {getAllowedFields(newRole.role_id).college && (
+                <div className="cl-field">
+                  <label>College</label>
+                  <select className="cl-input" value={newRole.college_id || ''} onChange={e => setNewRole(prev => ({ ...prev, college_id: e.target.value || null }))}>
+                    <option value="">None</option>
+                    {colleges.map(c => <option key={c.college_id} value={c.college_id}>{c.college_name}</option>)}
+                  </select>
+                </div>
+              )}
+              {getAllowedFields(newRole.role_id).department && (
+                <div className="cl-field">
+                  <label>Department</label>
+                  <select className="cl-input" value={newRole.department_id || ''} onChange={e => setNewRole(prev => ({ ...prev, department_id: e.target.value || null }))}>
+                    <option value="">None</option>
+                    {departments.map(d => <option key={d.department_id} value={d.department_id}>({d.department_id}) {d.department_name}</option>)}
+                  </select>
+                </div>
+              )}
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px' }}>
+                <div className="cl-field">
+                  <label>Start Date</label>
+                  <input type="date" className="cl-input" value={newRole.date_start?.split('T')[0] || ''} onChange={e => setNewRole(prev => ({ ...prev, date_start: e.target.value }))} />
+                </div>
+                <div className="cl-field">
+                  <label>End Date</label>
+                  <input type="date" className="cl-input" value={newRole.date_ended?.split('T')[0] || ''} onChange={e => setNewRole(prev => ({ ...prev, date_ended: e.target.value }))} />
+                </div>
               </div>
             </div>
-            <div className="modal-actions">
-              <button className="modal-button save" onClick={handleAddRole}>Save</button>
-              <button className="modal-button cancel" onClick={() => setShowAddRoleModal(false)}>Cancel</button>
+            <div className="cl-modal-footer">
+              <button type="button" className="cl-btn" onClick={() => { setShowAddRoleModal(false); setNewRole({}); }}>Cancel</button>
+              <button type="button" className="cl-btn primary" onClick={handleAddRole}>Save</button>
             </div>
           </div>
         </div>
       )}
 
-      {/* Edit Role Modal */}
+      {/* ════ EDIT ROLE MODAL ════ */}
       {editingRole && (
-        <div className="modal-overlay">
-          <div className="modal" style={{ width: 600 }}>
-            <h3>Edit Role</h3>
-            <div className="input-group">
-              <label>Role</label>
-              <select
-                value={editingRole?.role ?? ''}
-                onChange={e => {
-                  const role_id = e.target.value ? Number(e.target.value) : undefined;
-                  const allowed = getAllowedFields(role_id);
-
-                  setEditingRole(prev => prev && ({
-                    ...prev,
-                    role: role_id!,
-                    role_id,
-                    college_id: allowed.college ? prev.college_id : undefined,
-                    department_id: allowed.department ? prev.department_id : undefined,
-                  }));
-                }}
-              >
-                <option value="">Select Role</option>
-                {roles.map(role => (
-                  <option key={role.role_id} value={role.role_id}>{role.role_name}</option>
-                ))}
-              </select>
+        <div className="cl-modal-overlay" style={{ zIndex: 10003 }} onClick={() => setEditingRole(null)}>
+          <div className="cl-modal" onClick={e => e.stopPropagation()}>
+            <div className="cl-modal-header" style={{ maxWidth: '100%' }}>
+              <h3>Edit Role</h3>
             </div>
-            {getAllowedFields(editingRole?.role).college && (
-              <div className="input-group">
-                <label>College</label>
+            <div className="cl-modal-body">
+              <div className="cl-field">
+                <label>Role</label>
                 <select
-                  value={editingRole?.college_id || ''}
-                  onChange={e => setEditingRole(prev => prev && { ...prev, college_id: e.target.value || null })}
+                  className="cl-input"
+                  value={editingRole.role ?? ''}
+                  onChange={e => {
+                    const role_id = e.target.value ? Number(e.target.value) : undefined;
+                    const allowed = getAllowedFields(role_id);
+                    setEditingRole(prev => prev && ({ ...prev, role: role_id!, role_id, college_id: allowed.college ? prev.college_id : undefined, department_id: allowed.department ? prev.department_id : undefined }));
+                  }}
                 >
-                  <option value="">None</option>
-                  {colleges.map(c => (
-                    <option key={c.college_id} value={c.college_id}>{c.college_name}</option>
-                  ))}
+                  <option value="">Select Role</option>
+                  {roles.map(r => <option key={r.role_id} value={r.role_id}>{r.role_name}</option>)}
                 </select>
               </div>
-            )}
-            {getAllowedFields(editingRole?.role).department && (
-              <div className="input-group">
-                <label>Department</label>
-                <select
-                  value={editingRole?.department_id || ''}
-                  onChange={e => setEditingRole(prev => prev && { ...prev, department_id: e.target.value || null })}
-                >
-                  <option value="">None</option>
-                  {departments.map(d => (
-                    <option key={d.department_id} value={d.department_id}>{d.department_name}</option>
-                  ))}
-                </select>
-              </div>
-            )}
-            <div className="input-group">
-              <label>Start Date</label>
-              <div className="date-input-wrapper">
-                <FaCalendarAlt className="calendar-icon" />
-                <input
-                  type="date"
-                  value={editingRole.date_start?.split('T')[0] || ''}
-                  onChange={e => setEditingRole(prev => prev && { ...prev, date_start: e.target.value })}
-                />
-              </div>
-            </div>
-            <div className="input-group">
-              <label>End Date</label>
-              <div className="date-input-wrapper">
-                <FaCalendarAlt className="calendar-icon" />
-                <input
-                  type="date"
-                  value={editingRole.date_ended?.split('T')[0] || ''}
-                  onChange={e => setEditingRole(prev => prev && { ...prev, date_ended: e.target.value })}
-                />
+              {getAllowedFields(editingRole.role).college && (
+                <div className="cl-field">
+                  <label>College</label>
+                  <select className="cl-input" value={editingRole.college_id || ''} onChange={e => setEditingRole(prev => prev && { ...prev, college_id: e.target.value || null })}>
+                    <option value="">None</option>
+                    {colleges.map(c => <option key={c.college_id} value={c.college_id}>{c.college_name}</option>)}
+                  </select>
+                </div>
+              )}
+              {getAllowedFields(editingRole.role).department && (
+                <div className="cl-field">
+                  <label>Department</label>
+                  <select className="cl-input" value={editingRole.department_id || ''} onChange={e => setEditingRole(prev => prev && { ...prev, department_id: e.target.value || null })}>
+                    <option value="">None</option>
+                    {departments.map(d => <option key={d.department_id} value={d.department_id}>{d.department_name}</option>)}
+                  </select>
+                </div>
+              )}
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px' }}>
+                <div className="cl-field">
+                  <label>Start Date</label>
+                  <input type="date" className="cl-input" value={editingRole.date_start?.split('T')[0] || ''} onChange={e => setEditingRole(prev => prev && { ...prev, date_start: e.target.value })} />
+                </div>
+                <div className="cl-field">
+                  <label>End Date</label>
+                  <input type="date" className="cl-input" value={editingRole.date_ended?.split('T')[0] || ''} onChange={e => setEditingRole(prev => prev && { ...prev, date_ended: e.target.value })} />
+                </div>
               </div>
             </div>
-            <div className="modal-actions">
-              <button className="modal-button save" onClick={handleUpdateRole}>Save</button>
-              <button className="modal-button cancel" onClick={() => setEditingRole(null)}>Cancel</button>
+            <div className="cl-modal-footer">
+              <button type="button" className="cl-btn" onClick={() => setEditingRole(null)}>Cancel</button>
+              <button type="button" className="cl-btn primary" onClick={handleUpdateRole}>Save</button>
             </div>
           </div>
         </div>
       )}
 
-      {/* Import Accounts Modal */}
+      {/* ════ IMPORT ACCOUNTS MODAL ════ */}
       {showImportAccountsModal && (
-        <div className="modal-overlay">
-          <div className="modal" style={{
-            background: "#fff",
-            padding: "25px",
-            borderRadius: "12px",
-            width: "420px",
-            maxWidth: "95%",
-            boxShadow: "0px 4px 20px rgba(0,0,0,0.15)",
-            display: "flex",
-            flexDirection: "column",
-          }}>
-            <h3 style={{ textAlign: "center", marginBottom: "20px", color: "#333" }}>
-              Import Accounts from Excel
-            </h3>
-
-            {/* Info Box */}
-            <div
-              style={{
-                backgroundColor: "#f1f3f5",
-                padding: "15px",
-                borderRadius: "8px",
-                marginTop: "20px",
-                fontSize: "13px",
-                lineHeight: "1.4",
-                color: "#333",
-              }}
-            >
-              <strong style={{ color: "#000" }}>Excel Format Requirements:</strong>
-              <ul style={{ marginTop: "10px", paddingLeft: "20px" }}>
-                <li><strong>roles:</strong> IDs separated by semicolons (e.g., "1;2;3")</li>
-                <li><strong>colleges:</strong> IDs separated by semicolons (e.g., "CITC;CAS")</li>
-                <li><strong>departments:</strong> IDs separated by semicolons (e.g., "DIT;DCIT;")</li>
-                <li><strong>date_starts/date_endeds:</strong> YYYY-MM-DD format, separated by semicolons</li>
-                <li>Blank colleges/departments allowed, but each role must have at least one</li>
-                <li>All role-related columns must have the same number of values</li>
-              </ul>
+        <div className="cl-modal-overlay" onClick={() => !importLoading && setShowImportAccountsModal(false)}>
+          <div className="cl-modal" onClick={e => e.stopPropagation()}>
+            <div className="cl-modal-header" style={{ maxWidth: '100%' }}>
+              <h3>Import Accounts</h3>
+              <p>Upload an .xlsx file using the template format.</p>
             </div>
-
-            {/* File Input */}
-            <div style={{ marginBottom: "15px" }}>
-              <label style={{ color: "#000", fontWeight: 600, display: "block", marginBottom: "6px" }}>
-                Upload Excel File
-              </label>
-              <input
-                type="file"
-                accept=".xlsx,.xls"
-                onChange={handleImportAccounts}
-                disabled={importLoading}
-                style={{
-                  width: "100%",
-                  padding: "8px",
-                  borderRadius: "6px",
-                  border: "1px solid #ccc",
-                  opacity: importLoading ? 0.5 : 1,
-                  cursor: importLoading ? 'not-allowed' : 'pointer'
-                }}
-              />
-            </div>
-
-            <p style={{ fontSize: "12px", color: "#444", marginBottom: "20px" }}>
-              Default password format: <strong>LastName@UserID</strong>
-            </p>
-
-            {/* Buttons */}
-            <div style={{
-              display: "flex",
-              justifyContent: "space-between",
-              marginTop: "10px",
-            }}>
-              <button
-                type="button"
-                className="modal-button download"
-                onClick={downloadAccountsTemplate}
-                style={{
-                  background: "#2d6cdf",
-                  color: "#fff",
-                  padding: "10px 15px",
-                  borderRadius: "8px",
-                  border: "none",
-                  display: "flex",
-                  alignItems: "center",
-                  gap: "6px",
-                  cursor: "pointer",
-                  fontWeight: 600,
-                }}
-              >
-                <FaDownload /> Download Template
+            <div className="cl-modal-body">
+              <p className="cl-import-hint">
+                Columns: <strong>user_id, first_name, last_name, middle_name, email_address, contact_number, status, roles, colleges, departments, date_starts, date_endeds</strong>. Separate multiple values with semicolons.
+              </p>
+              <input type="file" accept=".xlsx,.xls" onChange={handleImportAccounts} disabled={importLoading} className="cl-file-input" />
+              <p style={{ fontSize: '11.5px', color: 'var(--cl-text-muted)', marginTop: '6px', fontFamily: 'var(--cl-mono)' }}>
+                Default password format: <strong>LastName@UserID</strong>
+              </p>
+              <button type="button" className="cl-btn" onClick={downloadAccountsTemplate} disabled={importLoading} style={{ width: '100%', justifyContent: 'center', marginTop: '8px' }}>
+                <FaDownload style={{ fontSize: '11px' }} /> Download Template
               </button>
-
-              <button
-                type="button"
-                className="modal-button cancel"
-                onClick={() => setShowImportAccountsModal(false)}
-                style={{
-                  background: "#ddd",
-                  padding: "10px 15px",
-                  borderRadius: "8px",
-                  border: "none",
-                  cursor: "pointer",
-                  fontWeight: 600,
-                }}
-              >
-                Close
+            </div>
+            <div className="cl-modal-footer">
+              <button type="button" className="cl-btn primary" onClick={() => setShowImportAccountsModal(false)} disabled={importLoading}>
+                {importLoading ? 'Importing…' : 'Done'}
               </button>
             </div>
           </div>
         </div>
       )}
 
-      {/* Import Roles Modal */}
+      {/* ════ IMPORT ROLES MODAL ════ */}
       {showImportRolesModal && (
-        <div className="modal-overlay">
-          <div className="modal">
-            <h4 style={{ textAlign: 'center' }}>Import Roles from Excel</h4>
-            <div style={{ backgroundColor: '#f8f9fa', padding: '15px', borderRadius: '5px', marginBottom: '15px', fontSize: '13px' }}>
-              <div
-                style={{
-                  backgroundColor: "#f1f3f5",
-                  padding: "15px",
-                  borderRadius: "8px",
-                  marginBottom: "-50px",
-                  fontSize: "13px",
-                  lineHeight: "1.4",
-                  color: "#333",
-                }}
-              >
-                <strong style={{ color: "#000" }}>Excel Format Requirements:</strong>
-                <ul style={{ marginTop: "1px", paddingLeft: "20px" }}>
-                  <li><strong>user:</strong> User ID (number)</li>
-                  <li><strong>role:</strong> Role ID (number)</li>
-                  <li><strong>college:</strong> College ID (can be empty if department provided)</li>
-                  <li><strong>department:</strong> Department ID (can be empty if college provided)</li>
-                  <li>Each role must have at least one: college OR department (or both)</li>
-                </ul>
-              </div>
+        <div className="cl-modal-overlay" onClick={() => !importLoading && setShowImportRolesModal(false)}>
+          <div className="cl-modal" onClick={e => e.stopPropagation()}>
+            <div className="cl-modal-header" style={{ maxWidth: '100%' }}>
+              <h3>Import Roles</h3>
+              <p>Upload an .xlsx file using the template format.</p>
             </div>
-            <div className="input-group">
-              <label>Upload Excel File</label>
-              <input
-                type="file"
-                accept=".xlsx, .xls"
-                onChange={handleImportRoles}
-                disabled={importLoading}
-                style={{
-                  opacity: importLoading ? 0.5 : 1,
-                  cursor: importLoading ? 'not-allowed' : 'pointer'
-                }}
-              />
-            </div>
-            <div className="modal-buttons">
-              <button type="button" className="modal-button download" onClick={downloadRolesTemplate}>
-                <FaDownload /> Download Template
+            <div className="cl-modal-body">
+              <p className="cl-import-hint">
+                Columns: <strong>user, role, college, department, date_start, date_ended</strong>. Each role must have at least one of college or department.
+              </p>
+              <input type="file" accept=".xlsx,.xls" onChange={handleImportRoles} disabled={importLoading} className="cl-file-input" />
+              <button type="button" className="cl-btn" onClick={downloadRolesTemplate} disabled={importLoading} style={{ width: '100%', justifyContent: 'center', marginTop: '8px' }}>
+                <FaDownload style={{ fontSize: '11px' }} /> Download Template
               </button>
-              <button type="button" className="modal-button cancel" onClick={() => setShowImportRolesModal(false)}>Close</button>
+            </div>
+            <div className="cl-modal-footer">
+              <button type="button" className="cl-btn primary" onClick={() => setShowImportRolesModal(false)} disabled={importLoading}>
+                {importLoading ? 'Importing…' : 'Done'}
+              </button>
             </div>
           </div>
         </div>
       )}
 
-      {/* Delete Confirmation Modal */}
+      {/* ════ DELETE CONFIRM MODAL ════ */}
       {showDeleteConfirm && (
-        <div className="modal-overlay" onClick={() => setShowDeleteConfirm(false)}>
-          <div className="modal delete-confirm-modal" onClick={(e) => e.stopPropagation()}>
-            <h3>Are you sure to delete this Account?</h3>
-            <p className="delete-confirm-message">
-              {deleteCount === 1 
-                ? 'Delete this one account' 
-                : `Delete these ${deleteCount} accounts`}
-            </p>
-            <div className="modal-actions">
-              <button 
-                type="button" 
-                className="modal-button confirm-delete"
-                onClick={confirmDelete}
-                disabled={isBulkDeletingAccounts}
-              >
-                {isBulkDeletingAccounts ? 'Deleting...' : 'Delete'}
-              </button>
-              <button 
-                type="button" 
-                className="modal-button cancel-delete"
-                onClick={() => setShowDeleteConfirm(false)}
-                disabled={isBulkDeletingAccounts}
-              >
-                Cancel
+        <div className="cl-modal-overlay" onClick={() => setShowDeleteConfirm(false)}>
+          <div className="cl-modal" onClick={e => e.stopPropagation()} style={{ maxWidth: '380px' }}>
+            <div className="cl-modal-header" style={{ maxWidth: '100%' }}>
+              <h3>Confirm Deletion</h3>
+            </div>
+            <div className="cl-modal-body">
+              <p style={{ fontSize: '13.5px', color: 'var(--cl-text-secondary)', lineHeight: 1.7, margin: 0 }}>
+                You are about to delete <strong>{deleteCount}</strong> account{deleteCount !== 1 ? 's' : ''} and all their associated roles. This action cannot be undone.
+              </p>
+            </div>
+            <div className="cl-modal-footer">
+              <button type="button" className="cl-btn" onClick={() => setShowDeleteConfirm(false)} disabled={isBulkDeleting}>Cancel</button>
+              <button type="button" className="cl-btn danger-fill" onClick={confirmDelete} disabled={isBulkDeleting}>
+                {isBulkDeleting ? 'Deleting…' : 'Yes, Delete'}
               </button>
             </div>
           </div>
@@ -2444,36 +1356,14 @@ export const UserManagement: React.FC<UserManagementProps> = ({ }) => {
       )}
 
       <ToastContainer position="top-right" autoClose={3000} />
+
+      {/* Global import loading overlay */}
       {importLoading && (
-        <div style={{
-          position: 'fixed',
-          top: 0,
-          left: 0,
-          right: 0,
-          bottom: 0,
-          backgroundColor: 'rgba(0, 0, 0, 0.5)',
-          display: 'flex',
-          justifyContent: 'center',
-          alignItems: 'center',
-          zIndex: 9999
-        }}>
-          <div style={{
-            backgroundColor: 'white',
-            padding: '30px',
-            borderRadius: '10px',
-            textAlign: 'center'
-          }}>
-            <div style={{
-              border: '4px solid #f3f3f3',
-              borderTop: '4px solid #3498db',
-              borderRadius: '50%',
-              width: '50px',
-              height: '50px',
-              animation: 'spin 1s linear infinite',
-              margin: '0 auto 20px'
-            }}></div>
-            <p style={{ margin: 0, fontSize: '16px', fontWeight: 600 }}>Importing data...</p>
-            <p style={{ margin: '10px 0 0', fontSize: '14px', color: '#666' }}>Please wait, this may take a moment.</p>
+        <div style={{ position: 'fixed', inset: 0, background: 'rgba(9,44,76,0.45)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 99999, backdropFilter: 'blur(4px)' }}>
+          <div style={{ background: 'var(--cl-surface)', padding: '32px 40px', borderRadius: 'var(--cl-radius-xl)', textAlign: 'center', boxShadow: 'var(--cl-shadow-lg)', border: '1.5px solid var(--cl-border)' }}>
+            <div className="cl-spinner" style={{ margin: '0 auto 16px' }} />
+            <p style={{ margin: 0, fontSize: '15px', fontWeight: 700, color: 'var(--cl-text-primary)', fontFamily: 'var(--cl-font)' }}>Importing data…</p>
+            <p style={{ margin: '6px 0 0', fontSize: '12.5px', color: 'var(--cl-text-muted)', fontFamily: 'var(--cl-font)' }}>Please wait, this may take a moment.</p>
           </div>
         </div>
       )}

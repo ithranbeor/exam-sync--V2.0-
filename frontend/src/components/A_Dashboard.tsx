@@ -3,24 +3,21 @@ import React, { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { api } from '../lib/apiClient.ts';
 import {
-  FaHome, FaUsers, FaBuilding, FaBook, FaCalendarAlt,
+  FaHome, FaUsers, FaBuilding, FaCalendarAlt,
   FaUser, FaSignOutAlt, FaPenAlt, FaBars, FaTimes
 } from 'react-icons/fa';
-import { PiBuildingApartmentFill, PiBuildingsFill } from "react-icons/pi";
+import { PiBuildingsFill } from "react-icons/pi";
 import { FaBookAtlas, FaBookJournalWhills } from "react-icons/fa6";
 import '../styles/F_Dashboard.css';
-import { BiSolidBuildings } from "react-icons/bi";
 import { IoCalendarSharp } from "react-icons/io5";
 
 
 import Colleges from './A_Colleges.tsx';
-import Departments from './A_Departments.tsx';
-import Programs from './A_Programs.tsx';
+import Structure from './A_Structure.tsx';
 import Courses from './A_Courses.tsx';
 import SectionCourses from './A_SectionCourses.tsx';
 import Terms from './A_Terms.tsx';
-import Buildings from './A_Buildings.tsx';
-import Rooms from './A_Rooms.tsx';
+import BuildingsAndRooms from './A_BuildingsAndRooms.tsx';
 import ExamPeriod from './A_ExamPeriod.tsx';
 import UserManagement from './A_UserManagement.tsx';
 import Profile from './F_Profile.tsx';
@@ -32,14 +29,11 @@ const iconStyle = { className: 'icon', size: 25 };
 
 const adminSidebarItems = [
   { key: 'dashboard', label: 'Dashboard', icon: <FaHome {...iconStyle} /> },
-  { key: 'colleges', label: 'Colleges', icon: <PiBuildingApartmentFill  {...iconStyle} /> },
-  { key: 'departments', label: 'Departments', icon: <FaBuilding {...iconStyle} /> },
-  { key: 'programs', label: 'Programs', icon: <FaBook {...iconStyle} /> },
+  { key: 'structure', label: 'College Structure', icon: <FaBuilding {...iconStyle} /> },
   { key: 'courses', label: 'Courses', icon: <FaBookAtlas {...iconStyle} /> },
   { key: 'section-courses', label: 'Section Courses', icon: <FaBookJournalWhills {...iconStyle} /> },
   { key: 'terms', label: 'Terms', icon: <FaCalendarAlt {...iconStyle} /> },
-  { key: 'buildings', label: 'Buildings', icon: <PiBuildingsFill {...iconStyle} /> },
-  { key: 'rooms', label: 'Rooms', icon: <BiSolidBuildings {...iconStyle} /> },
+  { key: 'buildings-and-rooms', label: 'Buildings & Rooms', icon: <PiBuildingsFill {...iconStyle} /> },
   { key: 'exam-period', label: 'Exam Period', icon: <IoCalendarSharp {...iconStyle} /> },
   { key: 'set-Modality', label: 'Set Modality', icon: <FaPenAlt {...iconStyle} /> },
   { key: 'User Management', label: 'User Management', icon: <FaUsers {...iconStyle} /> },
@@ -117,7 +111,7 @@ const DashboardAdmin: React.FC = () => {
           }
           return nowMobile;
         });
-      }, 150); 
+      }, 150);
     };
 
     const initialMobile = window.innerWidth <= 1024;
@@ -128,7 +122,7 @@ const DashboardAdmin: React.FC = () => {
       clearTimeout(resizeTimer);
       window.removeEventListener('resize', handleResize);
     };
-  }, []); 
+  }, []);
 
   const handleLogout = () => {
     localStorage.removeItem('user');
@@ -163,13 +157,11 @@ const DashboardAdmin: React.FC = () => {
   const renderContent = () => {
     switch (activeMenu) {
       case 'colleges': return <Colleges />;
-      case 'departments': return <Departments />;
-      case 'programs': return <Programs user={user} />;
+      case 'structure': return <Structure />;
       case 'courses': return <Courses />;
       case 'section-courses': return <SectionCourses />;
       case 'terms': return <Terms />;
-      case 'buildings': return <Buildings />;
-      case 'rooms': return <Rooms />;
+      case 'buildings-and-rooms': return <BuildingsAndRooms />;
       case 'exam-period': return <ExamPeriod />;
       case 'User Management': return <UserManagement user={user} />;
       case 'set-Modality': return <BayanihanModality user={user} />;
@@ -283,7 +275,7 @@ const DashboardAdmin: React.FC = () => {
         <main className={`main-content ${isSidebarOpen ? 'sidebar-open' : 'sidebar-closed'}`}>
           <div className="content-header">
             <h1>
-              {['colleges', 'departments', 'programs', 'courses', 'section-courses', 'terms', 'buildings', 'rooms', 'exam-period'].includes(activeMenu)
+              {['colleges', 'departments-and-programs', 'courses', 'section-courses', 'terms', 'buildings-and-rooms', 'exam-period'].includes(activeMenu)
                 ? `Manage ${activeMenu.charAt(0).toUpperCase() + activeMenu.slice(1).replace(/-/g, ' ')}`
                 : activeMenu.charAt(0).toUpperCase() + activeMenu.slice(1).replace(/-/g, ' ')}
             </h1>

@@ -130,6 +130,70 @@ const Courses: React.FC = () => {
     };
   }, [courses, searchTerm, loading]);
 
+  const selectStyles = {
+    control: (b: any) => ({
+      ...b,
+      fontSize: '13px',
+      minHeight: '36px',
+      borderColor: 'var(--cl-border)',
+      borderRadius: '6px',
+      backgroundColor: '#fff',
+    }),
+
+    menu: (b: any) => ({
+      ...b,
+      backgroundColor: '#fff',
+    }),
+
+    menuList: (b: any) => ({
+      ...b,
+      backgroundColor: '#fff',
+    }),
+
+    option: (b: any, state: any) => ({
+      ...b,
+      color: '#0C1B2A',
+      backgroundColor: state.isFocused ? '#f1f5f9' : '#fff',
+    }),
+
+    input: (b: any) => ({
+      ...b,
+      color: '#0C1B2A',
+    }),
+
+    singleValue: (b: any) => ({
+      ...b,
+      color: '#0C1B2A',
+    }),
+
+    placeholder: (b: any) => ({
+      ...b,
+      color: '#6b7280',
+    }),
+
+    multiValueLabel: (b: any) => ({
+      ...b,
+      color: '#0C1B2A',
+    }),
+
+    multiValueRemove: (b: any) => ({
+      ...b,
+      color: '#0C1B2A',
+      ':hover': {
+        backgroundColor: '#e2e8f0',
+        color: '#000',
+      },
+    }),
+
+    clearIndicator: (b: any) => ({
+      ...b,
+      color: '#0C1B2A',
+      ':hover': {
+        color: '#000',
+      },
+    }),
+  };
+
   const scrollTable = (direction: 'left' | 'right') => {
     const container = tableContainerRef.current;
     if (!container) return;
@@ -575,764 +639,319 @@ const Courses: React.FC = () => {
   }, []);
 
   return (
-    <div className="colleges-container">
-      <div className="colleges-header">
-        <div className="search-bar" style={{ marginLeft: 'auto' }}>
-          <input
-            type="text"
-            placeholder="Search"
-            value={searchTerm}
-            onChange={(e) => setSearchTerm(e.target.value)}
-          />
-          <button type="button" className="search-button">
-            <FaSearch />
+    <div className="cl-page">
+
+      {/* ── Page Header ── */}
+      <div className="cl-page-header">
+        <div className="cl-page-header-left">
+          <div className="cl-page-icon">
+            <svg width="22" height="22" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.8}>
+              <path strokeLinecap="round" strokeLinejoin="round" d="M12 6.253v13m0-13C10.832 5.477 9.246 5 7.5 5S4.168 5.477 3 6.253v13C4.168 18.477 5.754 18 7.5 18s3.332.477 4.5 1.253m0-13C13.168 5.477 14.754 5 16.5 5c1.747 0 3.332.477 4.5 1.253v13C19.832 18.477 18.247 18 16.5 18c-1.746 0-3.332.477-4.5 1.253" />
+            </svg>
+          </div>
+          <div className="cl-page-title">
+            <h1>Courses</h1>
+            <p>{courses.length} course{courses.length !== 1 ? 's' : ''} · {filteredCourses.length} showing</p>
+          </div>
+        </div>
+
+        <div className="cl-page-actions">
+          <div className="cl-search-bar">
+            <FaSearch className="cl-search-icon" />
+            <input
+              type="text"
+              placeholder="Search courses…"
+              value={searchTerm}
+              onChange={e => setSearchTerm(e.target.value)}
+            />
+          </div>
+
+          <button
+            type="button"
+            className="cl-btn primary"
+            onClick={() => {
+              setNewCourse({ course_id: '', course_name: '', term_id: 0, user_ids: [], leaders: [] });
+              setEditMode(false);
+              setShowModal(true);
+            }}
+          >
+            <FaPlus style={{ fontSize: '11px' }} /> Add
+          </button>
+          <button type="button" className="cl-btn" onClick={() => setShowImport(true)}>
+            <FaFileImport style={{ fontSize: '11px' }} /> Import
+          </button>
+          <button
+            type="button"
+            className="cl-btn danger"
+            onClick={handleBulkDelete}
+            disabled={isBulkDeleting || selectedIds.size === 0}
+            title={selectedIds.size > 0 ? `Delete ${selectedIds.size} selected` : 'Select rows to delete'}
+          >
+            <FaTrash style={{ fontSize: '11px' }} />
+            {selectedIds.size > 0 && <span>({selectedIds.size})</span>}
           </button>
         </div>
       </div>
 
-      <div className="colleges-actions">
-        <div style={{ display: "flex", alignItems: "center", gap: 8, width: "100%" }}>
-          <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
-            <button
-              type="button"
-              className="action-button add-new with-label"
-              onClick={() => {
-                setNewCourse({
-                  course_id: "",
-                  course_name: "",
-                  term_id: 0,
-                  user_ids: [],
-                  leaders: [],
-                });
-                setEditMode(false);
-                setShowModal(true);
-              }}
-            >
-              <FaPlus /><span className="btn-label">Add</span>
+      {/* ── Toolbar ── */}
+      <div className="cl-toolbar">
+        <div className="cl-toolbar-left">
+
+          {/* Sort dropdown */}
+          <div style={{ position: 'relative' }} data-sort-dropdown>
+            <button type="button" className="cl-toolbar-btn" onClick={() => setShowSortDropdown(!showSortDropdown)}>
+              <FaSort style={{ fontSize: '11px' }} />
+              Sort{sortBy !== 'none' ? `: ${sortBy === 'course_id' ? 'Code' : sortBy === 'course_name' ? 'Name' : 'Term'}` : ''}
+              <FaChevronDown style={{ fontSize: '9px', marginLeft: '2px' }} />
             </button>
-            <button
-              type="button"
-              className="action-button import with-label"
-              onClick={() => setShowImport(true)}
-            >
-              <FaFileImport /><span className="btn-label">Import</span>
-            </button>
-            <div style={{ position: 'relative' }} data-sort-dropdown>
-              <button
-                type='button'
-                className="action-button with-label sort-by-button"
-                onClick={() => setShowSortDropdown(!showSortDropdown)}
-                title="Sort by"
-              >
-                <FaSort />
-                <span className="btn-label">Sort by</span>
-              </button>
-              {showSortDropdown && (
-                <div
-                  style={{
-                    position: 'absolute',
-                    top: '100%',
-                    left: 0,
-                    marginTop: '4px',
-                    backgroundColor: 'white',
-                    border: '1px solid #ddd',
-                    borderRadius: '8px',
-                    boxShadow: '0 2px 8px rgba(0,0,0,0.15)',
-                    zIndex: 1000,
-                    minWidth: '150px'
-                  }}
-                >
+            {showSortDropdown && (
+              <div className="cl-dropdown">
+                {[
+                  { value: 'none', label: 'None' },
+                  { value: 'course_id', label: 'Course Code' },
+                  { value: 'course_name', label: 'Course Name' },
+                  { value: 'term', label: 'Term' },
+                ].map(opt => (
                   <button
+                    key={opt.value}
                     type="button"
-                    onClick={() => {
-                      setSortBy('none');
-                      setShowSortDropdown(false);
-                    }}
-                    style={{
-                      width: '100%',
-                      padding: '8px 12px',
-                      textAlign: 'left',
-                      border: 'none',
-                      backgroundColor: sortBy === 'none' ? '#f0f0f0' : 'white',
-                      color: '#000',
-                      cursor: 'pointer',
-                      fontSize: '14px'
-                    }}
-                    onMouseEnter={(e) => {
-                      if (sortBy !== 'none') e.currentTarget.style.backgroundColor = '#f5f5f5';
-                    }}
-                    onMouseLeave={(e) => {
-                      if (sortBy !== 'none') e.currentTarget.style.backgroundColor = 'white';
-                    }}
+                    className={`cl-dropdown-item${sortBy === opt.value ? ' active' : ''}`}
+                    onClick={() => { setSortBy(opt.value); setShowSortDropdown(false); }}
                   >
-                    None
+                    {opt.label}
                   </button>
-                  <button
-                    type="button"
-                    onClick={() => {
-                      setSortBy('course_id');
-                      setShowSortDropdown(false);
-                    }}
-                    style={{
-                      width: '100%',
-                      padding: '8px 12px',
-                      textAlign: 'left',
-                      border: 'none',
-                      backgroundColor: sortBy === 'course_id' ? '#f0f0f0' : 'white',
-                      color: '#000',
-                      cursor: 'pointer',
-                      fontSize: '14px',
-                      borderTop: '1px solid #eee'
-                    }}
-                    onMouseEnter={(e) => {
-                      if (sortBy !== 'course_id') e.currentTarget.style.backgroundColor = '#f5f5f5';
-                    }}
-                    onMouseLeave={(e) => {
-                      if (sortBy !== 'course_id') e.currentTarget.style.backgroundColor = 'white';
-                    }}
-                  >
-                    Course Code
-                  </button>
-                  <button
-                    type="button"
-                    onClick={() => {
-                      setSortBy('course_name');
-                      setShowSortDropdown(false);
-                    }}
-                    style={{
-                      width: '100%',
-                      padding: '8px 12px',
-                      textAlign: 'left',
-                      border: 'none',
-                      backgroundColor: sortBy === 'course_name' ? '#f0f0f0' : 'white',
-                      color: '#000',
-                      cursor: 'pointer',
-                      fontSize: '14px',
-                      borderTop: '1px solid #eee'
-                    }}
-                    onMouseEnter={(e) => {
-                      if (sortBy !== 'course_name') e.currentTarget.style.backgroundColor = '#f5f5f5';
-                    }}
-                    onMouseLeave={(e) => {
-                      if (sortBy !== 'course_name') e.currentTarget.style.backgroundColor = 'white';
-                    }}
-                  >
-                    Course Name
-                  </button>
-                  <button
-                    type="button"
-                    onClick={() => {
-                      setSortBy('term');
-                      setShowSortDropdown(false);
-                    }}
-                    style={{
-                      width: '100%',
-                      padding: '8px 12px',
-                      textAlign: 'left',
-                      border: 'none',
-                      backgroundColor: sortBy === 'term' ? '#f0f0f0' : 'white',
-                      color: '#000',
-                      cursor: 'pointer',
-                      fontSize: '14px',
-                      borderTop: '1px solid #eee'
-                    }}
-                    onMouseEnter={(e) => {
-                      if (sortBy !== 'term') e.currentTarget.style.backgroundColor = '#f5f5f5';
-                    }}
-                    onMouseLeave={(e) => {
-                      if (sortBy !== 'term') e.currentTarget.style.backgroundColor = 'white';
-                    }}
-                  >
-                    Term
-                  </button>
-                </div>
-              )}
-            </div>
-            {/* removed left-side college popover - using right-side select like UserManagement */}
-            <div style={{ position: 'relative' }} data-items-per-page-dropdown>
-              <button
-                type="button"
-                className="action-button with-label show-rows-button"
-                onClick={() => setShowItemsPerPageDropdown(!showItemsPerPageDropdown)}
-              >
-                <FaChevronDown size={12} />
-                <span className="btn-label">Show rows: {itemsPerPage === 'all' ? 'All' : itemsPerPage}</span>
-              </button>
-              {showItemsPerPageDropdown && (
-                <div
-                  style={{
-                    position: 'absolute',
-                    top: '100%',
-                    left: 0,
-                    marginTop: '4px',
-                    backgroundColor: 'white',
-                    border: '1px solid #ddd',
-                    borderRadius: '8px',
-                    boxShadow: '0 2px 8px rgba(0,0,0,0.15)',
-                    zIndex: 1000,
-                    minWidth: '240px',
-                    padding: '8px'
-                  }}
-                >
-                  <button
-                    type="button"
-                    onClick={() => handleItemsPerPageChange(10)}
-                    style={{
-                      width: '100%',
-                      padding: '8px 12px',
-                      textAlign: 'left',
-                      border: 'none',
-                      backgroundColor: itemsPerPage === 10 ? '#f0f0f0' : 'white',
-                      color: '#000',
-                      cursor: 'pointer',
-                      fontSize: '14px',
-                      borderRadius: '4px'
-                    }}
-                    onMouseEnter={(e) => {
-                      if (itemsPerPage !== 10) e.currentTarget.style.backgroundColor = '#f5f5f5';
-                    }}
-                    onMouseLeave={(e) => {
-                      if (itemsPerPage !== 10) e.currentTarget.style.backgroundColor = 'white';
-                    }}
-                  >
-                    10
-                  </button>
-                  <button
-                    type="button"
-                    onClick={() => handleItemsPerPageChange(20)}
-                    style={{
-                      width: '100%',
-                      padding: '8px 12px',
-                      textAlign: 'left',
-                      border: 'none',
-                      backgroundColor: itemsPerPage === 20 ? '#f0f0f0' : 'white',
-                      color: '#000',
-                      cursor: 'pointer',
-                      fontSize: '14px',
-                      borderRadius: '4px',
-                      borderTop: '1px solid #eee'
-                    }}
-                    onMouseEnter={(e) => {
-                      if (itemsPerPage !== 20) e.currentTarget.style.backgroundColor = '#f5f5f5';
-                    }}
-                    onMouseLeave={(e) => {
-                      if (itemsPerPage !== 20) e.currentTarget.style.backgroundColor = 'white';
-                    }}
-                  >
-                    20
-                  </button>
-                  <button
-                    type="button"
-                    onClick={() => handleItemsPerPageChange(30)}
-                    style={{
-                      width: '100%',
-                      padding: '8px 12px',
-                      textAlign: 'left',
-                      border: 'none',
-                      backgroundColor: itemsPerPage === 30 ? '#f0f0f0' : 'white',
-                      color: '#000',
-                      cursor: 'pointer',
-                      fontSize: '14px',
-                      borderRadius: '4px',
-                      borderTop: '1px solid #eee'
-                    }}
-                    onMouseEnter={(e) => {
-                      if (itemsPerPage !== 30) e.currentTarget.style.backgroundColor = '#f5f5f5';
-                    }}
-                    onMouseLeave={(e) => {
-                      if (itemsPerPage !== 30) e.currentTarget.style.backgroundColor = 'white';
-                    }}
-                  >
-                    30
-                  </button>
-                  <div style={{ borderTop: '1px solid #eee', marginTop: '4px', paddingTop: '8px' }}>
-                    <div style={{ display: 'flex', gap: '4px', marginBottom: '4px' }}>
-                      <div style={{ position: 'relative', flex: 1, display: 'flex', alignItems: 'center' }}>
-                        <input
-                          type="number"
-                          data-custom-input
-                          className="custom-number-input"
-                          value={customItemsPerPage}
-                          onChange={(e) => setCustomItemsPerPage(e.target.value)}
-                          placeholder="Custom Number"
-                          min="1"
-                          style={{
-                            width: '100%',
-                            padding: '6px 32px 6px 8px',
-                            border: '1px solid #0A3765',
-                            borderRadius: '4px',
-                            fontSize: '14px',
-                            backgroundColor: '#ffffff',
-                            color: '#333',
-                            outline: 'none'
-                          }}
-                          onFocus={(e) => {
-                            e.target.style.borderColor = '#0d4a7a';
-                            e.target.style.boxShadow = '0 0 0 2px rgba(10, 55, 101, 0.1)';
-                          }}
-                          onBlur={(e) => {
-                            e.target.style.borderColor = '#0A3765';
-                            e.target.style.boxShadow = 'none';
-                          }}
-                          onKeyDown={(e) => {
-                            if (e.key === 'Enter') {
-                              handleCustomItemsPerPage();
-                            }
-                          }}
-                        />
-                        <div style={{ position: 'absolute', right: '2px', display: 'flex', flexDirection: 'column', height: 'calc(100% - 4px)', gap: '0px', justifyContent: 'center', alignItems: 'center' }}>
-                          <button
-                            type="button"
-                            onClick={() => {
-                              const current = parseInt(customItemsPerPage) || 1;
-                              setCustomItemsPerPage(String(current + 1));
-                            }}
-                            style={{
-                              height: 'auto',
-                              background: 'transparent',
-                              border: 'none',
-                              color: '#0A3765',
-                              cursor: 'pointer',
-                              display: 'flex',
-                              alignItems: 'center',
-                              justifyContent: 'center',
-                              fontSize: '10px',
-                              fontWeight: 'bold',
-                              padding: '0',
-                              width: '16px',
-                              lineHeight: '1',
-                              transition: 'color 0.2s',
-                              borderRadius: '0',
-                              boxSizing: 'border-box'
-                            }}
-                            onMouseEnter={(e) => {
-                              e.currentTarget.style.color = '#0d4a7a';
-                            }}
-                            onMouseLeave={(e) => {
-                              e.currentTarget.style.color = '#0A3765';
-                            }}
-                          >
-                            ^
-                          </button>
-                          <button
-                            type="button"
-                            onClick={() => {
-                              const current = parseInt(customItemsPerPage) || 1;
-                              if (current > 1) {
-                                setCustomItemsPerPage(String(current - 1));
-                              }
-                            }}
-                            style={{
-                              height: 'auto',
-                              background: 'transparent',
-                              border: 'none',
-                              color: '#0A3765',
-                              cursor: 'pointer',
-                              display: 'flex',
-                              alignItems: 'center',
-                              justifyContent: 'center',
-                              fontSize: '10px',
-                              fontWeight: 'bold',
-                              padding: '0',
-                              width: '16px',
-                              lineHeight: '1',
-                              transition: 'color 0.2s',
-                              borderRadius: '0',
-                              boxSizing: 'border-box'
-                            }}
-                            onMouseEnter={(e) => {
-                              e.currentTarget.style.color = '#0d4a7a';
-                            }}
-                            onMouseLeave={(e) => {
-                              e.currentTarget.style.color = '#0A3765';
-                            }}
-                          >
-                            v
-                          </button>
-                        </div>
-                      </div>
-                      <button
-                        type="button"
-                        onClick={handleCustomItemsPerPage}
-                        style={{
-                          padding: '6px 12px',
-                          backgroundColor: '#0A3765',
-                          color: 'white',
-                          border: 'none',
-                          borderRadius: '4px',
-                          cursor: 'pointer',
-                          fontSize: '12px'
-                        }}
-                      >
-                        Apply
-                      </button>
-                    </div>
-                    <button
-                      type="button"
-                      onClick={() => handleItemsPerPageChange('all')}
-                      style={{
-                        width: '100%',
-                        padding: '8px 12px',
-                        textAlign: 'left',
-                        border: 'none',
-                        backgroundColor: itemsPerPage === 'all' ? '#f0f0f0' : 'white',
-                        color: '#000',
-                        cursor: 'pointer',
-                        fontSize: '14px',
-                        borderRadius: '4px',
-                        marginTop: '4px'
-                      }}
-                      onMouseEnter={(e) => {
-                        if (itemsPerPage !== 'all') e.currentTarget.style.backgroundColor = '#f5f5f5';
-                      }}
-                      onMouseLeave={(e) => {
-                        if (itemsPerPage !== 'all') e.currentTarget.style.backgroundColor = 'white';
-                      }}
-                    >
-                      Show All
-                    </button>
-                  </div>
-                </div>
-              )}
-            </div>
-            <div className="input-group" style={{ marginBottom: 0, marginLeft: '8px' }}>
-              <select
-                value={selectedCollege}
-                onChange={(e) => setSelectedCollege(e.target.value)}
-                className="college-filter-select"
-              >
-                <option value="all">All Colleges</option>
-                {colleges.map((college) => (
-                  <option key={college.college_id} value={college.college_id}>
-                    {college.college_name}
-                  </option>
                 ))}
-              </select>
-            </div>
-          </div>
-          <div style={{ marginLeft: "auto", display: "flex", alignItems: "center", gap: 8 }}>
-            <button
-              type="button"
-              className="action-button delete"
-              onClick={handleBulkDelete}
-              disabled={isBulkDeleting || selectedIds.size === 0}
-              title={selectedIds.size > 0 ? `Delete ${selectedIds.size} selected` : "Delete selected"}
-            >
-              <FaTrash />
-            </button>
-          </div>
-        </div>
-      </div>
-
-      <div className="pagination-controls">
-        <button
-          type="button"
-          className="pagination-arrow-btn"
-          onClick={() => setCurrentPage((prev) => Math.max(1, prev - 1))}
-          disabled={currentPage <= 1 || totalItems === 0}
-        >
-          {"<"}
-        </button>
-        <span className="pagination-page-number">
-          {totalItems === 0 ? '0/0' : `${currentPage}/${totalPages}`}
-        </span>
-        <button
-          type="button"
-          className="pagination-arrow-btn"
-          onClick={() => setCurrentPage((prev) => Math.min(totalPages, prev + 1))}
-          disabled={currentPage >= totalPages || totalItems === 0}
-        >
-          {">"}
-        </button>
-      </div>
-
-      <div className="table-scroll-wrapper">
-        <div className="table-scroll-hint">
-          <FaChevronLeft /> Swipe or use buttons to scroll <FaChevronRight />
-        </div>
-        <button
-          type="button"
-          className="table-scroll-buttons scroll-left"
-          onClick={() => scrollTable('left')}
-          disabled={!canScrollLeft}
-          aria-label="Scroll left"
-        >
-          <FaChevronLeft />
-        </button>
-        <button
-          type="button"
-          className="table-scroll-buttons scroll-right"
-          onClick={() => scrollTable('right')}
-          disabled={!canScrollRight}
-          aria-label="Scroll right"
-        >
-          <FaChevronRight />
-        </button>
-        <div className="colleges-table-container" ref={tableContainerRef}>
-          <table className="colleges-table">
-            <thead>
-              <tr>
-                <th>#</th>
-                <th>Course Code</th>
-                <th>Course Name</th>
-                <th>Term</th>
-                <th>Instructors</th>
-                <th>
-                  <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
-                    <span>Actions</span>
-                    <input
-                      type="checkbox"
-                      checked={isAllSelected}
-                      onChange={toggleSelectAll}
-                      disabled={loading || courses.length === 0}
-                      aria-label="Select all"
-                      title="Select all"
-                      style={{ marginLeft: "auto" }}
-                    />
-                  </div>
-                </th>
-              </tr>
-            </thead>
-            <tbody>
-              {loading ? (
-                <tr>
-                  <td colSpan={6} style={{ textAlign: "center", padding: "20px" }}>
-                    Loading courses...
-                  </td>
-                </tr>
-              ) : filteredCourses.length === 0 ? (
-                <tr>
-                  <td colSpan={6} style={{ textAlign: "center", padding: "20px" }}>
-                    No courses found.
-                  </td>
-                </tr>
-              ) : (
-                paginatedCourses.map((c, i) => {
-                  const isSelected = selectedIds.has(c.course_id);
-                  return (
-                    <tr
-                      key={c.course_id}
-                      style={{
-                        backgroundColor: isSelected ? '#f8d7da' : 'transparent',
-                      }}
-                    >
-                      <td>{(currentPage - 1) * effectiveItemsPerPage + i + 1}</td>
-                      <td>{c.course_id}</td>
-                      <td>{c.course_name}</td>
-                      <td>{c.term_name}</td>
-                      <td>
-                        {c.user_ids
-                          ?.map((id) => {
-                            const u = users.find((usr) => usr.user_id === id);
-                            return u ? formatName(u) : "";
-                          })
-                          .join(", ")}
-                      </td>
-                      <td className="action-buttons" style={{ display: "flex", alignItems: "center", gap: 8 }}>
-                        <button type='button' className="icon-button edit-button" onClick={() => handleEdit(c)}>
-                          <FaEdit />Edit
-                        </button>
-                        <input
-                          type="checkbox"
-                          checked={selectedIds.has(c.course_id)}
-                          onChange={() => toggleSelect(c.course_id)}
-                          aria-label={`Select ${c.course_id}`}
-                          style={{ marginLeft: "auto" }}
-                        />
-                      </td>
-                    </tr>
-                  );
-                })
-              )}
-            </tbody>
-          </table>
-        </div>
-      </div>
-
-      {showModal && (
-        <div className="modal-overlay">
-          <div className="modal">
-            <h3 style={{ textAlign: "center" }}>
-              {editMode ? "Edit Course" : "Add Course"}
-            </h3>
-
-            <div className="input-group">
-              <label>Course Code</label>
-              <input
-                type="text"
-                value={newCourse.course_id}
-                disabled={false}  
-                onChange={(e) =>
-                  setNewCourse({ ...newCourse, course_id: e.target.value })
-                }
-              />
-            </div>
-
-            <div className="input-group">
-              <label>Course Code</label>
-              <input
-                type="text"
-                value={newCourse.course_id}
-                disabled={editMode}
-                onChange={(e) =>
-                  setNewCourse({ ...newCourse, course_id: e.target.value })
-                }
-              />
-            </div>
-
-            <div className="input-group">
-              <label>Course Name</label>
-              <input
-                type="text"
-                value={newCourse.course_name}
-                onChange={(e) =>
-                  setNewCourse({ ...newCourse, course_name: e.target.value })
-                }
-              />
-            </div>
-
-            <div className="input-group">
-              <label>Term</label>
-              <select
-                value={String(newCourse.term_id || "")}
-                onChange={(e) =>
-                  setNewCourse({
-                    ...newCourse,
-                    term_id: Number(e.target.value),
-                  })
-                }
-              >
-                <option value="">Select Term</option>
-                {terms.map((t) => (
-                  <option key={t.term_id} value={t.term_id}>
-                    {t.term_name} ({t.academic_year})
-                  </option>
-                ))}
-              </select>
-            </div>
-
-            <div className="input-group">
-              <label>Instructors</label>
-              <Select
-                isMulti
-                options={users.map((u) => ({
-                  value: u.user_id,
-                  label: formatName(u),
-                }))}
-                value={users
-                  .filter((u) => newCourse.user_ids.includes(u.user_id))
-                  .map((u) => ({
-                    value: u.user_id,
-                    label: formatName(u),
-                  }))}
-                onChange={(selected) => {
-                  const ids = selected.map((opt) => opt.value);
-                  setNewCourse({
-                    ...newCourse,
-                    user_ids: ids,
-                    leaders: newCourse.leaders.filter((l) => ids.includes(l)),
-                  });
-                }}
-              />
-            </div>
-
-            {newCourse.user_ids.length > 0 && (
-              <div className="input-group">
-                <label>Bayanihan Leaders</label>
-                <Select
-                  isMulti
-                  options={users
-                    .filter((u) => newCourse.user_ids.includes(u.user_id))
-                    .map((u) => ({
-                      value: u.user_id,
-                      label: formatName(u),
-                    }))}
-                  value={users
-                    .filter((u) => newCourse.leaders.includes(u.user_id))
-                    .map((u) => ({
-                      value: u.user_id,
-                      label: formatName(u),
-                    }))}
-                  onChange={(selected) =>
-                    setNewCourse({
-                      ...newCourse,
-                      leaders: selected.map((opt) => opt.value),
-                    })
-                  }
-                />
               </div>
             )}
-
-            <div className="modal-actions">
-              <button
-                type="button"
-                onClick={handleSubmit}
-                disabled={isSubmitting}
-              >
-                {isSubmitting ? "Saving..." : "Save"}
-              </button>
-              <button type="button" onClick={() => setShowModal(false)}>
-                Cancel
-              </button>
-            </div>
           </div>
-        </div>
-      )}
 
-      {showImport && (
-        <div className="modal-overlay">
-          <div className="modal">
-            <h3 style={{ textAlign: "center" }}>Import Courses</h3>
-            <p style={{ fontSize: '12px', color: '#666', marginBottom: '10px' }}>
-              Each course must belong to an existing term and have at least one instructor.
-            </p>
-
-            <input type="file" accept=".xlsx,.xls" onChange={handleImport} disabled={isImporting} />
-
-            <button
-              type="button"
-              className="modal-button download"
-              onClick={downloadTemplate}
-              disabled={isImporting}
-            >
-              <FaDownload style={{ marginRight: 5 }} /> Download Template
+          {/* Rows per page dropdown */}
+          <div style={{ position: 'relative' }} data-items-per-page-dropdown>
+            <button type="button" className="cl-toolbar-btn" onClick={() => setShowItemsPerPageDropdown(!showItemsPerPageDropdown)}>
+              <FaChevronDown style={{ fontSize: '9px' }} />
+              Rows: {itemsPerPage === 'all' ? 'All' : itemsPerPage}
             </button>
+            {showItemsPerPageDropdown && (
+              <div className="cl-dropdown" style={{ minWidth: '200px' }}>
+                {[10, 20, 30].map(n => (
+                  <button key={n} type="button" className={`cl-dropdown-item${itemsPerPage === n ? ' active' : ''}`} onClick={() => handleItemsPerPageChange(n)}>{n}</button>
+                ))}
+                <div className="cl-dropdown-divider" />
+                <div className="cl-dropdown-custom">
+                  <input type="number" className="cl-custom-input" value={customItemsPerPage} onChange={e => setCustomItemsPerPage(e.target.value)} placeholder="Custom…" min="1" onKeyDown={e => { if (e.key === 'Enter') handleCustomItemsPerPage(); }} />
+                  <button type="button" className="cl-btn primary" style={{ padding: '5px 10px', fontSize: '11px', height: 'auto' }} onClick={handleCustomItemsPerPage}>Apply</button>
+                </div>
+                <button type="button" className={`cl-dropdown-item${itemsPerPage === 'all' ? ' active' : ''}`} onClick={() => handleItemsPerPageChange('all')}>Show All</button>
+              </div>
+            )}
+          </div>
 
-            <div className="modal-actions">
-              <button type="button" onClick={() => setShowImport(false)} disabled={isImporting}>
-                {isImporting ? "Importing…" : "Close"}
+          {/* College filter */}
+          <select
+            value={selectedCollege}
+            onChange={e => setSelectedCollege(e.target.value)}
+            className="cl-toolbar-btn"
+            style={{ cursor: 'pointer', paddingRight: '8px' }}
+          >
+            <option value="all">All Colleges</option>
+            {colleges.map(c => (
+              <option key={c.college_id} value={c.college_id}>{c.college_name}</option>
+            ))}
+          </select>
+
+        </div>
+
+        {/* Pagination */}
+        <div className="cl-pagination">
+          <button type="button" className="cl-page-btn" onClick={() => setCurrentPage(p => Math.max(1, p - 1))} disabled={currentPage <= 1 || totalItems === 0}>
+            <FaChevronLeft style={{ fontSize: '10px' }} />
+          </button>
+          <span className="cl-page-info">{totalItems === 0 ? '0 / 0' : `${currentPage} / ${totalPages}`}</span>
+          <button type="button" className="cl-page-btn" onClick={() => setCurrentPage(p => Math.min(totalPages, p + 1))} disabled={currentPage >= totalPages || totalItems === 0}>
+            <FaChevronRight style={{ fontSize: '10px' }} />
+          </button>
+        </div>
+      </div>
+
+      {/* ── Table Card ── */}
+      <div className="cl-table-card">
+        <div className="cl-table-scroll-wrapper">
+          <button type="button" className="cl-scroll-btn left" onClick={() => scrollTable('left')} disabled={!canScrollLeft}><FaChevronLeft /></button>
+          <button type="button" className="cl-scroll-btn right" onClick={() => scrollTable('right')} disabled={!canScrollRight}><FaChevronRight /></button>
+
+          <div className="cl-table-container" ref={tableContainerRef}>
+            <table className="cl-table">
+              <thead>
+                <tr>
+                  <th style={{ width: '52px' }}>#</th>
+                  <th>Course Code</th>
+                  <th>Course Name</th>
+                  <th>Term</th>
+                  <th>Instructors</th>
+                  <th style={{ width: '120px' }}>
+                    <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+                      <span>Actions</span>
+                      <input type="checkbox" checked={isAllSelected} onChange={toggleSelectAll} disabled={loading || courses.length === 0} title="Select all" style={{ cursor: 'pointer' }} />
+                    </div>
+                  </th>
+                </tr>
+              </thead>
+              <tbody>
+                {loading ? (
+                  <tr><td colSpan={6} className="cl-table-empty"><div className="cl-spinner" />Loading courses…</td></tr>
+                ) : filteredCourses.length === 0 ? (
+                  <tr><td colSpan={6} className="cl-table-empty">No courses found.</td></tr>
+                ) : (
+                  paginatedCourses.map((c, i) => {
+                    const isSelected = selectedIds.has(c.course_id);
+                    return (
+                      <tr key={c.course_id} className={isSelected ? 'selected' : ''}>
+                        <td className="cl-td-num">{(currentPage - 1) * effectiveItemsPerPage + i + 1}</td>
+                        <td><span className="cl-id-badge">{c.course_id}</span></td>
+                        <td>{c.course_name}</td>
+                        <td>{c.term_name}</td>
+                        <td style={{ fontSize: '12px', color: 'var(--cl-text-muted)' }}>
+                          {c.user_ids?.map(id => {
+                            const u = users.find(usr => usr.user_id === id);
+                            return u ? formatName(u) : '';
+                          }).filter(Boolean).join(', ') || '—'}
+                        </td>
+                        <td>
+                          <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                            <button type="button" className="cl-icon-btn edit" onClick={() => handleEdit(c)}>
+                              <FaEdit style={{ fontSize: '11px' }} /> Edit
+                            </button>
+                            <input type="checkbox" checked={isSelected} onChange={() => toggleSelect(c.course_id)} aria-label={`Select ${c.course_id}`} style={{ marginLeft: 'auto', cursor: 'pointer' }} />
+                          </div>
+                        </td>
+                      </tr>
+                    );
+                  })
+                )}
+              </tbody>
+            </table>
+          </div>
+        </div>
+      </div>
+
+      {/* ════ ADD / EDIT MODAL ════ */}
+      {showModal && (
+        <div className="cl-modal-overlay" onClick={() => { setShowModal(false); setEditMode(false); }}>
+          <div className="cl-modal" onClick={e => e.stopPropagation()} style={{ maxWidth: '500px' }}>
+            <div className="cl-modal-header">
+              <h3>{editMode ? 'Edit Course' : 'Add Course'}</h3>
+            </div>
+            <div className="cl-modal-body">
+              <div className="cl-field">
+                <label>Course Code</label>
+                <input
+                  type="text"
+                  className="cl-input"
+                  value={newCourse.course_id}
+                  disabled={editMode}
+                  onChange={e => setNewCourse({ ...newCourse, course_id: e.target.value })}
+                  placeholder="e.g. IT112"
+                />
+              </div>
+              <div className="cl-field">
+                <label>Course Name</label>
+                <input
+                  type="text"
+                  className="cl-input"
+                  value={newCourse.course_name}
+                  onChange={e => setNewCourse({ ...newCourse, course_name: e.target.value })}
+                  placeholder="e.g. Computer Programming 1"
+                />
+              </div>
+              <div className="cl-field">
+                <label>Term</label>
+                <select
+                  className="cl-input"
+                  value={String(newCourse.term_id || '')}
+                  onChange={e => setNewCourse({ ...newCourse, term_id: Number(e.target.value) })}
+                >
+                  <option value="">Select Term</option>
+                  {terms.map(t => (
+                    <option key={t.term_id} value={t.term_id}>{t.term_name} ({t.academic_year})</option>
+                  ))}
+                </select>
+              </div>
+              <div className="cl-field">
+                <label>Instructors</label>
+                <Select
+                  isMulti
+                  options={users.map(u => ({ value: u.user_id, label: formatName(u) }))}
+                  value={users.filter(u => newCourse.user_ids.includes(u.user_id)).map(u => ({ value: u.user_id, label: formatName(u) }))}
+                  onChange={selected => {
+                    const ids = selected.map(opt => opt.value);
+                    setNewCourse({ ...newCourse, user_ids: ids, leaders: newCourse.leaders.filter(l => ids.includes(l)) });
+                  }}
+                  styles={selectStyles}
+                />
+              </div>
+              {newCourse.user_ids.length > 0 && (
+                <div className="cl-field">
+                  <label>Bayanihan Leaders</label>
+                  <Select
+                    isMulti
+                    options={users.filter(u => newCourse.user_ids.includes(u.user_id)).map(u => ({ value: u.user_id, label: formatName(u) }))}
+                    value={users.filter(u => newCourse.leaders.includes(u.user_id)).map(u => ({ value: u.user_id, label: formatName(u) }))}
+                    onChange={selected => setNewCourse({ ...newCourse, leaders: selected.map(opt => opt.value) })}
+                    styles={selectStyles}
+                  />
+                </div>
+              )}
+            </div>
+            <div className="cl-modal-footer">
+              <button type="button" className="cl-btn" onClick={() => { setShowModal(false); setEditMode(false); }}>Cancel</button>
+              <button type="button" className="cl-btn primary" onClick={handleSubmit} disabled={isSubmitting}>
+                {isSubmitting ? 'Saving…' : 'Save'}
               </button>
             </div>
           </div>
         </div>
       )}
 
-      {/* Delete Confirmation Modal */}
-      {showDeleteConfirm && (
-        <div className="modal-overlay" onClick={() => setShowDeleteConfirm(false)}>
-          <div className="modal delete-confirm-modal" onClick={(e) => e.stopPropagation()}>
-            <h3>Are you sure to delete this Course?</h3>
-            <p className="delete-confirm-message">
-              {deleteCount === 1 
-                ? 'Delete this one course' 
-                : `Delete these ${deleteCount} courses`}
-            </p>
-            <div className="modal-actions">
-              <button 
-                type="button" 
-                className="modal-button confirm-delete"
-                onClick={confirmDelete}
-                disabled={isBulkDeleting}
-              >
-                {isBulkDeleting ? 'Deleting...' : 'Delete'}
+      {/* ════ IMPORT MODAL ════ */}
+      {showImport && (
+        <div className="cl-modal-overlay" onClick={() => setShowImport(false)}>
+          <div className="cl-modal" onClick={e => e.stopPropagation()}>
+            <div className="cl-modal-header">
+              <h3>Import Courses</h3>
+              <p>Must belong to an existing term with at least one instructor.</p>
+            </div>
+            <div className="cl-modal-body">
+              <p className="cl-import-hint">Each course must have a unique Course ID.</p>
+              <input type="file" accept=".xlsx,.xls" onChange={handleImport} disabled={isImporting} className="cl-file-input" />
+              <button type="button" className="cl-btn" onClick={downloadTemplate} disabled={isImporting} style={{ width: '100%', justifyContent: 'center', marginTop: '8px' }}>
+                <FaDownload style={{ fontSize: '11px' }} /> Download Template
               </button>
-              <button 
-                type="button" 
-                className="modal-button cancel-delete"
-                onClick={() => setShowDeleteConfirm(false)}
-                disabled={isBulkDeleting}
-              >
-                Cancel
+            </div>
+            <div className="cl-modal-footer">
+              <button type="button" className="cl-btn primary" onClick={() => setShowImport(false)} disabled={isImporting}>
+                {isImporting ? 'Importing…' : 'Done'}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* ════ DELETE CONFIRM MODAL ════ */}
+      {showDeleteConfirm && (
+        <div className="cl-modal-overlay" onClick={() => setShowDeleteConfirm(false)}>
+          <div className="cl-modal" onClick={e => e.stopPropagation()} style={{ maxWidth: '380px' }}>
+            <div className="cl-modal-header">
+              <h3>Confirm Deletion</h3>
+            </div>
+            <div className="cl-modal-body">
+              <p style={{ fontSize: '13.5px', color: 'var(--cl-text-secondary)', lineHeight: 1.7, margin: 0 }}>
+                {deleteCount === 1 ? 'You are about to delete 1 course. This cannot be undone.' : `You are about to delete ${deleteCount} courses. This cannot be undone.`}
+              </p>
+            </div>
+            <div className="cl-modal-footer">
+              <button type="button" className="cl-btn" onClick={() => setShowDeleteConfirm(false)} disabled={isBulkDeleting}>Cancel</button>
+              <button type="button" className="cl-btn danger-fill" onClick={confirmDelete} disabled={isBulkDeleting}>
+                {isBulkDeleting ? 'Deleting…' : 'Yes, Delete'}
               </button>
             </div>
           </div>
