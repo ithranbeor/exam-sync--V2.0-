@@ -4,29 +4,29 @@
    CSS VARIABLES
 ══════════════════════════════════════════ */
 :root {
-  --navy:        #092C4C;
-  --navy-light:  #0e3d6b;
-  --navy-faint:  #f0f4f8;
-  --accent:      #f7b731;
+  --navy: #092C4C;
+  --navy-light: #0e3d6b;
+  --navy-faint: #f0f4f8;
+  --accent: #f7b731;
   --accent-dark: #e0a520;
-  --danger:      #dc2626;
-  --success:     #059669;
-  --text-dark:   #0f1923;
-  --text-mid:    #374151;
-  --text-soft:   #6b7280;
-  --text-muted:  #9ca3af;
-  --border:      #e0e4ea;
-  --bg:          #f4f6f9;
-  --white:       #ffffff;
-  --radius-sm:   8px;
-  --radius-md:   12px;
-  --radius-lg:   16px;
-  --radius-xl:   20px;
-  --shadow-sm:   0 2px 8px rgba(9,44,76,0.07);
-  --shadow-md:   0 4px 20px rgba(9,44,76,0.10);
-  --shadow-lg:   0 12px 40px rgba(9,44,76,0.15);
-  --font:        'DM Sans', sans-serif;
-  --font-mono:   'DM Mono', monospace;
+  --danger: #dc2626;
+  --success: #059669;
+  --text-dark: #0f1923;
+  --text-mid: #374151;
+  --text-soft: #6b7280;
+  --text-muted: #9ca3af;
+  --border: #e0e4ea;
+  --bg: #f4f6f9;
+  --white: #ffffff;
+  --radius-sm: 8px;
+  --radius-md: 12px;
+  --radius-lg: 16px;
+  --radius-xl: 20px;
+  --shadow-sm: 0 2px 8px rgba(9, 44, 76, 0.07);
+  --shadow-md: 0 4px 20px rgba(9, 44, 76, 0.10);
+  --shadow-lg: 0 12px 40px rgba(9, 44, 76, 0.15);
+  --font: 'DM Sans', sans-serif;
+  --font-mono: 'DM Mono', monospace;
 }
 
 /* ══════════════════════════════════════════
@@ -253,12 +253,46 @@
   color: white !important;
 }
 
+.react-select__option {
+  color: var(--text-dark) !important;
+  background: var(--white) !important;
+  padding: 10px 12px !important;
+  font-size: 13px !important;
+  font-family: var(--font) !important;
+  cursor: pointer !important;
+}
+
+.react-select__option:hover {
+  background: var(--navy-faint) !important;
+  color: var(--text-dark) !important;
+}
+
 .react-select__option--is-focused {
   background: var(--navy-faint) !important;
+  color: var(--text-dark) !important;
 }
 
 .react-select__option--is-selected {
   background: var(--navy) !important;
+  color: white !important;
+}
+
+.react-select__menu {
+  border: 1.5px solid var(--border) !important;
+  border-radius: var(--radius-sm) !important;
+  box-shadow: var(--shadow-md) !important;
+}
+
+.react-select__input {
+  color: var(--text-dark) !important;
+}
+
+.react-select__placeholder {
+  color: var(--text-muted) !important;
+}
+
+.react-select__value-container {
+  color: var(--text-dark) !important;
 }
 
 /* ══════════════════════════════════════════
@@ -281,8 +315,15 @@
 }
 
 @keyframes dp-drop {
-  from { opacity: 0; transform: translateY(-6px); }
-  to   { opacity: 1; transform: translateY(0); }
+  from {
+    opacity: 0;
+    transform: translateY(-6px);
+  }
+
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
 }
 
 .date-picker-header {
@@ -346,7 +387,7 @@
 
 .calendar-day.disabled {
   color: #0d3879;
-  
+
   pointer-events: none;
 }
 
@@ -369,7 +410,7 @@
   color: white !important;
   font-weight: 700;
   border-color: var(--navy) !important;
-  box-shadow: 0 2px 8px rgba(9,44,76,0.25);
+  box-shadow: 0 2px 8px rgba(9, 44, 76, 0.25);
 }
 
 .calendar-day.today {
@@ -425,13 +466,13 @@
   min-width: 130px;
   margin-top: 8px;
   letter-spacing: 0.3px;
-  box-shadow: 0 2px 10px rgba(9,44,76,0.20);
+  box-shadow: 0 2px 10px rgba(9, 44, 76, 0.20);
   transition: all 0.2s ease;
 }
 
 .submit-button:hover {
   background: var(--navy-light);
-  box-shadow: 0 4px 14px rgba(9,44,76,0.28);
+  box-shadow: 0 4px 14px rgba(9, 44, 76, 0.28);
   transform: translateY(-1px);
 }
 
@@ -460,13 +501,13 @@
   min-width: 130px;
   margin-top: 8px;
   letter-spacing: 0.3px;
-  box-shadow: 0 2px 10px rgba(9,44,76,0.20);
+  box-shadow: 0 2px 10px rgba(9, 44, 76, 0.20);
   transition: all 0.2s ease;
 }
 
 .submit-buttons:hover {
   background: var(--navy-light);
-  box-shadow: 0 4px 14px rgba(9,44,76,0.28);
+  box-shadow: 0 4px 14px rgba(9, 44, 76, 0.28);
   transform: translateY(-1px);
 }
 
@@ -577,8 +618,13 @@
 }
 
 @keyframes modal-fade {
-  from { opacity: 0; }
-  to   { opacity: 1; }
+  from {
+    opacity: 0;
+  }
+
+  to {
+    opacity: 1;
+  }
 }
 
 .availability-modal-box {
@@ -593,8 +639,15 @@
 }
 
 @keyframes modal-up {
-  from { opacity: 0; transform: translateY(18px); }
-  to   { opacity: 1; transform: translateY(0); }
+  from {
+    opacity: 0;
+    transform: translateY(18px);
+  }
+
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
 }
 
 .availability-modal-title {
@@ -707,7 +760,7 @@
   font-family: var(--font);
   cursor: pointer;
   transition: all 0.18s ease;
-  box-shadow: 0 2px 8px rgba(9,44,76,0.2);
+  box-shadow: 0 2px 8px rgba(9, 44, 76, 0.2);
 }
 
 .modal-btn-primary:hover {
@@ -731,11 +784,30 @@
 /* ══════════════════════════════════════════
    SCROLLBAR
 ══════════════════════════════════════════ */
-::-webkit-scrollbar           { width: 8px; height: 8px; }
-::-webkit-scrollbar-track     { background: #f0f4f8; border-radius: 8px; }
-::-webkit-scrollbar-thumb     { background: #c9d6e3; border-radius: 8px; border: 2px solid #f0f4f8; }
-::-webkit-scrollbar-thumb:hover { background: #8ea9c1; }
-* { scrollbar-width: thin; scrollbar-color: #c9d6e3 #f0f4f8; }
+::-webkit-scrollbar {
+  width: 8px;
+  height: 8px;
+}
+
+::-webkit-scrollbar-track {
+  background: #f0f4f8;
+  border-radius: 8px;
+}
+
+::-webkit-scrollbar-thumb {
+  background: #c9d6e3;
+  border-radius: 8px;
+  border: 2px solid #f0f4f8;
+}
+
+::-webkit-scrollbar-thumb:hover {
+  background: #8ea9c1;
+}
+
+* {
+  scrollbar-width: thin;
+  scrollbar-color: #c9d6e3 #f0f4f8;
+}
 
 /* ══════════════════════════════════════════
    RESPONSIVE — Single column tablet/mobile

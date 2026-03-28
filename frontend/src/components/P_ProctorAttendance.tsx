@@ -3,15 +3,16 @@ import { toast, ToastContainer } from 'react-toastify';
 import 'react-toastify/dist/ReactToastify.css';
 import api from '../lib/apiClient';
 import '../styles/P_ProctorAttendance.css';
-import { FaCheckCircle } from 'react-icons/fa';
+import {
+  FaCheckCircle, FaClock, FaHistory, FaClipboardCheck,
+  FaExchangeAlt, FaSearch, FaShieldAlt, FaTimes, FaKey,
+  FaCalendarAlt, FaUserTie, FaChalkboardTeacher,
+  FaDoorOpen, FaBuilding, FaExclamationTriangle,
+  FaChevronDown, FaChevronUp,
+} from 'react-icons/fa';
 
 interface UserProps {
-  user: {
-    user_id: number;
-    email: string;
-    first_name?: string;
-    last_name?: string;
-  } | null;
+  user: { user_id: number; email: string; first_name?: string; last_name?: string } | null;
 }
 
 interface ExamDetails {
@@ -29,737 +30,447 @@ interface ExamDetails {
   status?: string;
 }
 
+type OtpStatus = 'idle' | 'valid-assigned' | 'valid-not-assigned' | 'invalid';
+type Tab = 'ongoing' | 'upcoming' | 'completed';
+
 const ProctorAttendance: React.FC<UserProps> = ({ user }) => {
-  const [selectedExam, setSelectedExam] = useState<ExamDetails | null>(null);
-  const [showModal, setShowModal] = useState(false);
+  const [selectedExam, setSelectedExam]             = useState<ExamDetails | null>(null);
+  const [showModal, setShowModal]                   = useState(false);
   const [isSubstitutionMode, setIsSubstitutionMode] = useState(false);
-  const [otpCode, setOtpCode] = useState('');
-  const [remarks, setRemarks] = useState('');
-  const [otpValidationStatus, setOtpValidationStatus] = useState<'idle' | 'valid-assigned' | 'valid-not-assigned' | 'invalid'>('idle');
+  const [otpCode, setOtpCode]                       = useState('');
+  const [remarks, setRemarks]                       = useState('');
+  const [otpStatus, setOtpStatus]                   = useState<OtpStatus>('idle');
+  const [ongoingExams, setOngoingExams]             = useState<ExamDetails[]>([]);
+  const [upcomingExams, setUpcomingExams]           = useState<ExamDetails[]>([]);
+  const [completedExams, setCompletedExams]         = useState<ExamDetails[]>([]);
+  const [allExams, setAllExams]                     = useState<ExamDetails[]>([]);
+  const [loading, setLoading]                       = useState(true);
+  const [verifyingOtp, setVerifyingOtp]             = useState(false);
+  const [submittingAttendance, setSubmitting]        = useState(false);
+  const [_verificationData, setVerificationData]    = useState<any>(null);
+  const [activeTab, setActiveTab]                   = useState<Tab>('ongoing');
+  const [searchTerm, setSearchTerm]                 = useState('');
+  // Collapsible substitution section — collapsed by default, resets on tab change
+  const [showSubstitution, setShowSubstitution]     = useState(false);
 
-  const [ongoingExams, setOngoingExams] = useState<ExamDetails[]>([]);
-  const [upcomingExams, setUpcomingExams] = useState<ExamDetails[]>([]);
-  const [completedExams, setCompletedExams] = useState<ExamDetails[]>([]);
-  const [allExams, setAllExams] = useState<ExamDetails[]>([]);
+  // Close substitution accordion whenever tab changes
+  useEffect(() => { setShowSubstitution(false); }, [activeTab]);
 
-  const [loading, setLoading] = useState(true);
-  const [verifyingOtp, setVerifyingOtp] = useState(false);
-  const [submittingAttendance, setSubmittingAttendance] = useState(false);
-  const [_verificationData, setVerificationData] = useState<any>(null);
-  const [showVerificationSuccess, setShowVerificationSuccess] = useState(false);
-  const [activeTab, setActiveTab] = useState<'ongoing' | 'upcoming' | 'completed'>('ongoing');
-
-  const fetchAssignedExams = useCallback(async () => {
+  const fetchAssigned = useCallback(async () => {
     if (!user?.user_id) return;
-
     try {
       const { data } = await api.get(`/proctor-assigned-exams/${user.user_id}/`);
-
       setOngoingExams(data.ongoing || []);
       setUpcomingExams(data.upcoming || []);
       setCompletedExams(data.completed || []);
-    } catch (error: any) {
-      console.error('Error fetching assigned exams:', error);
-      toast.error('Failed to load assigned exams');
-    }
+    } catch { toast.error('Failed to load assigned exams'); }
   }, [user]);
 
-  const fetchAllExams = useCallback(async () => {
+  const fetchAll = useCallback(async () => {
     if (!user?.user_id) return;
-
     try {
-      const { data } = await api.get('/all-exams-for-substitution/', {
-        params: { user_id: user.user_id }
-      });
-
+      const { data } = await api.get('/all-exams-for-substitution/', { params: { user_id: user.user_id } });
       setAllExams(data || []);
-    } catch (error: any) {
-      console.error('Error fetching all exams:', error);
-      toast.error('Failed to load exams');
-    }
+    } catch { toast.error('Failed to load substitution exams'); }
   }, [user]);
 
   useEffect(() => {
-    const loadData = async () => {
+    const load = async () => {
       setLoading(true);
-      await fetchAssignedExams();
-      await fetchAllExams();
+      await Promise.all([fetchAssigned(), fetchAll()]);
       setLoading(false);
     };
-    loadData();
+    load();
+    const iv = setInterval(load, 30000);
+    return () => clearInterval(iv);
+  }, [fetchAssigned, fetchAll]);
 
-    const interval = setInterval(loadData, 30000);
-    return () => clearInterval(interval);
-  }, [fetchAssignedExams, fetchAllExams]);
-
-  const handleCardClick = (exam: ExamDetails, isSubstitution: boolean = false) => {
-    setSelectedExam(exam);
-    setIsSubstitutionMode(isSubstitution);
-    setShowModal(true);
-    setOtpCode('');
-    setRemarks('');
-    setOtpValidationStatus('idle'); 
-    setShowVerificationSuccess(false); 
+  const fmt = (ts?: string) => {
+    if (!ts) return '—';
+    try {
+      const d = new Date(ts);
+      return isNaN(d.getTime()) ? '—' : d.toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit', hour12: true, timeZone: 'Asia/Manila' });
+    } catch { return '—'; }
   };
 
-  const handleCloseModal = () => {
-    setShowModal(false);
-    setSelectedExam(null);
-    setIsSubstitutionMode(false);
-    setOtpCode('');
-    setRemarks('');
-    setOtpValidationStatus('idle');
+  const filter = (list: ExamDetails[]) =>
+    !searchTerm.trim() ? list : list.filter(e =>
+      [e.course_id, e.subject, e.section_name, e.building_name, e.room_id, e.instructor_name ?? '']
+        .some(v => v.toLowerCase().includes(searchTerm.toLowerCase()))
+    );
+
+  const openModal = (exam: ExamDetails, isSub = false) => {
+    setSelectedExam(exam); setIsSubstitutionMode(isSub);
+    setShowModal(true); setOtpCode(''); setRemarks(''); setOtpStatus('idle');
+  };
+  const closeModal = () => {
+    setShowModal(false); setSelectedExam(null); setIsSubstitutionMode(false);
+    setOtpCode(''); setRemarks(''); setOtpStatus('idle');
   };
 
-  const handleOtpChange = (value: string) => {
-    setOtpCode(value);
-    if (otpValidationStatus !== 'idle') {
-      setOtpValidationStatus('idle');
-    }
-  };
-
-  const handleVerifyOtp = async () => {
-    if (!otpCode.trim() || !user?.user_id) {
-      return;
-    }
-
+  const handleVerify = async () => {
+    if (!otpCode.trim() || !user?.user_id) return;
     setVerifyingOtp(true);
     try {
-      const response = await api.post('/verify-otp/', {
-        otp_code: otpCode.trim(),
-        user_id: user.user_id
-      });
-
-      const { valid, verification_status, message, exam_schedule_id, ...examData } = response.data;
-
-      if (valid) {
-        setOtpValidationStatus(verification_status as 'valid-assigned' | 'valid-not-assigned');
-        setVerificationData({ exam_schedule_id, ...examData });
-        setShowVerificationSuccess(true);
-      } else {
-        setOtpValidationStatus('invalid');
-        toast.error(message || 'Invalid OTP code');
-      }
-    } catch (error: any) {
-      console.error('Error verifying OTP:', error);
-      setOtpValidationStatus('invalid');
-      const errorMessage = error.response?.data?.error || error.message || 'Failed to verify OTP';
-      toast.error(errorMessage);
-    } finally {
-      setVerifyingOtp(false);
-    }
-  };
-
-  const formatTo12Hour = (timeString: string | undefined) => {
-    if (!timeString) return '-';
-
-    try {
-      const date = new Date(timeString);
-
-      const options: Intl.DateTimeFormatOptions = {
-        hour: 'numeric',
-        minute: '2-digit',
-        hour12: true,
-        timeZone: 'Asia/Manila'
-      };
-
-      if (isNaN(date.getTime())) {
-        console.error('Invalid Date input:', timeString);
-        return '-';
-      }
-
-      return date.toLocaleTimeString('en-US', options);
-
-    } catch (e) {
-      console.error('Error formatting time:', timeString, e);
-      return '-';
-    }
+      const res = await api.post('/verify-otp/', { otp_code: otpCode.trim(), user_id: user.user_id });
+      const { valid, verification_status, message, exam_schedule_id, ...rest } = res.data;
+      if (valid) { setOtpStatus(verification_status); setVerificationData({ exam_schedule_id, ...rest }); }
+      else { setOtpStatus('invalid'); toast.error(message || 'Invalid OTP code'); }
+    } catch (e: any) { setOtpStatus('invalid'); toast.error(e.response?.data?.error || 'Failed to verify OTP'); }
+    finally { setVerifyingOtp(false); }
   };
 
   const handleSubmit = async () => {
-    if (!user?.user_id || !otpCode.trim()) {
-      toast.error('Missing required information');
-      return;
-    }
-
-    const role = (isSubstitutionMode || otpValidationStatus === 'valid-not-assigned') ? 'sub' : 'assigned';
-
-    if (role === 'sub' && !remarks.trim()) {
-      toast.error('Remarks are required for substitute proctors');
-      return;
-    }
-
-    setSubmittingAttendance(true);
+    if (!user?.user_id || !otpCode.trim()) { toast.error('Missing required information'); return; }
+    const role = (isSubstitutionMode || otpStatus === 'valid-not-assigned') ? 'sub' : 'assigned';
+    if (role === 'sub' && !remarks.trim()) { toast.error('Remarks are required for substitution'); return; }
+    setSubmitting(true);
     try {
-      const response = await api.post('/submit-proctor-attendance/', {
-        otp_code: otpCode.trim(),
-        user_id: user.user_id,
-        remarks: remarks.trim() || undefined,
-        role: role
+      const res = await api.post('/submit-proctor-attendance/', {
+        otp_code: otpCode.trim(), user_id: user.user_id,
+        remarks: remarks.trim() || undefined, role,
       });
+      toast.success(res.data.message || 'Attendance recorded successfully');
+      if (res.data.status === 'late') toast.warning('Marked as LATE — arrived more than 7 min after start time', { autoClose: 5000 });
+      await Promise.all([fetchAssigned(), fetchAll()]);
+      closeModal();
+    } catch (e: any) { toast.error(e.response?.data?.error || 'Failed to submit attendance'); }
+    finally { setSubmitting(false); }
+  };
 
-      toast.success(response.data.message || 'Attendance recorded successfully');
+  const isSubRole  = isSubstitutionMode || otpStatus === 'valid-not-assigned';
+  const canSubmit  = otpStatus.startsWith('valid') && !(isSubRole && !remarks.trim());
 
-      if (response.data.status === 'late') {
-        toast.warning('Marked as LATE - You arrived more than 7 minutes after start time', {
-          autoClose: 5000
-        });
-      }
+  const currentList = {
+    ongoing: filter(ongoingExams),
+    upcoming: filter(upcomingExams),
+    completed: filter(completedExams),
+  }[activeTab];
 
-      await fetchAssignedExams();
-      await fetchAllExams();
+  const filteredSubExams = filter(allExams);
 
-      setShowVerificationSuccess(false);
-      handleCloseModal();
-    } catch (error: any) {
-      console.error('Error submitting attendance:', error);
-      const errorMessage = error.response?.data?.error || error.message || 'Failed to submit attendance';
-      toast.error(errorMessage);
-    } finally {
-      setSubmittingAttendance(false);
-    }
+  const StatusBadge = ({ status }: { status?: string }) => {
+    if (!status) return null;
+    const m: Record<string, [string, string]> = {
+      confirmed:  ['Confirmed',  'pa-badge--confirmed'],
+      late:       ['Late',       'pa-badge--late'],
+      substitute: ['Substitute', 'pa-badge--sub'],
+      pending:    ['Ongoing',    'pa-badge--ongoing'],
+      absent:     ['Absent',     'pa-badge--absent'],
+      upcoming:   ['Upcoming',   'pa-badge--upcoming'],
+    };
+    const entry = m[status];
+    return entry ? <span className={`pa-badge ${entry[1]}`}>{entry[0]}</span> : null;
+  };
+
+  const ExamCard = ({ exam, isSub = false }: { exam: ExamDetails; isSub?: boolean }) => {
+    const locked = ['confirmed', 'late', 'substitute'].includes(exam.status ?? '');
+    const badgeStatus = exam.status ?? (activeTab === 'upcoming' ? 'upcoming' : 'pending');
+
+    return (
+      <div
+        className={`pa-card ${isSub ? 'pa-card--sub' : 'pa-card--assigned'} ${locked ? 'pa-card--locked' : 'pa-card--clickable'}`}
+        onClick={() => !locked && activeTab !== 'upcoming' && openModal(exam, isSub)}
+        role={!locked && activeTab !== 'upcoming' ? 'button' : undefined}
+        tabIndex={!locked && activeTab !== 'upcoming' ? 0 : -1}
+        onKeyDown={e => !locked && activeTab !== 'upcoming' && e.key === 'Enter' && openModal(exam, isSub)}
+      >
+        <div className="pa-card__top">
+          <div className="pa-card__pills">
+            <span className="pa-card__course">{exam.course_id}</span>
+            {isSub && <span className="pa-card__sub-pill"><FaExchangeAlt style={{ fontSize: 8 }} /> Sub</span>}
+          </div>
+          <StatusBadge status={badgeStatus} />
+        </div>
+
+        <div className="pa-card__body">
+          <h4 className="pa-card__title">{exam.subject}</h4>
+          <p className="pa-card__section">{exam.section_name}</p>
+        </div>
+
+        <div className="pa-card__details">
+          <div className="pa-card__row">
+            <FaCalendarAlt className="pa-card__row-icon" />
+            <span>{exam.exam_date}</span>
+            <span className="pa-card__dot">·</span>
+            <span>{fmt(exam.exam_start_time)} – {fmt(exam.exam_end_time)}</span>
+          </div>
+          <div className="pa-card__row">
+            <FaBuilding className="pa-card__row-icon" />
+            <span>{exam.building_name}</span>
+            <span className="pa-card__dot">·</span>
+            <FaDoorOpen className="pa-card__row-icon" />
+            <span>Room {exam.room_id}</span>
+          </div>
+          {exam.instructor_name && (
+            <div className="pa-card__row">
+              <FaChalkboardTeacher className="pa-card__row-icon" />
+              <span>{exam.instructor_name}</span>
+            </div>
+          )}
+          {isSub && exam.assigned_proctor && (
+            <div className="pa-card__row pa-card__row--warn">
+              <FaUserTie className="pa-card__row-icon" />
+              <span>Replacing <strong>{exam.assigned_proctor}</strong></span>
+            </div>
+          )}
+        </div>
+
+        <div className={`pa-card__footer ${locked ? 'pa-card__footer--done' : isSub ? 'pa-card__footer--sub' : activeTab === 'upcoming' ? 'pa-card__footer--muted' : 'pa-card__footer--action'}`}>
+          {locked
+            ? <><FaCheckCircle /> Attendance recorded</>
+            : activeTab === 'upcoming'
+            ? 'Not yet open for check-in'
+            : isSub
+            ? 'Tap to substitute as proctor →'
+            : 'Tap to confirm proctorship →'
+          }
+        </div>
+      </div>
+    );
   };
 
   return (
-    <div className="proctor-attendance-container">
+    <div className="pa-page">
       <ToastContainer position="top-right" autoClose={3000} />
 
-      {/* ✅ Tab Navigation */}
-      <div className="proctor-attendance-tabs">
-        <button
-          className={`tab-button ${activeTab === 'ongoing' ? 'active' : ''}`}
-          onClick={() => setActiveTab('ongoing')}
-        >
-          Ongoing ({ongoingExams.length})
-        </button>
-        <button
-          className={`tab-button ${activeTab === 'upcoming' ? 'active' : ''}`}
-          onClick={() => setActiveTab('upcoming')}
-        >
-          Upcoming ({upcomingExams.length})
-        </button>
-        <button
-          className={`tab-button ${activeTab === 'completed' ? 'active' : ''}`}
-          onClick={() => setActiveTab('completed')}
-        >
-          History ({completedExams.length})
-        </button>
+      {/* ── Header ── */}
+      <div className="pa-page-header">
+        <div className="pa-page-header__left">
+          <div className="pa-page-icon"><FaShieldAlt /></div>
+          <div className="pa-page-title">
+            <h1>Proctor Attendance</h1>
+            <p>{user?.first_name ? `${user.first_name} ${user.last_name ?? ''}` : user?.email}</p>
+          </div>
+        </div>
+        <div className="pa-search-bar">
+          <FaSearch className="pa-search-bar__icon" />
+          <input
+            type="text"
+            placeholder="Search exams, rooms, instructors…"
+            value={searchTerm}
+            onChange={e => setSearchTerm(e.target.value)}
+          />
+          {searchTerm && (
+            <button className="pa-search-bar__clear" onClick={() => setSearchTerm('')}>
+              <FaTimes />
+            </button>
+          )}
+        </div>
       </div>
 
-      {loading ? (
-        <div className="no-data-message">Loading exams...</div>
-      ) : (
-        <>
-          {/* ✅ ONGOING EXAMS TAB */}
-          {activeTab === 'ongoing' && (
-            <>
-              <div className="proctor-attendance-section">
-                <h3 className="proctor-attendance-section-title">My Ongoing Exams</h3>
-                <div className="proctor-attendance-canvas">
-                  <div className="proctor-attendance-schedules-grid">
-                    {ongoingExams.length > 0 ? (
-                      ongoingExams.map((exam) => (
-                        <div
-                          key={exam.id}
-                          className="proctor-attendance-schedule-card proctor-attendance-schedule-card-clickable proctor-attendance-schedule-card-assigned"
-                          onClick={() => handleCardClick(exam, false)}
-                          style={{
-                            opacity: exam.status === 'confirmed' || exam.status === 'late' || exam.status === 'substitute' ? 0.7 : 1,
-                            pointerEvents: exam.status === 'confirmed' || exam.status === 'late' || exam.status === 'substitute' ? 'none' : 'auto',
-                            cursor: exam.status === 'confirmed' || exam.status === 'late' || exam.status === 'substitute' ? 'not-allowed' : 'pointer'
-                          }}
-                        >
-                          <div className="proctor-attendance-schedule-header">
-                            <h3 className="proctor-attendance-schedule-subject">
-                              {exam.course_id} - {exam.subject}
-                            </h3>
-                            <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                              <span className="proctor-attendance-schedule-code">{exam.course_id}</span>
-                              {exam.status === 'confirmed' && <span className="confirmed-badge">✓ CONFIRMED</span>}
-                              {exam.status === 'late' && <span className="late-badge">⚠ LATE</span>}
-                              {exam.status === 'substitute' && <span className="substitute-badge"> SUBSTITUTE</span>}
-                              {exam.status === 'pending' && <span className="ongoing-badge">ONGOING</span>}
-                            </div>
-                          </div>
+      {/* ── Substitution Dropdown — always visible, collapsed by default ── */}
+      {activeTab === 'ongoing' && (
+        <div className="pa-sub-accordion">
+          <button
+            type="button"
+            className="pa-sub-accordion__trigger"
+            onClick={() => setShowSubstitution(v => !v)}
+            aria-expanded={showSubstitution}
+          >
+            <div className="pa-sub-accordion__trigger-left">
+              <span className="pa-sub-accordion__icon"><FaExchangeAlt /></span>
+              <span className="pa-sub-accordion__label">Available for Substitution</span>
+              {filteredSubExams.length > 0 && (
+                <span className="pa-sub-accordion__chip">{filteredSubExams.length}</span>
+              )}
+            </div>
+            <span className="pa-sub-accordion__arrow">
+              {showSubstitution ? <FaChevronUp /> : <FaChevronDown />}
+            </span>
+          </button>
 
-                          <div className="proctor-attendance-schedule-details">
-                            <div className="proctor-attendance-detail-row">
-                              <span className="proctor-attendance-detail-label">Section:</span>
-                              <span className="proctor-attendance-detail-value">{exam.section_name}</span>
-                            </div>
-                            <div className="proctor-attendance-detail-row">
-                              <span className="proctor-attendance-detail-label">Date:</span>
-                              <span className="proctor-attendance-detail-value">{exam.exam_date}</span>
-                            </div>
-                            <div className="proctor-attendance-detail-row">
-                              <span className="proctor-attendance-detail-label">Time:</span>
-                              <span className="proctor-attendance-detail-value">
-                                {formatTo12Hour(exam.exam_start_time)} - {formatTo12Hour(exam.exam_end_time)}
-                              </span>
-                            </div>
-                            <div className="proctor-attendance-detail-row">
-                              <span className="proctor-attendance-detail-label">Building:</span>
-                              <span className="proctor-attendance-detail-value">{exam.building_name}</span>
-                            </div>
-                            <div className="proctor-attendance-detail-row">
-                              <span className="proctor-attendance-detail-label">Room:</span>
-                              <span className="proctor-attendance-detail-value">{exam.room_id}</span>
-                            </div>
-                            <div className="proctor-attendance-detail-row">
-                              <span className="proctor-attendance-detail-label">Instructor:</span>
-                              <span className="proctor-attendance-detail-value">{exam.instructor_name}</span>
-                            </div>
-                          </div>
-                          {exam.status === 'pending' && (
-                            <div className="proctor-attendance-click-hint">
-                              Click to confirm proctorship
-                            </div>
-                          )}
-                          {(exam.status === 'confirmed' || exam.status === 'late' || exam.status === 'substitute') && (
-                            <div className="proctor-attendance-click-hint" style={{ color: '#4CAF50' }}>
-                              Attendance already recorded
-                            </div>
-                          )}
-                        </div>
-                      ))
-                    ) : (
-                      <div className="no-data-message">No ongoing exams</div>
-                    )}
-                  </div>
+          {showSubstitution && (
+            <div className="pa-sub-accordion__body">
+              {filteredSubExams.length === 0 ? (
+                <div className="pa-empty pa-empty--sm">
+                  <FaClipboardCheck className="pa-empty__icon" />
+                  <p>No exams available for substitution</p>
                 </div>
-              </div>
-
-              {/* Substitution Section - Only show for ongoing tab */}
-              <div className="proctor-attendance-section">
-                <h3 className="proctor-attendance-section-title">Available for Substitution</h3>
-                <div className="proctor-attendance-canvas">
-                  <div className="proctor-attendance-schedules-grid">
-                    {allExams.length > 0 ? (
-                      allExams.map((exam) => (
-                        <div
-                          key={exam.id}
-                          className="proctor-attendance-schedule-card proctor-attendance-schedule-card-clickable proctor-attendance-schedule-card-substitution"
-                          onClick={() => handleCardClick(exam, true)}
-                        >
-                          <div className="proctor-attendance-schedule-header">
-                            <h3 className="proctor-attendance-schedule-subject">
-                              {exam.course_id} - {exam.subject}
-                            </h3>
-                            <span className="proctor-attendance-schedule-code">{exam.course_id}</span>
-                          </div>
-
-                          <div className="proctor-attendance-schedule-details">
-                            <div className="proctor-attendance-detail-row">
-                              <span className="proctor-attendance-detail-label">Section:</span>
-                              <span className="proctor-attendance-detail-value">{exam.section_name}</span>
-                            </div>
-                            <div className="proctor-attendance-detail-row">
-                              <span className="proctor-attendance-detail-label">Date:</span>
-                              <span className="proctor-attendance-detail-value">{exam.exam_date}</span>
-                            </div>
-                            <div className="proctor-attendance-detail-row">
-                              <span className="proctor-attendance-detail-label">Time:</span>
-                              <span className="proctor-attendance-detail-value">
-                                {formatTo12Hour(exam.exam_start_time)} - {formatTo12Hour(exam.exam_end_time)}
-                              </span>
-                            </div>
-                            <div className="proctor-attendance-detail-row">
-                              <span className="proctor-attendance-detail-label">Building:</span>
-                              <span className="proctor-attendance-detail-value">{exam.building_name}</span>
-                            </div>
-                            <div className="proctor-attendance-detail-row">
-                              <span className="proctor-attendance-detail-label">Room:</span>
-                              <span className="proctor-attendance-detail-value">{exam.room_id}</span>
-                            </div>
-                            <div className="proctor-attendance-detail-row">
-                              <span className="proctor-attendance-detail-label">Assigned Proctor:</span>
-                              <span className="proctor-attendance-detail-value">{exam.assigned_proctor}</span>
-                            </div>
-                            <div className="proctor-attendance-detail-row">
-                              <span className="proctor-attendance-detail-label">Instructor:</span>
-                              <span className="proctor-attendance-detail-value">{exam.instructor_name}</span>
-                            </div>
-                          </div>
-
-                          <div className="proctor-attendance-click-hint proctor-attendance-substitution-hint">
-                            Click to substitute as proctor
-                          </div>
-                        </div>
-                      ))
-                    ) : (
-                      <div className="no-data-message">No exams available for substitution (conflicts excluded)</div>
-                    )}
-                  </div>
+              ) : (
+                <div className="pa-grid">
+                  {filteredSubExams.map(e => <ExamCard key={e.id} exam={e} isSub />)}
                 </div>
-              </div>
-            </>
-          )}
-
-          {/* ✅ UPCOMING EXAMS TAB */}
-          {activeTab === 'upcoming' && (
-            <div className="proctor-attendance-section">
-              <h3 className="proctor-attendance-section-title">Upcoming Exams</h3>
-              <div className="proctor-attendance-canvas">
-                <div className="proctor-attendance-schedules-grid">
-                  {upcomingExams.length > 0 ? (
-                    upcomingExams.map((exam) => (
-                      <div
-                        key={exam.id}
-                        className="proctor-attendance-schedule-card proctor-attendance-schedule-card-upcoming"
-                        style={{
-                          opacity: 0.6,
-                          cursor: 'not-allowed',
-                          backgroundColor: '#f5f5f5'
-                        }}
-                      >
-                        <div className="proctor-attendance-schedule-header">
-                          <h3 className="proctor-attendance-schedule-subject">
-                            {exam.course_id} - {exam.subject}
-                          </h3>
-                          <div style={{ display: 'flex', alignItems: 'center', gap: '8px', color: 'orange' }}>
-                            <span className="proctor-attendance-schedule-code">{exam.course_id}</span>
-                            <span className="upcoming-badge">UPCOMING</span>
-                          </div>
-                        </div>
-
-                        <div className="proctor-attendance-schedule-details">
-                          <div className="proctor-attendance-detail-row">
-                            <span className="proctor-attendance-detail-label">Section:</span>
-                            <span className="proctor-attendance-detail-value">{exam.section_name}</span>
-                          </div>
-                          <div className="proctor-attendance-detail-row">
-                            <span className="proctor-attendance-detail-label">Date:</span>
-                            <span className="proctor-attendance-detail-value">{exam.exam_date}</span>
-                          </div>
-                          <div className="proctor-attendance-detail-row">
-                            <span className="proctor-attendance-detail-label">Time:</span>
-                            <span className="proctor-attendance-detail-value">
-                              {formatTo12Hour(exam.exam_start_time)} - {formatTo12Hour(exam.exam_end_time)}
-                            </span>
-                          </div>
-                          <div className="proctor-attendance-detail-row">
-                            <span className="proctor-attendance-detail-label">Building:</span>
-                            <span className="proctor-attendance-detail-value">{exam.building_name}</span>
-                          </div>
-                          <div className="proctor-attendance-detail-row">
-                            <span className="proctor-attendance-detail-label">Room:</span>
-                            <span className="proctor-attendance-detail-value">{exam.room_id}</span>
-                          </div>
-                          <div className="proctor-attendance-detail-row">
-                            <span className="proctor-attendance-detail-label">Instructor:</span>
-                            <span className="proctor-attendance-detail-value">{exam.instructor_name}</span>
-                          </div>
-                        </div>
-                        <div className="proctor-attendance-click-hint" style={{ color: '#999' }}>
-                          Not yet available for check-in
-                        </div>
-                      </div>
-                    ))
-                  ) : (
-                    <div className="no-data-message">No upcoming exams</div>
-                  )}
-                </div>
-              </div>
+              )}
             </div>
           )}
-
-          {/* ✅ COMPLETED EXAMS TAB (HISTORY) */}
-          {activeTab === 'completed' && (
-            <div className="proctor-attendance-section">
-              <h3 className="proctor-attendance-section-title">Attendance History</h3>
-              <div className="proctor-attendance-canvas">
-                <div className="proctor-attendance-schedules-grid">
-                  {completedExams.length > 0 ? (
-                    completedExams.map((exam) => (
-                      <div
-                        key={exam.id}
-                        className="proctor-attendance-schedule-card proctor-attendance-schedule-card-history"
-                        style={{
-                          opacity: 0.8,
-                          cursor: 'default',
-                          backgroundColor: '#fafafa',
-                          border: '2px solid #e0e0e0'
-                        }}
-                      >
-                        <div className="proctor-attendance-schedule-header">
-                          <h3 className="proctor-attendance-schedule-subject">
-                            {exam.course_id} - {exam.subject}
-                          </h3>
-                          <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                            <span className="proctor-attendance-schedule-code">{exam.course_id}</span>
-                            {exam.status === 'confirmed' && <span className="confirmed-badge">ATTENDED</span>}
-                            {exam.status === 'late' && <span className="late-badge">LATE</span>}
-                            {exam.status === 'substitute' && <span className="substitute-badge">SUBSTITUTE</span>}
-                            {exam.status === 'absent' && <span className="absent-badge">ABSENT</span>}
-                          </div>
-                        </div>
-
-                        <div className="proctor-attendance-schedule-details">
-                          <div className="proctor-attendance-detail-row">
-                            <span className="proctor-attendance-detail-label">Section:</span>
-                            <span className="proctor-attendance-detail-value">{exam.section_name}</span>
-                          </div>
-                          <div className="proctor-attendance-detail-row">
-                            <span className="proctor-attendance-detail-label">Date:</span>
-                            <span className="proctor-attendance-detail-value">{exam.exam_date}</span>
-                          </div>
-                          <div className="proctor-attendance-detail-row">
-                            <span className="proctor-attendance-detail-label">Time:</span>
-                            <span className="proctor-attendance-detail-value">
-                              {formatTo12Hour(exam.exam_start_time)} - {formatTo12Hour(exam.exam_end_time)}
-                            </span>
-                          </div>
-                          <div className="proctor-attendance-detail-row">
-                            <span className="proctor-attendance-detail-label">Building:</span>
-                            <span className="proctor-attendance-detail-value">{exam.building_name}</span>
-                          </div>
-                          <div className="proctor-attendance-detail-row">
-                            <span className="proctor-attendance-detail-label">Room:</span>
-                            <span className="proctor-attendance-detail-value">{exam.room_id}</span>
-                          </div>
-                          <div className="proctor-attendance-detail-row">
-                            <span className="proctor-attendance-detail-label">Instructor:</span>
-                            <span className="proctor-attendance-detail-value">{exam.instructor_name}</span>
-                          </div>
-                        </div>
-                        <div className="proctor-attendance-click-hint" style={{ color: '#666' }}>
-                          Completed Exam
-                        </div>
-                      </div>
-                    ))
-                  ) : (
-                    <div className="no-data-message">No completed exams yet</div>
-                  )}
-                </div>
-              </div>
-            </div>
-          )}
-        </>
+        </div>
       )}
 
-      {/* Modal for Confirmation */}
-      {showModal && selectedExam && (
-        <div className="proctor-attendance-modal-overlay" onClick={handleCloseModal}>
-          <div className="proctor-attendance-modal" onClick={(e) => e.stopPropagation()}>
-            <div className="proctor-attendance-modal-header">
-              <h3 className="proctor-attendance-modal-title">
-                {isSubstitutionMode ? 'Substitute Proctorship' : 'Confirm Proctorship'}
+      {/* ── Tabs ── */}
+      <div className="pa-tabs">
+        {([
+          { id: 'ongoing'   as Tab, label: 'Ongoing',  count: ongoingExams.length,   icon: <FaClock /> },
+          { id: 'upcoming'  as Tab, label: 'Upcoming', count: upcomingExams.length,  icon: <FaCalendarAlt /> },
+          { id: 'completed' as Tab, label: 'History',  count: completedExams.length, icon: <FaHistory /> },
+        ]).map(t => (
+          <button
+            key={t.id}
+            className={`pa-tab ${activeTab === t.id ? 'pa-tab--active' : ''}`}
+            onClick={() => setActiveTab(t.id)}
+          >
+            <span className="pa-tab__icon">{t.icon}</span>
+            {t.label}
+            <span className="pa-tab__chip">{t.count}</span>
+          </button>
+        ))}
+      </div>
+
+      {/* ── Content ── */}
+      {loading ? (
+        <div className="pa-loading-state">
+          <div className="pa-spinner" /><span>Loading your schedule…</span>
+        </div>
+      ) : (
+        <div className="pa-content">
+          <div className="pa-section">
+            <div className="pa-section__head">
+              <h3 className="pa-section__title">
+                {activeTab === 'ongoing'   && 'My Ongoing Exams'}
+                {activeTab === 'upcoming'  && 'Upcoming Assignments'}
+                {activeTab === 'completed' && 'Attendance History'}
               </h3>
-              <button className="proctor-attendance-modal-close" onClick={handleCloseModal}>
-                ×
-              </button>
+              <span className="pa-section__chip">{currentList.length}</span>
+            </div>
+            <div className="pa-canvas">
+              {currentList.length === 0
+                ? (
+                  <div className="pa-empty">
+                    <FaClipboardCheck className="pa-empty__icon" />
+                    <p>
+                      {activeTab === 'ongoing'   ? 'No ongoing exams right now'
+                      : activeTab === 'upcoming' ? 'No upcoming exams scheduled'
+                      : 'No attendance records yet'}
+                    </p>
+                  </div>
+                )
+                : <div className="pa-grid">{currentList.map(e => <ExamCard key={e.id} exam={e} />)}</div>
+              }
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* ════ MODAL ════ */}
+      {showModal && selectedExam && (
+        <div className="pa-overlay" onClick={closeModal}>
+          <div className="pa-modal" onClick={e => e.stopPropagation()}>
+
+            <div className={`pa-modal__header ${isSubstitutionMode ? 'pa-modal__header--sub' : 'pa-modal__header--primary'}`}>
+              <div className="pa-modal__header-body">
+                <div className="pa-modal__header-icon">
+                  {isSubstitutionMode ? <FaExchangeAlt /> : <FaShieldAlt />}
+                </div>
+                <div>
+                  <h3 className="pa-modal__title">{isSubstitutionMode ? 'Substitute Proctorship' : 'Confirm Proctorship'}</h3>
+                  <p className="pa-modal__subtitle">{selectedExam.course_id} — {selectedExam.subject}</p>
+                </div>
+              </div>
+              <button className="pa-modal__close-btn" onClick={closeModal}><FaTimes /></button>
             </div>
 
-            <div className="proctor-attendance-modal-content">
+            <div className="pa-modal__body">
               {isSubstitutionMode && (
-                <div className="proctor-attendance-substitution-banner">
-                  <span className="substitution-icon">⚠️</span>
-                  <span className="substitution-text">
-                    You are substituting for: <strong>{selectedExam.assigned_proctor}</strong>
-                  </span>
+                <div className="pa-alert pa-alert--warn">
+                  <FaExchangeAlt className="pa-alert__icon" />
+                  <div>
+                    <p className="pa-alert__title">Substitution Mode Active</p>
+                    <p className="pa-alert__desc">You are replacing <strong>{selectedExam.assigned_proctor}</strong> and will be recorded as substitute proctor.</p>
+                  </div>
                 </div>
               )}
 
-              <div className="proctor-attendance-modal-exam-details">
-                <h4>Exam Details</h4>
-                <div className="proctor-attendance-modal-details-grid">
-                  <div className="proctor-attendance-modal-detail-item">
-                    <span className="modal-detail-label">Course:</span>
-                    <span className="modal-detail-value">{selectedExam.course_id} - {selectedExam.subject}</span>
-                  </div>
-                  <div className="proctor-attendance-modal-detail-item">
-                    <span className="modal-detail-label">Section:</span>
-                    <span className="modal-detail-value">{selectedExam.section_name}</span>
-                  </div>
-                  <div className="proctor-attendance-modal-detail-item">
-                    <span className="modal-detail-label">Date:</span>
-                    <span className="modal-detail-value">{selectedExam.exam_date}</span>
-                  </div>
-                  <div className="proctor-attendance-modal-detail-item">
-                    <span className="modal-detail-label">Time:</span>
-                    <span className="modal-detail-value">
-                      {formatTo12Hour(selectedExam.exam_start_time)} - {formatTo12Hour(selectedExam.exam_end_time)}
-                    </span>
-                  </div>
-                  <div className="proctor-attendance-modal-detail-item">
-                    <span className="modal-detail-label">Building:</span>
-                    <span className="modal-detail-value">{selectedExam.building_name}</span>
-                  </div>
-                  <div className="proctor-attendance-modal-detail-item">
-                    <span className="modal-detail-label">Room:</span>
-                    <span className="modal-detail-value">{selectedExam.room_id}</span>
-                  </div>
-                  {selectedExam.assigned_proctor && (
-                    <div className="proctor-attendance-modal-detail-item">
-                      <span className="modal-detail-label">Assigned Proctor:</span>
-                      <span className="modal-detail-value">{selectedExam.assigned_proctor}</span>
+              <div className="pa-exam-card">
+                <p className="pa-exam-card__heading">Exam Details</p>
+                <div className="pa-exam-card__grid">
+                  {[
+                    ['Course',    `${selectedExam.course_id} — ${selectedExam.subject}`],
+                    ['Section',   selectedExam.section_name],
+                    ['Date',      selectedExam.exam_date],
+                    ['Time',      `${fmt(selectedExam.exam_start_time)} – ${fmt(selectedExam.exam_end_time)}`],
+                    ['Building',  selectedExam.building_name],
+                    ['Room',      selectedExam.room_id],
+                    ...(selectedExam.instructor_name ? [['Instructor', selectedExam.instructor_name]] : []),
+                    ...(selectedExam.assigned_proctor ? [['Assigned Proctor', selectedExam.assigned_proctor]] : []),
+                  ].map(([k, v]) => (
+                    <div key={k} className="pa-exam-card__item">
+                      <span className="pa-exam-card__key">{k}</span>
+                      <span className="pa-exam-card__val">{v}</span>
                     </div>
-                  )}
-                  {selectedExam.instructor_name && (
-                    <div className="proctor-attendance-modal-detail-item">
-                      <span className="modal-detail-label">Instructor:</span>
-                      <span className="modal-detail-value">{selectedExam.instructor_name}</span>
-                    </div>
-                  )}
+                  ))}
                 </div>
               </div>
 
-              <div className="proctor-attendance-modal-form">
-                <div className="proctor-attendance-modal-input-group">
-                  <label htmlFor="otp-input" className="proctor-attendance-modal-label">
-                    Exam Code (OTP):
-                  </label>
-                  <div className="proctor-attendance-otp-input-wrapper">
-                    <input
-                      id="otp-input"
-                      type="text"
-                      className="proctor-attendance-modal-input"
-                      placeholder="Enter the exam code shown in the venue"
-                      value={otpCode}
-                      onChange={(e) => handleOtpChange(e.target.value)}
-                      onKeyPress={(e) => {
-                        if (e.key === 'Enter' && otpCode.trim()) {
-                          handleVerifyOtp();
-                        }
-                      }}
-                    />
-                    <button
-                      className="proctor-attendance-verify-button"
-                      onClick={handleVerifyOtp}
-                      disabled={!otpCode.trim() || verifyingOtp}
-                    >
-                      {verifyingOtp ? 'Verifying...' : 'Verify'}
-                    </button>
-                  </div>
-
-                  {/* Verification Success Modal */}
-                  {showVerificationSuccess && (
-                    <div
-                      style={{
-                        position: 'fixed',
-                        top: 0,
-                        left: 0,
-                        right: 0,
-                        bottom: 0,
-                        backgroundColor: 'rgba(0, 0, 0, 0.7)',
-                        display: 'flex',
-                        justifyContent: 'center',
-                        alignItems: 'center',
-                        zIndex: 10000
-                      }}
-                      onClick={() => setShowVerificationSuccess(false)}
-                    >
-                      <div
-                        style={{
-                          backgroundColor: 'white',
-                          padding: '30px',
-                          borderRadius: '15px',
-                          maxWidth: '500px',
-                          width: '90%',
-                          boxShadow: '0 8px 16px rgba(0, 0, 0, 0.3)',
-                          textAlign: 'center'
-                        }}
-                        onClick={(e) => e.stopPropagation()}>
-                        {showVerificationSuccess && (
-                          <div
-                            style={{
-                              borderRadius: '8px',
-                              padding: '12px',
-                              marginBottom: '2px',
-                              color: '#856404'
-                            }}
-                            onClick={() => setShowVerificationSuccess(false)}
-                          >
-                            <div style={{
-                              borderRadius: '8px',
-                              padding: '12px',
-                              marginBottom: '2px'
-                            }}
-                              onClick={(e) => e.stopPropagation()}>
-                              <div style={{ fontSize: '60px', marginBottom: '2px', color: '#28a745' }}><FaCheckCircle /></div>
-                              <h2 style={{ color: '#28a745', marginBottom: '5px' }}>Code Verified!</h2>
-                              <p style={{ color: '#666', marginBottom: '25px', fontSize: '16px' }}>
-                                {otpValidationStatus === 'valid-assigned'
-                                  ? 'You are assigned to this exam. Click submit to confirm your attendance.'
-                                  : 'Valid code, but you are not assigned. You will be marked as a substitute proctor.'}
-                              </p>
-
-
-                              <div style={{ display: 'flex', gap: '10px', justifyContent: 'center' }}>
-                                {/* buttons */}
-                              </div>
-                            </div>
-                          </div>
-                        )}
-
-                        <div style={{ display: 'flex', gap: '10px', justifyContent: 'center' }}>
-                          <button
-                            onClick={() => setShowVerificationSuccess(false)}
-                            style={{
-                              padding: '12px 24px',
-                              backgroundColor: '#6c757d',
-                              color: 'white',
-                              border: 'none',
-                              borderRadius: '8px',
-                              cursor: 'pointer',
-                              fontWeight: 'bold',
-                              fontSize: '14px'
-                            }}
-                          >
-                            Cancel
-                          </button>
-                          <button
-                            onClick={handleSubmit}
-                            disabled={
-                              ((isSubstitutionMode || otpValidationStatus === 'valid-not-assigned') && !remarks.trim()) ||
-                              submittingAttendance
-                            }
-                            style={{
-                              padding: '12px 24px',
-                              backgroundColor: submittingAttendance ? '#ccc' : '#28a745',
-                              color: 'white',
-                              border: 'none',
-                              borderRadius: '8px',
-                              cursor: submittingAttendance ? 'not-allowed' : 'pointer',
-                              fontWeight: 'bold',
-                              fontSize: '14px'
-                            }}
-                          >
-                            {submittingAttendance ? 'Submitting...' : 'Submit Attendance'}
-                          </button>
-                        </div>
-                      </div>
-                    </div>
-                  )}
-                </div>
-
-                <div className="proctor-attendance-modal-input-group">
-                  <label htmlFor="remarks-input" className="proctor-attendance-modal-label">
-                    Remarks {(isSubstitutionMode || otpValidationStatus === 'valid-not-assigned') ? '(Required for substitution)' : '(Optional)'}:
-                  </label>
-                  <textarea
-                    id="remarks-input"
-                    className={`proctor-attendance-modal-textarea ${(isSubstitutionMode || otpValidationStatus === 'valid-not-assigned') && !remarks.trim() ? 'proctor-attendance-required-field' : ''}`}
-                    placeholder={(isSubstitutionMode || otpValidationStatus === 'valid-not-assigned')
-                      ? "Please provide a reason for substitution (e.g., emergency leave, illness, etc.)"
-                      : "Enter any remarks or notes..."}
-                    rows={3}
-                    value={remarks}
-                    onChange={(e) => setRemarks(e.target.value)}
+              <div className="pa-field">
+                <label className="pa-field__lbl">
+                  <FaKey style={{ marginRight: 6, opacity: .7 }} />Exam Code (OTP)
+                </label>
+                <div className="pa-otp-group">
+                  <input
+                    className={`pa-input pa-input--mono ${otpStatus === 'invalid' ? 'pa-input--err' : ''} ${otpStatus.startsWith('valid') ? 'pa-input--ok' : ''}`}
+                    type="text"
+                    placeholder="Enter exam OTP"
+                    value={otpCode}
+                    onChange={e => { setOtpCode(e.target.value); setOtpStatus('idle'); }}
+                    onKeyDown={e => e.key === 'Enter' && otpCode.trim() && handleVerify()}
                   />
-                  {(isSubstitutionMode || otpValidationStatus === 'valid-not-assigned') && !remarks.trim() && (
-                    <span className="proctor-attendance-field-error">Remarks are required for substitution</span>
-                  )}
+                  <button
+                    className="pa-btn-verify"
+                    onClick={handleVerify}
+                    disabled={!otpCode.trim() || verifyingOtp}
+                  >
+                    {verifyingOtp ? <span className="pa-spinner pa-spinner--xs" /> : 'Verify'}
+                  </button>
                 </div>
+                {otpStatus === 'valid-assigned' && (
+                  <div className="pa-otp-msg pa-otp-msg--ok">
+                    <FaCheckCircle /> Verified — you are the assigned proctor.
+                  </div>
+                )}
+                {otpStatus === 'valid-not-assigned' && (
+                  <div className="pa-otp-msg pa-otp-msg--warn">
+                    <FaExclamationTriangle /> Valid code — you will be marked as a <strong>substitute proctor</strong>.
+                  </div>
+                )}
+                {otpStatus === 'invalid' && (
+                  <div className="pa-otp-msg pa-otp-msg--err">
+                    <FaTimes /> Invalid code. Please check and try again.
+                  </div>
+                )}
+              </div>
+
+              <div className="pa-field">
+                <label className="pa-field__lbl">
+                  Remarks
+                  {isSubRole
+                    ? <span className="pa-tag pa-tag--required">Required</span>
+                    : <span className="pa-tag pa-tag--optional">Optional</span>
+                  }
+                </label>
+                <textarea
+                  className={`pa-input pa-textarea ${isSubRole && !remarks.trim() && otpStatus !== 'idle' ? 'pa-input--err' : ''}`}
+                  rows={3}
+                  placeholder={isSubRole ? 'Reason for substitution (e.g., emergency leave, illness…)' : 'Any notes or observations…'}
+                  value={remarks}
+                  onChange={e => setRemarks(e.target.value)}
+                />
+                {isSubRole && !remarks.trim() && otpStatus !== 'idle' && (
+                  <span className="pa-err-hint">Remarks are required when substituting.</span>
+                )}
               </div>
             </div>
 
-            <div className="proctor-attendance-modal-footer">
+            <div className="pa-modal__footer">
+              <button className="pa-btn pa-btn--ghost" onClick={closeModal}>Cancel</button>
               <button
-                className="proctor-attendance-modal-cancel"
-                onClick={handleCloseModal}
+                className="pa-btn pa-btn--submit"
+                onClick={handleSubmit}
+                disabled={!canSubmit || submittingAttendance}
               >
-                Close
+                {submittingAttendance
+                  ? <><span className="pa-spinner pa-spinner--xs" />Submitting…</>
+                  : <><FaCheckCircle />Submit Attendance</>
+                }
               </button>
             </div>
           </div>

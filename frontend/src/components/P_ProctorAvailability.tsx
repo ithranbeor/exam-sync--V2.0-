@@ -14,40 +14,40 @@ type ProctorSetAvailabilityProps = {
 };
 
 export const AvailabilityTimeSlot = {
-  Morning:   '7 AM - 1 PM (Morning)',
+  Morning: '7 AM - 1 PM (Morning)',
   Afternoon: '1 PM - 6 PM (Afternoon)',
-  Evening:   '6 PM - 9 PM (Evening)',
+  Evening: '6 PM - 9 PM (Evening)',
 } as const;
 
 export type AvailabilityTimeSlot =
   (typeof AvailabilityTimeSlot)[keyof typeof AvailabilityTimeSlot];
 
 const ProctorSetAvailability: React.FC<ProctorSetAvailabilityProps> = ({ user }) => {
-  const [selectedDates, setSelectedDates]                   = useState<string[]>([]);
-  const [selectedTimeSlots, setSelectedTimeSlots]           = useState<AvailabilityTimeSlot[]>([]);
-  const [selectedOriginalDay, setSelectedOriginalDay]       = useState<string>('');
+  const [selectedDates, setSelectedDates] = useState<string[]>([]);
+  const [selectedTimeSlots, setSelectedTimeSlots] = useState<AvailabilityTimeSlot[]>([]);
+  const [selectedOriginalDay, setSelectedOriginalDay] = useState<string>('');
   const [selectedOriginalTimeSlot, setSelectedOriginalTimeSlot] = useState<string>('');
-  const [_availableDays, setAvailableDays]                  = useState<string[]>([]);
-  const [dayToTimeSlots, setDayToTimeSlots]                 = useState<Record<string, string[]>>({});
-  const [availabilityStatus, setAvailabilityStatus]         = useState('available');
-  const [remarks, setRemarks]                               = useState('');
-  const [changeStatus, setChangeStatus]                     = useState('unavailable');
-  const [reason, setReason]                                 = useState('');
-  const [showDatePicker, setShowDatePicker]                 = useState(false);
-  const [currentMonth, setCurrentMonth]                     = useState(new Date());
-  const [allowedDates, setAllowedDates]                     = useState<string[]>([]);
-  const [_collegeId, setCollegeId]                          = useState<number | null>(null);
-  const [isSubmitting, setIsSubmitting]                     = useState(false);
-  const [_hasApprovedSchedule, setHasApprovedSchedule]     = useState(false);
-  const [availabilityList, setAvailabilityList]             = useState<
+  const [_availableDays, setAvailableDays] = useState<string[]>([]);
+  const [dayToTimeSlots, setDayToTimeSlots] = useState<Record<string, string[]>>({});
+  const [availabilityStatus, setAvailabilityStatus] = useState('available');
+  const [remarks, setRemarks] = useState('');
+  const [changeStatus, setChangeStatus] = useState('unavailable');
+  const [reason, setReason] = useState('');
+  const [showDatePicker, setShowDatePicker] = useState(false);
+  const [currentMonth, setCurrentMonth] = useState(new Date());
+  const [allowedDates, setAllowedDates] = useState<string[]>([]);
+  const [_collegeId, setCollegeId] = useState<number | null>(null);
+  const [isSubmitting, setIsSubmitting] = useState(false);
+  const [_hasApprovedSchedule, setHasApprovedSchedule] = useState(false);
+  const [availabilityList, setAvailabilityList] = useState<
     { days: string[]; time_slots: string[]; status: string; remarks?: string }[]
   >([]);
-  const [showModal, setShowModal]                           = useState(false);
-  const [loadingAvailability, setLoadingAvailability]       = useState(false);
-  const [loadingAllowedDates, setLoadingAllowedDates]       = useState(false);
-  const [showConfirmAvailability, setShowConfirmAvailability]   = useState(false);
+  const [showModal, setShowModal] = useState(false);
+  const [loadingAvailability, setLoadingAvailability] = useState(false);
+  const [loadingAllowedDates, setLoadingAllowedDates] = useState(false);
+  const [showConfirmAvailability, setShowConfirmAvailability] = useState(false);
   const [showConfirmChangeRequest, setShowConfirmChangeRequest] = useState(false);
-  const [_confirmPendingSubmit, setConfirmPendingSubmit]    = useState<'availability' | 'change' | null>(null);
+  const [_confirmPendingSubmit, setConfirmPendingSubmit] = useState<'availability' | 'change' | null>(null);
 
   const today = new Date();
 
@@ -100,10 +100,10 @@ const ProctorSetAvailability: React.FC<ProctorSetAvailabilityProps> = ({ user })
         if (Array.isArray(data)) {
           type AvailabilityEntry = { days: string[]; time_slots: string[]; status: string; remarks?: string };
           const formatted: AvailabilityEntry[] = data.map((entry: any) => ({
-            days:       Array.isArray(entry.days)       ? entry.days       : [],
+            days: Array.isArray(entry.days) ? entry.days : [],
             time_slots: Array.isArray(entry.time_slots) ? entry.time_slots : [],
-            status:     entry.status,
-            remarks:    entry.remarks ?? undefined,
+            status: entry.status,
+            remarks: entry.remarks ?? undefined,
           }));
           setAvailabilityList(formatted);
           const daySlotMap: Record<string, string[]> = {};
@@ -160,7 +160,7 @@ const ProctorSetAvailability: React.FC<ProctorSetAvailabilityProps> = ({ user })
         collegePeriods.forEach((period: any) => {
           if (!period.start_date || !period.end_date) return;
           const start = new Date(period.start_date);
-          const end   = new Date(period.end_date);
+          const end = new Date(period.end_date);
           for (let d = new Date(start); d <= end; d.setDate(d.getDate() + 1)) {
             generatedDates.push(new Date(d).toLocaleDateString('en-CA'));
           }
@@ -192,13 +192,13 @@ const ProctorSetAvailability: React.FC<ProctorSetAvailabilityProps> = ({ user })
   }, [_collegeId]);
 
   // ── Calendar helpers ──────────────────────────────────────────────────────
-  const daysInMonth    = (y: number, m: number) => new Date(y, m + 1, 0).getDate();
+  const daysInMonth = (y: number, m: number) => new Date(y, m + 1, 0).getDate();
   const firstDayOfMonth = (y: number, m: number) => new Date(y, m, 1).getDay();
 
   const getCalendarDays = () => {
     const year = currentMonth.getFullYear();
     const month = currentMonth.getMonth();
-    const numDays  = daysInMonth(year, month);
+    const numDays = daysInMonth(year, month);
     const startDay = firstDayOfMonth(year, month);
     const arr: (number | null)[] = [];
     for (let i = 0; i < startDay; i++) arr.push(null);
@@ -257,7 +257,7 @@ const ProctorSetAvailability: React.FC<ProctorSetAvailabilityProps> = ({ user })
       );
       const results = await Promise.allSettled(postPromises);
       const succeeded = results.filter(r => r.status === 'fulfilled').length;
-      const failed    = results.length - succeeded;
+      const failed = results.length - succeeded;
       if (succeeded > 0) {
         toast.success('Availability set successfully!');
         const newEntries = selectedDates.flatMap(day =>
@@ -309,7 +309,7 @@ const ProctorSetAvailability: React.FC<ProctorSetAvailabilityProps> = ({ user })
   const handleSubmitChangeRequest = async (e: React.FormEvent) => {
     e.preventDefault();
     if (isSubmitting) return;
-    const days  = selectedOriginalDay.split(',').filter(Boolean);
+    const days = selectedOriginalDay.split(',').filter(Boolean);
     const slots = selectedOriginalTimeSlot.split(',').filter(Boolean);
     if (days.length === 0 || slots.length === 0) {
       toast.info('Please select at least one day and one time slot.'); return;
@@ -322,7 +322,7 @@ const ProctorSetAvailability: React.FC<ProctorSetAvailabilityProps> = ({ user })
   const handleConfirmChangeRequestSubmit = async () => {
     if (isSubmitting) return;
     setIsSubmitting(true);
-    const selectedDays  = selectedOriginalDay.split(',').filter(Boolean);
+    const selectedDays = selectedOriginalDay.split(',').filter(Boolean);
     const selectedSlots = selectedOriginalTimeSlot.split(',').filter(Boolean);
     const userId = user?.user_id;
     try {
@@ -333,12 +333,12 @@ const ProctorSetAvailability: React.FC<ProctorSetAvailabilityProps> = ({ user })
       }
       const response = await api.post('/tbl_availability/', {
         user_id: userId,
-        days:    selectedDays,
+        days: selectedDays,
         time_slots: selectedSlots,
-        status:  'pending',
+        status: 'pending',
         requested_status: changeStatus,
         remarks: reason || null,
-        type:    'change_request',
+        type: 'change_request',
       });
       if (response.status >= 200 && response.status < 300) {
         toast.success('Change request submitted! Awaiting scheduler approval.');
@@ -417,7 +417,7 @@ const ProctorSetAvailability: React.FC<ProctorSetAvailabilityProps> = ({ user })
                   className="date-input-field"
                   style={{
                     cursor: loadingAllowedDates || isSubmitting ? 'not-allowed' : 'pointer',
-                    color:  loadingAllowedDates ? '#9ca3af' : '#0f1923',
+                    color: loadingAllowedDates ? '#9ca3af' : '#0f1923',
                   }}
                 />
                 <span
@@ -447,10 +447,10 @@ const ProctorSetAvailability: React.FC<ProctorSetAvailabilityProps> = ({ user })
                         const dayDate = day
                           ? new Date(currentMonth.getFullYear(), currentMonth.getMonth(), day, 12)
                           : null;
-                        const isoDate   = dayDate ? dayDate.toISOString().split('T')[0] : '';
+                        const isoDate = dayDate ? dayDate.toISOString().split('T')[0] : '';
                         const isAllowed = allowedDates.includes(isoDate) && !isSubmitting;
                         const isSelected = selectedDates.includes(isoDate);
-                        const isToday   = dayDate && dayDate.toDateString() === today.toDateString();
+                        const isToday = dayDate && dayDate.toDateString() === today.toDateString();
                         return (
                           <div
                             key={index}
@@ -458,8 +458,8 @@ const ProctorSetAvailability: React.FC<ProctorSetAvailabilityProps> = ({ user })
                               'calendar-day',
                               day ? 'selectable' : '',
                               isSelected ? 'selected' : '',
-                              isToday    ? 'today'    : '',
-                              isAllowed  ? 'allowed'  : 'disabled',
+                              isToday ? 'today' : '',
+                              isAllowed ? 'allowed' : 'disabled',
                             ].filter(Boolean).join(' ')}
                             onClick={() => isAllowed && handleDateSelect(day)}
                             style={{ pointerEvents: isAllowed ? 'auto' : 'none', opacity: isAllowed ? 1 : 0.35 }}
@@ -588,11 +588,11 @@ const ProctorSetAvailability: React.FC<ProctorSetAvailabilityProps> = ({ user })
                 options={
                   selectedOriginalDay
                     ? Array.from(new Set(
-                        selectedOriginalDay
-                          .split(',')
-                          .filter(d => !isPastDate(d))
-                          .flatMap(day => dayToTimeSlots[day] || [])
-                      )).map(slot => ({ value: slot, label: slot }))
+                      selectedOriginalDay
+                        .split(',')
+                        .filter(d => !isPastDate(d))
+                        .flatMap(day => dayToTimeSlots[day] || [])
+                    )).map(slot => ({ value: slot, label: slot }))
                     : Object.values(AvailabilityTimeSlot).map(slot => ({ value: slot, label: slot }))
                 }
                 placeholder={selectedOriginalDay ? 'Select time slot(s)…' : 'Select days first'}

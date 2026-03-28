@@ -3,18 +3,18 @@ import React, { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { api } from '../lib/apiClient.ts';
 import {
-  FaHome, FaUsers, FaBuilding, FaCalendarAlt,
+  FaHome, FaUsers, FaBuilding,
   FaUser, FaSignOutAlt, FaPenAlt, FaBars, FaTimes
 } from 'react-icons/fa';
 import { PiBuildingsFill } from "react-icons/pi";
-import { FaBookAtlas, FaBookJournalWhills } from "react-icons/fa6";
+import { FaBookAtlas } from "react-icons/fa6";
 import '../styles/F_Dashboard.css';
 import { IoCalendarSharp } from "react-icons/io5";
 
 
 import Colleges from './A_Colleges.tsx';
 import Structure from './A_Structure.tsx';
-import Courses from './A_Courses.tsx';
+import Courses from './A_AcademicData.tsx';
 import SectionCourses from './A_SectionCourses.tsx';
 import Terms from './A_Terms.tsx';
 import BuildingsAndRooms from './A_BuildingsAndRooms.tsx';
@@ -30,9 +30,8 @@ const iconStyle = { className: 'icon', size: 25 };
 const adminSidebarItems = [
   { key: 'dashboard', label: 'Dashboard', icon: <FaHome {...iconStyle} /> },
   { key: 'structure', label: 'College Structure', icon: <FaBuilding {...iconStyle} /> },
-  { key: 'courses', label: 'Courses', icon: <FaBookAtlas {...iconStyle} /> },
-  { key: 'section-courses', label: 'Section Courses', icon: <FaBookJournalWhills {...iconStyle} /> },
-  { key: 'terms', label: 'Terms', icon: <FaCalendarAlt {...iconStyle} /> },
+  { key: 'courses', label: 'Courses & Sections', icon: <FaBookAtlas {...iconStyle} /> },
+  // { key: 'terms', label: 'Terms', icon: <FaCalendarAlt {...iconStyle} /> },
   { key: 'buildings-and-rooms', label: 'Buildings & Rooms', icon: <PiBuildingsFill {...iconStyle} /> },
   { key: 'exam-period', label: 'Exam Period', icon: <IoCalendarSharp {...iconStyle} /> },
   { key: 'set-Modality', label: 'Set Modality', icon: <FaPenAlt {...iconStyle} /> },

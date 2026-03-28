@@ -869,3 +869,307 @@
 .cl-room-row td:nth-child(2) {
   opacity: 0.6;
 }
+
+/* ══════════════════════════════════════════
+   ACADEMIC DATA — TAB ADDITIONS
+   Append these rules to A_Colleges.css
+══════════════════════════════════════════ */
+
+/* ── Tabs ── */
+.cl-tabs {
+  display: flex;
+  gap: 4px;
+  background: var(--cl-surface);
+  border: 1.5px solid var(--cl-border);
+  border-radius: var(--cl-radius-md);
+  padding: 4px;
+  box-shadow: var(--cl-shadow-sm);
+  width: fit-content;
+}
+
+.cl-tab {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  padding: 8px 16px;
+  border: none;
+  border-radius: var(--cl-radius-sm);
+  background: transparent;
+  color: var(--cl-text-muted);
+  font-size: 12.5px;
+  font-weight: 600;
+  font-family: var(--cl-font);
+  cursor: pointer;
+  transition: background 0.15s, color 0.15s;
+  white-space: nowrap;
+}
+
+.cl-tab:hover {
+  background: var(--cl-surface-3);
+  color: var(--cl-text-secondary);
+}
+
+.cl-tab.active {
+  background: var(--cl-brand);
+  color: #fff;
+}
+
+.cl-tab-badge {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 20px;
+  height: 18px;
+  padding: 0 5px;
+  border-radius: 20px;
+  font-size: 10px;
+  font-weight: 700;
+  font-family: var(--cl-mono);
+  background: rgba(255,255,255,0.2);
+  color: inherit;
+}
+
+.cl-tab.active .cl-tab-badge {
+  background: rgba(255,255,255,0.25);
+  color: #fff;
+}
+
+.cl-tab:not(.active) .cl-tab-badge {
+  background: var(--cl-surface-3);
+  color: var(--cl-text-muted);
+}
+
+/* ── Term badge ── */
+.cl-term-badge {
+  display: inline-block;
+  padding: 3px 9px;
+  background: var(--cl-warn-soft);
+  color: var(--cl-warn);
+  border-radius: 20px;
+  font-size: 11px;
+  font-weight: 700;
+  font-family: var(--cl-mono);
+}
+
+/* ── Night class badge ── */
+.cl-night-badge {
+  display: inline-block;
+  padding: 3px 8px;
+  background: #1e1b4b;
+  color: #a5b4fc;
+  border-radius: 20px;
+  font-size: 10.5px;
+  font-weight: 700;
+  font-family: var(--cl-mono);
+}
+
+/* ══════════════════════════════════════════
+   SCHEDULER AVAILABILITY ADDITIONS
+   Append these rules to A_Colleges.css
+══════════════════════════════════════════ */
+
+/* ── Alert tab variant ── */
+.cl-tab.cl-tab-alert {
+  color: #c2410c;
+}
+
+.cl-tab-badge-alert {
+  background: #ef4444 !important;
+  color: #fff !important;
+  animation: cl-pulse 2s infinite;
+}
+
+@keyframes cl-pulse {
+  0%, 100% { transform: scale(1); }
+  50%       { transform: scale(1.15); }
+}
+
+/* ── Active toolbar button (filter pills) ── */
+.cl-toolbar-btn.cl-toolbar-btn-active {
+  background: var(--cl-brand);
+  color: #fff;
+  border-color: var(--cl-brand);
+}
+
+/* ── Availability status badges ── */
+.cl-avail-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  padding: 3px 10px;
+  border-radius: 20px;
+  font-size: 11.5px;
+  font-weight: 700;
+  font-family: var(--cl-mono);
+  text-transform: capitalize;
+}
+
+.cl-avail-badge.available,
+.cl-avail-badge.cl-status-available {
+  background: var(--cl-success-soft);
+  color: var(--cl-success);
+}
+
+.cl-avail-badge.unavailable,
+.cl-avail-badge.cl-status-unavailable {
+  background: var(--cl-danger-soft);
+  color: var(--cl-danger);
+}
+
+.cl-avail-badge.cl-status-pending {
+  background: var(--cl-warn-soft);
+  color: var(--cl-warn);
+}
+
+/* ── Pending banner ── */
+.cl-pending-banner {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 12px 18px;
+  border-radius: var(--cl-radius-md);
+  background: var(--cl-warn-soft);
+  border: 1.5px solid #fed7aa;
+  color: var(--cl-warn);
+  font-weight: 600;
+  font-size: 13.5px;
+  box-shadow: var(--cl-shadow-sm);
+}
+
+/* ── Change request cards ── */
+.cl-cr-card {
+  background: var(--cl-surface);
+  border: 1.5px solid var(--cl-border);
+  border-radius: var(--cl-radius-md);
+  padding: 16px 20px;
+  cursor: pointer;
+  box-shadow: var(--cl-shadow-sm);
+  transition: box-shadow 0.15s, transform 0.12s;
+  border-left-width: 4px;
+}
+
+.cl-cr-card:hover {
+  box-shadow: var(--cl-shadow-md);
+  transform: translateY(-1px);
+}
+
+.cl-cr-card.pending {
+  border-color: #fbbf24;
+  border-left-color: #f59e0b;
+  box-shadow: 0 2px 8px rgba(245, 158, 11, 0.10);
+}
+
+.cl-cr-card.approved {
+  border-left-color: var(--cl-success);
+}
+
+.cl-cr-card.rejected {
+  border-left-color: var(--cl-danger);
+}
+
+/* ── Inline edit strip inside CR card ── */
+.cl-inline-edit {
+  margin-top: 12px;
+  padding: 12px 14px;
+  background: var(--cl-surface-2);
+  border: 1.5px solid var(--cl-border);
+  border-radius: var(--cl-radius-sm);
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+/* ── Calendar ── */
+.cl-calendar {
+  margin-top: 8px;
+  border: 1.5px solid var(--cl-border);
+  border-radius: var(--cl-radius-md);
+  background: var(--cl-surface);
+  box-shadow: var(--cl-shadow-md);
+  overflow: hidden;
+  animation: cl-slide-up 0.18s ease;
+}
+
+.cl-calendar-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 12px 16px;
+  background: var(--cl-brand);
+  color: #fff;
+  font-size: 13px;
+  font-weight: 700;
+  font-family: var(--cl-font);
+}
+
+.cl-cal-nav {
+  background: transparent;
+  border: none;
+  color: #fff;
+  cursor: pointer;
+  padding: 4px 8px;
+  border-radius: var(--cl-radius-sm);
+  transition: background 0.12s;
+  font-size: 12px;
+}
+
+.cl-cal-nav:hover {
+  background: rgba(255, 255, 255, 0.15);
+}
+
+.cl-calendar-grid {
+  display: grid;
+  grid-template-columns: repeat(7, 1fr);
+  padding: 10px 12px;
+  gap: 2px;
+}
+
+.cl-cal-dayname {
+  text-align: center;
+  font-size: 10.5px;
+  font-weight: 700;
+  font-family: var(--cl-mono);
+  color: var(--cl-text-muted);
+  padding: 4px 0 6px;
+}
+
+.cl-cal-day {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  height: 34px;
+  border-radius: var(--cl-radius-sm);
+  font-size: 12.5px;
+  font-family: var(--cl-font);
+  color: var(--cl-text-secondary);
+  cursor: pointer;
+  transition: background 0.12s, color 0.12s;
+}
+
+.cl-cal-day:not(.empty):not(.disabled):hover {
+  background: var(--cl-accent-soft);
+  color: var(--cl-brand);
+}
+
+.cl-cal-day.selected {
+  background: var(--cl-brand);
+  color: #fff;
+  font-weight: 700;
+}
+
+.cl-cal-day.disabled {
+  color: var(--cl-surface-3);
+  cursor: not-allowed;
+}
+
+.cl-cal-day.empty {
+  cursor: default;
+}
+
+.cl-calendar-footer {
+  display: flex;
+  gap: 8px;
+  padding: 10px 12px;
+  border-top: 1.5px solid var(--cl-surface-3);
+  background: var(--cl-surface-2);
+}
