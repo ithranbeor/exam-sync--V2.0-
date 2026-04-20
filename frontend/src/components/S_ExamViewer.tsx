@@ -3,8 +3,8 @@ import React, { useEffect, useState, useRef } from "react";
 import Select from "react-select";
 import { api } from '../lib/apiClient.ts';
 import "../styles/S_ExamViewer.css";
-import { FaChevronLeft, FaChevronRight, FaUserEdit, FaEnvelope, FaFileDownload, FaPlus, FaTrash, FaPaperPlane, FaCog } from "react-icons/fa";
-import { MdSwapHoriz, MdEmail } from 'react-icons/md';
+import { FaChevronLeft, FaChevronRight, FaUserEdit, FaEnvelope, FaFileDownload, FaPlus, FaTrash, FaCog } from "react-icons/fa";
+import { MdSwapHoriz } from 'react-icons/md';
 import { ToastContainer, toast } from 'react-toastify';
 import 'react-toastify/dist/ReactToastify.css';
 import Modal from "./S_Modal.tsx";
@@ -37,7 +37,7 @@ const SchedulerView: React.FC<SchedulerViewProps> = ({ user }) => {
   const [examData, setExamData] = useState<ExamDetail[]>([]);
   const [users, setUsers] = useState<{ user_id: number; first_name: string; last_name: string }[]>([]);
   const [page, setPage] = useState(0);
-  const [_activeCards, setActiveCards] = useState<Record<string, boolean>>({});
+  const [_activeCards, _setActiveCards] = useState<Record<string, boolean>>({});
   const [swapMode, setSwapMode] = useState(false);
   const [showSwapInstructions, setShowSwapInstructions] = useState(false);
   const [selectedSwap, setSelectedSwap] = useState<ExamDetail | null>(null);
@@ -65,13 +65,16 @@ const SchedulerView: React.FC<SchedulerViewProps> = ({ user }) => {
   const [searchMatches, setSearchMatches] = useState<ExamDetail[]>([]);
   const [currentMatchIndex, setCurrentMatchIndex] = useState<number>(-1);
   const searchInputRef = useRef<HTMLInputElement>(null);
+  const [activePanel, setActivePanel] = useState<string | null>(null);
 
   const maxRoomColumns = 5;
   const [_sendingToDean, _setSendingToDean] = useState(false);
   const [approvalStatus, setApprovalStatus] = useState<'pending' | 'approved' | 'rejected' | null>(null);
   const [remarks, setRemarks] = useState<string | null>(null);
 
-  const [showExportModal, setShowExportModal] = useState(false);
+  const [filterMenuOpen, setFilterMenuOpen] = useState(false);
+  const filterRef = useRef<HTMLDivElement>(null);
+
   const [_showExportDropdown, setShowExportDropdown] = useState(false);
   const [collegeDataReady, setCollegeDataReady] = useState(false);
   const exportRef = useRef<HTMLDivElement>(null);
@@ -302,7 +305,6 @@ const SchedulerView: React.FC<SchedulerViewProps> = ({ user }) => {
   };
 
   const resetAllModes = () => {
-    setIsModalOpen(false);
     setActiveProctorEdit(null);
     setSwapMode(false);
     setShowSwapInstructions(false);
@@ -310,6 +312,7 @@ const SchedulerView: React.FC<SchedulerViewProps> = ({ user }) => {
     setShowEnvelopeDropdown(false);
     setShowExportDropdown(false);
     setIsDragDropMode(false);
+    setActivePanel(null); // ← NEW
   };
 
   const saveUnscheduledSections = (sections: any[]) => {
@@ -358,12 +361,22 @@ const SchedulerView: React.FC<SchedulerViewProps> = ({ user }) => {
   }, [schedulerCollegeName]);
 
   useEffect(() => {
+    const handleFilterOutside = (e: MouseEvent) => {
+      if (filterRef.current && !filterRef.current.contains(e.target as Node)) {
+        setFilterMenuOpen(false);
+      }
+    };
+    document.addEventListener('mousedown', handleFilterOutside);
+    return () => document.removeEventListener('mousedown', handleFilterOutside);
+  }, []);
+
+  useEffect(() => {
     const preventZoom = (e: WheelEvent) => {
       if (e.ctrlKey) {
         e.preventDefault();
       }
     };
-    
+
     document.addEventListener('wheel', preventZoom, { passive: false });
     return () => document.removeEventListener('wheel', preventZoom);
   }, []);
@@ -945,13 +958,19 @@ const SchedulerView: React.FC<SchedulerViewProps> = ({ user }) => {
       setCurrentMatchIndex(-1);
       return;
     }
-
     const searchLower = searchTerm.toLowerCase();
     const matches = filteredExamData.filter(exam => examMatchesSearch(exam, searchLower));
     setSearchMatches(matches);
-
     if (matches.length > 0) {
       setCurrentMatchIndex(0);
+      // auto-scroll to first match immediately
+      setTimeout(() => {
+        const first = matches[0];
+        if (first?.examdetails_id) {
+          const el = document.querySelector(`[data-exam-id="${first.examdetails_id}"]`);
+          el?.scrollIntoView({ behavior: 'smooth', block: 'center' });
+        }
+      }, 80);
     } else {
       setCurrentMatchIndex(-1);
     }
@@ -1173,12 +1192,6 @@ const SchedulerView: React.FC<SchedulerViewProps> = ({ user }) => {
 
   const hasData = searchFilteredData.length > 0;
 
-  const toggleCard = (key: string) => {
-    setActiveCards(prev => ({ ...prev, [key]: !prev[key] }));
-  };
-
-  const [isModalOpen, setIsModalOpen] = useState(false);
-
   const handleDeleteAllSchedules = async () => {
     if (!schedulerCollegeName || schedulerCollegeName === "Add schedule first") {
       toast.warn("No college detected. Cannot delete schedules.");
@@ -1321,10 +1334,26 @@ const SchedulerView: React.FC<SchedulerViewProps> = ({ user }) => {
     return h * 60 + m;
   };
 
+  /**
+   * ════════════════════════════════════════════════════════════════
+   * PATCH: Replace the `dynamicIcons` array in S_ExamViewer.tsx
+   * ════════════════════════════════════════════════════════════════
+   *
+   * Find: `const dynamicIcons = [`
+   * Replace the whole array with the one below.
+   *
+   * Key changes:
+   *  - "Add Schedule" → opens activePanel="Add Schedule" (no Modal)
+   *  - "Export"       → opens activePanel="Export"       (no Modal)
+   *  - "Edit Manually"→ opens activePanel="Edit Manually"(no Modal)
+   *  - All other icons are identical to before
+   * ════════════════════════════════════════════════════════════════
+   */
+
   const dynamicIcons = [
     {
       key: "Add Schedule",
-      icon: <FaPlus style={{ fontSize: "25px", color: "gold" }} />,
+      icon: <FaPlus style={{ fontSize: "20px", color: "gold" }} />,
       action: () => {
         if (approvalStatus === "pending") {
           toast.warn("Waiting for dean approval");
@@ -1332,13 +1361,13 @@ const SchedulerView: React.FC<SchedulerViewProps> = ({ user }) => {
           toast.warn("Schedule already approved. Cannot modify.");
         } else {
           resetAllModes();
-          setIsModalOpen(true);
+          setActivePanel("Add Schedule");
         }
       },
     },
     {
       key: "Change Proctor",
-      icon: <FaUserEdit style={{ fontSize: "20px" }} />,
+      icon: <FaUserEdit style={{ fontSize: "18px" }} />,
       action: () => {
         if (approvalStatus === "pending") {
           toast.warn("Waiting for dean approval");
@@ -1348,13 +1377,13 @@ const SchedulerView: React.FC<SchedulerViewProps> = ({ user }) => {
           const newMode = activeProctorEdit === -1 ? null : -1;
           resetAllModes();
           setActiveProctorEdit(newMode);
-          setShowProctorInstructions(newMode === -1); // ✅ ADD
+          setShowProctorInstructions(newMode === -1);
         }
       },
     },
     {
       key: "Swap Room",
-      icon: <MdSwapHoriz style={{ fontSize: "25px" }} />,
+      icon: <MdSwapHoriz style={{ fontSize: "22px" }} />,
       action: () => {
         if (approvalStatus === "pending") {
           toast.warn("Waiting for dean approval");
@@ -1365,16 +1394,16 @@ const SchedulerView: React.FC<SchedulerViewProps> = ({ user }) => {
           resetAllModes();
           setSwapMode(newSwapMode);
           setSelectedSwap(null);
-          setDraggedExamId(null);       // ✅ clear any active drag
-          setDraggedOverExamId(null);   // ✅ clear hover state
-          setIsDragDropMode(false);     // ✅ reset drag mode
+          setDraggedExamId(null);
+          setDraggedOverExamId(null);
+          setIsDragDropMode(false);
           setShowSwapInstructions(newSwapMode);
         }
       },
     },
     {
       key: "Send Messages",
-      icon: <FaEnvelope style={{ fontSize: "20px" }} />,
+      icon: <FaEnvelope style={{ fontSize: "17px" }} />,
       action: () => {
         resetAllModes();
         setShowEnvelopeDropdown(true);
@@ -1383,44 +1412,31 @@ const SchedulerView: React.FC<SchedulerViewProps> = ({ user }) => {
     },
     {
       key: "Export",
-      icon: <FaFileDownload style={{ fontSize: "18px" }} />,
+      icon: <FaFileDownload style={{ fontSize: "17px" }} />,
       action: () => {
         resetAllModes();
-        setShowExportDropdown(true);
-        setShowExportModal(true);
-        setShowExportDropdown(false);
-
+        setActivePanel("Export");
       },
       ref: exportRef,
     },
     {
       key: "Delete All",
-      icon: <FaTrash style={{ fontSize: "18px" }} />,
+      icon: <FaTrash style={{ fontSize: "16px" }} />,
       action: handleDeleteAllSchedules,
     },
     {
       key: "Edit Manually",
       icon: (
-        <div style={{ position: 'relative', display: 'inline-block' }}>
-          <FaEdit style={{ fontSize: "20px" }} />
+        <div style={{ position: 'relative', display: 'inline-flex', alignItems: 'center', justifyContent: 'center' }}>
+          <FaEdit style={{ fontSize: "18px" }} />
           {showUnscheduledBadge && (
             <span style={{
-              position: 'absolute',
-              top: '-4px',
-              right: '-4px',
-              backgroundColor: '#dc3545',
-              color: 'white',
-              borderRadius: '50%',
-              minWidth: '18px',
-              height: '18px',
-              display: 'flex',
-              alignItems: 'center',
-              justifyContent: 'center',
-              fontSize: '11px',
-              fontWeight: 'bold',
-              padding: '2px',
-              boxShadow: '0 2px 4px rgba(0, 0, 0, 0.2)',
-              zIndex: 1
+              position: 'absolute', top: '-5px', right: '-6px',
+              backgroundColor: '#dc3545', color: 'white',
+              borderRadius: '50%', minWidth: '16px', height: '16px',
+              display: 'flex', alignItems: 'center', justifyContent: 'center',
+              fontSize: '10px', fontWeight: 'bold', padding: '1px',
+              boxShadow: '0 1px 3px rgba(0,0,0,0.3)', zIndex: 1
             }}>
               {persistentUnscheduled.length > 99 ? '99+' : persistentUnscheduled.length}
             </span>
@@ -1434,25 +1450,10 @@ const SchedulerView: React.FC<SchedulerViewProps> = ({ user }) => {
           toast.warn("Schedule already approved. Cannot modify.");
         } else {
           resetAllModes();
-
-          // Check for unscheduled sections
           if (persistentUnscheduled.length > 0) {
-            const result = window.confirm(
-              `Found ${persistentUnscheduled.length} unscheduled section(s) from previous attempt.\n\n` +
-              `Would you like to schedule them now?`
-            );
-
-            if (result) {
-              setManualEditorSections(persistentUnscheduled);
-              setShowManualEditor(true);
-            }
-          } else if (examData.length === 0) {
-            toast.info("No schedules found. Please add schedules first.");
-          } else {
-            // Allow manual editing of existing schedules
-            setManualEditorSections([]);
-            setShowManualEditor(true);
+            setManualEditorSections(persistentUnscheduled);
           }
+          setActivePanel("Edit Manually");
         }
       },
     },
@@ -1487,480 +1488,340 @@ const SchedulerView: React.FC<SchedulerViewProps> = ({ user }) => {
 
   return (
     <div style={{ position: "relative", width: "100%", overflow: "visible" }}>
+
+      {/* ══════════════════════════════════════════
+          TOP NAV BAR
+      ══════════════════════════════════════════ */}
       <div className="scheduler-top-card">
-        {approvalStatus && (
-          <div
-            style={{
-              position: "fixed",
-              top: "80px",
-              left: "50%",
-              transform: "translateX(-50%)",
-              display: "flex",
-              flexDirection: "column",
-              justifyContent: "center",
-              alignItems: "center",
-              padding: "10px 20px",
-              borderRadius: "8px",
-              backgroundColor:
-                approvalStatus === "approved"
-                  ? "#4CAF50"
-                  : approvalStatus === "rejected"
-                    ? "#f44336"
-                    : "#FF9800",
-              color: "white",
-              fontWeight: "bold",
-              zIndex: 1000,
-              boxShadow: "0 2px 8px rgba(0,0,0,0.3)",
-              maxWidth: "90%",
-              textAlign: "center",
-            }}
-          >
-            <span>
-              Status: {approvalStatus.toUpperCase()}
-              {approvalStatus === "pending" && " - Waiting for Dean"}
-              {approvalStatus === "rejected" && " - You can modify and resubmit"}
-            </span>
-
-            {approvalStatus === "rejected" && remarks && (
-              <span
-                style={{
-                  marginTop: "5px",
-                  fontWeight: "normal",
-                  fontSize: "0.9rem",
-                  opacity: 0.9,
-                }}
-              >
-                <strong>Remarks:</strong> {remarks}
-              </span>
-            )}
-          </div>
-        )}
-
-        {swapMode && (
-          <div
-            style={{
-              position: "fixed",
-              top: "90px",
-              left: "50%",
-              transform: "translateX(-50%)",
-              backgroundColor: "#ff9500ff",
-              color: "white",
-              padding: "12px 25px",
-              borderRadius: "10px",
-              boxShadow: "0 4px 10px rgba(0,0,0,0.3)",
-              zIndex: 1200,
-              textAlign: "center",
-              fontWeight: "bold",
-              opacity: 0.9
-            }}
-          >
-            Swapping Mode
-          </div>
-        )}
-
-        {activeProctorEdit === -1 && (
-          <div
-            style={{
-              position: "fixed",
-              top: "90px",
-              left: "50%",
-              transform: "translateX(-50%)",
-              backgroundColor: "#ff9500ff",
-              color: "white",
-              padding: "12px 25px",
-              borderRadius: "10px",
-              boxShadow: "0 4px 10px rgba(0,0,0,0.3)",
-              zIndex: 1200,
-              textAlign: "center",
-              fontWeight: "bold",
-              opacity: 0.9
-            }}
-          >
-            Proctor Edit Mode
-          </div>
-        )}
-
-        {showSwapInstructions && (
-          <div
-            style={{
-              position: "fixed",
-              top: "250px",
-              left: "50%",
-              transform: "translateX(-50%)",
-              backgroundColor: "white",
-              color: "#092C4C",
-              borderRadius: "10px",
-              padding: "5px 10px",
-              width: "400px",
-              zIndex: 1201,
-              boxShadow: "0 4px 12px rgba(0,0,0,0.3)",
-              textAlign: "center",
-              animation: "fadeIn 0.3s ease",
-            }}
-          >
-            <h4 style={{ marginBottom: "8px", fontWeight: "bold" }}>Swapping Instructions</h4>
-            <p style={{ fontSize: "15px", lineHeight: "1.5", marginBottom: "10px" }}>
-              <strong>Option 1 — Swap rooms:</strong><br />
-              1. Click a schedule to select it.<br />
-              2. Click another schedule with the same course & timeslot to swap rooms.<br /><br />
-              <strong>Option 2 — Drag & drop:</strong><br />
-              1. Drag any schedule card to an empty cell to move it there.
-            </p>
-            <button type="button"
-              onClick={() => setShowSwapInstructions(false)}
-              style={{
-                backgroundColor: "transparent",
-                color: "red",
-                border: "none",
-                borderRadius: "10px",
-                padding: "6px 12px",
-                cursor: "pointer",
-                fontWeight: "bold",
-              }}
+        {/* ── Action icons ── */}
+        {dynamicIcons.map(({ key, icon, action, ref: iconRef }) => {
+          const isActive =
+            (swapMode && key === "Swap Room") ||
+            (activeProctorEdit !== null && key === "Change Proctor") ||
+            (showEnvelopeDropdown && key === "Send Messages") ||
+            (activePanel === key);
+      
+          return (
+            <div
+              key={key}
+              ref={key === "Send Messages" ? iconRef : undefined}
+              className={`scheduler-icon ${isActive ? "active" : ""} ${showIconLabels ? "label-mode" : ""}`}
+              onClick={() => { if (action) action(); }}
             >
-              Close Instructions
-            </button>
-          </div>
-        )}
-
-        {showProctorInstructions && (
-          <div
-            style={{
-              position: "fixed",
-              top: "250px",
-              left: "50%",
-              transform: "translateX(-50%)",
-              backgroundColor: "white",
-              color: "#092C4C",
-              borderRadius: "10px",
-              padding: "5px 10px",
-              width: "400px",
-              zIndex: 1201,
-              boxShadow: "0 4px 12px rgba(0,0,0,0.3)",
-              textAlign: "center",
-              animation: "fadeIn 0.3s ease",
-            }}
+              <span className="nav-icon-inner" style={{ display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                {icon}
+              </span>
+              {showIconLabels && <span className="nav-label">{key}</span>}
+              {!showIconLabels && <span className="tooltip-text">{key}</span>}
+      
+              {key === "Send Messages" && showEnvelopeDropdown && (
+                <div className="envelope-dropdown" onClick={e => e.stopPropagation()}>
+                  <button type="button" className="dropdown-item"
+                    onClick={(e) => { e.stopPropagation(); setShowDeanModal(true); setShowEnvelopeDropdown(false); }}>
+                    Send to Dean
+                  </button>
+                  <button type="button" className="dropdown-item"
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      if (approvalStatus !== "approved") {
+                        toast.warn("You can only send email once the schedule is approved.");
+                        return;
+                      }
+                      setShowEmailModal(true);
+                      setShowEnvelopeDropdown(false);
+                    }}>
+                    Send Email
+                  </button>
+                </div>
+              )}
+            </div>
+          );
+        })}
+      
+        <div className="nav-divider" />
+      
+        {/* ── Custom filter dropdown ── */}
+        <div className={`nav-filter-wrap ${filterMenuOpen ? "open" : ""}`} ref={filterRef}>
+          <button
+            type="button"
+            className={`nav-filter-btn ${filterMenuOpen ? "open" : ""}`}
+            onClick={() => setFilterMenuOpen(v => !v)}
           >
-            <h4 style={{ marginBottom: "8px", fontWeight: "bold" }}>Proctor Edit Instructions</h4>
-            <p style={{ fontSize: "15px", lineHeight: "1.5", marginBottom: "10px" }}>
-              1. Click on any schedule's <strong>Proctor</strong> section to open the selector.<br />
-              2. Search and select one or more proctors from the dropdown.<br />
-              3. Click <strong>✕</strong> on the selector to confirm and close.
-            </p>
-            <button type="button"
-              onClick={() => setShowProctorInstructions(false)}
-              style={{
-                backgroundColor: "transparent",
-                color: "red",
-                border: "none",
-                borderRadius: "10px",
-                padding: "6px 12px",
-                cursor: "pointer",
-                fontWeight: "bold",
-              }}
+            {selectedFilter === "all"
+              ? "All Dates"
+              : (() => {
+                  const parts = selectedFilter.split("|");
+                  // show just the date part (last segment after trimming)
+                  return parts[parts.length - 1]?.trim() || selectedFilter;
+                })()
+            }
+            {/* chevron SVG */}
+            <svg className="chevron" viewBox="0 0 10 6" fill="none" xmlns="http://www.w3.org/2000/svg">
+              <path d="M1 1L5 5L9 1" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"/>
+            </svg>
+          </button>
+      
+          <div className="nav-filter-menu">
+            {/* All Dates option */}
+            <div
+              className={`nav-filter-option ${selectedFilter === "all" ? "selected" : ""}`}
+              onClick={() => { setSelectedFilter("all"); setPage(0); setFilterMenuOpen(false); }}
             >
-              Close Instructions
-            </button>
-          </div>
-        )}
-
-        {dynamicIcons.map(({ key, icon, action, ref }) => (
-          <div
-            key={key}
-            ref={key === "Send Messages" ? ref : undefined}
-            className={`scheduler-icon ${
-              (swapMode && key === "Swap Room") ||
-              (activeProctorEdit !== null && key === "Change Proctor") ||
-              (isModalOpen && key === "Add Schedule") ||
-              (showEnvelopeDropdown && key === "Send Messages")
-                ? "active"
-                : ""
-            }`}
-            style={{
-              position: key === "Send Messages" ? "relative" : undefined,
-              flexDirection: showIconLabels ? 'column' : 'row',
-              gap: showIconLabels ? '4px' : '0'
-            }}
-            onClick={() => {
-              if (action) {
-                action();
-              } else {
-                toggleCard(key);
-              }
-            }}
-          >
-            {icon}
-            {showIconLabels ? (
-              <span style={{
-                fontSize: '10px',
-                color: '#092C4C',
-                fontWeight: '500',
-                whiteSpace: 'nowrap',
-                marginTop: '2px'
-              }}>
-                {key}
-              </span>
-            ) : (
-              <span className="tooltip-text">
-                {key.charAt(0).toUpperCase() + key.slice(1)}
-              </span>
-            )}
-
-            {key === "Send Messages" && showEnvelopeDropdown && (
-              <div className="envelope-dropdown">
-                <button
-                  type="button"
-                  className="dropdown-item"
-                  onClick={(e) => {
-                    e.stopPropagation();
-                    setShowDeanModal(true);
-                    setShowEnvelopeDropdown(false);
-                  }}
-                  title="Send to Dean"
+              <span className="opt-dot" />
+              All Dates
+            </div>
+      
+            {getFilterOptions().length > 0 && <div className="nav-filter-divider" />}
+      
+            {getFilterOptions().map((option, idx) => {
+              const parts = option.split("|").map(s => s.trim());
+              // Display: "Semester | AY · Date"
+              const label = parts.length >= 3
+                ? `${parts[0]} · ${parts[2]}`
+                : option;
+              return (
+                <div
+                  key={idx}
+                  className={`nav-filter-option ${selectedFilter === option ? "selected" : ""}`}
+                  onClick={() => { setSelectedFilter(option); setPage(0); setFilterMenuOpen(false); }}
                 >
-                  <FaPaperPlane />
-                </button>
-
-                <button
-                  type="button"
-                  className="dropdown-item"
-                  onClick={(e) => {
-                    e.stopPropagation();
-
-                    if (approvalStatus !== "approved") {
-                      toast.warn("You can only send email once the schedule is approved.");
-                      return;
-                    }
-
-                    setShowEmailModal(true);
-                    setShowEnvelopeDropdown(false);
-                  }}
-                  title="Send Email"
-                >
-                  <MdEmail />
-                </button>
-              </div>
-            )}
+                  <span className="opt-dot" />
+                  {label}
+                </div>
+              );
+            })}
           </div>
-        ))}
-        <div style={{
-          top: "20px",
-          right: "-100px",
-        }}>
-          <select
-            value={selectedFilter}
-            onChange={(e) => {
-              setSelectedFilter(e.target.value);
-              setPage(0);
-            }}
-            style={{
-              padding: "8px 1px", fontSize: "14px", borderRadius: "15px", border: "2px solid #092C4C",
-              backgroundColor: "white", cursor: "pointer", minWidth: "250px", color: "#092C4C",
-            }}
-          >
-            <option value="all">All Dates</option>
-            {getFilterOptions().map((option, index) => (
-              <option key={index} value={option}>
-                {option}
-              </option>
-            ))}
-          </select>
         </div>
-        <div
-          className="search-container"
-          style={{
-            padding: "1px",
-            fontSize: "10px",
-            borderRadius: "15px",
-            border: "2px solid #092C4C",
-            backgroundColor: "white",
-            cursor: "pointer",
-            minWidth: "250px",
-            color: "#092C4C",
-            height: "40%",
-            display: "flex",
-            alignItems: "center",
-            gap: "4px",
-            paddingRight: "8px"
-          }}
-        >
-          <span style={{ color: "#092C4C", fontSize: "16px" }}></span>
+      
+        <div className="nav-divider" />
+      
+        {/* ── Search ── */}
+        <div className="nav-search-wrap">
+          {/* small search icon */}
+          <svg className="nav-search-icon" viewBox="0 0 16 16" fill="currentColor" style={{ width: 13, height: 13, flexShrink: 0, color: 'rgba(255,255,255,0.4)', marginRight: 2 }}>
+            <path d="M11.742 10.344a6.5 6.5 0 1 0-1.397 1.398h-.001c.03.04.062.078.098.115l3.85 3.85a1 1 0 0 0 1.415-1.414l-3.85-3.85a1.007 1.007 0 0 0-.115-.099zm-5.242 1.156a5.5 5.5 0 1 1 0-11 5.5 5.5 0 0 1 0 11z"/>
+          </svg>
           <input
             ref={searchInputRef}
             type="text"
             value={searchTerm}
-            onChange={(e) => {
-              setSearchTerm(e.target.value);
-              setPage(0);
-            }}
-            placeholder="Search schedules... (Ctrl+F)"
-            style={{
-              border: "none",
-              outline: "none",
-              fontSize: "14px",
-              color: "#092C4C",
-              backgroundColor: "transparent",
-              flex: 1,
-              minWidth: 0
-            }}
+            onChange={(e) => { setSearchTerm(e.target.value); setPage(0); }}
+            placeholder="Search…  Ctrl+F"
           />
-          {searchTerm && (
+          {searchTerm && searchMatches.length > 0 && (
+            <span className="nav-search-count">{currentMatchIndex + 1}/{searchMatches.length}</span>
+          )}
+          {searchTerm && searchMatches.length > 0 && (
             <>
-              {searchMatches.length > 0 ? (
-                <>
-                  <span style={{
-                    fontSize: "12px",
-                    color: "#666",
-                    whiteSpace: "nowrap",
-                    marginRight: "4px"
-                  }}>
-                    {currentMatchIndex + 1}/{searchMatches.length}
-                  </span>
-                  <button
-                    type="button"
-                    onClick={(e) => {
-                      e.stopPropagation();
-                      handlePreviousMatch();
-                    }}
-                    className="search-nav-button"
-                    title="Previous match"
-                    style={{
-                      background: "none",
-                      border: "none",
-                      color: "#092C4C",
-                      cursor: "pointer",
-                      fontSize: "14px",
-                      padding: "4px 6px",
-                      display: "flex",
-                      alignItems: "center",
-                      justifyContent: "center",
-                      borderRadius: "4px",
-                      transition: "background 0.2s"
-                    }}
-                    onMouseEnter={(e) => {
-                      e.currentTarget.style.background = "#f0f0f0";
-                    }}
-                    onMouseLeave={(e) => {
-                      e.currentTarget.style.background = "none";
-                    }}
-                  >
-                    <FaChevronLeft />
-                  </button>
-                  <button
-                    type="button"
-                    onClick={(e) => {
-                      e.stopPropagation();
-                      handleNextMatch();
-                    }}
-                    className="search-nav-button"
-                    title="Next match"
-                    style={{
-                      background: "none",
-                      border: "none",
-                      color: "#092C4C",
-                      cursor: "pointer",
-                      fontSize: "14px",
-                      padding: "4px 6px",
-                      display: "flex",
-                      alignItems: "center",
-                      justifyContent: "center",
-                      borderRadius: "4px",
-                      transition: "background 0.2s"
-                    }}
-                    onMouseEnter={(e) => {
-                      e.currentTarget.style.background = "#f0f0f0";
-                    }}
-                    onMouseLeave={(e) => {
-                      e.currentTarget.style.background = "none";
-                    }}
-                  >
-                    <FaChevronRight />
-                  </button>
-                </>
-              ) : (
-                <span style={{
-                  fontSize: "12px",
-                  color: "#999",
-                  whiteSpace: "nowrap",
-                  marginRight: "4px",
-                  fontStyle: "italic"
-                }}>
-                  No results
-                </span>
-              )}
+              <button type="button" className="nav-search-btn" onClick={handlePreviousMatch} title="Previous (Shift+Enter)">
+                <FaChevronLeft />
+              </button>
+              <button type="button" className="nav-search-btn" onClick={handleNextMatch} title="Next (Enter)">
+                <FaChevronRight />
+              </button>
             </>
           )}
           {searchTerm && (
-            <button
-              type="button"
-              onClick={() => {
-                setSearchTerm("");
-                setPage(0);
-                setCurrentMatchIndex(-1);
-              }}
-              style={{
-                background: "none",
-                border: "none",
-                color: "#092C4C",
-                cursor: "pointer",
-                fontSize: "18px",
-                padding: "0 4px",
-                display: "flex",
-                alignItems: "center",
-                justifyContent: "center",
-                borderRadius: "4px",
-                transition: "background 0.2s"
-              }}
-              onMouseEnter={(e) => {
-                e.currentTarget.style.background = "#f0f0f0";
-              }}
-              onMouseLeave={(e) => {
-                e.currentTarget.style.background = "none";
-              }}
-              title="Clear search (Esc)"
+            <button type="button" className="nav-search-btn"
+              onClick={() => { setSearchTerm(""); setPage(0); setCurrentMatchIndex(-1); }}
+              title="Clear (Esc)"
             >
               ✕
             </button>
           )}
         </div>
+      
       </div>
+
+      {/* ══════════════════════════════════════════
+          DROPDOWN PANELS
+      ══════════════════════════════════════════ */}
+
+      {/* ── "Add Schedule" panel ── */}
+      <div className={`nav-dropdown-overlay ${activePanel === "Add Schedule" ? "open" : ""}`}>
+        <div className="nav-dropdown-backdrop" onClick={() => setActivePanel(null)} />
+        <div className="nav-dropdown-panel">
+          <div className="nav-panel-header">
+            <span className="nav-panel-title">
+              <FaPlus style={{ color: 'gold' }} /> Plot Exam Schedule
+            </span>
+            <button type="button" className="nav-panel-close" onClick={() => setActivePanel(null)}>✕</button>
+          </div>
+          <div className="nav-panel-body">
+            <AddScheduleForm
+              user={user}
+              onScheduleCreated={async (unscheduled?: any[]) => {
+                try {
+                  const params: any = {};
+                  if (schedulerCollegeName && schedulerCollegeName !== "Add schedule first") {
+                    params.college_name = schedulerCollegeName;
+                  }
+                  const examsResponse = await api.get('/tbl_examdetails', { params });
+                  if (examsResponse.data) setExamData(examsResponse.data);
+                } catch (_) { }
+
+                setActivePanel(null);
+
+                if (unscheduled && unscheduled.length > 0) {
+                  saveUnscheduledSections(unscheduled);
+                  const result = window.confirm(
+                    `Schedule generation complete!\n\n${unscheduled.length} section(s) need manual scheduling.\n\n⚠️ Click 'OK' to save and view later`
+                  );
+                  if (result) {
+                    setManualEditorSections(unscheduled);
+                    setShowManualEditor(true);
+                  } else {
+                    toast.info(`${unscheduled.length} section(s) saved. Click "Edit Manually" later.`, { autoClose: 8000 });
+                  }
+                } else {
+                  saveUnscheduledSections([]);
+                }
+              }}
+            />
+          </div>
+        </div>
+      </div>
+
+      {/* ── "Export" panel ── */}
+      <div className={`nav-dropdown-overlay ${activePanel === "Export" ? "open" : ""}`}>
+        <div className="nav-dropdown-backdrop" onClick={() => setActivePanel(null)} />
+        <div className="nav-dropdown-panel">
+          <div className="nav-panel-header">
+            <span className="nav-panel-title">
+              <FaFileDownload /> Export Schedule
+            </span>
+            <button type="button" className="nav-panel-close" onClick={() => setActivePanel(null)}>✕</button>
+          </div>
+          <div className="nav-panel-body">
+            <ExportSchedule onClose={() => setActivePanel(null)} collegeName={collegeName} />
+          </div>
+        </div>
+      </div>
+
+      {/* ── "Edit Manually" panel ── */}
+      <div className={`nav-dropdown-overlay ${activePanel === "Edit Manually" || showManualEditor ? "open" : ""}`}>
+        <div className="nav-dropdown-backdrop" onClick={() => { setActivePanel(null); setShowManualEditor(false); }} />
+        <div className="nav-dropdown-panel" style={{ width: 'min(96vw, 1000px)' }}>
+          <div className="nav-panel-header">
+            <span className="nav-panel-title">
+              <FaEdit /> Manual Schedule Editor
+            </span>
+            <button type="button" className="nav-panel-close" onClick={() => { setActivePanel(null); setShowManualEditor(false); setManualEditorSections([]); }}>✕</button>
+          </div>
+          <div className="nav-panel-body" style={{ padding: 0 }}>
+            <ManualScheduleEditor
+              unscheduledSections={manualEditorSections.length > 0 ? manualEditorSections : persistentUnscheduled}
+              examDates={uniqueDates.filter((date): date is string => date !== undefined)}
+              schedulerCollegeName={schedulerCollegeName}
+              onClose={() => { setActivePanel(null); setShowManualEditor(false); setManualEditorSections([]); }}
+              onScheduleCreated={async (remainingUnscheduled?: any[]) => {
+                try {
+                  const params: any = {};
+                  if (schedulerCollegeName && schedulerCollegeName !== "Add schedule first") {
+                    params.college_name = schedulerCollegeName;
+                  }
+                  const examsResponse = await api.get('/tbl_examdetails', { params });
+                  if (examsResponse.data) setExamData(examsResponse.data);
+                } catch (_) { }
+
+                if (remainingUnscheduled && remainingUnscheduled.length > 0) {
+                  saveUnscheduledSections(remainingUnscheduled);
+                  toast.info(`${remainingUnscheduled.length} section(s) still need scheduling.`, { autoClose: 5000 });
+                } else {
+                  saveUnscheduledSections([]);
+                  toast.success("All sections scheduled successfully!");
+                }
+
+                setActivePanel(null);
+                setShowManualEditor(false);
+                setManualEditorSections([]);
+              }}
+              academicYear={yearName}
+              semester={semesterName}
+              examCategory={termName}
+              examPeriod={examPeriodName}
+              duration={{ hours: 1, minutes: 30 }}
+            />
+          </div>
+        </div>
+      </div>
+
+      {/* ══════════════════════════════════════════
+          STATUS / MODE BANNERS
+      ══════════════════════════════════════════ */}
+      {approvalStatus && (
+        <div className={`status-banner ${approvalStatus}`}>
+          <span>
+            Status: {approvalStatus.toUpperCase()}
+            {approvalStatus === "pending" && " — Waiting for Dean"}
+            {approvalStatus === "rejected" && " — You can modify and resubmit"}
+          </span>
+          {approvalStatus === "rejected" && remarks && (
+            <span className="remarks"><strong>Remarks:</strong> {remarks}</span>
+          )}
+        </div>
+      )}
+
+      {swapMode && <div className="mode-banner">Swapping Mode — drag cards or click to swap rooms</div>}
+      {activeProctorEdit === -1 && <div className="mode-banner">Proctor Edit Mode — click any Proctor field</div>}
+
+      {showSwapInstructions && (
+        <div className="instruction-card" style={{ top: swapMode ? 'calc(var(--nav-top) + var(--nav-height) + 58px)' : undefined }}>
+          <h4>Swapping Instructions</h4>
+          <p>
+            <strong>Option 1 — Swap rooms:</strong><br />
+            Click a schedule to select it, then click another with the same course &amp; timeslot.<br /><br />
+            <strong>Option 2 — Drag &amp; drop:</strong><br />
+            Drag any schedule card to an empty cell to move it there.
+          </p>
+          <button type="button" className="instruction-close" onClick={() => setShowSwapInstructions(false)}>
+            Close
+          </button>
+        </div>
+      )}
+
+      {showProctorInstructions && (
+        <div className="instruction-card">
+          <h4>Proctor Edit Instructions</h4>
+          <p>
+            Click on any schedule's <strong>Proctor</strong> field to open the selector.<br />
+            Search and select proctors, then click <strong>✕</strong> to confirm.
+          </p>
+          <button type="button" className="instruction-close" onClick={() => setShowProctorInstructions(false)}>
+            Close
+          </button>
+        </div>
+      )}
 
       <button
         type="button"
-        onClick={() => {
-          resetAllModes();
-          setShowFooterSettings(true);
-        }}
+        onClick={() => { resetAllModes(); setShowFooterSettings(true); }}
         style={{
-          position: 'fixed',
-          bottom: '30px',
-          right: '30px',
-          backgroundColor: '#ffffffff',
-          color: '#092C4C',
-          border: 'none',
-          borderRadius: '50px',
-          padding: '12px 24px',
-          fontSize: '14px',
-          fontWeight: 'bold',
+          position: 'fixed', bottom: 28, right: 28,
+          background: 'var(--surface, white)', color: 'var(--brand, #092C4C)',
+          border: '1.5px solid var(--border, #d0d0d0)',
+          borderRadius: '999px',
+          padding: '10px 20px',
+          fontSize: '13px', fontWeight: '600',
           cursor: 'pointer',
-          boxShadow: '0 4px 12px rgba(0,0,0,0.3)',
+          boxShadow: 'var(--shadow-md, 0 4px 12px rgba(0,0,0,0.15))',
           zIndex: 1000,
-          display: 'flex',
-          alignItems: 'center',
-          gap: '8px',
-          transition: 'all 0.3s ease',
+          display: 'flex', alignItems: 'center', gap: 7,
+          fontFamily: 'var(--font, inherit)',
+          transition: 'all 0.2s ease',
         }}
-        onMouseEnter={(e) => {
-          e.currentTarget.style.transform = 'scale(1.05)';
-          e.currentTarget.style.boxShadow = '0 6px 16px rgba(0,0,0,0.4)';
+        onMouseEnter={e => {
+          e.currentTarget.style.background = 'var(--brand, #092C4C)';
+          e.currentTarget.style.color = '#fff';
+          e.currentTarget.style.borderColor = 'var(--brand, #092C4C)';
         }}
-        onMouseLeave={(e) => {
-          e.currentTarget.style.transform = 'scale(1)';
-          e.currentTarget.style.boxShadow = '0 4px 12px rgba(0,0,0,0.3)';
+        onMouseLeave={e => {
+          e.currentTarget.style.background = 'var(--surface, white)';
+          e.currentTarget.style.color = 'var(--brand, #092C4C)';
+          e.currentTarget.style.borderColor = 'var(--border, #d0d0d0)';
         }}
       >
-        <FaCog style={{ fontSize: '16px' }} />
-        Settings
+        <FaCog style={{ fontSize: 14 }} /> Settings
       </button>
 
       {hasData && page > 0 && (
@@ -2253,44 +2114,35 @@ const SchedulerView: React.FC<SchedulerViewProps> = ({ user }) => {
                                     onDrop={() => handleDrop(exam.examdetails_id!)}
                                     onDragLeave={() => setDraggedOverExamId(null)}
                                     onClick={() => handleScheduleClick(exam)}
+                                    className={
+                                      searchTerm && examMatchesSearch(exam, searchTerm.toLowerCase())
+                                        ? currentMatchIndex >= 0 && searchMatches[currentMatchIndex]?.examdetails_id === exam.examdetails_id
+                                          ? "exam-card-match-active"
+                                          : "exam-card-match"
+                                        : draggedExamId === exam.examdetails_id
+                                          ? "exam-card-dragging"
+                                          : draggedOverExamId === exam.examdetails_id
+                                            ? "exam-card-drop-target"
+                                            : selectedSwap?.examdetails_id === exam.examdetails_id
+                                              ? "exam-card-swap-selected"
+                                              : ""
+                                    }
                                     style={{
                                       backgroundColor: courseColorMap[exam.course_id || ""] || "#ccc",
                                       color: "white",
                                       padding: "6px 8px",
-                                      borderRadius: "6px",
+                                      borderRadius: "5px",
                                       fontSize: "11px",
-                                      height: "100%",          // ✅ fill the entire rowSpan cell
-                                      minHeight: "60px",
+                                      height: "100%",
+                                      minHeight: "52px",
                                       boxSizing: "border-box",
                                       overflowY: "hidden",
                                       cursor: swapMode ? "grab" : "default",
                                       display: "flex",
                                       flexDirection: "column",
                                       justifyContent: "flex-start",
-                                      gap: "2px", 
-                                      outline: draggedExamId === exam.examdetails_id
-                                        ? "3px dashed #ff6b6b"
-                                        : draggedOverExamId === exam.examdetails_id
-                                          ? "3px solid #4CAF50"
-                                          : selectedSwap?.examdetails_id === exam.examdetails_id
-                                            ? "10px solid blue"
-                                            : searchTerm && examMatchesSearch(exam, searchTerm.toLowerCase())
-                                              ? currentMatchIndex >= 0 &&
-                                                searchMatches[currentMatchIndex]?.examdetails_id === exam.examdetails_id
-                                                ? "3px solid #2563eb"
-                                                : "2px solid #fbbf24"
-                                              : "none",
-                                      boxShadow: draggedExamId === exam.examdetails_id
-                                        ? "0 0 8px 2px rgba(255, 107, 107, 0.5)"
-                                        : draggedOverExamId === exam.examdetails_id
-                                          ? "0 0 8px 2px rgba(76, 175, 80, 0.5)"
-                                          : searchTerm && examMatchesSearch(exam, searchTerm.toLowerCase())
-                                            ? currentMatchIndex >= 0 &&
-                                              searchMatches[currentMatchIndex]?.examdetails_id === exam.examdetails_id
-                                              ? "0 0 8px 2px rgba(37, 99, 235, 0.5)"
-                                              : "0 0 4px 1px rgba(251, 191, 36, 0.4)"
-                                            : "none",
-                                      opacity: draggedExamId === exam.examdetails_id ? 0.6 : 1
+                                      gap: "2px",
+                                      opacity: draggedExamId === exam.examdetails_id ? 0.55 : 1,
                                     }}
                                   >
                                     <p><strong>{exam.course_id}</strong></p>
@@ -2369,7 +2221,7 @@ const SchedulerView: React.FC<SchedulerViewProps> = ({ user }) => {
                                                 minHeight: '25px',
                                                 maxHeight: '80px',
                                                 overflowY: 'auto',
-                                                color: '#092C4C'
+                                                color: '#092C4C',
                                               }),
                                               option: (provided, state) => ({
                                                 ...provided,
@@ -2429,7 +2281,6 @@ const SchedulerView: React.FC<SchedulerViewProps> = ({ user }) => {
                                       )}
                                     </div>
 
-                                    <p>{formatTo12Hour(examStartTimeStr)} - {formatTo12Hour(examEndTimeStr)}</p>
                                   </div>
                                 </td>
                               );
@@ -2696,44 +2547,35 @@ const SchedulerView: React.FC<SchedulerViewProps> = ({ user }) => {
                                     onDrop={() => handleDrop(exam.examdetails_id!)}
                                     onDragLeave={() => setDraggedOverExamId(null)}
                                     onClick={() => handleScheduleClick(exam)}
+                                    className={
+                                      searchTerm && examMatchesSearch(exam, searchTerm.toLowerCase())
+                                        ? currentMatchIndex >= 0 && searchMatches[currentMatchIndex]?.examdetails_id === exam.examdetails_id
+                                          ? "exam-card-match-active"
+                                          : "exam-card-match"
+                                        : draggedExamId === exam.examdetails_id
+                                          ? "exam-card-dragging"
+                                          : draggedOverExamId === exam.examdetails_id
+                                            ? "exam-card-drop-target"
+                                            : selectedSwap?.examdetails_id === exam.examdetails_id
+                                              ? "exam-card-swap-selected"
+                                              : ""
+                                    }
                                     style={{
                                       backgroundColor: courseColorMap[exam.course_id || ""] || "#ccc",
                                       color: "white",
                                       padding: "6px 8px",
-                                      borderRadius: "6px",
+                                      borderRadius: "5px",
                                       fontSize: "11px",
-                                      height: "100%",      
-                                      minHeight: "60px",
+                                      height: "100%",
+                                      minHeight: "52px",
                                       boxSizing: "border-box",
                                       overflowY: "hidden",
                                       cursor: swapMode ? "grab" : "default",
                                       display: "flex",
                                       flexDirection: "column",
                                       justifyContent: "flex-start",
-                                      gap: "2px", 
-                                      outline: draggedExamId === exam.examdetails_id
-                                        ? "3px dashed #ff6b6b"
-                                        : draggedOverExamId === exam.examdetails_id
-                                          ? "3px solid #4CAF50"
-                                          : selectedSwap?.examdetails_id === exam.examdetails_id
-                                            ? "10px solid blue"
-                                            : searchTerm && examMatchesSearch(exam, searchTerm.toLowerCase())
-                                              ? currentMatchIndex >= 0 &&
-                                                searchMatches[currentMatchIndex]?.examdetails_id === exam.examdetails_id
-                                                ? "3px solid #2563eb"
-                                                : "2px solid #fbbf24"
-                                              : "none",
-                                      boxShadow: draggedExamId === exam.examdetails_id
-                                        ? "0 0 8px 2px rgba(255, 107, 107, 0.5)"
-                                        : draggedOverExamId === exam.examdetails_id
-                                          ? "0 0 8px 2px rgba(76, 175, 80, 0.5)"
-                                          : searchTerm && examMatchesSearch(exam, searchTerm.toLowerCase())
-                                            ? currentMatchIndex >= 0 &&
-                                              searchMatches[currentMatchIndex]?.examdetails_id === exam.examdetails_id
-                                              ? "0 0 8px 2px rgba(37, 99, 235, 0.5)"
-                                              : "0 0 4px 1px rgba(251, 191, 36, 0.4)"
-                                            : "none",
-                                      opacity: draggedExamId === exam.examdetails_id ? 0.6 : 1
+                                      gap: "2px",
+                                      opacity: draggedExamId === exam.examdetails_id ? 0.55 : 1,
                                     }}
                                   >
                                     <p><strong>{exam.course_id}</strong></p>
@@ -2865,7 +2707,6 @@ const SchedulerView: React.FC<SchedulerViewProps> = ({ user }) => {
                                         </span>
                                       )}
                                     </div>
-                                    <p>{formatTo12Hour(examStartTimeStr)} - {formatTo12Hour(examEndTimeStr)}</p>
                                   </div>
                                 </td>
                               );
@@ -2928,51 +2769,6 @@ const SchedulerView: React.FC<SchedulerViewProps> = ({ user }) => {
             });
           })
         )}
-        <Modal isOpen={isModalOpen} onClose={() => setIsModalOpen(false)}>
-          <AddScheduleForm
-            user={user}
-            onScheduleCreated={async (unscheduled?: any[]) => {
-              try {
-                const params: any = {};
-                if (schedulerCollegeName && schedulerCollegeName !== "Add schedule first") {
-                  params.college_name = schedulerCollegeName;
-                }
-
-                const examsResponse = await api.get('/tbl_examdetails', { params });
-                if (examsResponse.data) {
-                  setExamData(examsResponse.data);
-                }
-              } catch (error) {
-              }
-
-              setIsModalOpen(false);
-
-              // ✅ Save unscheduled sections for later access
-              if (unscheduled && unscheduled.length > 0) {
-                saveUnscheduledSections(unscheduled); // ✅ NOW THIS WORKS
-
-                const result = window.confirm(
-                  `Schedule generation complete!\n\n` +
-                  `${unscheduled.length} section(s) need manual scheduling.\n\n` +
-                  `⚠️ Click 'OK' so it will be save and can be viewed later`
-                );
-
-                if (result) {
-                  setManualEditorSections(unscheduled);
-                  setShowManualEditor(true);
-                } else {
-                  toast.info(
-                    `${unscheduled.length} section(s) saved for manual scheduling. ` +
-                    `Click "Edit Manually" button to schedule them later.`,
-                    { autoClose: 8000 }
-                  );
-                }
-              } else {
-                saveUnscheduledSections([]); // ✅ Clear storage if all scheduled
-              }
-            }}
-          />
-        </Modal>
       </div>
 
       <Modal isOpen={showEmailModal} onClose={() => setShowEmailModal(false)}>
@@ -3001,10 +2797,6 @@ const SchedulerView: React.FC<SchedulerViewProps> = ({ user }) => {
         />
       </Modal>
 
-      <Modal isOpen={showExportModal} onClose={() => setShowExportModal(false)}>
-        <ExportSchedule onClose={() => setShowExportModal(false)} collegeName={collegeName} />
-      </Modal>
-
       <Modal isOpen={showFooterSettings} onClose={() => setShowFooterSettings(false)}>
         <FooterSettingsModal
           isOpen={showFooterSettings}
@@ -3031,163 +2823,117 @@ const SchedulerView: React.FC<SchedulerViewProps> = ({ user }) => {
         />
       </Modal>
 
-      <Modal isOpen={showManualEditor} onClose={() => setShowManualEditor(false)}>
-        <ManualScheduleEditor
-          unscheduledSections={manualEditorSections.length > 0 ? manualEditorSections : persistentUnscheduled}
-          examDates={uniqueDates.filter((date): date is string => date !== undefined)}
-          schedulerCollegeName={schedulerCollegeName}
-          onClose={() => {
-            setShowManualEditor(false);
-            setManualEditorSections([]);
-          }}
-          onScheduleCreated={async (remainingUnscheduled?: any[]) => {
-            try {
-              const params: any = {};
-              if (schedulerCollegeName && schedulerCollegeName !== "Add schedule first") {
-                params.college_name = schedulerCollegeName;
-              }
-
-              const examsResponse = await api.get('/tbl_examdetails', { params });
-              if (examsResponse.data) {
-                setExamData(examsResponse.data);
-              }
-            } catch (error) {
-            }
-
-            // ✅ Update persistent storage with remaining unscheduled
-            if (remainingUnscheduled && remainingUnscheduled.length > 0) {
-              saveUnscheduledSections(remainingUnscheduled); // ✅ NOW THIS WORKS
-              toast.info(
-                `${remainingUnscheduled.length} section(s) still need manual scheduling.`,
-                { autoClose: 5000 }
-              );
-            } else {
-              saveUnscheduledSections([]); // ✅ Clear if all done
-              toast.success("All sections scheduled successfully!");
-            }
-
-            setShowManualEditor(false);
-            setManualEditorSections([]);
-          }}
-          academicYear={yearName}
-          semester={semesterName}
-          examCategory={termName}
-          examPeriod={examPeriodName}
-          duration={{ hours: 1, minutes: 30 }}
-        />
-      </Modal>
-
       {/* Delete Progress Modal */}
-      {deleteProgress && (
-        <div style={{
-          position: 'fixed',
-          top: 0,
-          left: 0,
-          right: 0,
-          bottom: 0,
-          backgroundColor: 'rgba(0, 0, 0, 0.7)',
-          display: 'flex',
-          alignItems: 'center',
-          justifyContent: 'center',
-          zIndex: 10000,
-          animation: 'fadeIn 0.3s ease'
-        }}>
+        { deleteProgress && (
           <div style={{
-            backgroundColor: 'white',
-            borderRadius: '16px',
-            padding: '40px',
-            maxWidth: '500px',
-            width: '90%',
-            boxShadow: '0 10px 40px rgba(0, 0, 0, 0.3)',
-            animation: 'slideUp 0.3s ease'
+            position: 'fixed',
+            top: 0,
+            left: 0,
+            right: 0,
+            bottom: 0,
+            backgroundColor: 'rgba(0, 0, 0, 0.7)',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            zIndex: 10000,
+            animation: 'fadeIn 0.3s ease'
           }}>
-            {/* Icon */}
             <div style={{
-              textAlign: 'center',
-              marginBottom: '20px'
+              backgroundColor: 'white',
+              borderRadius: '16px',
+              padding: '40px',
+              maxWidth: '500px',
+              width: '90%',
+              boxShadow: '0 10px 40px rgba(0, 0, 0, 0.3)',
+              animation: 'slideUp 0.3s ease'
             }}>
+              {/* Icon */}
               <div style={{
-                width: '80px',
-                height: '80px',
-                margin: '0 auto',
-                borderRadius: '50%',
-                backgroundColor: deleteProgress.progress === 100 ? '#10b981' : '#ef4444',
-                display: 'flex',
-                alignItems: 'center',
-                justifyContent: 'center',
-                animation: 'pulse 2s infinite'
+                textAlign: 'center',
+                marginBottom: '20px'
               }}>
-                {deleteProgress.progress === 100 ? (
-                  <span style={{ fontSize: '40px' }}>✓</span>
-                ) : (
-                  <FaTrash style={{ fontSize: '32px', color: 'white' }} />
-                )}
+                <div style={{
+                  width: '80px',
+                  height: '80px',
+                  margin: '0 auto',
+                  borderRadius: '50%',
+                  backgroundColor: deleteProgress.progress === 100 ? '#10b981' : '#ef4444',
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  animation: 'pulse 2s infinite'
+                }}>
+                  {deleteProgress.progress === 100 ? (
+                    <span style={{ fontSize: '40px' }}>✓</span>
+                  ) : (
+                    <FaTrash style={{ fontSize: '32px', color: 'white' }} />
+                  )}
+                </div>
               </div>
-            </div>
 
-            {/* Message */}
-            <h3 style={{
-              textAlign: 'center',
-              color: '#092C4C',
-              marginBottom: '10px',
-              fontSize: '20px',
-              fontWeight: 'bold'
-            }}>
-              {deleteProgress.progress === 100 ? 'Deletion Complete!' : 'Deleting Schedules...'}
-            </h3>
+              {/* Message */}
+              <h3 style={{
+                textAlign: 'center',
+                color: '#092C4C',
+                marginBottom: '10px',
+                fontSize: '20px',
+                fontWeight: 'bold'
+              }}>
+                {deleteProgress.progress === 100 ? 'Deletion Complete!' : 'Deleting Schedules...'}
+              </h3>
 
-            <p style={{
-              textAlign: 'center',
-              color: '#666',
-              marginBottom: '25px',
-              fontSize: '14px'
-            }}>
-              {deleteProgress.message}
-            </p>
-
-            {/* Progress Bar */}
-            <div style={{
-              width: '100%',
-              height: '12px',
-              backgroundColor: '#e5e7eb',
-              borderRadius: '6px',
-              overflow: 'hidden',
-              marginBottom: '15px'
-            }}>
-              <div style={{
-                width: `${deleteProgress.progress}%`,
-                height: '100%',
-                backgroundColor: deleteProgress.progress === 100 ? '#10b981' : '#ef4444',
-                transition: 'width 0.5s ease',
-                borderRadius: '6px'
-              }} />
-            </div>
-
-            {/* Percentage */}
-            <p style={{
-              textAlign: 'center',
-              color: '#092C4C',
-              fontWeight: 'bold',
-              fontSize: '16px'
-            }}>
-              {deleteProgress.progress}%
-            </p>
-
-            {/* Warning Text */}
-            {deleteProgress.progress < 100 && (
               <p style={{
                 textAlign: 'center',
-                color: '#ef4444',
-                fontSize: '12px',
-                marginTop: '20px',
-                fontWeight: '500'
+                color: '#666',
+                marginBottom: '25px',
+                fontSize: '14px'
               }}>
-                ⚠️ Please do not close this window
+                {deleteProgress.message}
               </p>
-            )}
+
+              {/* Progress Bar */}
+              <div style={{
+                width: '100%',
+                height: '12px',
+                backgroundColor: '#e5e7eb',
+                borderRadius: '6px',
+                overflow: 'hidden',
+                marginBottom: '15px'
+              }}>
+                <div style={{
+                  width: `${deleteProgress.progress}%`,
+                  height: '100%',
+                  backgroundColor: deleteProgress.progress === 100 ? '#10b981' : '#ef4444',
+                  transition: 'width 0.5s ease',
+                  borderRadius: '6px'
+                }} />
+              </div>
+
+              {/* Percentage */}
+              <p style={{
+                textAlign: 'center',
+                color: '#092C4C',
+                fontWeight: 'bold',
+                fontSize: '16px'
+              }}>
+                {deleteProgress.progress}%
+              </p>
+
+              {/* Warning Text */}
+              {deleteProgress.progress < 100 && (
+                <p style={{
+                  textAlign: 'center',
+                  color: '#ef4444',
+                  fontSize: '12px',
+                  marginTop: '20px',
+                  fontWeight: '500'
+                }}>
+                  ⚠️ Please do not close this window
+                </p>
+              )}
+            </div>
           </div>
-        </div>
-      )}
+        )}
 
       <ToastContainer position="top-right" autoClose={1500} />
     </div>

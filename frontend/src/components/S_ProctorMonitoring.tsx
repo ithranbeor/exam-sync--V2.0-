@@ -547,10 +547,10 @@ const ProctorMonitoring: React.FC<UserProps> = () => {
           </div>
           <div className={`pm-approval-badge ${hasApprovedSchedules ? 'approved' : 'waiting'}`}>
             {isViewingHistory
-              ? '📁 Historical'
+              ? 'Historical'
               : hasApprovedSchedules
-              ? '✅ Approved'
-              : '⏳ Pending'}
+              ? 'Approved'
+              : 'Pending'}
           </div>
           <p className="pm-stat-caption">
             {isViewingHistory

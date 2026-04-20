@@ -2,7 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { api } from '../lib/apiClient';
 import { toast } from 'react-toastify';
 import '../styles/S_SettingsModal.css';
-import { FaImage, FaEye, FaFileSignature } from 'react-icons/fa';
+import { FaImage, FaEye, FaFileSignature, FaTimes } from 'react-icons/fa';
 
 interface FooterSettingsModalProps {
   isOpen: boolean;
@@ -80,7 +80,7 @@ const FooterSettingsModal: React.FC<FooterSettingsModalProps> = ({
               if (user?.first_name && user?.last_name) {
                 setDeanName(`${user.first_name} ${user.last_name}`);
               }
-            } catch (err) {}
+            } catch (err) { }
           } else {
             setDeanName('Dean Name Not Found');
           }
@@ -96,7 +96,7 @@ const FooterSettingsModal: React.FC<FooterSettingsModalProps> = ({
             setVcaaName(`${vcaaRole.user.first_name} ${vcaaRole.user.last_name}`);
           }
         }
-      } catch (error) {}
+      } catch (error) { }
     };
 
     fetchRoleNames();
@@ -349,287 +349,299 @@ const FooterSettingsModal: React.FC<FooterSettingsModalProps> = ({
 
   if (!isOpen) return null;
 
-  return (
-    <div className="footer-settings-overlay">
-      <div className="footer-settings-modal">
-        <div className="footer-settings-header">
-          <h2>Settings</h2>
-          <button type="button" className="close-button" onClick={onClose}>&times;</button>
-        </div>
+  // Icon helpers
+  const IconSettings = () => (
+    <svg width="24" height="24" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.8}>
+      <path strokeLinecap="round" strokeLinejoin="round" d="M9.594 3.94c.09-.542.56-.94 1.11-.94h2.592c.55 0 1.02.398 1.11.94a6.059 6.059 0 01.1 1.032c0 .199-.01.403-.031.606a6.04 6.04 0 01-.1 1.032c-.09.542-.56.94-1.11.94h-.738a6.025 6.025 0 00-1.146.194c-.487.082-.97-.01-1.386-.25l-.5.866a6.04 6.04 0 01-.1-1.032 6.059 6.059 0 01.1-1.032c.09-.542.56-.94 1.11-.94zm6.593 9.97c.092-.542.56-.94 1.11-.94h2.592c.55 0 1.02.398 1.11.94a6.059 6.059 0 01.1 1.032c0 .199-.01.403-.031.606a6.04 6.04 0 01-.1 1.032c-.09.542-.56.94-1.11.94h-2.592c-.55 0-1.02-.398-1.11-.94a6.059 6.059 0 01-.1-1.032 6.04 6.04 0 01.1-1.032zM9.25 12a.75.75 0 11-1.5 0 .75.75 0 011.5 0z" />
+    </svg>
+  );
 
-        <div className="settings-body">
-          {/* Sidebar Navigation */}
-          <div className="settings-sidebar">
-            <div
-              className={`settings-nav-item ${activeTab === 'appearance' ? 'active' : ''}`}
-              onClick={() => setActiveTab('appearance')}
-            >
-              <FaImage />
-              <span>Appearance</span>
-            </div>
-            <div
-              className={`settings-nav-item ${activeTab === 'display' ? 'active' : ''}`}
-              onClick={() => setActiveTab('display')}
-            >
-              <FaEye />
-              <span>Display</span>
-            </div>
-            <div
-              className={`settings-nav-item ${activeTab === 'footer' ? 'active' : ''}`}
-              onClick={() => setActiveTab('footer')}
-            >
-              <FaFileSignature />
-              <span>Footer Settings</span>
+  return (
+    <div className="settings-overlay">
+      <div className="settings-modal">
+        {/* Header */}
+        <div className="settings-page-header">
+          <div className="settings-page-header-left">
+            <div className="settings-page-icon"><IconSettings /></div>
+            <div className="settings-page-title">
+              <h1>Settings</h1>
+              <p>Configure schedule appearance and footer information</p>
             </div>
           </div>
+          <button
+            type="button"
+            className="settings-close-btn"
+            onClick={onClose}
+            title="Close"
+          >
+            <FaTimes />
+          </button>
+        </div>
 
-          {/* Main Content */}
-          <div className="settings-main-content">
-            {isLoading ? (
-              <div className="loading-spinner">Loading...</div>
-            ) : (
-              <>
-                {/* Appearance Tab */}
-                {activeTab === 'appearance' && (
-                  <>
-                    <div className="settings-section">
-                      <h3>Logo</h3>
-                      <p className="section-description">
-                        Upload one or more logos to appear on all schedule documents. New logos are added to the right.
-                      </p>
+        {/* Loading State */}
+        {isLoading ? (
+          <div className="settings-loading-state">
+            <div className="settings-spinner" />
+            <p>Loading settings…</p>
+          </div>
+        ) : (
+          <>
+            {/* Tab Navigation */}
+            <div className="settings-tabs">
+              <button
+                className={`settings-tab ${activeTab === 'appearance' ? 'active' : ''}`}
+                onClick={() => setActiveTab('appearance')}
+              >
+                <FaImage />
+                Appearance
+              </button>
+              <button
+                className={`settings-tab ${activeTab === 'display' ? 'active' : ''}`}
+                onClick={() => setActiveTab('display')}
+              >
+                <FaEye />
+                Display
+              </button>
+              <button
+                className={`settings-tab ${activeTab === 'footer' ? 'active' : ''}`}
+                onClick={() => setActiveTab('footer')}
+              >
+                <FaFileSignature />
+                Footer
+              </button>
+            </div>
 
-                      <div className="logo-upload-section">
-                        {/* Logo row */}
-                        <div style={{
-                          display: 'flex',
-                          flexWrap: 'wrap',
-                          gap: '12px',
-                          marginBottom: '16px',
-                          minHeight: '96px',
-                          alignItems: 'flex-start'
-                        }}>
-                          {logoPreviews.length === 0 && (
-                            <div className="logo-upload-placeholder">
-                              <p>No logo<br />uploaded</p>
-                            </div>
-                          )}
-
-                          {logoPreviews.map((preview, index) => (
-                            <div
-                              key={index}
-                              style={{
-                                position: 'relative',
-                                display: 'inline-block',
-                                flexShrink: 0
-                              }}
-                            >
-                              <img
-                                src={preview}
-                                alt={`Logo ${index + 1}`}
-                                style={{
-                                  width: '100px',
-                                  height: '80px',
-                                  objectFit: 'contain',
-                                  borderRadius: '8px',
-                                  border: '2px solid #e5e7eb',
-                                  background: '#f9f9f9',
-                                  padding: '4px',
-                                  display: 'block'
-                                }}
-                              />
-                              <button
-                                type="button"
-                                onClick={() => handleRemoveLogo(index)}
-                                title="Remove logo"
-                                style={{
-                                  position: 'absolute',
-                                  top: '-8px',
-                                  right: '-8px',
-                                  background: '#ef4444',
-                                  color: 'white',
-                                  border: 'none',
-                                  borderRadius: '50%',
-                                  width: '22px',
-                                  height: '22px',
-                                  fontSize: '11px',
-                                  cursor: 'pointer',
-                                  display: 'flex',
-                                  alignItems: 'center',
-                                  justifyContent: 'center',
-                                  fontWeight: 'bold',
-                                  boxShadow: '0 2px 4px rgba(0,0,0,0.25)',
-                                  lineHeight: 1
-                                }}
-                              >
-                                ✕
-                              </button>
-                            </div>
-                          ))}
-                        </div>
-
-                        {/* Upload controls */}
-                        <div className="logo-actions" style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
-                          <input
-                            type="file"
-                            accept="image/jpeg,image/jpg,image/png,image/gif,image/webp"
-                            onChange={handleLogoChange}
-                            id="logo-upload"
-                            style={{ display: 'none' }}
-                          />
-                          <label htmlFor="logo-upload" className="upload-logo-btn">
-                            + Add Logo
-                          </label>
-                          {logoPreviews.length > 0 && (
-                            <span style={{ fontSize: '12px', color: '#666' }}>
-                              {logoPreviews.length} logo{logoPreviews.length > 1 ? 's' : ''} added
-                            </span>
-                          )}
-                        </div>
-                      </div>
+            {/* Main Content */}
+            <div className="settings-content">
+              {/* Appearance Tab */}
+              {activeTab === 'appearance' && (
+                <div className="settings-tab-content">
+                  <div className="settings-card">
+                    <div className="settings-card-header">
+                      <h3>Logo Management</h3>
+                      <p>Upload one or more logos to appear on schedule documents</p>
                     </div>
-                  </>
-                )}
+                    <div className="settings-card-body">
+                      {/* Logo Display */}
+                      <div className="logo-display-area">
+                        {logoPreviews.length === 0 ? (
+                          <div className="logo-empty-state">
+                            <div className="logo-empty-icon">📷</div>
+                            <p>No logos uploaded yet</p>
+                            <span>Add logos to include them in schedule documents</span>
+                          </div>
+                        ) : (
+                          <div className="logo-grid">
+                            {logoPreviews.map((preview, index) => (
+                              <div key={index} className="logo-item">
+                                <img src={preview} alt={`Logo ${index + 1}`} />
+                                <button
+                                  type="button"
+                                  className="logo-remove"
+                                  onClick={() => handleRemoveLogo(index)}
+                                  title="Remove logo"
+                                >
+                                  <FaTimes />
+                                </button>
+                              </div>
+                            ))}
+                          </div>
+                        )}
+                      </div>
 
-                {/* Display Tab */}
-                {activeTab === 'display' && (
-                  <>
-                    <div className="settings-section">
-                      <h3>Toolbar Display</h3>
-                      <p className="section-description">
-                        Customize how the toolbar icons appear in the schedule view
+                      {/* Upload Controls */}
+                      <div className="logo-upload-controls">
+                        <input
+                          type="file"
+                          accept="image/jpeg,image/jpg,image/png,image/gif,image/webp"
+                          onChange={handleLogoChange}
+                          id="logo-upload"
+                          style={{ display: 'none' }}
+                        />
+                        <label htmlFor="logo-upload" className="settings-btn primary">
+                          <span>+ Add Logo</span>
+                        </label>
+                        {logoPreviews.length > 0 && (
+                          <div className="logo-count-badge">
+                            {logoPreviews.length} logo{logoPreviews.length > 1 ? 's' : ''}
+                          </div>
+                        )}
+                      </div>
+
+                      <p className="settings-hint">
+                        Supported formats: JPEG, PNG, GIF, WebP. Maximum size: 5MB per image.
                       </p>
-                      <div className="toggle-container">
-                        <label className="toggle-switch">
+                    </div>
+                  </div>
+                </div>
+              )}
+
+              {/* Display Tab */}
+              {activeTab === 'display' && (
+                <div className="settings-tab-content">
+                  <div className="settings-card">
+                    <div className="settings-card-header">
+                      <h3>Toolbar Display</h3>
+                      <p>Customize how toolbar icons appear in the schedule view</p>
+                    </div>
+                    <div className="settings-card-body">
+                      <div className="settings-toggle-group">
+                        <label className="settings-toggle-item">
                           <input
                             type="checkbox"
                             checked={showIconLabels}
                             onChange={(e) => onIconLabelsChange(e.target.checked)}
+                            className="settings-toggle-input"
                           />
-                          <span className="toggle-slider"></span>
+                          <span className="settings-toggle-track">
+                            <span className="settings-toggle-thumb" />
+                          </span>
+                          <span className="settings-toggle-label">
+                            <span className="settings-toggle-title">Show icon labels</span>
+                            <span className="settings-toggle-description">
+                              Display text labels below toolbar icons instead of tooltips
+                            </span>
+                          </span>
                         </label>
-                        <div className="toggle-label">
-                          <div className="toggle-label-text">Show icon labels</div>
-                          <div className="toggle-label-description">
-                            Display text labels below toolbar icons instead of tooltips
-                          </div>
-                        </div>
                       </div>
                     </div>
-                  </>
-                )}
+                  </div>
+                </div>
+              )}
 
-                {/* Footer Settings Tab */}
-                {activeTab === 'footer' && (
-                  <>
-                    <div className="settings-section">
-                      <h3>Prepared By (Left Side)</h3>
-                      <p className="section-description">
-                        Information for the person who prepared the schedule
-                      </p>
-                      <div className="form-group">
-                        <label>Name:</label>
+              {/* Footer Tab */}
+              {activeTab === 'footer' && (
+                <div className="settings-tab-content">
+                  {/* Prepared By */}
+                  <div className="settings-card">
+                    <div className="settings-card-header">
+                      <h3>Prepared By Information</h3>
+                      <p>Details for the person who prepared the schedule (left side)</p>
+                    </div>
+                    <div className="settings-card-body">
+                      <div className="settings-form-group">
+                        <label htmlFor="prepared-name">Full Name</label>
                         <input
+                          id="prepared-name"
                           type="text"
                           value={footerData.prepared_by_name}
                           onChange={(e) => handleInputChange('prepared_by_name', e.target.value)}
-                          placeholder="Type name"
+                          placeholder="Enter name"
+                          className="settings-input"
                         />
                       </div>
-                      <div className="form-group">
-                        <label>Title:</label>
+                      <div className="settings-form-group">
+                        <label htmlFor="prepared-title">Title/Position</label>
                         <input
+                          id="prepared-title"
                           type="text"
                           value={footerData.prepared_by_title}
                           onChange={(e) => handleInputChange('prepared_by_title', e.target.value)}
                           placeholder={`Dean, ${collegeName}`}
+                          className="settings-input"
                         />
                       </div>
                     </div>
+                  </div>
 
-                    <div className="settings-section">
-                      <h3>Approved By (Right Side)</h3>
-                      <p className="section-description">
-                        Information for the person who approves the schedule
-                      </p>
-                      <div className="form-group">
-                        <label>Name:</label>
+                  {/* Approved By */}
+                  <div className="settings-card">
+                    <div className="settings-card-header">
+                      <h3>Approved By Information</h3>
+                      <p>Details for the person who approves the schedule (right side)</p>
+                    </div>
+                    <div className="settings-card-body">
+                      <div className="settings-form-group">
+                        <label htmlFor="approved-name">Full Name</label>
                         <input
+                          id="approved-name"
                           type="text"
                           value={footerData.approved_by_name}
                           onChange={(e) => handleInputChange('approved_by_name', e.target.value)}
-                          placeholder="Type name"
+                          placeholder="Enter name"
+                          className="settings-input"
                         />
                       </div>
-                      <div className="form-group">
-                        <label>Title:</label>
+                      <div className="settings-form-group">
+                        <label htmlFor="approved-title">Title/Position</label>
                         <input
+                          id="approved-title"
                           type="text"
                           value={footerData.approved_by_title}
                           onChange={(e) => handleInputChange('approved_by_title', e.target.value)}
                           placeholder="VCAA, USTP-CDO"
+                          className="settings-input"
                         />
                       </div>
                     </div>
+                  </div>
 
-                    <div className="settings-section">
+                  {/* Contact Information */}
+                  <div className="settings-card">
+                    <div className="settings-card-header">
                       <h3>Contact Information</h3>
-                      <p className="section-description">
-                        Address and contact details shown at the bottom of schedules
-                      </p>
-                      <div className="form-group">
-                        <label>Address:</label>
+                      <p>Address and contact details shown at the bottom of schedules</p>
+                    </div>
+                    <div className="settings-card-body">
+                      <div className="settings-form-group">
+                        <label htmlFor="address">Address</label>
                         <input
+                          id="address"
                           type="text"
                           value={footerData.address_line}
                           onChange={(e) => handleInputChange('address_line', e.target.value)}
                           placeholder="C.M Recto Avenue, Lapasan, Cagayan de Oro City 9000 Philippines"
+                          className="settings-input"
                         />
                       </div>
-                      <div className="form-group">
-                        <label>Contact Info:</label>
+                      <div className="settings-form-group">
+                        <label htmlFor="contact">Contact Info</label>
                         <input
+                          id="contact"
                           type="text"
                           value={footerData.contact_line}
                           onChange={(e) => handleInputChange('contact_line', e.target.value)}
                           placeholder="Tel Nos. +63 (88) 856 1738; Telefax +63 (88) 856 4696 | http://www.ustp.edu.ph"
+                          className="settings-input"
                         />
                       </div>
                     </div>
-                  </>
-                )}
-              </>
-            )}
-          </div>
-        </div>
+                  </div>
+                </div>
+              )}
+            </div>
 
-        <div className="footer-settings-actions">
-          <button
-            type="button"
-            className="reset-btn"
-            onClick={handleReset}
-            disabled={isSaving}
-          >
-            Reset to Default
-          </button>
-          <div className="action-buttons">
-            <button
-              type="button"
-              className="cancel-btn"
-              onClick={onClose}
-              disabled={isSaving}
-            >
-              Cancel
-            </button>
-            <button
-              type="button"
-              className="save-btn"
-              onClick={handleSave}
-              disabled={isSaving || isLoading || !collegeId}
-            >
-              {isSaving ? 'Saving...' : 'Save Changes'}
-            </button>
-          </div>
-        </div>
+            {/* Footer Actions */}
+            <div className="settings-footer">
+              <button
+                type="button"
+                className="settings-btn secondary"
+                onClick={handleReset}
+                disabled={isSaving}
+              >
+                Reset to Default
+              </button>
+              <div className="settings-actions">
+                <button
+                  type="button"
+                  className="settings-btn secondary"
+                  onClick={onClose}
+                  disabled={isSaving}
+                >
+                  Cancel
+                </button>
+                <button
+                  type="button"
+                  className="settings-btn primary"
+                  onClick={handleSave}
+                  disabled={isSaving || isLoading || !collegeId}
+                >
+                  {isSaving ? 'Saving…' : 'Save Changes'}
+                </button>
+              </div>
+            </div>
+          </>
+        )}
       </div>
     </div>
   );

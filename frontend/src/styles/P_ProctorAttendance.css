@@ -481,6 +481,9 @@
   min-height: 100px;
   display: flex;
   flex-direction: column;
+  max-height: 55vh;
+  overflow-y: auto;
+  -webkit-overflow-scrolling: touch;
 }
 
 /* ── Grid — single column on mobile ─────────────── */

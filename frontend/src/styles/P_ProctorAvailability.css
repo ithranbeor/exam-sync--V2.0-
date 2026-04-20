@@ -78,17 +78,7 @@
 }
 
 /* ══════════════════════════════════════════
-   TWO-COLUMN LAYOUT
-══════════════════════════════════════════ */
-.availability-sections {
-  display: grid;
-  grid-template-columns: 1fr 1fr;
-  gap: 24px;
-  align-items: start;
-}
-
-/* ══════════════════════════════════════════
-   CARD
+   CARD — single centered layout
 ══════════════════════════════════════════ */
 .availability-card {
   background: var(--white);
@@ -97,7 +87,11 @@
   box-shadow: var(--shadow-sm);
   overflow: hidden;
   transition: box-shadow 0.2s ease;
-  height: 100%;
+}
+
+.availability-card--single {
+  max-width: 680px;
+  margin: 0 auto;
 }
 
 .availability-card:hover {
@@ -115,7 +109,7 @@
   display: flex;
   align-items: center;
   gap: 10px;
-  border-radius: 10px;
+  border-radius: 10px 10px 0 0;
 }
 
 .card-header-request::before {
@@ -139,7 +133,7 @@
 .availability-form {
   display: flex;
   flex-direction: column;
-  gap: 18px;
+  gap: 20px;
   padding: 20px 24px 28px;
 }
 
@@ -149,7 +143,7 @@
 .form-group {
   display: flex;
   flex-direction: column;
-  gap: 6px;
+  gap: 8px;
   position: relative;
 }
 
@@ -184,8 +178,8 @@
 
 .form-group textarea {
   resize: vertical;
-  min-height: 88px;
-  max-height: 180px;
+  min-height: 80px;
+  max-height: 160px;
   line-height: 1.55;
   cursor: text;
 }
@@ -194,12 +188,6 @@
 .date-input-field {
   cursor: pointer !important;
   background: var(--white) !important;
-}
-
-.date-input-field:disabled,
-.date-input-field[style*="not-allowed"] {
-  background: #f8f9fa !important;
-  color: var(--text-muted) !important;
 }
 
 /* Dropdown arrow */
@@ -217,82 +205,150 @@
   font-size: 11px;
 }
 
-/* react-select overrides */
-.react-select__control {
-  border: 1.5px solid var(--border) !important;
-  border-radius: var(--radius-sm) !important;
-  box-shadow: none !important;
-  font-size: 13px !important;
-  font-family: var(--font) !important;
-  min-height: 42px !important;
-  transition: border-color 0.18s ease !important;
+/* ══════════════════════════════════════════
+   TIME SLOT PILLS (replaces dropdown)
+══════════════════════════════════════════ */
+.timeslot-track {
+  display: flex;
+  gap: 12px;
+  flex-wrap: wrap;
 }
 
-.react-select__control:hover {
+.timeslot-pill {
+  flex: 1;
+  min-width: 130px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 4px;
+  padding: 14px 12px;
+  border: 2px solid var(--border);
+  border-radius: var(--radius-md);
+  background: var(--white);
+  cursor: pointer;
+  transition: all 0.2s ease;
+  position: relative;
+  font-family: var(--font);
+  text-align: center;
+}
+
+.timeslot-pill:hover:not(:disabled) {
+  border-color: var(--navy);
+  background: var(--navy-faint);
+  transform: translateY(-2px);
+  box-shadow: var(--shadow-sm);
+}
+
+.timeslot-pill--active {
   border-color: var(--navy) !important;
-}
-
-.react-select__control--is-focused {
-  border-color: var(--navy) !important;
-  box-shadow: 0 0 0 3px rgba(9, 44, 76, 0.08) !important;
-}
-
-.react-select__multi-value {
-  background: rgba(9, 44, 76, 0.10) !important;
-  border-radius: 5px !important;
-}
-
-.react-select__multi-value__label {
-  color: var(--navy) !important;
-  font-weight: 500 !important;
-  font-size: 12px !important;
-}
-
-.react-select__multi-value__remove:hover {
   background: var(--navy) !important;
+  box-shadow: 0 4px 16px rgba(9, 44, 76, 0.25) !important;
+  transform: translateY(-2px);
+}
+
+.timeslot-pill--active .timeslot-pill__label {
   color: white !important;
 }
 
-.react-select__option {
-  color: var(--text-dark) !important;
-  background: var(--white) !important;
-  padding: 10px 12px !important;
-  font-size: 13px !important;
-  font-family: var(--font) !important;
-  cursor: pointer !important;
+.timeslot-pill--active .timeslot-pill__sub {
+  color: rgba(255, 255, 255, 0.75) !important;
 }
 
-.react-select__option:hover {
-  background: var(--navy-faint) !important;
-  color: var(--text-dark) !important;
+.timeslot-pill:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
 }
 
-.react-select__option--is-focused {
-  background: var(--navy-faint) !important;
-  color: var(--text-dark) !important;
+.timeslot-pill__emoji {
+  font-size: 22px;
+  line-height: 1;
 }
 
-.react-select__option--is-selected {
-  background: var(--navy) !important;
-  color: white !important;
+.timeslot-pill__label {
+  font-size: 13px;
+  font-weight: 700;
+  color: var(--text-dark);
+  transition: color 0.2s;
 }
 
-.react-select__menu {
-  border: 1.5px solid var(--border) !important;
-  border-radius: var(--radius-sm) !important;
-  box-shadow: var(--shadow-md) !important;
+.timeslot-pill__sub {
+  font-size: 11px;
+  color: var(--text-muted);
+  font-family: var(--font-mono);
+  transition: color 0.2s;
 }
 
-.react-select__input {
-  color: var(--text-dark) !important;
+.timeslot-pill__check {
+  position: absolute;
+  top: 8px;
+  right: 8px;
+  font-size: 14px;
+  color: var(--accent);
 }
 
-.react-select__placeholder {
-  color: var(--text-muted) !important;
+/* ══════════════════════════════════════════
+   FORM ACTION BUTTONS (row layout)
+══════════════════════════════════════════ */
+.form-actions {
+  display: flex;
+  gap: 12px;
+  justify-content: flex-end;
+  align-items: center;
+  margin-top: 4px;
+  padding-top: 16px;
+  border-top: 1.5px solid var(--border);
 }
 
-.react-select__value-container {
-  color: var(--text-dark) !important;
+.btn-outline {
+  padding: 10px 20px;
+  background: transparent;
+  color: var(--navy);
+  border: 1.5px solid var(--navy);
+  border-radius: var(--radius-sm);
+  font-size: 13px;
+  font-weight: 600;
+  font-family: var(--font);
+  cursor: pointer;
+  transition: all 0.18s ease;
+  white-space: nowrap;
+}
+
+.btn-outline:hover {
+  background: var(--navy);
+  color: white;
+}
+
+.btn-primary {
+  padding: 10px 24px;
+  background: var(--navy);
+  color: white;
+  border: none;
+  border-radius: var(--radius-sm);
+  font-size: 13px;
+  font-weight: 700;
+  font-family: var(--font);
+  cursor: pointer;
+  transition: all 0.2s ease;
+  box-shadow: 0 2px 10px rgba(9, 44, 76, 0.20);
+  white-space: nowrap;
+  letter-spacing: 0.3px;
+}
+
+.btn-primary:hover:not(:disabled) {
+  background: var(--navy-light);
+  box-shadow: 0 4px 14px rgba(9, 44, 76, 0.28);
+  transform: translateY(-1px);
+}
+
+.btn-primary:active {
+  transform: translateY(0);
+}
+
+.btn-primary:disabled {
+  background: #d1d5db;
+  cursor: not-allowed;
+  box-shadow: none;
+  transform: none;
 }
 
 /* ══════════════════════════════════════════
@@ -315,15 +371,8 @@
 }
 
 @keyframes dp-drop {
-  from {
-    opacity: 0;
-    transform: translateY(-6px);
-  }
-
-  to {
-    opacity: 1;
-    transform: translateY(0);
-  }
+  from { opacity: 0; transform: translateY(-6px); }
+  to   { opacity: 1; transform: translateY(0); }
 }
 
 .date-picker-header {
@@ -387,7 +436,6 @@
 
 .calendar-day.disabled {
   color: #0d3879;
-
   pointer-events: none;
 }
 
@@ -450,158 +498,7 @@
 }
 
 /* ══════════════════════════════════════════
-   SUBMIT BUTTON
-══════════════════════════════════════════ */
-.submit-button {
-  background: var(--navy);
-  color: rgb(205, 19, 19);
-  padding: 12px 36px;
-  border: none;
-  border-radius: var(--radius-sm);
-  font-size: 14px;
-  font-weight: 600;
-  font-family: var(--font);
-  cursor: pointer;
-  align-self: center;
-  min-width: 130px;
-  margin-top: 8px;
-  letter-spacing: 0.3px;
-  box-shadow: 0 2px 10px rgba(9, 44, 76, 0.20);
-  transition: all 0.2s ease;
-}
-
-.submit-button:hover {
-  background: var(--navy-light);
-  box-shadow: 0 4px 14px rgba(9, 44, 76, 0.28);
-  transform: translateY(-1px);
-}
-
-.submit-button:active {
-  transform: translateY(0);
-}
-
-.submit-button:disabled {
-  background: #d1d5db;
-  cursor: not-allowed;
-  box-shadow: none;
-  transform: none;
-}
-
-.submit-buttons {
-  background: var(--navy);
-  color: white;
-  border: 1.5px solid var(--navy);
-  padding: 9px 18px;
-  border-radius: var(--radius-sm);
-  font-size: 14px;
-  font-weight: 600;
-  font-family: var(--font);
-  cursor: pointer;
-  align-self: center;
-  min-width: 130px;
-  margin-top: 8px;
-  letter-spacing: 0.3px;
-  box-shadow: 0 2px 10px rgba(9, 44, 76, 0.20);
-  transition: all 0.2s ease;
-}
-
-.submit-buttons:hover {
-  background: var(--navy-light);
-  box-shadow: 0 4px 14px rgba(9, 44, 76, 0.28);
-  transform: translateY(-1px);
-}
-
-.submit-buttons:active {
-  transform: translateY(0);
-}
-
-.submit-buttons:disabled {
-  background: #d1d5db;
-  cursor: not-allowed;
-  box-shadow: none;
-  transform: none;
-}
-
-/* ══════════════════════════════════════════
-   VIEW ALL LINK BUTTON
-══════════════════════════════════════════ */
-.view-all-btn {
-  display: inline-flex;
-  align-items: center;
-  gap: 6px;
-  color: var(--navy);
-  cursor: pointer;
-  border: 1.5px solid var(--navy);
-  padding: 9px 18px;
-  border-radius: var(--radius-sm);
-  font-size: 13px;
-  font-weight: 500;
-  font-family: var(--font);
-  transition: all 0.2s ease;
-  background: transparent;
-  margin-top: 4px;
-}
-
-.view-all-btn:hover {
-  background: var(--navy);
-  color: white;
-}
-
-/* ══════════════════════════════════════════
-   ALTERNATIVE SLOTS HINT BOX
-══════════════════════════════════════════ */
-.alt-slots-box {
-  background: #eff6ff;
-  border: 1.5px solid #bfdbfe;
-  border-left: 4px solid var(--navy);
-  border-radius: var(--radius-sm);
-  padding: 14px 16px;
-}
-
-.alt-slots-box .alt-slots-title {
-  font-size: 13px;
-  font-weight: 700;
-  color: var(--navy);
-  margin: 0 0 8px;
-  display: flex;
-  align-items: center;
-  gap: 6px;
-}
-
-.alt-slots-box p {
-  font-size: 12px;
-  color: var(--text-soft);
-  margin: 0 0 8px;
-  line-height: 1.5;
-}
-
-.alt-slots-tags {
-  display: flex;
-  gap: 6px;
-  flex-wrap: wrap;
-}
-
-.alt-slot-tag {
-  background: var(--navy);
-  color: white;
-  padding: 4px 12px;
-  border-radius: 20px;
-  font-size: 11px;
-  font-weight: 600;
-  font-family: var(--font-mono);
-  letter-spacing: 0.3px;
-}
-
-.alt-slots-note {
-  font-size: 11px !important;
-  color: var(--text-muted) !important;
-  font-style: italic;
-  margin-top: 10px !important;
-  margin-bottom: 0 !important;
-}
-
-/* ══════════════════════════════════════════
-   MODALS (shared base)
+   MODALS
 ══════════════════════════════════════════ */
 .availability-modal-overlay {
   position: fixed;
@@ -618,13 +515,8 @@
 }
 
 @keyframes modal-fade {
-  from {
-    opacity: 0;
-  }
-
-  to {
-    opacity: 1;
-  }
+  from { opacity: 0; }
+  to   { opacity: 1; }
 }
 
 .availability-modal-box {
@@ -639,15 +531,8 @@
 }
 
 @keyframes modal-up {
-  from {
-    opacity: 0;
-    transform: translateY(18px);
-  }
-
-  to {
-    opacity: 1;
-    transform: translateY(0);
-  }
+  from { opacity: 0; transform: translateY(18px); }
+  to   { opacity: 1; transform: translateY(0); }
 }
 
 .availability-modal-title {
@@ -678,7 +563,6 @@
   gap: 12px;
 }
 
-/* Confirm modal entry */
 .availability-entry {
   background: var(--navy-faint);
   border: 1.5px solid var(--border);
@@ -697,30 +581,6 @@
 .availability-entry p strong {
   color: var(--text-dark);
   font-weight: 600;
-}
-
-.availability-entry hr {
-  display: none;
-}
-
-/* Modal close / action buttons */
-.availability-modal-close-btn {
-  display: block;
-  margin: 0 auto;
-  padding: 10px 24px;
-  background: var(--navy);
-  color: white;
-  border: none;
-  border-radius: var(--radius-sm);
-  font-size: 13px;
-  font-weight: 600;
-  font-family: var(--font);
-  cursor: pointer;
-  transition: background 0.18s ease;
-}
-
-.availability-modal-close-btn:hover {
-  background: var(--navy-light);
 }
 
 .modal-footer-actions {
@@ -784,42 +644,15 @@
 /* ══════════════════════════════════════════
    SCROLLBAR
 ══════════════════════════════════════════ */
-::-webkit-scrollbar {
-  width: 8px;
-  height: 8px;
-}
-
-::-webkit-scrollbar-track {
-  background: #f0f4f8;
-  border-radius: 8px;
-}
-
-::-webkit-scrollbar-thumb {
-  background: #c9d6e3;
-  border-radius: 8px;
-  border: 2px solid #f0f4f8;
-}
-
-::-webkit-scrollbar-thumb:hover {
-  background: #8ea9c1;
-}
-
-* {
-  scrollbar-width: thin;
-  scrollbar-color: #c9d6e3 #f0f4f8;
-}
+::-webkit-scrollbar { width: 8px; height: 8px; }
+::-webkit-scrollbar-track { background: #f0f4f8; border-radius: 8px; }
+::-webkit-scrollbar-thumb { background: #c9d6e3; border-radius: 8px; border: 2px solid #f0f4f8; }
+::-webkit-scrollbar-thumb:hover { background: #8ea9c1; }
+* { scrollbar-width: thin; scrollbar-color: #c9d6e3 #f0f4f8; }
 
 /* ══════════════════════════════════════════
-   RESPONSIVE — Single column tablet/mobile
+   RESPONSIVE
 ══════════════════════════════════════════ */
-@media (max-width: 1024px) {
-  .availability-sections {
-    grid-template-columns: 1fr;
-    max-width: 580px;
-    margin: 0 auto;
-  }
-}
-
 @media (max-width: 640px) {
   .set-availability-container {
     padding: 20px 14px;
@@ -840,11 +673,35 @@
 
   .availability-form {
     padding: 16px 18px 22px;
-    gap: 14px;
+    gap: 16px;
   }
 
-  .submit-button {
+  .timeslot-track {
+    flex-direction: column;
+  }
+
+  .timeslot-pill {
+    flex-direction: row;
+    justify-content: flex-start;
+    gap: 12px;
+    padding: 12px 16px;
+    text-align: left;
+  }
+
+  .timeslot-pill__check {
+    margin-left: auto;
+    position: static;
+  }
+
+  .form-actions {
+    flex-direction: column-reverse;
+  }
+
+  .btn-outline,
+  .btn-primary {
     width: 100%;
+    text-align: center;
+    justify-content: center;
   }
 
   .availability-modal-box {
@@ -858,7 +715,6 @@
   .modal-btn-primary,
   .modal-btn-secondary {
     width: 100%;
-    justify-content: center;
   }
 }
 
@@ -871,10 +727,6 @@
     width: 40px;
     height: 40px;
     font-size: 17px;
-  }
-
-  .availability-form {
-    padding: 14px 14px 18px;
   }
 
   .date-picker {

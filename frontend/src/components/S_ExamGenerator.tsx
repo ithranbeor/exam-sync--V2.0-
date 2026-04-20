@@ -1789,11 +1789,7 @@ const SchedulerPlottingSchedule: React.FC<SchedulerProps> = ({ user, onScheduleC
   );
 
   return (
-    <div className="scheduler-container">
-      <h2 className="scheduler-header">Exam Schedule Generator</h2>
-      <p className="scheduler-subheader">
-        Configure exam schedules using intelligent genetic algorithm optimization
-      </p>
+     <div className="scheduler-container" style={{ margin: 0, padding: '0 4px 16px', boxShadow: 'none', background: 'transparent', border: 'none' }}>
 
       {/* Academic Configuration Section */}
       <div className="configuration-section">

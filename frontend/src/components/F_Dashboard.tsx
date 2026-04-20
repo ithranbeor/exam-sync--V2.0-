@@ -354,9 +354,6 @@ const DashboardFaculty = () => {
         )}
 
         <main className={`main-content ${roles.length > 0 && isSidebarOpen ? 'sidebar-open' : 'sidebar-closed'}`}>
-          <div className="content-header">
-            <h1>{activeMenu.charAt(0).toUpperCase() + activeMenu.slice(1).replace(/-/g, ' ')}</h1>
-          </div>
 
           {activeMenu === 'dashboard' && (
             <div className="dashboard-grid">

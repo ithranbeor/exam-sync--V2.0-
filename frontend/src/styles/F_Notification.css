@@ -481,7 +481,7 @@
   position: absolute;
   top: 20px;
   right: 20px;
-  width: 32px;
+  width: 42px;
   height: 32px;
   border: none;
   background: #f0f4f8;
@@ -722,7 +722,7 @@
   .notif-modal-close {
     top: 14px;
     right: 14px;
-    width: 28px;
+    width: 42px;
     height: 28px;
     font-size: 12px;
   }

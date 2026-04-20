@@ -1,890 +1,825 @@
+@import url('https://fonts.googleapis.com/css2?family=Sora:wght@300;400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap');
+
+/* ══════════════════════════════════════════
+   DESIGN TOKENS
+══════════════════════════════════════════ */
+:root {
+  --brand:          #092C4C;
+  --brand-mid:      #0A3765;
+  --brand-light:    #1a5a8a;
+  --accent:         #2F80ED;
+  --accent-soft:    #EBF4FF;
+  --danger:         #C0392B;
+  --danger-soft:    #FEF2F2;
+  --success:        #047857;
+  --success-soft:   #ECFDF5;
+  --warn:           #B45309;
+  --warn-soft:      #FFFBEB;
+  --surface:        #FFFFFF;
+  --surface-2:      #F5F7FA;
+  --surface-3:      #EEF1F6;
+  --border:         #DDE3EC;
+  --border-2:       #C8D3E0;
+  --text-primary:   #0C1B2A;
+  --text-secondary: #4B5E72;
+  --text-muted:     #8A9BB0;
+  --radius-sm:  6px;
+  --radius-md:  10px;
+  --radius-lg:  14px;
+  --radius-xl:  20px;
+  --shadow-sm:  0 1px 4px rgba(9,44,76,0.07);
+  --shadow-md:  0 4px 16px rgba(9,44,76,0.12);
+  --shadow-lg:  0 12px 40px rgba(9,44,76,0.18);
+  --font:  'Sora', sans-serif;
+  --mono:  'JetBrains Mono', monospace;
+  --nav-height: 52px;
+  --nav-top:    12px;
+}
+
+/* ══════════════════════════════════════════
+   TOP NAV BAR
+══════════════════════════════════════════ */
+.scheduler-top-card {
+  position: fixed;
+  top: var(--nav-top);
+  left: 50%;
+  transform: translateX(-50%);
+  z-index: 1100;
+  display: flex;
+  align-items: center;
+  gap: 2px;
+  height: var(--nav-height);
+  padding: 0 10px;
+  background: var(--brand);
+  border-radius: 999px;
+  box-shadow: var(--shadow-lg);
+  font-family: var(--font);
+}
+
+.nav-divider {
+  width: 1px;
+  height: 24px;
+  background: rgba(255,255,255,0.18);
+  margin: 0 6px;
+  flex-shrink: 0;
+}
+
+/* ── Icon buttons ── */
+.scheduler-icon {
+  position: relative;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 40px;
+  height: 40px;
+  border-radius: var(--radius-md);
+  cursor: pointer;
+  color: rgba(255,255,255,0.72);
+  font-size: 18px;
+  transition: background 0.15s, color 0.15s, transform 0.12s;
+  flex-shrink: 0;
+  user-select: none;
+}
+.scheduler-icon:hover {
+  background: rgba(255,255,255,0.12);
+  color: #fff;
+  transform: translateY(-1px);
+}
+.scheduler-icon.active {
+  background: rgba(255,255,255,0.2);
+  color: #fff;
+}
+.scheduler-icon.active svg,
+.scheduler-icon.active .nav-icon-inner svg { color: #fff !important; }
+
+.tooltip-text {
+  position: absolute;
+  top: calc(100% + 8px);
+  left: 50%;
+  transform: translateX(-50%);
+  background: var(--text-primary);
+  color: #fff;
+  font-size: 10px;
+  font-family: var(--mono);
+  font-weight: 500;
+  padding: 4px 9px;
+  border-radius: var(--radius-sm);
+  white-space: nowrap;
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity 0.15s;
+  z-index: 9999;
+}
+.tooltip-text::before {
+  content: '';
+  position: absolute;
+  bottom: 100%;
+  left: 50%;
+  transform: translateX(-50%);
+  border: 4px solid transparent;
+  border-bottom-color: var(--text-primary);
+}
+.scheduler-icon:hover .tooltip-text { opacity: 1; }
+
+/* label mode */
+.scheduler-icon.label-mode {
+  width: auto;
+  min-width: 44px;
+  padding: 0 10px;
+  gap: 6px;
+  flex-direction: row;
+}
+.scheduler-icon.label-mode .nav-label {
+  font-size: 11px;
+  font-weight: 600;
+  color: rgba(255,255,255,0.85);
+  white-space: nowrap;
+}
+.scheduler-icon.label-mode:hover .nav-label,
+.scheduler-icon.label-mode.active .nav-label { color: #fff; }
+
+/* ══════════════════════════════════════════
+   CUSTOM FILTER DROPDOWN  (replaces <select>)
+══════════════════════════════════════════ */
+.nav-filter-wrap {
+  position: relative;
+  flex-shrink: 0;
+}
+
+.nav-filter-btn {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  height: 32px;
+  padding: 0 12px 0 14px;
+  background: rgba(255,255,255,0.1);
+  border: 1px solid rgba(255,255,255,0.2);
+  border-radius: 999px;
+  color: rgba(255,255,255,0.92);
+  font-family: var(--mono);
+  font-size: 11.5px;
+  font-weight: 500;
+  cursor: pointer;
+  transition: background 0.15s, border-color 0.15s;
+  white-space: nowrap;
+  min-width: 130px;
+  max-width: 200px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  outline: none;
+  border: none;
+  letter-spacing: 0.01em;
+}
+.nav-filter-btn:hover,
+.nav-filter-btn.open {
+  background: rgba(255,255,255,0.18);
+}
+.nav-filter-btn svg.chevron {
+  margin-left: auto;
+  flex-shrink: 0;
+  width: 12px;
+  height: 12px;
+  opacity: 0.6;
+  transition: transform 0.2s;
+}
+.nav-filter-btn.open svg.chevron { transform: rotate(180deg); }
+
+/* Dropdown list */
+.nav-filter-menu {
+  position: absolute;
+  top: calc(100% + 8px);
+  left: 50%;
+  transform: translateX(-50%) translateY(-6px);
+  background: var(--surface);
+  border: 1.5px solid var(--border);
+  border-radius: var(--radius-lg);
+  box-shadow: var(--shadow-lg);
+  min-width: 220px;
+  max-height: 300px;
+  overflow-y: auto;
+  overflow-x: hidden;
+  z-index: 9999;
+  padding: 6px;
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity 0.18s ease, transform 0.18s cubic-bezier(0.34,1.2,0.64,1);
+  scrollbar-width: thin;
+  scrollbar-color: var(--border) transparent;
+}
+.nav-filter-menu::-webkit-scrollbar { width: 4px; }
+.nav-filter-menu::-webkit-scrollbar-thumb { background: var(--border-2); border-radius: 99px; }
+
+.nav-filter-wrap.open .nav-filter-menu {
+  opacity: 1;
+  pointer-events: auto;
+  transform: translateX(-50%) translateY(0);
+}
+
+.nav-filter-option {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 9px 12px;
+  border-radius: var(--radius-sm);
+  font-family: var(--font);
+  font-size: 12px;
+  font-weight: 500;
+  color: var(--text-secondary);
+  cursor: pointer;
+  transition: background 0.12s, color 0.12s;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.nav-filter-option:hover {
+  background: var(--surface-2);
+  color: var(--text-primary);
+}
+.nav-filter-option.selected {
+  background: var(--accent-soft);
+  color: var(--accent);
+  font-weight: 600;
+}
+.nav-filter-option .opt-dot {
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  background: var(--border-2);
+  flex-shrink: 0;
+  transition: background 0.12s;
+}
+.nav-filter-option.selected .opt-dot { background: var(--accent); }
+.nav-filter-option:hover .opt-dot { background: var(--text-muted); }
+
+/* divider inside menu */
+.nav-filter-divider {
+  height: 1px;
+  background: var(--border);
+  margin: 4px 6px;
+}
+
+/* ══════════════════════════════════════════
+   SEARCH BAR  (auto-advances, inline count)
+══════════════════════════════════════════ */
+.nav-search-wrap {
+  display: flex;
+  align-items: center;
+  gap: 3px;
+  background: rgba(255,255,255,0.1);
+  border: 1px solid rgba(255,255,255,0.2);
+  border-radius: 999px;
+  padding: 0 8px 0 14px;
+  height: 32px;
+  transition: background 0.15s, border-color 0.15s;
+  min-width: 210px;
+}
+.nav-search-wrap:focus-within {
+  background: rgba(255,255,255,0.18);
+  border-color: rgba(255,255,255,0.4);
+}
+
+/* search icon inside bar */
+.nav-search-icon {
+  color: rgba(255,255,255,0.45);
+  font-size: 12px;
+  flex-shrink: 0;
+  margin-right: 2px;
+}
+
+.nav-search-wrap input {
+  background: transparent;
+  border: none;
+  outline: none;
+  color: #fff;
+  font-family: var(--mono);
+  font-size: 11.5px;
+  width: 120px;
+  letter-spacing: 0.01em;
+}
+.nav-search-wrap input::placeholder { color: rgba(255,255,255,0.38); }
+
+/* match counter pill */
+.nav-search-count {
+  font-family: var(--mono);
+  font-size: 10px;
+  font-weight: 500;
+  color: rgba(255,255,255,0.55);
+  white-space: nowrap;
+  padding: 0 4px;
+  letter-spacing: 0.02em;
+}
+
+/* nav icon mini-buttons */
+.nav-search-btn {
+  background: none;
+  border: none;
+  color: rgba(255,255,255,0.55);
+  cursor: pointer;
+  font-size: 12px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 22px;
+  height: 22px;
+  border-radius: 5px;
+  transition: color 0.12s, background 0.12s;
+  flex-shrink: 0;
+}
+.nav-search-btn:hover {
+  color: #fff;
+  background: rgba(255,255,255,0.14);
+}
+
+/* ══════════════════════════════════════════
+   DROPDOWN PANEL
+══════════════════════════════════════════ */
+.nav-dropdown-overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 1050;
+  pointer-events: none;
+}
+.nav-dropdown-overlay.open { pointer-events: auto; }
+
+.nav-dropdown-backdrop {
+  position: absolute;
+  inset: 0;
+  background: rgba(9,44,76,0.06);
+  opacity: 0;
+  transition: opacity 0.2s;
+}
+.nav-dropdown-overlay.open .nav-dropdown-backdrop { opacity: 1; }
+
+.nav-dropdown-panel {
+  position: absolute;
+  top: calc(var(--nav-top) + var(--nav-height) + 8px);
+  left: 50%;
+  transform: translateX(-50%) translateY(-14px);
+  width: min(92vw, 860px);
+  background: var(--surface);
+  border: 1.5px solid var(--border);
+  border-radius: var(--radius-xl);
+  box-shadow: var(--shadow-lg);
+  overflow: hidden;
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity 0.22s ease, transform 0.22s cubic-bezier(0.34,1.2,0.64,1);
+  z-index: 1051;
+}
+.nav-dropdown-overlay.open .nav-dropdown-panel {
+  opacity: 1;
+  pointer-events: auto;
+  transform: translateX(-50%) translateY(0);
+}
+
+.nav-panel-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 14px 22px 13px;
+  border-bottom: 1px solid var(--border);
+  background: var(--surface);
+}
+.nav-panel-title {
+  font-size: 13.5px;
+  font-weight: 700;
+  color: var(--text-primary);
+  font-family: var(--font);
+  letter-spacing: -0.2px;
+  display: flex;
+  align-items: center;
+  gap: 9px;
+}
+.nav-panel-title svg { color: var(--brand); }
+
+.nav-panel-close {
+  background: none;
+  border: none;
+  cursor: pointer;
+  color: var(--text-muted);
+  font-size: 15px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 28px;
+  height: 28px;
+  border-radius: var(--radius-sm);
+  transition: background 0.12s, color 0.12s;
+}
+.nav-panel-close:hover {
+  background: var(--surface-3);
+  color: var(--text-primary);
+}
+
+.nav-panel-body {
+  padding: 20px 22px 26px;
+  max-height: 74vh;
+  overflow-y: auto;
+  background: #f4f6f9;
+  scrollbar-width: thin;
+  scrollbar-color: var(--border-2) transparent;
+}
+.nav-panel-body::-webkit-scrollbar { width: 5px; }
+.nav-panel-body::-webkit-scrollbar-thumb { background: var(--border-2); border-radius: 99px; }
+
+/* ══════════════════════════════════════════
+   STATUS BANNERS
+══════════════════════════════════════════ */
+.status-banner {
+  position: fixed;
+  top: calc(var(--nav-top) + var(--nav-height) + 10px);
+  left: 50%;
+  transform: translateX(-50%);
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 3px;
+  padding: 8px 22px;
+  border-radius: var(--radius-lg);
+  font-family: var(--font);
+  font-size: 12.5px;
+  font-weight: 600;
+  z-index: 1040;
+  box-shadow: var(--shadow-md);
+  text-align: center;
+  max-width: 90%;
+  animation: sb-in 0.25s ease;
+}
+@keyframes sb-in {
+  from { opacity: 0; transform: translateX(-50%) translateY(-6px); }
+  to   { opacity: 1; transform: translateX(-50%) translateY(0); }
+}
+.status-banner.approved { background: #16a34a; color: #fff; }
+.status-banner.rejected { background: var(--danger); color: #fff; }
+.status-banner.pending  { background: #ea7b00; color: #fff; }
+.status-banner .remarks { font-size: 11.5px; font-weight: 400; opacity: 0.9; }
+
+.mode-banner {
+  position: fixed;
+  top: calc(var(--nav-top) + var(--nav-height) + 10px);
+  left: 50%;
+  transform: translateX(-50%);
+  background: #ea7b00;
+  color: #fff;
+  padding: 8px 24px;
+  border-radius: var(--radius-lg);
+  font-family: var(--font);
+  font-size: 12.5px;
+  font-weight: 700;
+  z-index: 1040;
+  box-shadow: var(--shadow-md);
+  animation: sb-in 0.2s ease;
+}
+
+.instruction-card {
+  position: fixed;
+  top: calc(var(--nav-top) + var(--nav-height) + 58px);
+  left: 50%;
+  transform: translateX(-50%);
+  background: var(--surface);
+  color: var(--text-primary);
+  border: 1.5px solid var(--border);
+  border-radius: var(--radius-lg);
+  padding: 16px 20px;
+  width: min(90vw, 380px);
+  z-index: 1039;
+  box-shadow: var(--shadow-md);
+  text-align: center;
+  font-family: var(--font);
+  animation: sb-in 0.22s ease;
+}
+.instruction-card h4 {
+  font-size: 13px; font-weight: 700; color: var(--text-primary); margin: 0 0 8px;
+}
+.instruction-card p {
+  font-size: 12.5px; line-height: 1.6; color: var(--text-secondary); margin: 0 0 12px;
+}
+.instruction-close {
+  background: none;
+  border: 1.5px solid var(--border);
+  border-radius: var(--radius-sm);
+  padding: 5px 16px;
+  font-size: 12px; font-weight: 600;
+  color: var(--danger);
+  cursor: pointer;
+  font-family: var(--font);
+  transition: background 0.12s;
+}
+.instruction-close:hover { background: var(--danger-soft); }
+
+/* ══════════════════════════════════════════
+   SEND MESSAGES SUB-DROPDOWN
+══════════════════════════════════════════ */
+.envelope-dropdown {
+  position: absolute;
+  top: calc(100% + 8px);
+  left: 50%;
+  transform: translateX(-50%);
+  background: var(--surface);
+  border: 1.5px solid var(--border);
+  border-radius: var(--radius-md);
+  box-shadow: var(--shadow-md);
+  padding: 5px;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  min-width: 130px;
+  z-index: 9999;
+  animation: sb-in 0.18s ease;
+}
+.dropdown-item {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 9px 13px;
+  border: none;
+  background: none;
+  border-radius: var(--radius-sm);
+  color: var(--text-secondary);
+  font-size: 12.5px;
+  font-weight: 500;
+  font-family: var(--font);
+  cursor: pointer;
+  transition: background 0.12s, color 0.12s;
+  white-space: nowrap;
+}
+.dropdown-item:hover {
+  background: var(--brand);
+  color: #fff;
+}
+
+/* ══════════════════════════════════════════
+   EXAM TABLE  — full redesign
+══════════════════════════════════════════ */
 .scheduler-view-container {
-  padding: 25px;
-  font-family: Arial, sans-serif;
+  padding: 28px 28px 20px;
+  font-family: var(--font);
 }
 
 .header {
   text-align: center;
-  margin-bottom: 20px;
+  margin-bottom: 24px;
 }
 
-.logo {
-  width: 100px;
-  height: auto;
-}
-
-.exam-date-section {
-  margin-bottom: 30px;
-}
-
-/* Table wrapper for horizontal scrolling on mobile */
-.table-wrapper {
-  width: 100%;
-  overflow-x: auto;
-  overflow-y: visible;
-  -webkit-overflow-scrolling: touch;
-  scroll-behavior: smooth;
-  position: relative;
-}
-
-/* Hide scrollbar but keep functionality */
-.table-wrapper::-webkit-scrollbar {
-  height: 8px;
-}
-
-.table-wrapper::-webkit-scrollbar-track {
-  background: rgba(0, 0, 0, 0.05);
-  border-radius: 4px;
-}
-
-.table-wrapper::-webkit-scrollbar-thumb {
-  background: rgba(9, 44, 76, 0.3);
-  border-radius: 4px;
-}
-
-.table-wrapper::-webkit-scrollbar-thumb:hover {
-  background: rgba(9, 44, 76, 0.5);
-}
-
-/* Firefox scrollbar */
-.table-wrapper {
-  scrollbar-width: thin;
-  scrollbar-color: rgba(9, 44, 76, 0.3) rgba(0, 0, 0, 0.05);
-}
-
+/* The table itself */
 .exam-table {
   width: 100%;
   min-width: 600px;
-  /* Minimum width to ensure table doesn't get too compressed */
-  border-collapse: collapse;
-  border-top-right-radius: 50px;
-  border-top-left-radius: 50px;
+  border-collapse: separate;
+  border-spacing: 0;
+  border-radius: var(--radius-lg);
+  overflow: hidden;
+  box-shadow: 0 1px 6px rgba(9,44,76,0.1);
+  font-family: var(--font);
 }
 
-.exam-table thead tr:first-child th {
-  font-size: 16px;
-  border-top-right-radius: 10px;
-  border-top-left-radius: 10px;
-  color: #fff;
-  border: white;
-}
-
-.exam-table thead tr:nth-child(2) th {
-  font-size: 15px;
-}
-
-.exam-table thead tr:nth-child(3) th {
-  font-size: 14px;
-}
-
+/* ── Header rows ── */
 .exam-table thead th {
-  background-color: #092C4C;
-  color: #fff;
-  font-weight: bold;
-  font-family: serif;
-}
-
-.exam-table th,
-.exam-table td {
-  border: 1px solid #ccc;
-  padding: 5px;
-  text-align: center;
-  vertical-align: top;
-  color: #092C4C;
-  font-weight: bold;
-}
-
-.exam-box {
-  background-color: #79b4f2;
-  padding: 5px;
-  margin-bottom: 2px;
-  border-radius: 4px;
-  color: #fff;
+  background: var(--brand);
+  color: rgba(255,255,255,0.95);
+  font-family: var(--font);
   font-size: 12px;
-}
-
-.center-cell {
+  font-weight: 600;
+  letter-spacing: 0.02em;
+  padding: 10px 10px;
   text-align: center;
-  font-weight: bold;
-  font-size: 16px;
-  padding: 10px 0;
-}
-
-.scheduler-view-card {
-  background: #f9f9f9;
-  border-radius: 80px;
-  box-shadow: 0 4px 10px rgba(0, 0, 0, 0.4), 0 0 10px rgba(0, 0, 0, 0.2);
-  padding: 20px;
-
-}
-
-.scheduler-top-card {
-  display: flex;
-  justify-content: center;
-  left: 100%;
-  /* center horizontally */
-  align-items: center;
-  gap: 1rem;
-  padding: 0.5rem 1rem;
-  border-radius: 20px;
-  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.2);
-  position: fixed;
-  /* stay on screen */
-  top: 15px;
-  /* distance from top */
-  left: 53%;
-  transform: translateX(-50%);
-  z-index: 1000;
-  color: #092C4C;
-  background-color: white;
-}
-
-.scheduler-icon-card {
-  position: absolute;
-  top: 2.5rem;
-  /* below the icon */
-  left: 50%;
-  transform: translateX(-50%);
-  background: #fff;
-  padding: 0.5rem 1rem;
-  border-radius: 8px;
-  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.2);
-  min-width: 200px;
-  transition: opacity 0.3s ease;
-}
-
-.proctor-dropdown {
-  padding: 6px 10px;
-  font-size: 13px;
-  border: 1px solid #ccc;
-  border-radius: 6px;
-  background-color: #fff;
-  cursor: pointer;
-  transition: all 0.2s ease;
-  width: 100%;
-  max-width: 180px;
-  color: #092C4C;
-}
-
-.proctor-dropdown:hover {
-  border-color: #092C4C;
-  background-color: #f9f9f9;
-}
-
-.proctor-dropdown:focus {
-  outline: none;
-  border-color: #092C4C;
-  box-shadow: 0 0 4px rgba(9, 44, 76, 0.4);
-}
-
-.tooltip-text {
-  position: absolute;
-  top: 28px;
-  /* show above the icon */
-  left: 50%;
-  transform: translateX(-50%);
-  background: transparent;
-  color: #092C4C;
-  font-size: 10px;
-  padding: 2px 6px;
-  border-radius: 4px;
+  border: none;
+  border-bottom: 1px solid rgba(255,255,255,0.08);
   white-space: nowrap;
-  opacity: 0;
-  transition: opacity 0.2s ease;
-  pointer-events: none;
 }
 
-.scheduler-icon:hover .tooltip-text {
-  opacity: 1;
+/* Date row — slightly lighter navy */
+.exam-table thead tr:first-child th {
+  background: #0b3660;
+  font-size: 13px;
+  font-weight: 700;
+  letter-spacing: 0.01em;
+  padding: 12px 14px;
+  color: #fff;
 }
 
-.modal-scroll {
-  max-height: 80vh;
-  overflow-y: auto;
+/* Building row */
+.exam-table thead tr:nth-child(2) th {
+  background: #0d4075;
+  font-size: 11px;
+  font-weight: 600;
+  padding: 8px 10px;
+  color: rgba(255,255,255,0.85);
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
 }
 
-/* Webkit browsers (Chrome, Edge, Safari) */
-.modal-scroll::-webkit-scrollbar {
-  width: 8px;
+/* Room row */
+.exam-table thead tr:nth-child(3) th {
+  background: var(--brand);
+  font-size: 12px;
+  font-weight: 700;
+  padding: 9px 8px;
 }
 
-.modal-scroll::-webkit-scrollbar-track {
-  background: rgba(0, 0, 0, 0.05);
-  border-radius: 4px;
+/* ── Time column (first <td>) ── */
+.exam-table tbody td:first-child {
+  width: 108px;
+  min-width: 90px;
+  max-width: 120px;
+  height: 52px !important;
+  max-height: 52px !important;
+  vertical-align: middle !important;
+  text-align: center;
+  white-space: nowrap;
+  overflow: hidden;
+  padding: 0 8px;
+  box-sizing: border-box;
+  font-family: var(--mono);
+  font-size: 10.5px;
+  font-weight: 500;
+  color: var(--text-secondary);
+  background: #f0f4f8;
+  border-right: 2px solid var(--border-2);
+  border-bottom: 1px solid var(--border);
+  letter-spacing: 0.01em;
 }
 
-.modal-scroll::-webkit-scrollbar-thumb {
-  background: rgba(0, 0, 0, 0.25);
-  border-radius: 4px;
-}
+/* Alternating time-row shading */
+.exam-table tbody tr:nth-child(even) td:first-child { background: #e8edf3; }
 
-.modal-scroll::-webkit-scrollbar-thumb:hover {
-  background: rgba(0, 0, 0, 0.4);
-}
-
-/* Firefox */
-.modal-scroll {
-  scrollbar-width: thin;
-  scrollbar-color: rgba(0, 0, 0, 0.25) rgba(0, 0, 0, 0.05);
-}
-
-.envelope-dropdown {
-  position: absolute;
-  top: 40px;
-  /* below the icon */
-  right: 10;
+/* ── Regular body cells ── */
+.exam-table tbody td {
+  height: 52px;
+  vertical-align: top;
+  padding: 3px;
+  overflow: hidden;
+  border: 1px solid var(--border);
   background: #ffffff;
-  border-radius: 10px;
-  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
-  padding: 8px 0;
+  box-sizing: border-box;
+  transition: background 0.12s;
+}
+
+/* Alternating row bg for empty cells */
+.exam-table tbody tr:nth-child(even) td { background: #fafbfc; }
+
+/* ── Exam card inside a cell ── */
+.exam-table tbody td > div[data-exam-id] {
+  height: 100%;
+  min-height: unset;
+  box-sizing: border-box;
+  overflow: hidden;
+  cursor: default;
+  border-radius: 5px;
+  padding: 6px 8px;
   display: flex;
   flex-direction: column;
-  min-width: 100%;
-  z-index: 9999;
-  animation: fadeSlideIn 0.2s ease-out forwards;
+  justify-content: flex-start;
+  gap: 2px;
 }
 
-@keyframes fadeSlideIn {
-  from {
-    opacity: 0;
-    transform: translateY(-8px);
-  }
-
-  to {
-    opacity: 1;
-    transform: translateY(0);
-  }
+/* ── Text inside exam cards ── */
+.exam-table td > div p {
+  margin: 4px 0;
+  font-size: 11px;
+  font-family: var(--font);
+  line-height: 1.35;
+  color: rgba(255,255,255,0.95);
+  
 }
 
-.dropdown-item {
-  background: none;
-  border: none;
-  color: #092C4C;
-  font-weight: 500;
-  text-align: left;
-  padding: 10px 15px;
-  cursor: pointer;
-  display: flex;
-  align-items: center;
-  gap: 10px;
-  transition: background 0.2s ease, color 0.2s ease;
+.exam-table td > div p strong {
+  font-size: 15px;
+  font-weight: 700;
+  letter-spacing: -0.01em;
+  color: #fff;
 }
 
-.dropdown-item svg {
-  font-size: 16px;
-  color: #092C4C;
-  transition: color 0.2s ease;
+/* ── Drop-target empty cell highlight ── */
+.exam-table tbody td.drop-hover {
+  background: #e0f2fe !important;
+  border: 2px dashed #0288d1 !important;
 }
 
-.dropdown-item:hover {
-  background-color: #092C4C;
-  color: #ffffff;
-  border-radius: 100px;
+/* ── Rounded corners on table ── */
+.exam-table thead tr:first-child th:first-child { border-radius: var(--radius-lg) 0 0 0; }
+.exam-table thead tr:first-child th:last-child  { border-radius: 0 var(--radius-lg) 0 0; }
+
+/* ══════════════════════════════════════════
+   SCHEDULE VIEW CARD WRAPPER
+══════════════════════════════════════════ */
+.scheduler-view-card {
+  background: #f2f5f8;
+  border-radius: 14px;
+  box-shadow: 0 6px 24px rgba(9,44,76,0.13), 0 1px 4px rgba(9,44,76,0.06);
+  padding: 20px;
 }
 
-.dropdown-item:hover svg {
-  color: #ffffff;
-}
-
-.dean-name {
-  font-size: 0.9rem;
-  font-style: italic;
-  color: #555;
-  text-align: center;
-  padding: 4px 10px;
-  border-top: 1px solid #eee;
-}
-
-/* ICON WRAPPER (ENVELOPE) */
-.scheduler-icon {
-  position: relative;
-  margin: 0 5px;
-  cursor: pointer;
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  color: #092C4C;
-  font-size: 22px;
-  padding: 8px;
-  transition: background 0.2s ease, transform 0.1s ease;
-}
-
-/* Navigation buttons for pagination */
+/* ── Nav prev/next buttons ── */
 .scheduler-nav-button {
   position: fixed;
   z-index: 1000;
-  background: rgba(255, 255, 255, 1);
+  background: var(--surface);
+  border: 1.5px solid var(--border);
   border-radius: 50%;
   cursor: pointer;
   padding: 0.75rem;
-  box-shadow: 0 2px 12px rgba(0, 0, 0, 0.15);
-  transition: all 0.3s ease;
+  box-shadow: var(--shadow-md);
+  transition: all 0.2s ease;
   display: flex;
   align-items: center;
   justify-content: center;
   min-width: 50px;
   min-height: 50px;
 }
-
 .scheduler-nav-button:hover {
-  background: rgba(9, 44, 76, 0.1);
-  box-shadow: 0 6px 16px rgba(0, 0, 0, 0.2);
+  background: var(--brand);
+  border-color: var(--brand);
 }
+.scheduler-nav-button:hover svg { color: #fff !important; }
+.scheduler-nav-button svg { color: var(--brand); }
+.scheduler-nav-button-left  { left: calc(50% - 60px); top: 90%; }
+.scheduler-nav-button-right { left: calc(50% + 60px); top: 90%; }
 
-.scheduler-nav-button-left:hover,
-.scheduler-nav-button-right:hover {
-  transform: scale(1.1);
-}
-
-.scheduler-nav-button-left:active,
-.scheduler-nav-button-right:active {
-  transform: scale(0.95);
-}
-
-.scheduler-nav-button svg {
-  color: #092C4C;
-  transition: opacity 0.2s ease;
-}
-
-.scheduler-nav-button:hover svg {
-  opacity: 1;
-}
-
-.scheduler-nav-button-left {
-  left: calc(50% - 50px);
-  top: 90%;
-  transform: none;
-  right: auto;
-}
-
-.scheduler-nav-button-right {
-  left: calc(50% + 50px);
-  top: 90%;
-  transform: none;
-  right: auto;
-}
-
-/* ======================= DESKTOP (min-width: 1025px) ======================= */
-@media (min-width: 1025px) {
-  .scheduler-nav-button-left {
-    left: calc(50% - 60px);
-    top: 90%;
-    transform: none;
-    right: auto;
-  }
-
-  .scheduler-nav-button-right {
-    left: calc(50% + 60px);
-    top: 90%;
-    transform: none;
-    right: auto;
-  }
-
-  .scheduler-nav-button {
-    min-width: 50px;
-    min-height: 50px;
-  }
-
-  .scheduler-nav-button svg {
-    font-size: 3rem !important;
-  }
-}
-
-/* ======================= TABLET RESPONSIVENESS (769px - 1024px) ======================= */
-@media (min-width: 769px) and (max-width: 1024px) {
-  .scheduler-nav-button {
-    min-width: 55px;
-    min-height: 55px;
-    padding: 0.85rem;
-  }
-
-  .scheduler-nav-button svg {
-    font-size: 2.5rem !important;
-  }
-
-  .scheduler-nav-button-left {
-    left: 50%;
-    top: 85%;
-    transform: translateX(-50%);
-    right: auto;
-  }
-
-  .scheduler-nav-button-right {
-    left: 50%;
-    top: 92%;
-    transform: translateX(-50%);
-    right: auto;
-  }
-}
-
-/* ======================= SMALL TABLET / LARGE MOBILE (600px - 900px) ======================= */
-@media (min-width: 600px) and (max-width: 900px) {
-  .scheduler-nav-button {
-    min-width: 60px;
-    min-height: 60px;
-    padding: 1rem;
-    background: rgba(255, 255, 255, 0.95);
-    border-width: 3px;
-  }
-
-  .scheduler-nav-button svg {
-    font-size: 2.2rem !important;
-  }
-
-  .scheduler-nav-button-left {
-    left: 50%;
-    top: 83%;
-    transform: translateX(-50%);
-    right: auto;
-  }
-
-  .scheduler-nav-button-right {
-    left: 50%;
-    top: 90%;
-    transform: translateX(-50%);
-    right: auto;
-  }
-}
-
-/* ======================= MOBILE RESPONSIVENESS (max-width: 599px) ======================= */
-@media (max-width: 599px) {
-  .scheduler-view-container {
-    padding: 12px;
-  }
-
-  .header {
-    margin-bottom: 15px;
-  }
-
-  .header img {
-    width: 120px !important;
-    height: 96px !important;
-    margin-bottom: 3px !important;
-  }
-
-  .header>div {
-    font-size: 14px !important;
-    margin-bottom: -8px !important;
-  }
-
-  .header>div:first-of-type {
-    font-size: 18px !important;
-  }
-
-  .header>div:nth-of-type(2) {
-    font-size: 10px !important;
-  }
-
-  .header>div:nth-of-type(3) {
-    font-size: 18px !important;
-  }
-
-  .header>div:nth-of-type(4) {
-    font-size: 14px !important;
-  }
-
-  .header>div:nth-of-type(5) {
-    font-size: 14px !important;
-  }
-
-  .table-wrapper {
-    margin: 0 -12px;
-    padding: 0 12px;
-  }
-
-  .exam-table {
-    min-width: 800px;
-    font-size: 11px;
-  }
-
-  .exam-table thead tr:first-child th {
-    font-size: 12px;
-    padding: 6px 4px;
-  }
-
-  .exam-table thead tr:nth-child(2) th {
-    font-size: 11px;
-    padding: 5px 3px;
-  }
-
-  .exam-table thead tr:nth-child(3) th {
-    font-size: 10px;
-    padding: 4px 2px;
-  }
-
-  .exam-table th,
-  .exam-table td {
-    padding: 3px;
-    font-size: 10px;
-  }
-
-  .exam-table td>div {
-    padding: 3px !important;
-    font-size: 9px !important;
-  }
-
-  .exam-table td>div>p {
-    margin: 2px 0;
-    font-size: 9px;
-  }
-
-  .scheduler-view-card {
-    padding: 12px;
-    border-radius: 12px;
-    transform: scale(0.95) !important;
-  }
-
-  .scheduler-top-card {
-    flex-wrap: wrap;
-    gap: 0.5rem;
-    padding: 0.4rem 0.8rem;
-    left: 50%;
-    top: 10px;
-    max-width: 95%;
-  }
-
-  .scheduler-icon {
-    font-size: 18px;
-    padding: 6px;
-    margin: 0 3px;
-  }
-
-  .scheduler-icon svg {
-    font-size: 18px !important;
-  }
-
-  .scheduler-nav-button {
-    min-width: 45px;
-    min-height: 45px;
-    padding: 0.8rem;
-    background: rgba(255, 255, 255, 0.95);
-    border-width: 2px;
-  }
-
-  .scheduler-nav-button svg {
-    font-size: 1.6rem !important;
-  }
-
-  .scheduler-nav-button-left {
-    left: 50%;
-    top: 80%;
-    transform: translateX(-50%);
-    right: auto;
-  }
-
-  .scheduler-nav-button-right {
-    left: 50%;
-    top: 88%;
-    transform: translateX(-50%);
-    right: auto;
-  }
-
-  .tooltip-text {
-    font-size: 9px;
-    padding: 2px 5px;
-  }
-
-  .envelope-dropdown {
-    min-width: 120px;
-    padding: 6px 0;
-  }
-
-  .dropdown-item {
-    padding: 8px 12px;
-    font-size: 12px;
-  }
-
-  .dropdown-item svg {
-    font-size: 14px;
-  }
-}
-
-/* Swap Animation */
+/* ══════════════════════════════════════════
+   SWAP ANIMATION
+══════════════════════════════════════════ */
 @keyframes swapPulse {
-
-  0%,
-  100% {
-    transform: scale(1);
-    opacity: 1;
-  }
-
-  50% {
-    transform: scale(0.95);
-    opacity: 0.7;
-  }
+  0%, 100% { transform: scale(1);     opacity: 1; }
+  50%       { transform: scale(0.95); opacity: 0.72; }
 }
-
 .swapping-animation {
   animation: swapPulse 0.6s ease-in-out;
   border: 3px solid #ff9500 !important;
-  box-shadow: 0 0 20px rgba(255, 149, 0, 0.6) !important;
+  box-shadow: 0 0 20px rgba(255,149,0,0.55) !important;
 }
 
-/* Floating Footer Settings Button - Responsive */
+/* ══════════════════════════════════════════
+   SEARCH HIGHLIGHT on exam cards
+══════════════════════════════════════════ */
+.exam-card-match {
+  outline: 2px solid #fbbf24 !important;
+  box-shadow: 0 0 6px rgba(251,191,36,0.45) !important;
+}
+.exam-card-match-active {
+  outline: 3px solid #2563eb !important;
+  box-shadow: 0 0 10px rgba(37,99,235,0.5) !important;
+}
+
+/* ══════════════════════════════════════════
+   DELETE PROGRESS MODAL
+══════════════════════════════════════════ */
+@keyframes fadeIn  { from { opacity: 0; } to { opacity: 1; } }
+@keyframes slideUp { from { opacity: 0; transform: translateY(30px); } to { opacity: 1; transform: translateY(0); } }
+@keyframes pulse   { 0%, 100% { transform: scale(1); } 50% { transform: scale(1.05); } }
+
+/* ══════════════════════════════════════════
+   MODAL SCROLL
+══════════════════════════════════════════ */
+.modal-scroll {
+  max-height: 80vh;
+  overflow-y: auto;
+  scrollbar-width: thin;
+  scrollbar-color: rgba(0,0,0,0.18) transparent;
+}
+.modal-scroll::-webkit-scrollbar { width: 6px; }
+.modal-scroll::-webkit-scrollbar-thumb { background: rgba(0,0,0,0.18); border-radius: 4px; }
+
+/* ══════════════════════════════════════════
+   RESPONSIVE
+══════════════════════════════════════════ */
 @media (max-width: 768px) {
-  button[style*="bottom: 30px"][style*="right: 30px"] {
-    bottom: 20px !important;
-    right: 20px !important;
-    padding: 10px 18px !important;
-    font-size: 12px !important;
-  }
+  .scheduler-top-card { gap: 1px; padding: 0 6px; height: 46px; }
+  .scheduler-icon { width: 34px; height: 34px; font-size: 15px; }
+  .nav-filter-btn { min-width: 90px; font-size: 10.5px; }
+  .nav-search-wrap { min-width: 150px; }
+  .nav-search-wrap input { width: 80px; }
+  .nav-dropdown-panel { width: 96vw; }
+  .scheduler-nav-button-left  { left: 50%; transform: translateX(calc(-50% - 32px)); top: 88%; }
+  .scheduler-nav-button-right { left: 50%; transform: translateX(calc(-50% + 32px)); top: 88%; }
 }
-
 @media (max-width: 480px) {
-  button[style*="bottom: 30px"][style*="right: 30px"] {
-    bottom: 15px !important;
-    right: 15px !important;
-    padding: 8px 14px !important;
-    font-size: 11px !important;
-  }
-
-  button[style*="bottom: 30px"][style*="right: 30px"] svg {
-    font-size: 14px !important;
-  }
+  .nav-filter-btn { display: none; }
+  .scheduler-icon { width: 30px; height: 30px; font-size: 14px; }
 }
 
-/* Icon labels responsive */
-@media (max-width: 768px) {
-  .scheduler-icon[style*="flex-direction: column"] {
-    padding: 6px 10px !important;
-  }
-
-  .scheduler-icon[style*="flex-direction: column"] span {
-    font-size: 9px !important;
-  }
+/* ══════════════════════════════════════════
+   EXAM CARD STATES (drag / swap / search)
+══════════════════════════════════════════ */
+.exam-card-match {
+  outline: 2px solid #fbbf24 !important;
+  box-shadow: 0 0 6px rgba(251,191,36,0.45) !important;
 }
-
-/* Delete Progress Animations */
-@keyframes fadeIn {
-  from {
-    opacity: 0;
-  }
-
-  to {
-    opacity: 1;
-  }
-}
-
-@keyframes slideUp {
-  from {
-    opacity: 0;
-    transform: translateY(30px);
-  }
-
-  to {
-    opacity: 1;
-    transform: translateY(0);
-  }
-}
-
-@keyframes pulse {
-
-  0%,
-  100% {
-    transform: scale(1);
-    opacity: 1;
-  }
-
-  50% {
-    transform: scale(1.05);
-    opacity: 0.9;
-  }
-}
-
-/* Responsive adjustments for progress modal */
-@media (max-width: 768px) {
-  div[style*="maxWidth: '500px'"] {
-    padding: 30px 20px !important;
-  }
-
-  div[style*="width: '80px'"] {
-    width: 60px !important;
-    height: 60px !important;
-  }
-
-  h3[style*="fontSize: '20px'"] {
-    font-size: 18px !important;
-  }
-}
-
-.exam-table td>div p {
-  margin: 2px 0;
-  font-size: 12px;
-  line-height: 1.3;
-}
-
-.icon-with-badge {
-  position: relative;
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-}
-
-/* Small red circle count badge */
-.icon-count-badge {
-  position: absolute;
-  top: -4px;
-  right: -4px;
-  background-color: #dc3545;
-  color: white;
-  border-radius: 50%;
-  min-width: 18px;
-  height: 18px;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  font-size: 11px;
-  font-weight: bold;
-  padding: 2px;
-  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.2);
-  z-index: 1;
-}
-
-/* For larger numbers, make it oval */
-.icon-count-badge.large-count {
-  min-width: 22px;
-  border-radius: 10px;
-  padding: 2px 5px;
-}
-
-/* Responsive adjustments */
-@media (max-width: 768px) {
-  .icon-count-badge {
-    min-width: 16px;
-    height: 16px;
-    font-size: 10px;
-    top: -3px;
-    right: -3px;
-  }
-
-  .icon-count-badge.large-count {
-    min-width: 20px;
-    padding: 2px 4px;
-  }
-}
-
-/* Search Container Styles */
-.search-container {
+.exam-card-match-active {
+  outline: 3px solid #2563eb !important;
+  box-shadow: 0 0 10px rgba(37,99,235,0.5) !important;
+  z-index: 2;
   position: relative;
 }
-
-.search-container input {
-  flex: 1;
-  min-width: 0;
+.exam-card-dragging {
+  outline: 3px dashed #fb7185 !important;
+  box-shadow: 0 0 10px rgba(251,113,133,0.5) !important;
 }
-
-.search-nav-button {
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  transition: all 0.2s ease;
+.exam-card-drop-target {
+  outline: 3px solid #22c55e !important;
+  box-shadow: 0 0 10px rgba(34,197,94,0.5) !important;
 }
-
-.search-nav-button:disabled {
-  opacity: 0.4;
-  cursor: not-allowed;
-}
-
-.search-nav-button:not(:disabled):hover {
-  background-color: #f0f0f0;
-  transform: scale(1.1);
-}
-
-.search-nav-button:not(:disabled):active {
-  transform: scale(0.95);
-}
-
-/* Current Match Highlight - Simple and subtle */
-.current-match-highlight {
-  transition: outline 0.2s ease, box-shadow 0.2s ease;
-}
-
-/* Responsive search container */
-@media (max-width: 768px) {
-  .search-container {
-    min-width: 200px !important;
-    font-size: 12px;
-  }
-
-  .search-container input {
-    font-size: 12px !important;
-  }
-
-  .search-nav-button {
-    padding: 2px 4px !important;
-    font-size: 12px !important;
-  }
-
-  .search-container span[style*="fontSize: '12px'"] {
-    font-size: 10px !important;
-    margin-right: 2px !important;
-  }
-}
-
-@media (max-width: 480px) {
-  .search-container {
-    min-width: 180px !important;
-  }
-
-  .search-container input::placeholder {
-    font-size: 10px;
-  }
-}
-
-.exam-table tbody td {
-  vertical-align: top;
-  padding: 2px;
-}
-
-.exam-table tbody td > div {
-  height: 100%;
-  box-sizing: border-box;
-}
-
-.exam-table tbody tr {
-  height: 60px;  /* fixed row height — adjust to taste */
-}
-
-.exam-table tbody td {
-  height: 60px;
-  vertical-align: top;
-  padding: 2px;
-  overflow: hidden;
-}
-
-/* Cards fill their cell completely */
-.exam-table tbody td > div[data-exam-id] {
-  height: 100%;
-  min-height: unset;
-  box-sizing: border-box;
-  overflow-y: hidden;
-}
-
-.exam-table tbody td:first-child {
-  height: 60px !important;
-  max-height: 60px !important;
-  vertical-align: middle !important;
-  text-align: center;
-  white-space: nowrap;
-  overflow: hidden;
-  padding: 0 4px;
-  box-sizing: border-box;
-}
-
-.exam-table tbody td > div[data-exam-id] {
-  cursor: default;
-}
-
-.scheduler-icon.active {
-  background-color: #092C4C;
-  color: white !important;
-  border-radius: 10px;
-}
-
-.scheduler-icon.active svg {
-  color: white !important;
-}
-
-.scheduler-icon.active span {
-  color: white !important;
+.exam-card-swap-selected {
+  outline: 3px solid #3b82f6 !important;
+  box-shadow: 0 0 10px rgba(59,130,246,0.5) !important;
 }
