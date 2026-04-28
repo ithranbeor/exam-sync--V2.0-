@@ -1173,3 +1173,7 @@
   border-top: 1.5px solid var(--cl-surface-3);
   background: var(--cl-surface-2);
 }
+
+.Toastify__toast-container {
+  z-index: 9999999 !important;
+}

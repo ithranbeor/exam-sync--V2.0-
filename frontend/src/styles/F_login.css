@@ -668,3 +668,7 @@
     padding: 36px 28px 28px;
   }
 }
+
+.Toastify__toast-container {
+  z-index: 9999999 !important;
+}

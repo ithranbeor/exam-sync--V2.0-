@@ -195,7 +195,11 @@ const ProctorSetAvailability: React.FC<ProctorSetAvailabilityProps> = ({ user })
           }
         });
         generatedDates.sort();
-        setAllowedDates(generatedDates);
+        // Filter out past dates
+        const today = new Date();
+        today.setHours(0, 0, 0, 0);
+        const futureOnlyDates = generatedDates.filter(dateStr => new Date(dateStr) >= today);
+        setAllowedDates(futureOnlyDates);
       } catch { setAllowedDates([]); } finally {
         setLoadingAllowedDates(false);
       }
@@ -685,9 +689,9 @@ const ProctorSetAvailability: React.FC<ProctorSetAvailabilityProps> = ({ user })
               >
                 {(selectedOriginalDay
                   ? Array.from(new Set(
-                      selectedOriginalDay.split(',').filter(d => !isPastDate(d))
-                        .flatMap(day => dayToTimeSlots[day] || [])
-                    ))
+                    selectedOriginalDay.split(',').filter(d => !isPastDate(d))
+                      .flatMap(day => dayToTimeSlots[day] || [])
+                  ))
                   : Object.values(AvailabilityTimeSlot)
                 ).map(slot => (
                   <option key={slot} value={slot}>{slot}</option>

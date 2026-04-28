@@ -739,3 +739,8 @@
     font-size: 12px;
   }
 }
+
+/* ── Toast fix — always on top ── */
+.Toastify__toast-container {
+  z-index: 9999999 !important;
+}

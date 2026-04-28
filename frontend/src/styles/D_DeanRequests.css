@@ -745,3 +745,7 @@
   .dr-header { flex-direction: row; align-items: center; }
   .dr-modal { max-height: 90vh; }
 }
+
+.Toastify__toast-container {
+  z-index: 9999999 !important;
+}

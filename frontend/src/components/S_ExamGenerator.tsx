@@ -386,8 +386,13 @@ const SchedulerPlottingSchedule: React.FC<SchedulerProps> = ({ user, onScheduleC
     });
 
     const seen = new Set<string>();
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
     return days.filter((d: any) => {
       if (seen.has(d.iso)) return false;
+      // Filter out past dates
+      const dateObj = new Date(d.iso);
+      if (dateObj < today) return false;
       seen.add(d.iso);
       return true;
     });
@@ -1789,7 +1794,7 @@ const SchedulerPlottingSchedule: React.FC<SchedulerProps> = ({ user, onScheduleC
   );
 
   return (
-     <div className="scheduler-container" style={{ margin: 0, padding: '0 4px 16px', boxShadow: 'none', background: 'transparent', border: 'none' }}>
+    <div className="scheduler-container" style={{ margin: 0, padding: '0 4px 16px', boxShadow: 'none', background: 'transparent', border: 'none' }}>
 
       {/* Academic Configuration Section */}
       <div className="configuration-section">

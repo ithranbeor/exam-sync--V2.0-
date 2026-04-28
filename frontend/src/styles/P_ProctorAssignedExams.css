@@ -466,3 +466,7 @@
 .courses-list::-webkit-scrollbar-thumb:hover {
   background: #0e4a7a;
 }
+
+.Toastify__toast-container {
+  z-index: 9999999 !important;
+}

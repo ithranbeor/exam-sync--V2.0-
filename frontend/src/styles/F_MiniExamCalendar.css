@@ -272,3 +272,7 @@
     font-size: 8px;
   }
 }
+
+.Toastify__toast-container {
+  z-index: 9999999 !important;
+}

@@ -382,3 +382,7 @@ textarea:focus {
     padding: 14px 16px;
   }
 }
+
+.Toastify__toast-container {
+  z-index: 9999999 !important;
+}

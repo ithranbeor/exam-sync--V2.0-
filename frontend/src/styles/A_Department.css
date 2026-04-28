@@ -1053,3 +1053,7 @@
   height: 0; /* Remove height */
   cursor: default; /* No pointer cursor */
 }
+
+.Toastify__toast-container {
+  z-index: 9999999 !important;
+}

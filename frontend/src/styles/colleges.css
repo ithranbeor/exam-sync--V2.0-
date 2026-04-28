@@ -1600,3 +1600,7 @@ body {
   border-color: #0A3765;
   box-shadow: 0 0 0 2px rgba(10, 55, 101, 0.1);
 }
+
+.Toastify__toast-container {
+  z-index: 9999999 !important;
+}

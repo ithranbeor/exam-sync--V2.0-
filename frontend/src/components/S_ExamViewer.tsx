@@ -3,7 +3,7 @@ import React, { useEffect, useState, useRef } from "react";
 import Select from "react-select";
 import { api } from '../lib/apiClient.ts';
 import "../styles/S_ExamViewer.css";
-import { FaChevronLeft, FaChevronRight, FaUserEdit, FaEnvelope, FaFileDownload, FaPlus, FaTrash, FaCog } from "react-icons/fa";
+import { FaChevronLeft, FaChevronRight, FaUserEdit, FaEnvelope, FaFileDownload, FaPlus, FaTrash, FaCog, FaPalette } from "react-icons/fa";
 import { MdSwapHoriz } from 'react-icons/md';
 import { ToastContainer, toast } from 'react-toastify';
 import 'react-toastify/dist/ReactToastify.css';
@@ -15,6 +15,7 @@ import ExportSchedule from "./S_ExportSchedule.tsx";
 import FooterSettingsModal from "./S_SettingsModal.tsx";
 import ManualScheduleEditor from './S_ManualScheduleEditor.tsx';
 import { FaEdit } from 'react-icons/fa';
+import ScheduleLayoutEditor, { useLayoutConfig } from "./S_LayoutEditor";
 
 interface ExamDetail {
   examdetails_id?: number; course_id: string; section_name?: string; sections?: string[]; room_id?: string; exam_date?: string; exam_start_time?: string; semester?: string;
@@ -255,6 +256,7 @@ const SchedulerView: React.FC<SchedulerViewProps> = ({ user }) => {
     const stored = localStorage.getItem('showIconLabels');
     return stored ? JSON.parse(stored) : false;
   });
+  const [showLayoutEditor, setShowLayoutEditor] = useState(false);
 
   const [_deleteProgress, setDeleteProgress] = useState<{
     isDeleting: boolean;
@@ -1100,13 +1102,16 @@ const SchedulerView: React.FC<SchedulerViewProps> = ({ user }) => {
     if (searchMatches.length === 0) return;
     const nextIndex = (currentMatchIndex + 1) % searchMatches.length;
     setCurrentMatchIndex(nextIndex);
-
     const currentMatch = searchMatches[nextIndex];
-    if (currentMatch?.examdetails_id) {
-      const examElement = document.querySelector(`[data-exam-id="${currentMatch.examdetails_id}"]`);
-      if (examElement) {
-        examElement.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
-      }
+    if (currentMatch) {
+      const targetPage = getPageIndexForExam(currentMatch);
+      setPage(targetPage);
+      setTimeout(() => {
+        if (currentMatch?.examdetails_id) {
+          const el = document.querySelector(`[data-exam-id="${currentMatch.examdetails_id}"]`);
+          el?.scrollIntoView({ behavior: 'smooth', block: 'center' });
+        }
+      }, 520);
     }
   };
 
@@ -1114,13 +1119,16 @@ const SchedulerView: React.FC<SchedulerViewProps> = ({ user }) => {
     if (searchMatches.length === 0) return;
     const prevIndex = (currentMatchIndex - 1 + searchMatches.length) % searchMatches.length;
     setCurrentMatchIndex(prevIndex);
-
     const currentMatch = searchMatches[prevIndex];
-    if (currentMatch?.examdetails_id) {
-      const examElement = document.querySelector(`[data-exam-id="${currentMatch.examdetails_id}"]`);
-      if (examElement) {
-        examElement.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
-      }
+    if (currentMatch) {
+      const targetPage = getPageIndexForExam(currentMatch);
+      setPage(targetPage);
+      setTimeout(() => {
+        if (currentMatch?.examdetails_id) {
+          const el = document.querySelector(`[data-exam-id="${currentMatch.examdetails_id}"]`);
+          el?.scrollIntoView({ behavior: 'smooth', block: 'center' });
+        }
+      }, 520);
     }
   };
 
@@ -1135,14 +1143,15 @@ const SchedulerView: React.FC<SchedulerViewProps> = ({ user }) => {
     setSearchMatches(matches);
     if (matches.length > 0) {
       setCurrentMatchIndex(0);
-      // auto-scroll to first match immediately
+      const targetPage = getPageIndexForExam(matches[0]);
+      setPage(targetPage);
       setTimeout(() => {
         const first = matches[0];
         if (first?.examdetails_id) {
           const el = document.querySelector(`[data-exam-id="${first.examdetails_id}"]`);
           el?.scrollIntoView({ behavior: 'smooth', block: 'center' });
         }
-      }, 80);
+      }, 520);
     } else {
       setCurrentMatchIndex(-1);
     }
@@ -1160,11 +1169,15 @@ const SchedulerView: React.FC<SchedulerViewProps> = ({ user }) => {
           const nextIndex = (currentMatchIndex + 1) % searchMatches.length;
           setCurrentMatchIndex(nextIndex);
           const currentMatch = searchMatches[nextIndex];
-          if (currentMatch?.examdetails_id) {
-            const examElement = document.querySelector(`[data-exam-id="${currentMatch.examdetails_id}"]`);
-            if (examElement) {
-              examElement.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
-            }
+          if (currentMatch) {
+            const targetPage = getPageIndexForExam(currentMatch);
+            setPage(targetPage);
+            setTimeout(() => {
+              if (currentMatch?.examdetails_id) {
+                const el = document.querySelector(`[data-exam-id="${currentMatch.examdetails_id}"]`);
+                el?.scrollIntoView({ behavior: 'smooth', block: 'center' });
+              }
+            }, 520);
           }
         }
       }
@@ -1174,11 +1187,15 @@ const SchedulerView: React.FC<SchedulerViewProps> = ({ user }) => {
           const prevIndex = (currentMatchIndex - 1 + searchMatches.length) % searchMatches.length;
           setCurrentMatchIndex(prevIndex);
           const currentMatch = searchMatches[prevIndex];
-          if (currentMatch?.examdetails_id) {
-            const examElement = document.querySelector(`[data-exam-id="${currentMatch.examdetails_id}"]`);
-            if (examElement) {
-              examElement.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
-            }
+          if (currentMatch) {
+            const targetPage = getPageIndexForExam(currentMatch);
+            setPage(targetPage);
+            setTimeout(() => {
+              if (currentMatch?.examdetails_id) {
+                const el = document.querySelector(`[data-exam-id="${currentMatch.examdetails_id}"]`);
+                el?.scrollIntoView({ behavior: 'smooth', block: 'center' });
+              }
+            }, 520);
           }
         }
       }
@@ -1361,6 +1378,7 @@ const SchedulerView: React.FC<SchedulerViewProps> = ({ user }) => {
   }, [examData.length]);
 
   const courseColorMap = courseColorMapRef.current;
+  const layoutConfig = useLayoutConfig(schedulerCollegeId);
 
   const hasData = searchFilteredData.length > 0;
 
@@ -1480,6 +1498,25 @@ const SchedulerView: React.FC<SchedulerViewProps> = ({ user }) => {
     const timePart = isoTime.slice(11, 16); // "HH:MM"
     const [h, m] = timePart.split(':').map(Number);
     return h * 60 + m;
+  };
+
+  const getPageIndexForExam = (exam: ExamDetail): number => {
+    let slideIndex = 0;
+    for (const date of uniqueDates) {
+      const dateExams = filteredExamData.filter(e => e.exam_date === date);
+      const dateRooms = Array.from(
+        new Set(dateExams.map(e => e.room_id).filter(Boolean))
+      ).sort((a, b) => String(a).localeCompare(String(b), undefined, { numeric: true }));
+      const dateTotalPages = Math.max(1, Math.ceil(dateRooms.length / maxRoomColumns));
+      for (let p = 0; p < dateTotalPages; p++) {
+        const pageRooms = dateRooms.slice(p * maxRoomColumns, (p + 1) * maxRoomColumns);
+        if (exam.exam_date === date && pageRooms.includes(exam.room_id ?? "")) {
+          return slideIndex;
+        }
+        slideIndex++;
+      }
+    }
+    return 0;
   };
 
   /**
@@ -1941,36 +1978,72 @@ const SchedulerView: React.FC<SchedulerViewProps> = ({ user }) => {
         </div>
       )}
 
-      <button
-        type="button"
-        onClick={() => { resetAllModes(); setShowFooterSettings(true); }}
-        style={{
-          position: 'fixed', bottom: 28, right: 28,
-          background: 'var(--surface, white)', color: 'var(--brand, #092C4C)',
-          border: '1.5px solid var(--border, #d0d0d0)',
-          borderRadius: '999px',
-          padding: '10px 20px',
-          fontSize: '13px', fontWeight: '600',
-          cursor: 'pointer',
-          boxShadow: 'var(--shadow-md, 0 4px 12px rgba(0,0,0,0.15))',
-          zIndex: 1000,
-          display: 'flex', alignItems: 'center', gap: 7,
-          fontFamily: 'var(--font, inherit)',
-          transition: 'all 0.2s ease',
-        }}
-        onMouseEnter={e => {
-          e.currentTarget.style.background = 'var(--brand, #092C4C)';
-          e.currentTarget.style.color = '#fff';
-          e.currentTarget.style.borderColor = 'var(--brand, #092C4C)';
-        }}
-        onMouseLeave={e => {
-          e.currentTarget.style.background = 'var(--surface, white)';
-          e.currentTarget.style.color = 'var(--brand, #092C4C)';
-          e.currentTarget.style.borderColor = 'var(--border, #d0d0d0)';
-        }}
-      >
-        <FaCog style={{ fontSize: 14 }} /> Settings
-      </button>
+      <>
+        <div>
+          
+        </div>
+        <button
+          type="button"
+          onClick={() => { resetAllModes(); setShowFooterSettings(true); }}
+          style={{
+            position: 'fixed', bottom: 28, right: 109,
+            background: 'var(--surface, white)', color: 'var(--brand, #092C4C)',
+            border: '1.5px solid var(--border, #d0d0d0)',
+            borderRadius: '999px',
+            padding: '15px 20px',
+            fontSize: '13px', fontWeight: '600',
+            cursor: 'pointer',
+            boxShadow: 'var(--shadow-md, 0 4px 12px rgba(0,0,0,0.15))',
+            zIndex: 1000,
+            display: 'flex', alignItems: 'center', gap: 7,
+            fontFamily: 'var(--font, inherit)',
+            transition: 'all 0.2s ease',
+          }}
+          onMouseEnter={e => {
+            e.currentTarget.style.background = 'var(--brand, #092C4C)';
+            e.currentTarget.style.color = '#fff';
+            e.currentTarget.style.borderColor = 'var(--brand, #092C4C)';
+          }}
+          onMouseLeave={e => {
+            e.currentTarget.style.background = 'var(--surface, white)';
+            e.currentTarget.style.color = 'var(--brand, #092C4C)';
+            e.currentTarget.style.borderColor = 'var(--border, #d0d0d0)';
+          }}
+        >
+          <FaCog style={{ fontSize: 20 }} />
+        </button>
+      
+        <button
+          type="button"
+          onClick={() => { resetAllModes(); setShowLayoutEditor(true); }}
+          style={{
+            position: 'fixed', bottom: 28, right: 40,
+            background: 'var(--surface, white)', color: 'var(--brand, #092C4C)',
+            border: '1.5px solid var(--border, #d0d0d0)',
+            borderRadius: '999px',
+            padding: '15px 20px',
+            fontSize: '20px', fontWeight: '600',
+            cursor: 'pointer',
+            boxShadow: 'var(--shadow-md, 0 4px 12px rgba(0,0,0,0.15))',
+            zIndex: 1000,
+            display: 'flex', alignItems: 'center', gap: 7,
+            fontFamily: 'var(--font, inherit)',
+            transition: 'all 0.2s ease',
+          }}
+          onMouseEnter={e => {
+            e.currentTarget.style.background = 'var(--brand, #092C4C)';
+            e.currentTarget.style.color = '#fff';
+            e.currentTarget.style.borderColor = 'var(--brand, #092C4C)';
+          }}
+          onMouseLeave={e => {
+            e.currentTarget.style.background = 'var(--surface, white)';
+            e.currentTarget.style.color = 'var(--brand, #092C4C)';
+            e.currentTarget.style.borderColor = 'var(--border, #d0d0d0)';
+          }}
+        >
+          <FaPalette style={{ fontSize: 20 }} />
+        </button>
+      </>
 
       {hasData && page > 0 && (
         <button
@@ -2018,22 +2091,39 @@ const SchedulerView: React.FC<SchedulerViewProps> = ({ user }) => {
           >
             <div className="scheduler-view-container">
               <div className="header" style={{ textAlign: "center", marginBottom: "20px" }}>
-                <div style={{ display: 'flex', justifyContent: 'center', alignItems: 'center', gap: '16px', marginBottom: '5px' }}>
+                <div style={{
+                  display: 'flex',
+                  justifyContent: layoutConfig?.logo.position === 'left' ? 'flex-start'
+                    : layoutConfig?.logo.position === 'right' ? 'flex-end' : 'center',
+                  gap: layoutConfig?.logo.gap ?? 16,
+                }}>
                   {(footerData?.logo_urls && footerData.logo_urls.length > 0
                     ? footerData.logo_urls
                     : footerData?.logo_url
                       ? [footerData.logo_url]
                       : ["/logo/USTPlogo.png"]
                   ).map((url, idx) => (
-                    <img
-                      key={idx}
-                      src={url}
-                      alt={`School Logo ${idx + 1}`}
-                      style={{ width: '160px', height: '130px', objectFit: 'contain' }}
-                    />
+                     <img
+                        src={url}
+                        alt={`Logo ${idx + 1}`}
+                        onError={e => { (e.target as HTMLImageElement).style.display = 'none'; }}
+                        style={{
+                          width: layoutConfig?.logo.size ?? 160,
+                          height: (layoutConfig?.logo.size ?? 160) * 0.8,
+                          objectFit: 'contain'
+                        }}
+                      />
                   ))}
                 </div>
-                <div style={{ fontSize: '30px', color: '#333', marginBottom: '-10px', fontFamily: 'serif' }}>
+                <div style={{
+                  fontSize: layoutConfig?.universityName.fontSize ?? 30,
+                  color: layoutConfig?.universityName.color ?? '#333',
+                  fontFamily: layoutConfig?.universityName.fontFamily ?? 'serif',
+                  fontWeight: layoutConfig?.universityName.bold ? 'bold' : 'normal',
+                  textAlign: layoutConfig?.universityName.align ?? 'center',
+                  marginBottom: layoutConfig?.universityName.offsetY ?? 0,
+                  display: layoutConfig?.universityName.visible === false ? 'none' : undefined,
+                }}>
                   University of Science and Technology of Southern Philippines
                 </div>
                 <div style={{ fontSize: '15px', color: '#555', marginBottom: '-10px', fontFamily: 'serif' }}>
@@ -2165,22 +2255,39 @@ const SchedulerView: React.FC<SchedulerViewProps> = ({ user }) => {
                 >
                   <div className="scheduler-view-container">
                     <div className="header" style={{ textAlign: "center", marginBottom: "20px" }}>
-                      <div style={{ display: 'flex', justifyContent: 'center', alignItems: 'center', gap: '16px', marginBottom: '5px' }}>
+                      <div style={{
+                        display: 'flex',
+                        justifyContent: layoutConfig?.logo.position === 'left' ? 'flex-start'
+                          : layoutConfig?.logo.position === 'right' ? 'flex-end' : 'center',
+                        gap: layoutConfig?.logo.gap ?? 16,
+                      }}>
                         {(footerData?.logo_urls && footerData.logo_urls.length > 0
                           ? footerData.logo_urls
                           : footerData?.logo_url
                             ? [footerData.logo_url]
                             : ["/logo/USTPlogo.png"]
                         ).map((url, idx) => (
-                          <img
-                            key={idx}
-                            src={url}
-                            alt={`School Logo ${idx + 1}`}
-                            style={{ width: '160px', height: '130px', objectFit: 'contain' }}
-                          />
+                           <img
+                              src={url}
+                              alt={`Logo ${idx + 1}`}
+                              onError={e => { (e.target as HTMLImageElement).style.display = 'none'; }}
+                              style={{
+                                width: layoutConfig?.logo.size ?? 160,
+                                height: (layoutConfig?.logo.size ?? 160) * 0.8,
+                                objectFit: 'contain'
+                              }}
+                            />
                         ))}
                       </div>
-                      <div style={{ fontSize: '30px', color: '#333', marginBottom: '-10px', fontFamily: 'serif' }}>
+                      <div style={{
+                        fontSize: layoutConfig?.universityName.fontSize ?? 30,
+                        color: layoutConfig?.universityName.color ?? '#333',
+                        fontFamily: layoutConfig?.universityName.fontFamily ?? 'serif',
+                        fontWeight: layoutConfig?.universityName.bold ? 'bold' : 'normal',
+                        textAlign: layoutConfig?.universityName.align ?? 'center',
+                        marginBottom: layoutConfig?.universityName.offsetY ?? 0,
+                        display: layoutConfig?.universityName.visible === false ? 'none' : undefined,
+                      }}>
                         University of Science and Technology of Southern Philippines
                       </div>
                       <div style={{ fontSize: '15px', color: '#555', marginBottom: '-10px', fontFamily: 'serif' }}>
@@ -2195,11 +2302,21 @@ const SchedulerView: React.FC<SchedulerViewProps> = ({ user }) => {
                     <hr />
                     <table className="exam-table">
                       <thead>
+                        {/* Date row */}
                         <tr>
-                          <th colSpan={pageRooms.length + 1}>{date && new Date(date).toLocaleDateString("en-US", { year: "numeric", month: "long", day: "numeric" })}</th>
+                          <th colSpan={pageRooms.length + 1} style={{
+                            fontSize: layoutConfig?.tableDateHeader?.fontSize ?? 13,
+                            fontFamily: layoutConfig?.tableDateHeader?.fontFamily ?? 'serif',
+                            color: layoutConfig?.tableDateHeader?.color ?? '#ffffff',
+                            fontWeight: layoutConfig?.tableDateHeader?.bold ? 'bold' : '700',
+                            textAlign: layoutConfig?.tableDateHeader?.align ?? 'center',
+                          }}>
+                            {date && new Date(date).toLocaleDateString("en-US", { year: "numeric", month: "long", day: "numeric" })}
+                          </th>
                         </tr>
+
+                        {/* Building row */}
                         <tr>
-                          <th></th>
                           {(() => {
                             const buildingGroups: Record<string, string[]> = {};
                             pageRooms.forEach((room) => {
@@ -2207,14 +2324,32 @@ const SchedulerView: React.FC<SchedulerViewProps> = ({ user }) => {
                               if (!buildingGroups[building]) buildingGroups[building] = [];
                               buildingGroups[building].push(String(room));
                             });
-
-                            return Object.entries(buildingGroups).map(([building, rooms]) => (
-                              <th key={building} colSpan={rooms.length}>{building}</th>
+                            const entries = Object.entries(buildingGroups);
+                            return entries.map(([building, rooms], i) => (
+                              <th key={building} colSpan={i === 0 ? rooms.length + 1 : rooms.length} style={{
+                                fontSize: layoutConfig?.tableBuildingHeader?.fontSize ?? 11,
+                                fontFamily: layoutConfig?.tableBuildingHeader?.fontFamily ?? 'serif',
+                                color: layoutConfig?.tableBuildingHeader?.color ?? 'rgba(255,255,255,0.85)',
+                                fontWeight: layoutConfig?.tableBuildingHeader?.bold ? 'bold' : '600',
+                                textAlign: layoutConfig?.tableBuildingHeader?.align ?? 'center',
+                              }}>
+                                {building}
+                              </th>
                             ));
                           })()}
                         </tr>
+
+                        {/* Room + Time row */}
                         <tr>
-                          <th>Time</th>
+                          <th style={{
+                            fontSize: layoutConfig?.tableRoomHeader?.fontSize ?? 12,
+                            fontFamily: layoutConfig?.tableRoomHeader?.fontFamily ?? 'serif',
+                            color: layoutConfig?.tableRoomHeader?.color ?? '#ffffff',
+                            fontWeight: layoutConfig?.tableRoomHeader?.bold ? 'bold' : '700',
+                            textAlign: layoutConfig?.tableRoomHeader?.align ?? 'center',
+                          }}>
+                            Time
+                          </th>
                           {(() => {
                             const buildingGroups: Record<string, string[]> = {};
                             pageRooms.forEach((room) => {
@@ -2222,17 +2357,34 @@ const SchedulerView: React.FC<SchedulerViewProps> = ({ user }) => {
                               if (!buildingGroups[building]) buildingGroups[building] = [];
                               buildingGroups[building].push(String(room));
                             });
-
                             return Object.values(buildingGroups)
                               .flat()
-                              .map((room, idx) => <th key={idx}>{room}</th>);
+                              .map((room, idx) => (
+                                <th key={idx} style={{
+                                  fontSize: layoutConfig?.tableRoomHeader?.fontSize ?? 12,
+                                  fontFamily: layoutConfig?.tableRoomHeader?.fontFamily ?? 'serif',
+                                  color: layoutConfig?.tableRoomHeader?.color ?? '#ffffff',
+                                  fontWeight: layoutConfig?.tableRoomHeader?.bold ? 'bold' : '700',
+                                  textAlign: layoutConfig?.tableRoomHeader?.align ?? 'center',
+                                }}>
+                                  {room}
+                                </th>
+                              ));
                           })()}
                         </tr>
                       </thead>
                       <tbody>
                         {timeSlots.map((slot, rowIndex) => (
                           <tr key={slot.start24}>
-                            <td>{slot.label}</td>
+                            <td style={{
+                              fontSize: layoutConfig?.tableTimeColumn?.fontSize ?? 10.5,
+                              fontFamily: layoutConfig?.tableTimeColumn?.fontFamily ?? 'inherit',
+                              color: layoutConfig?.tableTimeColumn?.color ?? undefined,
+                              fontWeight: layoutConfig?.tableTimeColumn?.bold ? 'bold' : undefined,
+                              textAlign: (layoutConfig?.tableTimeColumn?.align ?? 'center') as any,
+                            }}>
+                              {slot.label}
+                            </td>
                             {pageRooms.map((room) => {
                               const key = `${date}-${room}-${rowIndex}`;
                               if (occupiedCells[key]) return null;
@@ -2352,26 +2504,23 @@ const SchedulerView: React.FC<SchedulerViewProps> = ({ user }) => {
                                       opacity: draggedExamId === exam.examdetails_id ? 0.55 : 1,
                                     }}
                                   >
-                                    <p><strong>{exam.course_id}</strong></p>
+                                    <p style={{ fontSize: layoutConfig?.tableCourseName?.fontSize ?? 15, fontFamily: layoutConfig?.tableCourseName?.fontFamily, color: layoutConfig?.tableCourseName?.color ?? '#fff' }}>
+                                      <strong>{exam.course_id}</strong>
+                                    </p>
 
-                                    {/* ✅ UPDATED: Show all sections without tooltip limit */}
-                                    <p style={{
-                                      fontSize: exam.sections && exam.sections.length > 3 ? '10px' : '12px',
-                                      lineHeight: '1.2'
-                                    }}>
+                                    <p style={{ fontSize: layoutConfig?.tableSectionName?.fontSize ?? 12, fontFamily: layoutConfig?.tableSectionName?.fontFamily, color: layoutConfig?.tableSectionName?.color ?? '#fff', lineHeight: '1.2' }}>
                                       {getSectionDisplay(exam)}
                                     </p>
 
-                                    <p style={{
-                                      fontSize: exam.instructors && exam.instructors.length > 2 ? '10px' : '12px',
-                                      lineHeight: '1.2'
-                                    }}>
+                                    <p style={{ fontSize: layoutConfig?.tableInstructor?.fontSize ?? 12, fontFamily: layoutConfig?.tableInstructor?.fontFamily, color: layoutConfig?.tableInstructor?.color ?? '#fff', lineHeight: '1.2' }}>
                                       Instructor: {getInstructorDisplay(exam)}
                                     </p>
 
                                     <div
                                       style={{
-                                        fontSize: exam.proctors && exam.proctors.length > 2 ? '10px' : '12px',
+                                        fontSize: layoutConfig?.tableProctor?.fontSize ?? 12,
+                                        fontFamily: layoutConfig?.tableProctor?.fontFamily,
+                                        color: layoutConfig?.tableProctor?.color ?? '#fff',
                                         lineHeight: '1.2',
                                         cursor: activeProctorEdit === -1 ? 'pointer' : 'default',
                                         padding: '4px',
@@ -2598,7 +2747,12 @@ const SchedulerView: React.FC<SchedulerViewProps> = ({ user }) => {
                 >
                   <div className="scheduler-view-container">
                     <div className="header" style={{ textAlign: "center", marginBottom: "20px" }}>
-                      <div style={{ display: 'flex', justifyContent: 'center', alignItems: 'center', gap: '16px', marginBottom: '5px' }}>
+                      <div style={{
+                        display: 'flex',
+                        justifyContent: layoutConfig?.logo.position === 'left' ? 'flex-start'
+                          : layoutConfig?.logo.position === 'right' ? 'flex-end' : 'center',
+                        gap: layoutConfig?.logo.gap ?? 16,
+                      }}>
                         {(footerData?.logo_urls && footerData.logo_urls.length > 0
                           ? footerData.logo_urls
                           : footerData?.logo_url
@@ -2606,14 +2760,26 @@ const SchedulerView: React.FC<SchedulerViewProps> = ({ user }) => {
                             : ["/logo/USTPlogo.png"]
                         ).map((url, idx) => (
                           <img
-                            key={idx}
                             src={url}
-                            alt={`School Logo ${idx + 1}`}
-                            style={{ width: '160px', height: '130px', objectFit: 'contain' }}
+                            alt={`Logo ${idx + 1}`}
+                            onError={e => { (e.target as HTMLImageElement).style.display = 'none'; }}
+                            style={{
+                              width: layoutConfig?.logo.size ?? 160,
+                              height: (layoutConfig?.logo.size ?? 160) * 0.8,
+                              objectFit: 'contain'
+                            }}
                           />
                         ))}
                       </div>
-                      <div style={{ fontSize: '30px', color: '#333', marginBottom: '-10px', fontFamily: 'serif' }}>
+                        <div style={{
+                        fontSize: layoutConfig?.universityName.fontSize ?? 30,
+                        color: layoutConfig?.universityName.color ?? '#333',
+                        fontFamily: layoutConfig?.universityName.fontFamily ?? 'serif',
+                        fontWeight: layoutConfig?.universityName.bold ? 'bold' : 'normal',
+                        textAlign: layoutConfig?.universityName.align ?? 'center',
+                        marginBottom: layoutConfig?.universityName.offsetY ?? 0,
+                        display: layoutConfig?.universityName.visible === false ? 'none' : undefined,
+                      }}>
                         University of Science and Technology of Southern Philippines
                       </div>
                       <div style={{ fontSize: '15px', color: '#555', marginBottom: '-10px', fontFamily: 'serif' }}>
@@ -2628,11 +2794,21 @@ const SchedulerView: React.FC<SchedulerViewProps> = ({ user }) => {
                     <hr />
                     <table className="exam-table">
                       <thead>
+                        {/* Date row */}
                         <tr>
-                          <th colSpan={pageRooms.length + 1}>{date && new Date(date).toLocaleDateString("en-US", { year: "numeric", month: "long", day: "numeric" })}</th>
+                          <th colSpan={pageRooms.length + 1} style={{
+                            fontSize: layoutConfig?.tableDateHeader?.fontSize ?? 13,
+                            fontFamily: layoutConfig?.tableDateHeader?.fontFamily ?? 'serif',
+                            color: layoutConfig?.tableDateHeader?.color ?? '#ffffff',
+                            fontWeight: layoutConfig?.tableDateHeader?.bold ? 'bold' : '700',
+                            textAlign: layoutConfig?.tableDateHeader?.align ?? 'center',
+                          }}>
+                            {date && new Date(date).toLocaleDateString("en-US", { year: "numeric", month: "long", day: "numeric" })}
+                          </th>
                         </tr>
+
+                        {/* Building row */}
                         <tr>
-                          <th></th>
                           {(() => {
                             const buildingGroups: Record<string, string[]> = {};
                             pageRooms.forEach((room) => {
@@ -2640,14 +2816,32 @@ const SchedulerView: React.FC<SchedulerViewProps> = ({ user }) => {
                               if (!buildingGroups[building]) buildingGroups[building] = [];
                               buildingGroups[building].push(String(room));
                             });
-
-                            return Object.entries(buildingGroups).map(([building, rooms]) => (
-                              <th key={building} colSpan={rooms.length}>{building}</th>
+                            const entries = Object.entries(buildingGroups);
+                            return entries.map(([building, rooms], i) => (
+                              <th key={building} colSpan={i === 0 ? rooms.length + 1 : rooms.length} style={{
+                                fontSize: layoutConfig?.tableBuildingHeader?.fontSize ?? 11,
+                                fontFamily: layoutConfig?.tableBuildingHeader?.fontFamily ?? 'serif',
+                                color: layoutConfig?.tableBuildingHeader?.color ?? 'rgba(255,255,255,0.85)',
+                                fontWeight: layoutConfig?.tableBuildingHeader?.bold ? 'bold' : '600',
+                                textAlign: layoutConfig?.tableBuildingHeader?.align ?? 'center',
+                              }}>
+                                {building}
+                              </th>
                             ));
                           })()}
                         </tr>
+
+                        {/* Room + Time row */}
                         <tr>
-                          <th>Time</th>
+                          <th style={{
+                            fontSize: layoutConfig?.tableRoomHeader?.fontSize ?? 12,
+                            fontFamily: layoutConfig?.tableRoomHeader?.fontFamily ?? 'serif',
+                            color: layoutConfig?.tableRoomHeader?.color ?? '#ffffff',
+                            fontWeight: layoutConfig?.tableRoomHeader?.bold ? 'bold' : '700',
+                            textAlign: layoutConfig?.tableRoomHeader?.align ?? 'center',
+                          }}>
+                            Time
+                          </th>
                           {(() => {
                             const buildingGroups: Record<string, string[]> = {};
                             pageRooms.forEach((room) => {
@@ -2655,17 +2849,34 @@ const SchedulerView: React.FC<SchedulerViewProps> = ({ user }) => {
                               if (!buildingGroups[building]) buildingGroups[building] = [];
                               buildingGroups[building].push(String(room));
                             });
-
                             return Object.values(buildingGroups)
                               .flat()
-                              .map((room, idx) => <th key={idx}>{room}</th>);
+                              .map((room, idx) => (
+                                <th key={idx} style={{
+                                  fontSize: layoutConfig?.tableRoomHeader?.fontSize ?? 12,
+                                  fontFamily: layoutConfig?.tableRoomHeader?.fontFamily ?? 'serif',
+                                  color: layoutConfig?.tableRoomHeader?.color ?? '#ffffff',
+                                  fontWeight: layoutConfig?.tableRoomHeader?.bold ? 'bold' : '700',
+                                  textAlign: layoutConfig?.tableRoomHeader?.align ?? 'center',
+                                }}>
+                                  {room}
+                                </th>
+                              ));
                           })()}
                         </tr>
                       </thead>
                       <tbody>
                         {timeSlots.map((slot, rowIndex) => (
                           <tr key={slot.start24}>
-                            <td>{slot.label}</td>
+                            <td style={{
+                              fontSize: layoutConfig?.tableTimeColumn?.fontSize ?? 10.5,
+                              fontFamily: layoutConfig?.tableTimeColumn?.fontFamily ?? 'inherit',
+                              color: layoutConfig?.tableTimeColumn?.color ?? undefined,
+                              fontWeight: layoutConfig?.tableTimeColumn?.bold ? 'bold' : undefined,
+                              textAlign: (layoutConfig?.tableTimeColumn?.align ?? 'center') as any,
+                            }}>
+                              {slot.label}
+                            </td>
                             {pageRooms.map((room) => {
                               const key = `${date}-${room}-${rowIndex}`;
                               if (occupiedCells[key]) return null;
@@ -2785,25 +2996,23 @@ const SchedulerView: React.FC<SchedulerViewProps> = ({ user }) => {
                                       opacity: draggedExamId === exam.examdetails_id ? 0.55 : 1,
                                     }}
                                   >
-                                    <p><strong>{exam.course_id}</strong></p>
+                                    <p style={{ fontSize: layoutConfig?.tableCourseName?.fontSize ?? 15, fontFamily: layoutConfig?.tableCourseName?.fontFamily, color: layoutConfig?.tableCourseName?.color ?? '#fff' }}>
+                                      <strong>{exam.course_id}</strong>
+                                    </p>
 
-                                    <p style={{
-                                      fontSize: exam.sections && exam.sections.length > 3 ? '10px' : '12px',
-                                      lineHeight: '1.2'
-                                    }}>
+                                    <p style={{ fontSize: layoutConfig?.tableSectionName?.fontSize ?? 12, fontFamily: layoutConfig?.tableSectionName?.fontFamily, color: layoutConfig?.tableSectionName?.color ?? '#fff', lineHeight: '1.2' }}>
                                       {getSectionDisplay(exam)}
                                     </p>
 
-                                    <p style={{
-                                      fontSize: exam.instructors && exam.instructors.length > 2 ? '10px' : '12px',
-                                      lineHeight: '1.2'
-                                    }}>
+                                    <p style={{ fontSize: layoutConfig?.tableInstructor?.fontSize ?? 12, fontFamily: layoutConfig?.tableInstructor?.fontFamily, color: layoutConfig?.tableInstructor?.color ?? '#fff', lineHeight: '1.2' }}>
                                       Instructor: {getInstructorDisplay(exam)}
                                     </p>
 
                                     <div
                                       style={{
-                                        fontSize: exam.proctors && exam.proctors.length > 2 ? '10px' : '12px',
+                                        fontSize: layoutConfig?.tableProctor?.fontSize ?? 12,
+                                        fontFamily: layoutConfig?.tableProctor?.fontFamily,
+                                        color: layoutConfig?.tableProctor?.color ?? '#fff',
                                         lineHeight: '1.2',
                                         cursor: activeProctorEdit === -1 ? 'pointer' : 'default',
                                         padding: '4px',
@@ -3112,6 +3321,66 @@ const SchedulerView: React.FC<SchedulerViewProps> = ({ user }) => {
             onCancel={() => setDeleteModal(null)}
             onConfirm={handleDeleteConfirm2}
           />
+        )}
+
+        {showLayoutEditor && (
+          <div style={{
+            position: 'fixed', inset: 0, zIndex: 10001,
+            background: 'rgba(0,0,0,0.55)',
+            display: 'flex', alignItems: 'center', justifyContent: 'center',
+          }}>
+            <div style={{
+              width: 'min(96vw, 1180px)',
+              height: 'min(92vh, 860px)',
+              background: '#fff',
+              borderRadius: 14,
+              boxShadow: '0 20px 60px rgba(0,0,0,0.4)',
+              overflow: 'hidden',
+              display: 'flex',
+              flexDirection: 'column',
+            }}>
+              {/* Modal header */}
+              <div style={{
+                padding: '14px 20px',
+                borderBottom: '1px solid #ddd',
+                display: 'flex', alignItems: 'center', justifyContent: 'space-between',
+                background: '#092C4C', color: '#fff',
+              }}>
+                <span style={{ fontWeight: 700, fontSize: 16 }}>🎨 Schedule Layout Editor</span>
+                <button
+                  type="button"
+                  onClick={() => setShowLayoutEditor(false)}
+                  style={{
+                    background: 'rgba(255,255,255,0.15)', border: 'none',
+                    borderRadius: 6, color: '#fff', cursor: 'pointer',
+                    padding: '5px 12px', fontSize: 14, fontWeight: 700,
+                  }}
+                >
+                  ✕ Close
+                </button>
+              </div>
+        
+              {/* Editor body */}
+              <div style={{ flex: 1, overflow: 'hidden' }}>
+                <ScheduleLayoutEditor
+                  collegeName={collegeName}
+                  collegeId={schedulerCollegeId}
+                  examData={{
+                    termName,
+                    semesterName,
+                    yearName,
+                    examPeriodName,
+                  }}
+                  footerData={footerData}
+                  onSave={() => {
+                    setShowLayoutEditor(false);
+                    toast.success("Layout saved! Refresh to see changes in schedule.");
+                  }}
+                  onClose={() => setShowLayoutEditor(false)}
+                />
+              </div>
+            </div>
+          </div>
         )}
 
       <ToastContainer position="top-right" autoClose={1500} />

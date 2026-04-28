@@ -1023,8 +1023,12 @@ h3 {
   -webkit-appearance: none;
   margin: 0;
   background: transparent;
-  opacity: 0; /* Make them completely invisible */
-  width: 0; /* Remove width to prevent space */
-  height: 0; /* Remove height */
-  cursor: default; /* No pointer cursor */
+  opacity: 0; 
+  width: 0;
+  height: 0; 
+  cursor: default; 
+}
+
+.Toastify__toast-container {
+  z-index: 9999999 !important;
 }

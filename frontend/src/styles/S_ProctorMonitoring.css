@@ -1061,3 +1061,7 @@
   .pm-stats-grid { grid-template-columns: 1fr; }
   .pm-page-title h1 { font-size: 17px; }
 }
+
+.Toastify__toast-container {
+  z-index: 9999999 !important;
+}
