@@ -3,7 +3,7 @@ import React, { useState, useCallback, useRef, useMemo } from "react";
 import { useNavigate } from "react-router-dom";
 import { api } from "../lib/apiClient.ts";
 import { FaEye, FaEyeSlash } from "react-icons/fa";
-import "../styles/F_Login.css";
+import "../styles/F_login.css";
 
 const getGreeting = (): string => {
   const hour = new Date().getHours();
