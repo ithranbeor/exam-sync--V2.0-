@@ -53,7 +53,7 @@
   display: flex;
   align-items: center;
   justify-content: center;
-  z-index: 2000;
+  z-index: 20000;
   padding: 16px;
   backdrop-filter: blur(0px);
 }
@@ -480,8 +480,8 @@
   position: absolute;
   top: 4px;
   right: 4px;
-  width: 28px;
-  height: 28px;
+  width: 50px;
+  height: 50px;
   border-radius: 50%;
   background: var(--danger);
   color: white;
@@ -490,7 +490,7 @@
   display: flex;
   align-items: center;
   justify-content: center;
-  font-size: 12px;
+  font-size: 15px;
   opacity: 0;
   transition: all 0.2s ease;
   box-shadow: 0 2px 8px rgba(192, 57, 43, 0.2);

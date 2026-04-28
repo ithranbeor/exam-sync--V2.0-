@@ -1,16 +1,15 @@
 // DashboardAdmin.tsx
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useRef, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { api } from '../lib/apiClient.ts';
 import {
   FaHome, FaUsers, FaBuilding,
-  FaUser, FaSignOutAlt, FaPenAlt, FaBars, FaTimes
+  FaSignOutAlt, FaPenAlt, FaBars, FaTimes, FaUserShield, FaBell, FaUser
 } from 'react-icons/fa';
 import { PiBuildingsFill } from "react-icons/pi";
 import { FaBookAtlas } from "react-icons/fa6";
 import '../styles/F_Dashboard.css';
 import { IoCalendarSharp } from "react-icons/io5";
-
 
 import Colleges from './A_Colleges.tsx';
 import Structure from './A_Structure.tsx';
@@ -24,19 +23,18 @@ import Profile from './F_Profile.tsx';
 import ProctorCourseDetails from './P_ProctorAssignedExams.tsx';
 import BayanihanModality from "./B_BayanihanModality.tsx";
 import MiniExamDateCalendar from "./F_MiniExamDateCalendar.tsx";
+import Notification from "./F_Notification.tsx";
 
 const iconStyle = { className: 'icon', size: 25 };
 
 const adminSidebarItems = [
-  { key: 'dashboard', label: 'Dashboard', icon: <FaHome {...iconStyle} /> },
-  { key: 'structure', label: 'College Structure', icon: <FaBuilding {...iconStyle} /> },
-  { key: 'courses', label: 'Courses & Sections', icon: <FaBookAtlas {...iconStyle} /> },
-  // { key: 'terms', label: 'Terms', icon: <FaCalendarAlt {...iconStyle} /> },
-  { key: 'buildings-and-rooms', label: 'Buildings & Rooms', icon: <PiBuildingsFill {...iconStyle} /> },
-  { key: 'exam-period', label: 'Exam Period', icon: <IoCalendarSharp {...iconStyle} /> },
-  { key: 'set-Modality', label: 'Set Modality', icon: <FaPenAlt {...iconStyle} /> },
-  { key: 'User Management', label: 'User Management', icon: <FaUsers {...iconStyle} /> },
-  { key: 'profile', label: 'Profile', icon: <FaUser {...iconStyle} /> },
+  { key: 'dashboard',          label: 'Dashboard',        icon: <FaHome {...iconStyle} /> },
+  { key: 'structure',          label: 'College Structure', icon: <FaBuilding {...iconStyle} /> },
+  { key: 'courses',            label: 'Courses & Sections',icon: <FaBookAtlas {...iconStyle} /> },
+  { key: 'buildings-and-rooms',label: 'Buildings & Rooms', icon: <PiBuildingsFill {...iconStyle} /> },
+  { key: 'exam-period',        label: 'Exam Period',       icon: <IoCalendarSharp {...iconStyle} /> },
+  { key: 'set-Modality',       label: 'Set Modality',      icon: <FaPenAlt {...iconStyle} /> },
+  { key: 'User Management',    label: 'User Management',   icon: <FaUsers {...iconStyle} /> },
 ];
 
 const DashboardAdmin: React.FC = () => {
@@ -47,205 +45,139 @@ const DashboardAdmin: React.FC = () => {
   const [showLogoutModal, setShowLogoutModal] = useState(false);
   const [isMobile, setIsMobile] = useState(window.innerWidth <= 1024);
   const [roles, setRoles] = useState<string[]>([]);
+  const [dropdownOpen, setDropdownOpen] = useState(false);
+  const [unreadCount, setUnreadCount] = useState(0);
+  const dropdownRef = useRef<HTMLDivElement>(null);
   const navigate = useNavigate();
+
+  const hasFacultyRole = roles.some(r => r !== 'admin');
 
   useEffect(() => {
     const loadUser = async () => {
       const stored = JSON.parse(localStorage.getItem('user') || 'null') ||
         JSON.parse(sessionStorage.getItem('user') || 'null');
-      if (!stored) return navigate('/admin-login');
-
+      if (!stored) return navigate('/');
       try {
         const res = await api.get(`/users/${stored.user_id}/`);
-        const data = res.data;
-        setUser({
-          ...data,
-          full_name: `${data.first_name} ${data.middle_name ?? ''} ${data.last_name}`.trim(),
-          avatar_url: data.avatar_url || '/images/default-pp.jpg',
-        });
-      } catch (err) {
-        console.error(err);
-        setUser({
-          ...stored,
-          full_name: `${stored.first_name} ${stored.middle_name ?? ''} ${stored.last_name}`.trim(),
-          avatar_url: stored.avatar_url || '/images/default-pp.jpg',
-        });
+        const d = res.data;
+        setUser({ ...d, full_name: `${d.first_name} ${d.middle_name ?? ''} ${d.last_name}`.trim(), avatar_url: d.avatar_url || '/images/default-pp.jpg' });
+      } catch {
+        setUser({ ...stored, full_name: `${stored.first_name} ${stored.middle_name ?? ''} ${stored.last_name}`.trim(), avatar_url: stored.avatar_url || '/images/default-pp.jpg' });
       }
     };
     loadUser();
   }, [navigate]);
 
   useEffect(() => {
-    const fetchUserRoles = async () => {
-      if (!user?.user_id) return;
-      try {
-        const res = await api.get(`/user-roles/${user.user_id}/roles/`);
-        const roleData = res.data
-          .filter((r: any) => r.status?.toLowerCase() === 'active')
-          .map((r: any) => r.role_name.toLowerCase());
-        setRoles(roleData);
-      } catch (err) {
-        console.error('Error fetching roles:', err);
-      }
-    };
-    fetchUserRoles();
+    if (!user?.user_id) return;
+    api.get(`/user-roles/${user.user_id}/roles/`).then(res => {
+      setRoles(res.data.filter((r: any) => r.status?.toLowerCase() === 'active').map((r: any) => r.role_name.toLowerCase()));
+    }).catch(console.error);
   }, [user]);
 
   useEffect(() => {
-    const timer = setInterval(() => setCurrentDateTime(new Date()), 1000);
-    return () => clearInterval(timer);
+    if (!user?.user_id) return;
+    const fetch = () => api.get(`/notifications/${user.user_id}/`).then(res => setUnreadCount(res.data.filter((n: any) => !n.is_seen).length)).catch(console.error);
+    fetch();
+    const id = setInterval(fetch, 10000);
+    return () => clearInterval(id);
+  }, [user]);
+
+  useEffect(() => {
+    const id = setInterval(() => setCurrentDateTime(new Date()), 1000);
+    return () => clearInterval(id);
   }, []);
 
   useEffect(() => {
-    let resizeTimer: NodeJS.Timeout;
-
-    const handleResize = () => {
-      clearTimeout(resizeTimer);
-      resizeTimer = setTimeout(() => {
-        const nowMobile = window.innerWidth <= 1024;
-
-        setIsMobile(prevMobile => {
-          if (prevMobile !== nowMobile) {
-            setIsSidebarOpen(false);
-          }
-          return nowMobile;
-        });
+    let t: ReturnType<typeof setTimeout>;
+    const onResize = () => {
+      clearTimeout(t);
+      t = setTimeout(() => {
+        const m = window.innerWidth <= 1024;
+        setIsMobile(prev => { if (prev !== m) setIsSidebarOpen(false); return m; });
       }, 150);
     };
-
-    const initialMobile = window.innerWidth <= 1024;
-    setIsMobile(initialMobile);
-
-    window.addEventListener('resize', handleResize);
-    return () => {
-      clearTimeout(resizeTimer);
-      window.removeEventListener('resize', handleResize);
-    };
+    window.addEventListener('resize', onResize);
+    return () => { clearTimeout(t); window.removeEventListener('resize', onResize); };
   }, []);
 
-  const handleLogout = () => {
-    localStorage.removeItem('user');
-    sessionStorage.removeItem('user');
-    navigate('/');
-  };
+  useEffect(() => {
+    const onClick = (e: MouseEvent) => {
+      if (dropdownRef.current && !dropdownRef.current.contains(e.target as Node)) setDropdownOpen(false);
+    };
+    document.addEventListener('mousedown', onClick);
+    return () => document.removeEventListener('mousedown', onClick);
+  }, []);
 
-  const toggleSidebar = () => {
-    setIsSidebarOpen(!isSidebarOpen);
-  };
+  const handleMenuClick = (key: string) => { setActiveMenu(key); if (isMobile) setIsSidebarOpen(false); setDropdownOpen(false); };
+  const handleSidebarHover = (e: boolean) => { if (!isMobile) setIsSidebarOpen(e); };
+  const handleLogout = () => { localStorage.removeItem('user'); sessionStorage.removeItem('user'); navigate('/'); };
 
-  const handleMenuClick = (menuKey: string) => {
-    setActiveMenu(menuKey);
-    if (isMobile) {
-      setIsSidebarOpen(false);
-    }
-  };
-
-  /** 🖱️ Handle sidebar hover (desktop only) */
-  const handleSidebarHover = (isEntering: boolean) => {
-    if (!isMobile) {
-      setIsSidebarOpen(isEntering);
-    }
-  };
-
+  const formattedDate = currentDateTime.toLocaleDateString('en-US', { month: 'long', day: 'numeric', year: 'numeric' });
   const formattedTime = currentDateTime.toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit', hour12: true });
-  const [hour, minute, ampm] = formattedTime.split(/:| /);
-  const dateStr = currentDateTime.toLocaleDateString('en-US', { weekday: 'long', month: 'long', day: 'numeric' });
+  const greeting = currentDateTime.getHours() < 12 ? 'Good morning' : currentDateTime.getHours() < 18 ? 'Good afternoon' : 'Good evening';
 
-  if (!user) return <div style={{ color: "black" }}>Please Wait...</div>;
+  if (!user) return <div style={{ color: 'black' }}>Please Wait...</div>;
 
   const renderContent = () => {
     switch (activeMenu) {
-      case 'colleges': return <Colleges />;
-      case 'structure': return <Structure />;
-      case 'courses': return <Courses />;
-      case 'section-courses': return <SectionCourses />;
-      case 'terms': return <Terms />;
+      case 'colleges':          return <Colleges />;
+      case 'structure':         return <Structure />;
+      case 'courses':           return <Courses />;
+      case 'section-courses':   return <SectionCourses />;
+      case 'terms':             return <Terms />;
       case 'buildings-and-rooms': return <BuildingsAndRooms />;
-      case 'exam-period': return <ExamPeriod />;
-      case 'User Management': return <UserManagement user={user} />;
-      case 'set-Modality': return <BayanihanModality user={user} />;
-      case 'profile': return <Profile user={user} />;
-      case 'dashboard':
-      default:
-        return (
-          activeMenu === 'dashboard' && (
-            <div className="dashboard-grid">
-              <div className="card welcome-card">
-                <h3>Welcome, <span className="robert-name">{user.first_name}!</span></h3>
-                <p>Organize your work and improve your performance here</p>
-              </div>
+      case 'exam-period':       return <ExamPeriod />;
+      case 'User Management':   return <UserManagement user={user} />;
+      case 'set-Modality':      return <BayanihanModality user={user} />;
+      case 'profile':           return <Profile user={user} />;
+      case 'notification':      return <Notification user={user} />;
+      default: return (
+        <div className="dashboard-shortcuts-wrapper">
+          <div className="shortcuts-grid">
 
-              <div className="card datetime-card">
-                <div className="date-display-simple">{dateStr}</div>
-                <div className="time-display">
-                  <span>{hour}:</span><span>{minute}</span><span className="ampm">{ampm}</span>
-                </div>
-              </div>
+            {/* TOP LEFT — Proctor assignments */}
+            <div className="shortcut-card">
+              {roles.includes('proctor')
+                ? <ProctorCourseDetails user={user} />
+                : <div className="placeholder-content"><span className="placeholder-icon">🗂️</span><p>Assigned Proctoring</p><small>No proctor role assigned</small></div>
+              }
+            </div>
 
-              <div className="card faculty-info-card">
-                <img src={user.avatar_url} alt="Avatar" className="faculty-avatar" />
-                <h4>{user.full_name}</h4>
-                <p>Admin</p>
-              </div>
+            {/* TOP RIGHT — Mini calendar */}
+            <div className="shortcut-card">
+              <MiniExamDateCalendar user={user} />
+            </div>
 
-              <div className="full-width-section">
-                <h2>Shortcut</h2>
-                <div className="try-things-grid">
-                  {roles.includes('proctor') &&
-                    <div className="try-thing-card"><ProctorCourseDetails user={user} /></div>}
-                  <div className="try-thing-card"><MiniExamDateCalendar user={user} /></div>
-                </div>
+            {/* BOTTOM FULL WIDTH — future shortcut */}
+            <div className="shortcut-card full-width">
+              <div className="placeholder-content">
+                <span className="placeholder-icon"></span>
+                <p>More features coming soon...</p>
               </div>
             </div>
-          )
-        );
+
+          </div>
+        </div>
+      );
     }
   };
 
   return (
     <div className="app-container">
       <div className="main-content-wrapper">
-        {/* Hamburger Menu Button (Mobile/Tablet) */}
+
         {isMobile && (
-          <button
-            type="button"
-            className="menu-toggle-btn"
-            onClick={toggleSidebar}
-            aria-label="Toggle menu"
-          >
+          <button type="button" className="menu-toggle-btn" onClick={() => setIsSidebarOpen(o => !o)} aria-label="Toggle menu">
             {isSidebarOpen ? <FaTimes /> : <FaBars />}
           </button>
         )}
+        {isMobile && <div className={`sidebar-backdrop ${isSidebarOpen ? 'active' : ''}`} onClick={() => setIsSidebarOpen(false)} />}
 
-        {/* Sidebar Backdrop (Mobile/Tablet) */}
-        {isMobile && (
-          <div
-            className={`sidebar-backdrop ${isSidebarOpen ? 'active' : ''}`}
-            onClick={() => setIsSidebarOpen(false)}
-          />
-        )}
-
-        <aside
-          className={`sidebar ${isSidebarOpen ? 'open' : 'closed'}`}
-          onMouseEnter={() => handleSidebarHover(true)}
-          onMouseLeave={() => handleSidebarHover(false)}
-        >
+        <aside className={`sidebar ${isSidebarOpen ? 'open' : 'closed'}`} onMouseEnter={() => handleSidebarHover(true)} onMouseLeave={() => handleSidebarHover(false)}>
           <div className="sidebar-header">
-            <button
-              type="button"
-              className="sidebar-logo-button"
-              onClick={() => setActiveMenu('dashboard')}
-              style={{
-                background: 'none',
-                border: 'none',
-                cursor: 'pointer',
-                display: 'flex',
-                alignItems: 'center',
-                gap: '10px',
-                padding: 0,
-                width: '100%'
-              }}
-            >
+            <button type="button" className="sidebar-logo-button" onClick={() => setActiveMenu('dashboard')}
+              style={{ background: 'none', border: 'none', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '10px', padding: 0, width: '100%' }}>
               <img src="/logo/Exam.png" alt="Logo" className="logo-img" />
               {isSidebarOpen && <span className="logo-text">ExamSync</span>}
             </button>
@@ -254,30 +186,56 @@ const DashboardAdmin: React.FC = () => {
             <ul>
               {adminSidebarItems.map(({ key, label, icon }) => (
                 <li key={key} className={activeMenu === key ? 'active' : ''}>
-                  <button type="button" onClick={() => handleMenuClick(key)}>
-                    {icon} {isSidebarOpen && <span>{label}</span>}
-                  </button>
+                  <button type="button" onClick={() => handleMenuClick(key)}>{icon} {isSidebarOpen && <span>{label}</span>}</button>
                 </li>
               ))}
-              <li>
-                <button type="button" onClick={() => {
-                  setShowLogoutModal(true);
-                  if (isMobile) setIsSidebarOpen(false);
-                }}>
-                  <FaSignOutAlt /> {isSidebarOpen && <span>Logout</span>}
-                </button>
-              </li>
             </ul>
           </nav>
         </aside>
 
         <main className={`main-content ${isSidebarOpen ? 'sidebar-open' : 'sidebar-closed'}`}>
-          <div className="content-header">
-            <h1>
-              {['colleges', 'departments-and-programs', 'courses', 'section-courses', 'terms', 'buildings-and-rooms', 'exam-period'].includes(activeMenu)
-                ? `Manage ${activeMenu.charAt(0).toUpperCase() + activeMenu.slice(1).replace(/-/g, ' ')}`
-                : activeMenu.charAt(0).toUpperCase() + activeMenu.slice(1).replace(/-/g, ' ')}
-            </h1>
+
+          {/* ── Top bar: welcome pill (center) + right cluster ── */}
+          <div className="floating-topbar">
+            {activeMenu === 'dashboard' ? (
+              <div className="topbar-welcome">
+                {greeting}, <span className="highlight">{user.first_name}!</span>
+              </div>
+            ) : (
+              <div className="topbar-pagetitle">
+                {adminSidebarItems.find(i => i.key === activeMenu)?.label
+                  ?? activeMenu.charAt(0).toUpperCase() + activeMenu.slice(1).replace(/-/g, ' ')}
+              </div>
+            )}
+
+            <div className="topbar-right-cluster">
+              <div className="topbar-datetime-pill">
+                <span className="topbar-date">{formattedDate}</span>
+                <span className="topbar-time">{formattedTime}</span>
+              </div>
+
+              <div className="topbar-avatar-notification-pill" ref={dropdownRef}>
+                <button type="button" className="topbar-bell-btn" onClick={() => handleMenuClick('notification')} aria-label="Notifications">
+                  <FaBell />
+                  {unreadCount > 0 && <span className="topbar-badge">{unreadCount}</span>}
+                </button>
+                <img src={user.avatar_url} alt="avatar" className="topbar-avatar" onClick={() => setDropdownOpen(p => !p)} />
+                {dropdownOpen && (
+                  <div className="topbar-dropdown">
+                    <div className="dropdown-header">
+                      <div className="dropdown-name">{user.full_name}</div>
+                      <div className="dropdown-role">Admin</div>
+                    </div>
+                    <ul className="dropdown-menu-list">
+                      <li><button type="button" onClick={() => handleMenuClick('profile')}><FaUser size={13} /> Profile</button></li>
+                      {hasFacultyRole && <li><button type="button" onClick={() => navigate('/faculty-dashboard')}><FaUserShield size={13} /> Switch to Faculty Dashboard</button></li>}
+                      <li className="dropdown-divider" />
+                      <li><button type="button" className="dropdown-signout" onClick={() => { setDropdownOpen(false); setShowLogoutModal(true); }}><FaSignOutAlt size={13} /> Sign out</button></li>
+                    </ul>
+                  </div>
+                )}
+              </div>
+            </div>
           </div>
           {renderContent()}
         </main>
@@ -285,11 +243,11 @@ const DashboardAdmin: React.FC = () => {
 
       {showLogoutModal && (
         <div className="myModal-overlay" onClick={() => setShowLogoutModal(false)}>
-          <div className="myModal-box" onClick={(e) => e.stopPropagation()}>
+          <div className="myModal-box" onClick={e => e.stopPropagation()}>
             <h3 className="myModal-title">Are you sure you want to logout?</h3>
             <div className="myModal-actions">
-              <button type='button' className="myModal-btn myModal-btn-confirm" onClick={handleLogout}>Logout</button>
-              <button type='button' className="myModal-btn myModal-btn-cancel" onClick={() => setShowLogoutModal(false)}>Cancel</button>
+              <button type="button" className="myModal-btn myModal-btn-confirm" onClick={handleLogout}>Logout</button>
+              <button type="button" className="myModal-btn myModal-btn-cancel" onClick={() => setShowLogoutModal(false)}>Cancel</button>
             </div>
           </div>
         </div>

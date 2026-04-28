@@ -3,15 +3,14 @@ import React, { useState, useCallback, useRef, useMemo } from "react";
 import { useNavigate } from "react-router-dom";
 import { api } from "../lib/apiClient.ts";
 import { FaEye, FaEyeSlash } from "react-icons/fa";
-import { IoSettingsSharp } from "react-icons/io5"; // For the bottom-right settings/admin icon
-import "../styles/F_login.css";
+import "../styles/F_Login.css";
 
 const getGreeting = (): string => {
   const hour = new Date().getHours();
-  if (hour >= 22 || hour < 4) return "Late Night Access";
-  if (hour < 12) return "Rise and Shine";
-  if (hour < 18) return "Midday Welcome";
-  return "Evening Welcome";
+  if (hour >= 22 || hour < 4) return "Late Night";
+  if (hour < 12) return "Good Morning";
+  if (hour < 18) return "Good Afternoon";
+  return "Good Evening";
 };
 
 const roleToDashboardMap: Record<string, string> = {
@@ -20,22 +19,22 @@ const roleToDashboardMap: Record<string, string> = {
   scheduler: "/faculty-dashboard",
   "bayanihan leader": "/faculty-dashboard",
   dean: "/faculty-dashboard",
-  admin: "/admin-dashboard", // Separate dashboard for admin login
+  admin: "/admin-dashboard",
 };
 
-const LoginFaculty: React.FC = () => {
-  const navigate = useNavigate();
+type LoginMode = "faculty" | "admin";
 
-  const [isFacultyLogin, setIsFacultyLogin] = useState(true); // Toggles between Faculty and Admin
+const UnifiedLogin: React.FC = () => {
+  const navigate = useNavigate();
+  const [mode, setMode] = useState<LoginMode>("faculty");
   const [form, setForm] = useState({ id: "", password: "" });
   const [rememberMe, setRememberMe] = useState(false);
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(false);
+  const [animating, setAnimating] = useState(false);
 
   const showPasswordRef = useRef(false);
   const [, forceRerender] = useState(false);
-
-  // Memoize the greeting to avoid re-calculating on every render
   const greeting = useMemo(() => getGreeting(), []);
 
   const handleChange = useCallback((e: any) => {
@@ -48,76 +47,47 @@ const LoginFaculty: React.FC = () => {
     forceRerender((x) => !x);
   }, []);
 
-  const toggleLoginRole = useCallback(() => {
-    setIsFacultyLogin(prev => !prev);
-    setError(""); // Clear error when switching roles
-    setForm({ id: "", password: "" }); // Clear form when switching roles
-  }, []);
+  const switchMode = useCallback(
+    (newMode: LoginMode) => {
+      if (newMode === mode || animating) return;
+      setAnimating(true);
+      setTimeout(() => {
+        setMode(newMode);
+        setError("");
+        setForm({ id: "", password: "" });
+        setAnimating(false);
+      }, 300);
+    },
+    [mode, animating]
+  );
 
   const handleLogin = useCallback(
     async (e: React.FormEvent) => {
       e.preventDefault();
       setError("");
       setLoading(true);
-
       const ctrl = new AbortController();
-      const loginEndpoint = "/login/"; // Assuming the same endpoint handles both
 
       try {
         const { data: authData } = await api.post(
-          loginEndpoint,
-          {
-            user_id: form.id,
-            password: form.password,
-          },
+          "/login/",
+          { user_id: form.id, password: form.password },
           { signal: ctrl.signal }
         );
 
         if (!authData?.token) {
-          setError("Invalid credentials.");
+          setError("Invalid credentials. Please try again.");
           return;
         }
 
-        const activeRoles =
+        const activeRoles: string[] =
           authData.roles
             ?.filter((r: any) => r.status?.toLowerCase() === "active")
-            ?.map((r: any) => r.role_name?.toLowerCase()) || [];
+            ?.map((r: any) => r.role_name?.toLowerCase()) ?? [];
 
         if (activeRoles.length === 0) {
-          setError("You do not have any active roles.");
+          setError("No active roles assigned to this account.");
           return;
-        }
-
-        let assignedRole = activeRoles[0]; // Default to the first active role
-
-        // Logic for Admin/Faculty differentiation
-        if (isFacultyLogin) {
-          // For Faculty login, prioritize 'admin' if available, otherwise first role
-          assignedRole = activeRoles.includes("admin")
-            ? "admin"
-            : activeRoles[0];
-        } else {
-          // For Admin login, it must be 'admin'
-          if (!activeRoles.includes("admin")) {
-            setError("You must have an 'admin' role to log in as Admin.");
-            return;
-          }
-          assignedRole = "admin";
-        }
-
-        // Determine dashboard based on assigned role
-        const dashboard = roleToDashboardMap[assignedRole];
-
-        // Additional check to ensure faculty doesn't land on admin dashboard and vice versa
-        if (!dashboard ||
-          (!isFacultyLogin && dashboard !== "/admin-dashboard") ||
-          (isFacultyLogin && dashboard === "/admin-dashboard" && assignedRole !== "admin")) {
-          // This handles cases where a non-admin user might try to use the admin path 
-          // or vice versa, but we'll simplify: just check if a dashboard exists
-          if (!dashboard) {
-            setError(`No dashboard found for role: ${assignedRole}`);
-            return;
-          }
         }
 
         const userData = {
@@ -129,112 +99,194 @@ const LoginFaculty: React.FC = () => {
           roles: authData.roles,
         };
 
-        (rememberMe ? localStorage : sessionStorage).setItem(
-          "user",
-          JSON.stringify(userData)
-        );
+        const storage = rememberMe ? localStorage : sessionStorage;
 
-        navigate(dashboard);
+        if (mode === "admin") {
+          // Admin tab: must have admin role
+          if (!activeRoles.includes("admin")) {
+            setError("Admin access denied. Your account has no admin role.");
+            return;
+          }
+          storage.setItem("user", JSON.stringify(userData));
+          navigate("/admin-dashboard");
+        } else {
+          // Faculty tab: accepts any role.
+          // If the user ONLY has admin and no other role, still let them in
+          // but land them on the admin dashboard (they chose wrong tab).
+          const nonAdminRoles = activeRoles.filter((r) => r !== "admin");
+
+          if (nonAdminRoles.length === 0) {
+            // Pure admin account logged in via Faculty tab → redirect to admin
+            storage.setItem("user", JSON.stringify(userData));
+            navigate("/admin-dashboard");
+            return;
+          }
+
+          // Pick the first non-admin role for dashboard routing
+          const primaryRole = nonAdminRoles[0];
+          const dashboard = roleToDashboardMap[primaryRole] ?? "/faculty-dashboard";
+          storage.setItem("user", JSON.stringify(userData));
+          navigate(dashboard);
+        }
       } catch (err: any) {
-        console.error("Login error:", err);
-        const roleText = isFacultyLogin ? "Employee" : "Admin";
-        setError(err.response?.data?.message || `Invalid ${roleText} ID or password.`);
+        const roleLabel = mode === "admin" ? "Admin" : "Employee";
+        setError(
+          err.response?.data?.message ?? `Invalid ${roleLabel} ID or password.`
+        );
       } finally {
         setLoading(false);
       }
 
       return () => ctrl.abort();
     },
-    [form, rememberMe, navigate, isFacultyLogin]
+    [form, rememberMe, navigate, mode]
   );
 
-  const loginTitle = isFacultyLogin ? "Login as Faculty" : "Login as Admin";
-  const inputLabel = isFacultyLogin ? "Employee ID" : "Admin ID";
-
   return (
-    <div className="login-container">
-      <div className="background-gradient">
-        <div className="greeting-text">
-          <p>{greeting}!</p>
-        </div>
+    <div className="ul-root">
+      {/* Animated background */}
+      <div className={`ul-bg ul-bg--${mode}`}>
+        <div className="ul-bg__orb ul-bg__orb--1" />
+        <div className="ul-bg__orb ul-bg__orb--2" />
+        <div className="ul-bg__orb ul-bg__orb--3" />
+        <div className="ul-grid-overlay" />
       </div>
 
-      {/* Logo Section */}
-      <div className="logo-section">
-        <div className="e-graphic-logo">
-          <img src="/logo/Exam.png" alt="ExamSync Logo" className="examsync-logo" />
-          <p className="logo-text">ExamSync</p>
-        </div>
+      {/* Greeting pill top-left */}
+      <div className="ul-greeting">
+        <span className="ul-greeting__wave">👋</span>
+        <span>{greeting}!</span>
       </div>
 
-      {/* Login Form Section */}
-      <form className="login-form-card" onSubmit={handleLogin}>
-        <h2>{loginTitle}</h2>
-
-        {/* Employee/Admin ID Input */}
-        <div className="input-field">
-          <input
-            type="text"
-            id="id"
-            placeholder=''
-            value={form.id}
-            onChange={handleChange}
-            required
-            autoComplete="username"
-          />
-          <label htmlFor="id">{inputLabel}</label>
+      {/* Center card */}
+      <div className={`ul-card ${animating ? "ul-card--exit" : "ul-card--enter"}`}>
+        {/* Logo */}
+        <div className="ul-logo">
+          <img src="/logo/Exam.png" alt="ExamSync" className="ul-logo__img" />
+          <span className="ul-logo__name">ExamSync</span>
         </div>
 
-        {/* Password Input */}
-        <div className="input-field password-field">
-          <input
-            type={showPasswordRef.current ? "text" : "password"}
-            id="password"
-            placeholder=""
-            value={form.password}
-            onChange={handleChange}
-            required
-            autoComplete="current-password"
-          />
-          <label htmlFor="password">Password</label>
-          <span className="toggle-password" onClick={togglePassword}>
-            {showPasswordRef.current ? <FaEyeSlash style={{ color: 'white' }} /> : <FaEye style={{ color: 'white' }} />}
-          </span>
+        {/* Mode toggle tabs */}
+        <div className="ul-tabs">
+          <button
+            type="button"
+            className={`ul-tab ${mode === "faculty" ? "ul-tab--active" : ""}`}
+            onClick={() => switchMode("faculty")}
+          >
+            <span className="ul-tab__dot" />
+            Faculty
+          </button>
+          <button
+            type="button"
+            className={`ul-tab ${mode === "admin" ? "ul-tab--active" : ""}`}
+            onClick={() => switchMode("admin")}
+          >
+            <span className="ul-tab__dot" />
+            Admin
+          </button>
+          <div className={`ul-tabs__slider ul-tabs__slider--${mode}`} />
         </div>
 
-        {/* Remember Me & Error */}
-        <div className="form-actions">
-          <label className="modern-checkbox-container">
-            Remember me
+        {/* Title */}
+        <h2 className="ul-title">
+          {mode === "faculty" ? "Faculty Login" : "Admin Login"}
+        </h2>
+        <p className="ul-subtitle">
+          {mode === "faculty"
+            ? "Sign in with your employee credentials"
+            : "Sign in with your administrator credentials"}
+        </p>
+
+        {/* Form */}
+        <form className="ul-form" onSubmit={handleLogin}>
+          <div className="ul-field">
+            <input
+              type="text"
+              id="id"
+              value={form.id}
+              onChange={handleChange}
+              placeholder=" "
+              required
+              autoComplete="username"
+              className="ul-field__input"
+            />
+            <label htmlFor="id" className="ul-field__label">
+              {mode === "faculty" ? "Employee ID" : "Admin ID"}
+            </label>
+            <div className="ul-field__bar" />
+          </div>
+
+          <div className="ul-field ul-field--password">
+            <input
+              type={showPasswordRef.current ? "text" : "password"}
+              id="password"
+              value={form.password}
+              onChange={handleChange}
+              placeholder=" "
+              required
+              autoComplete="current-password"
+              className="ul-field__input"
+            />
+            <label htmlFor="password" className="ul-field__label">
+              Password
+            </label>
+            <div className="ul-field__bar" />
+            <button
+              type="button"
+              className="ul-field__eye"
+              onClick={togglePassword}
+              tabIndex={-1}
+            >
+              {showPasswordRef.current ? <FaEyeSlash /> : <FaEye />}
+            </button>
+          </div>
+
+          {/* Error */}
+          <div className={`ul-error ${error ? "ul-error--visible" : ""}`}>
+            <span className="ul-error__icon">!</span>
+            {error}
+          </div>
+
+          {/* Remember me */}
+          <label className="ul-remember">
             <input
               type="checkbox"
               checked={rememberMe}
               onChange={(e) => setRememberMe(e.target.checked)}
+              className="ul-remember__input"
             />
-            <span className="checkmark"></span>
+            <span className="ul-remember__box">
+              <svg viewBox="0 0 12 10" fill="none">
+                <polyline
+                  points="1,5 4,8 11,1"
+                  stroke="white"
+                  strokeWidth="2"
+                  strokeLinecap="round"
+                />
+              </svg>
+            </span>
+            <span className="ul-remember__label">Remember me</span>
           </label>
-          <span className={`error-text ${error ? '' : 'hidden'}`}>
-            {error || '‎'}
-          </span>
-        </div>
 
-        {/* Login Button */}
-        <button
-          type="submit"
-          className="submit-button"
-          disabled={loading}
-          aria-label={`Log in as ${isFacultyLogin ? 'Faculty' : 'Admin'}`}
-        >
-          {loading ? <span className="spinner"></span> : 'Login'}
-        </button>
-      </form>
-
-      {/* Toggle Button in the bottom right */}
-      <div className="admin-toggle-button" onClick={toggleLoginRole}>
-        <IoSettingsSharp size={24} />
+          {/* Submit */}
+          <button
+            type="submit"
+            className={`ul-submit ul-submit--${mode}`}
+            disabled={loading}
+          >
+            {loading ? (
+              <span className="ul-submit__spinner" />
+            ) : (
+              <span>Sign In</span>
+            )}
+          </button>
+        </form>
       </div>
+
+      {/* Version tag */}
+      <div className="ul-version">ExamSync v2.0</div>
     </div>
   );
 };
 
-export default LoginFaculty;
+export default UnifiedLogin;

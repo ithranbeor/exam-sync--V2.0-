@@ -1542,3 +1542,428 @@ button.view-button {
     height: 20px;
   }
 }
+
+.fab-switch-admin,
+.fab-switch-faculty {
+  position: fixed;
+  bottom: 28px;
+  right: 28px;
+  z-index: 1200;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 12px 20px;
+  border: none;
+  border-radius: 999px;
+  font-family: var(--font-sans, 'DM Sans', system-ui, sans-serif);
+  font-size: 13px;
+  font-weight: 600;
+  letter-spacing: 0.02em;
+  cursor: pointer;
+  box-shadow: 0 4px 20px rgba(0, 0, 0, 0.22), 0 1px 6px rgba(0, 0, 0, 0.14);
+  transition: transform 0.2s ease, box-shadow 0.2s ease, opacity 0.2s ease;
+  white-space: nowrap;
+}
+ 
+/* Faculty dashboard → switch to Admin */
+.fab-switch-admin {
+  background: #042352;
+  color: #e2c47a;
+}
+ 
+.fab-switch-admin:hover {
+  transform: translateY(-3px);
+  box-shadow: 0 8px 28px rgba(0, 0, 0, 0.28), 0 2px 8px rgba(0, 0, 0, 0.18);
+  background: #112240;
+}
+ 
+/* Admin dashboard → switch to Faculty */
+.fab-switch-faculty {
+  background: #042352;
+  color: #ffffff;
+}
+ 
+.fab-switch-faculty:hover {
+  transform: translateY(-3px);
+  box-shadow: 0 8px 28px rgba(30, 110, 181, 0.35), 0 2px 8px rgba(0, 0, 0, 0.18);
+  background: #1a5fa0;
+}
+ 
+.fab-switch-admin:active,
+.fab-switch-faculty:active {
+  transform: translateY(0);
+  box-shadow: 0 2px 10px rgba(0, 0, 0, 0.2);
+}
+ 
+/* On very small screens, collapse to icon-only */
+@media (max-width: 420px) {
+  .fab-switch-admin span,
+  .fab-switch-faculty span {
+    display: none;
+  }
+ 
+  .fab-switch-admin,
+  .fab-switch-faculty {
+    padding: 14px;
+    bottom: 20px;
+    right: 20px;
+    border-radius: 50%;
+  }
+}
+
+/* ============================================================
+   DASHBOARD REDESIGN — matches screenshot layout
+   Append to or replace relevant sections in F_Dashboard.css
+   ============================================================ */
+
+/* ── Floating top bar ── */
+.floating-topbar {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 20px;
+  padding: 10px 20px;
+  margin-bottom: 10px;
+  position: relative;
+  z-index: 99999;          
+  overflow: visible;    
+}
+
+/* Centered welcome pill */
+.topbar-welcome {
+  background: #ffffff;
+  border-radius: 999px;
+  padding: 10px 18px;
+  box-shadow: 0 2px 16px rgba(9, 44, 76, 0.10);
+  font-size: 1.25rem;
+  font-weight: 700;
+  color: #092C4C;
+  white-space: nowrap;
+}
+
+.topbar-pagetitle {
+  background: #ffffff;
+  border-radius: 999px;
+  padding: 10px 28px;
+  box-shadow: 0 2px 16px rgba(9, 44, 76, 0.10);
+  font-size: 1.1rem;
+  font-weight: 700;
+  color: #092C4C;
+  white-space: nowrap;
+  letter-spacing: 0.01em;
+}
+
+.topbar-welcome .highlight {
+  color: #F2994A;
+}
+
+/* Right cluster: date+time pill, bell, avatar */
+.topbar-right-cluster {
+  position: absolute;
+  right: 20px;
+  top: 50%;
+  transform: translateY(-50%);
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.topbar-datetime-pill {
+  background: #ffffff;
+  border-radius: 999px;
+  padding: 5px 18px;
+  box-shadow: 0 2px 10px rgba(9, 44, 76, 0.10);
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  line-height: 1.3;
+}
+
+.topbar-avatar-notification-pill {
+  background: #ffffff;
+  border-radius: 999px;
+  padding: 5px 15px;
+  box-shadow: 0 2px 10px rgba(9, 44, 76, 0.10);
+  display: flex;
+  align-items: center;
+  line-height: 1.3;
+  gap: 5px;
+  position: relative;        /* ← ADD */
+  z-index: 99999;            /* ← ADD — lifts the whole pill above page content */
+}
+
+.topbar-date {
+  font-size: 0.75rem;
+  color: #F2994A;
+  font-weight: 700;
+  letter-spacing: 0.02em;
+}
+
+.topbar-time {
+  font-size: 1rem;
+  font-weight: 800;
+  color: #F2994A;
+}
+
+/* Bell button */
+.topbar-bell-btn {
+  position: relative;
+  background: none;
+  border: none;
+  cursor: pointer;
+  color: #092C4C;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 6px;
+  border-radius: 50%;
+  transition: background-color 0.2s;
+  font-size: 1.3rem;
+}
+
+.topbar-bell-btn:hover {
+  background-color: #f0f4ff;
+  color: #F2994A;
+}
+
+.topbar-badge {
+  position: absolute;
+  top: 0;
+  right: 0;
+  background-color: #F2994A;
+  color: #fff;
+  border-radius: 50%;
+  min-width: 16px;
+  height: 16px;
+  font-size: 10px;
+  font-weight: 700;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 0 3px;
+  border: 2px solid #fff;
+  box-sizing: border-box;
+  line-height: 1;
+}
+
+/* Avatar */
+.topbar-avatar-wrapper {
+  position: relative;
+}
+
+.topbar-avatar {
+  width: 42px;
+  height: 42px;
+  border-radius: 50%;
+  object-fit: cover;
+  cursor: pointer;
+  border: 2px solid #F2994A;
+  transition: box-shadow 0.2s;
+}
+
+.topbar-avatar:hover {
+  box-shadow: 0 0 0 3px rgba(242, 153, 74, 0.3);
+}
+
+/* Dropdown */
+.topbar-dropdown {
+  position: absolute;
+  top: calc(100% + 10px);
+  right: 0;
+  background: #ffffff;
+  border: 1px solid #e0e0e0;
+  border-radius: 12px;
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.13);
+  width: 220px;
+  z-index: 99999;
+  overflow: hidden;
+  animation: dropdownFadeIn 0.18s ease-out;
+}
+
+@keyframes dropdownFadeIn {
+  from { opacity: 0; transform: translateY(-8px); }
+  to   { opacity: 1; transform: translateY(0); }
+}
+
+.dropdown-header {
+  padding: 12px 14px;
+  border-bottom: 1px solid #f0f0f0;
+}
+
+.dropdown-name {
+  font-weight: 700;
+  font-size: 0.9rem;
+  color: #092C4C;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.dropdown-role {
+  font-size: 0.75rem;
+  color: #F2994A;
+  margin-top: 2px;
+}
+
+.dropdown-menu-list {
+  list-style: none;
+  margin: 0;
+  padding: 6px;
+}
+
+.dropdown-menu-list li button {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  width: 100%;
+  background: none;
+  border: none;
+  cursor: pointer;
+  padding: 8px 10px;
+  border-radius: 8px;
+  font-size: 0.85rem;
+  color: #333;
+  font-weight: 500;
+  transition: background-color 0.15s, color 0.15s;
+  text-align: left;
+}
+
+.dropdown-menu-list li button:hover {
+  background-color: #f5f7fa;
+  color: #092C4C;
+}
+
+.dropdown-divider {
+  border-top: 1px solid #f0f0f0;
+  margin: 4px 0;
+  pointer-events: none;
+}
+
+.dropdown-signout {
+  color: #e53e3e !important;
+}
+
+.dropdown-signout:hover {
+  background-color: #fff5f5 !important;
+  color: #c53030 !important;
+}
+
+/* ── Dashboard shortcut grid — matches screenshot ── */
+.dashboard-shortcuts-wrapper {
+  padding: 0 4px;
+}
+
+/* Two cards side-by-side on top row, third spans full width below */
+.shortcuts-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  grid-template-rows: auto auto;
+  gap: 20px;
+}
+
+.shortcut-card {
+  background: #ffffff;
+  border-radius: 16px;
+  box-shadow: 0 4px 16px rgba(9, 44, 76, 0.09);
+  padding: 0;
+  overflow: hidden;
+  display: flex;
+  flex-direction: column;
+  min-height: 320px;
+}
+
+/* Third card spans both columns */
+.shortcut-card.full-width {
+  grid-column: 1 / -1;
+}
+
+/* Placeholder card */
+.shortcut-card.placeholder {
+  border: 2px dashed #d0d8e8;
+  background: transparent;
+  box-shadow: none;
+  align-items: center;
+  justify-content: center;
+}
+
+.placeholder-content {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 8px;
+  color: #aab4c4;
+  text-align: center;
+  padding: 40px;
+}
+
+.placeholder-icon {
+  font-size: 2.5rem;
+  opacity: 0.45;
+}
+
+.placeholder-content p {
+  margin: 0;
+  font-size: 1rem;
+  font-weight: 600;
+}
+
+.placeholder-content small {
+  font-size: 0.8rem;
+}
+
+/* Inner components fill their card */
+.shortcut-card > * {
+  flex: 1;
+  width: 100%;
+  min-width: 0;
+}
+
+/* ── Mobile: stack all cards ── */
+@media (max-width: 768px) {
+  .floating-topbar {
+    flex-direction: column;
+    align-items: stretch;
+    gap: 10px;
+    padding: 8px 12px;
+    padding-top: 60px;
+  }
+
+  .topbar-welcome {
+    text-align: center;
+    font-size: 1rem;
+    padding: 8px 20px;
+  }
+
+  .topbar-right-cluster {
+    position: static;
+    transform: none;
+    justify-content: flex-end;
+  }
+
+  .shortcuts-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .shortcut-card.full-width {
+    grid-column: 1;
+  }
+
+  .shortcut-card {
+    min-height: 260px;
+  }
+}
+
+@media (min-width: 769px) and (max-width: 1024px) {
+  .floating-topbar {
+    padding-top: 60px;
+  }
+
+  .shortcuts-grid {
+    grid-template-columns: 1fr 1fr;
+    gap: 16px;
+  }
+
+  .shortcut-card {
+    min-height: 280px;
+  }
+}

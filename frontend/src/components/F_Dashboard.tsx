@@ -1,4 +1,5 @@
-import { useEffect, useState } from 'react';
+// DashboardFaculty.tsx
+import { useEffect, useRef, useState } from 'react';
 import type { JSX } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { api } from '../lib/apiClient.ts';
@@ -28,44 +29,39 @@ import MiniPlotSchedule from './MiniPlotSchedule.tsx';
 
 const iconStyle = { className: 'icon', size: 20 };
 
-const roleSidebarMap: Record<string, { key: string, label: string, icon: JSX.Element }[]> = {
+const roleSidebarMap: Record<string, { key: string; label: string; icon: JSX.Element }[]> = {
   proctor: [
-    { key: 'exam-Date', label: 'Exam Date', icon: <FaCalendar {...iconStyle} /> },
-    { key: 'set-Availability', label: 'Set Availability', icon: <FaClock {...iconStyle} /> },
-    { key: 'exam-Schedule', label: 'Exam Schedule', icon: <FaClipboardList {...iconStyle} /> },
-    { key: 'proctor-Attendance', label: 'Proctor Attendance', icon: <FaClipboardCheck {...iconStyle} /> },
-    { key: 'notification', label: 'Notification', icon: <FaBell {...iconStyle} /> },
+    { key: 'exam-Date',         label: 'Exam Date',          icon: <FaCalendar {...iconStyle} /> },
+    { key: 'set-Availability',  label: 'Set Availability',   icon: <FaClock {...iconStyle} /> },
+    { key: 'exam-Schedule',     label: 'Exam Schedule',      icon: <FaClipboardList {...iconStyle} /> },
+    { key: 'proctor-Attendance',label: 'Proctor Attendance', icon: <FaClipboardCheck {...iconStyle} /> },
   ],
   scheduler: [
-    { key: 'exam-Date', label: 'Exam Date', icon: <FaCalendar {...iconStyle} /> },
-    { key: 'plot-Schedule', label: 'Plot Schedule', icon: <FaCalendarPlus {...iconStyle} /> },
-    { key: 'exam-Schedule', label: 'Exam Schedule', icon: <FaClipboardList {...iconStyle} /> },
+    { key: 'exam-Date',             label: 'Exam Date',         icon: <FaCalendar {...iconStyle} /> },
+    { key: 'plot-Schedule',         label: 'Plot Schedule',     icon: <FaCalendarPlus {...iconStyle} /> },
+    { key: 'exam-Schedule',         label: 'Exam Schedule',     icon: <FaClipboardList {...iconStyle} /> },
     { key: 'proctors-Availability', label: 'Available Proctor', icon: <FaUsers {...iconStyle} /> },
-    { key: 'proctor-Monitoring', label: 'Proctor Monitoring', icon: <FaEye {...iconStyle} /> },
-    { key: 'notification', label: 'Notification', icon: <FaBell {...iconStyle} /> },
-    { key: 'Room-Management', label: 'Room Management', icon: <FaBuilding {...iconStyle} /> },
+    { key: 'proctor-Monitoring',    label: 'Proctor Monitoring',icon: <FaEye {...iconStyle} /> },
+    { key: 'Room-Management',       label: 'Room Management',   icon: <FaBuilding {...iconStyle} /> },
   ],
   dean: [
     { key: 'exam-Date', label: 'Exam Date', icon: <FaCalendar {...iconStyle} /> },
-    { key: 'notification', label: 'Notification', icon: <FaBell {...iconStyle} /> },
-    { key: 'Request', label: 'Requests', icon: <BsFillSendPlusFill {...iconStyle} /> },
+    { key: 'Request',   label: 'Requests',  icon: <BsFillSendPlusFill {...iconStyle} /> },
   ],
   'bayanihan leader': [
-    { key: 'exam-Date', label: 'Exam Date', icon: <FaCalendar {...iconStyle} /> },
+    { key: 'exam-Date',    label: 'Exam Date',    icon: <FaCalendar {...iconStyle} /> },
     { key: 'set-Modality', label: 'Set Modality', icon: <FaPenAlt {...iconStyle} /> },
-    { key: 'exam-Schedule', label: 'Exam Schedule', icon: <FaClipboardList {...iconStyle} /> },
-    { key: 'notification', label: 'Notification', icon: <FaBell {...iconStyle} /> },
+    { key: 'exam-Schedule',label: 'Exam Schedule',icon: <FaClipboardList {...iconStyle} /> },
   ],
   admin: [
-    { key: 'exam-Date', label: 'Exam Date', icon: <FaCalendar {...iconStyle} /> },
-    { key: 'plot-Schedule', label: 'Plot Schedule', icon: <FaCalendarPlus {...iconStyle} /> },
-    { key: 'exam-Schedule', label: 'Exam Schedule', icon: <FaClipboardList {...iconStyle} /> },
+    { key: 'exam-Date',             label: 'Exam Date',         icon: <FaCalendar {...iconStyle} /> },
+    { key: 'plot-Schedule',         label: 'Plot Schedule',     icon: <FaCalendarPlus {...iconStyle} /> },
+    { key: 'exam-Schedule',         label: 'Exam Schedule',     icon: <FaClipboardList {...iconStyle} /> },
     { key: 'proctors-Availability', label: 'Available Proctor', icon: <FaUsers {...iconStyle} /> },
-    { key: 'set-Modality', label: 'Set Modality', icon: <FaPenAlt {...iconStyle} /> },
-    { key: 'Request', label: 'Requests', icon: <BsFillSendPlusFill {...iconStyle} /> },
-    { key: 'Room-Management', label: 'Room Management', icon: <FaBuilding {...iconStyle} /> },
-    { key: 'notification', label: 'Notification', icon: <FaBell {...iconStyle} /> },
-  ]
+    { key: 'set-Modality',          label: 'Set Modality',      icon: <FaPenAlt {...iconStyle} /> },
+    { key: 'Request',               label: 'Requests',          icon: <BsFillSendPlusFill {...iconStyle} /> },
+    { key: 'Room-Management',       label: 'Room Management',   icon: <FaBuilding {...iconStyle} /> },
+  ],
 };
 
 const DashboardFaculty = () => {
@@ -76,212 +72,106 @@ const DashboardFaculty = () => {
   const [roles, setRoles] = useState<string[]>([]);
   const [showLogoutModal, setShowLogoutModal] = useState(false);
   const [isMobile, setIsMobile] = useState(window.innerWidth <= 1024);
-  const [unreadNotificationCount, setUnreadNotificationCount] = useState(0);
+  const [unreadCount, setUnreadCount] = useState(0);
   const [pendingRequestCount, setPendingRequestCount] = useState(0);
+  const [dropdownOpen, setDropdownOpen] = useState(false);
+  const dropdownRef = useRef<HTMLDivElement>(null);
   const navigate = useNavigate();
+
+  const isAlsoAdmin = roles.includes('admin');
 
   useEffect(() => {
     const loadUser = async () => {
-      const stored =
-        JSON.parse(localStorage.getItem('user') || 'null') ||
-        JSON.parse(sessionStorage.getItem('user') || 'null');
-
+      const stored = JSON.parse(localStorage.getItem('user') || 'null') || JSON.parse(sessionStorage.getItem('user') || 'null');
       if (!stored) return navigate('/');
-
       try {
         const res = await api.get(`/users/${stored.user_id}/`);
-        const data = res.data;
-
-        setUser({
-          ...data,
-          full_name: `${data.first_name} ${data.middle_name ?? ''} ${data.last_name}`.trim(),
-          avatar_url: data.avatar_url || '/images/default-pp.jpg',
-        });
-      } catch (err) {
-        setUser({
-          ...stored,
-          full_name: `${stored.first_name} ${stored.middle_name ?? ''} ${stored.last_name}`.trim(),
-          avatar_url: stored.avatar_url || '/images/default-pp.jpg',
-        });
+        const d = res.data;
+        setUser({ ...d, full_name: `${d.first_name} ${d.middle_name ?? ''} ${d.last_name}`.trim(), avatar_url: d.avatar_url || '/images/default-pp.jpg' });
+      } catch {
+        setUser({ ...stored, full_name: `${stored.first_name} ${stored.middle_name ?? ''} ${stored.last_name}`.trim(), avatar_url: stored.avatar_url || '/images/default-pp.jpg' });
       }
     };
-
     loadUser();
   }, [navigate]);
 
   useEffect(() => {
-    const timer = setInterval(() => setCurrentDateTime(new Date()), 1000);
-    return () => clearInterval(timer);
+    const id = setInterval(() => setCurrentDateTime(new Date()), 1000);
+    return () => clearInterval(id);
   }, []);
 
   useEffect(() => {
-    const fetchUserRoles = async () => {
-      if (!user?.user_id) return;
-      try {
-        const res = await api.get(`/user-roles/${user.user_id}/roles/`);
-        const roleData = res.data
-          .filter((r: any) => r.status?.toLowerCase() === 'active')
-          .map((r: any) => r.role_name.toLowerCase());
-        setRoles(roleData);
-      } catch (err) {
-        console.error('Error fetching roles:', err);
-      }
-    };
-    fetchUserRoles();
+    if (!user?.user_id) return;
+    api.get(`/user-roles/${user.user_id}/roles/`).then(res => {
+      setRoles(res.data.filter((r: any) => r.status?.toLowerCase() === 'active').map((r: any) => r.role_name.toLowerCase()));
+    }).catch(console.error);
   }, [user]);
 
   useEffect(() => {
-    const fetchUnreadCount = async () => {
-      if (!user?.user_id) return;
-      try {
-        const res = await api.get(`/notifications/${user.user_id}/`);
-        const unreadCount = res.data.filter((n: any) => !n.is_seen).length;
-        setUnreadNotificationCount(unreadCount);
-      } catch (err) {
-        console.error('Error fetching notification count:', err);
-      }
-    };
-
-    fetchUnreadCount();
-    const interval = setInterval(fetchUnreadCount, 10000);
-    return () => clearInterval(interval);
+    if (!user?.user_id) return;
+    const fetch = () => api.get(`/notifications/${user.user_id}/`).then(res => setUnreadCount(res.data.filter((n: any) => !n.is_seen).length)).catch(console.error);
+    fetch(); const id = setInterval(fetch, 10000); return () => clearInterval(id);
   }, [user]);
 
   useEffect(() => {
-    const fetchPendingRequests = async () => {
-      if (!user?.user_id) return;
-      try {
-        const res = await api.get(`/tbl_scheduleapproval/`, {
-          params: { status: 'pending', reviewer_id: user.user_id }
-        });
-        const pendingCount = Array.isArray(res.data) ? res.data.length : 0;
-        setPendingRequestCount(pendingCount);
-      } catch (err) {
-        console.error('Error fetching pending request count:', err);
-      }
-    };
-
-    fetchPendingRequests();
-    const interval = setInterval(fetchPendingRequests, 10000);
-    return () => clearInterval(interval);
+    if (!user?.user_id) return;
+    const fetch = () => api.get('/tbl_scheduleapproval/', { params: { status: 'pending', reviewer_id: user.user_id } })
+      .then(res => setPendingRequestCount(Array.isArray(res.data) ? res.data.length : 0)).catch(console.error);
+    fetch(); const id = setInterval(fetch, 10000); return () => clearInterval(id);
   }, [user]);
 
   useEffect(() => {
-    let resizeTimer: NodeJS.Timeout;
-
-    const handleResize = () => {
-      clearTimeout(resizeTimer);
-      resizeTimer = setTimeout(() => {
-        const nowMobile = window.innerWidth <= 1024;
-        const wasMobile = isMobile;
-
-        setIsMobile(nowMobile);
-
-        if (wasMobile !== nowMobile) {
-          setIsSidebarOpen(false);
-        }
+    let t: ReturnType<typeof setTimeout>;
+    const onResize = () => {
+      clearTimeout(t);
+      t = setTimeout(() => {
+        const m = window.innerWidth <= 1024;
+        setIsMobile(prev => { if (prev !== m) setIsSidebarOpen(false); return m; });
       }, 150);
     };
+    window.addEventListener('resize', onResize);
+    return () => { clearTimeout(t); window.removeEventListener('resize', onResize); };
+  }, []);
 
-    const initialMobile = window.innerWidth <= 1024;
-    setIsMobile(initialMobile);
-
-    window.addEventListener('resize', handleResize);
-    return () => {
-      clearTimeout(resizeTimer);
-      window.removeEventListener('resize', handleResize);
+  useEffect(() => {
+    const onClick = (e: MouseEvent) => {
+      if (dropdownRef.current && !dropdownRef.current.contains(e.target as Node)) setDropdownOpen(false);
     };
-  }, [isMobile]);
+    document.addEventListener('mousedown', onClick);
+    return () => document.removeEventListener('mousedown', onClick);
+  }, []);
 
   const mergedSidebarItems = Array.from(
-    new Map(
-      roles
-        .flatMap(role => roleSidebarMap[role] || [])
-        .filter(item => item.key !== 'notification')
-        .map(item => [item.key, item])
-    ).values()
+    new Map(roles.flatMap(role => roleSidebarMap[role] || []).map(item => [item.key, item])).values()
   );
 
-  const notificationItem = roles
-    .flatMap(role => roleSidebarMap[role] || [])
-    .find(item => item.key === 'notification');
+  const handleMenuClick = (key: string) => { setActiveMenu(key); if (isMobile) setIsSidebarOpen(false); setDropdownOpen(false); };
+  const handleSidebarHover = (e: boolean) => { if (!isMobile) setIsSidebarOpen(e); };
+  const handleLogoutConfirm = () => { localStorage.removeItem('user'); sessionStorage.removeItem('user'); navigate('/'); };
 
-  const toggleSidebar = () => {
-    setIsSidebarOpen(!isSidebarOpen);
-  };
+  const formattedDate = currentDateTime.toLocaleDateString('en-US', { month: 'long', day: 'numeric', year: 'numeric' });
+  const formattedTime = currentDateTime.toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit', hour12: true });
+  const greeting = currentDateTime.getHours() < 12 ? 'Good morning' : currentDateTime.getHours() < 18 ? 'Good afternoon' : 'Good evening';
+  const displayRoles = roles.filter(r => r !== 'admin');
 
-  const handleMenuClick = (menuKey: string) => {
-    setActiveMenu(menuKey);
-    if (isMobile) {
-      setIsSidebarOpen(false);
-    }
-  };
-
-  const handleSidebarHover = (isEntering: boolean) => {
-    if (!isMobile) {
-      setIsSidebarOpen(isEntering);
-    }
-  };
-
-  const handleLogoutConfirm = () => {
-    localStorage.removeItem('user');
-    sessionStorage.removeItem('user');
-    navigate('/');
-  };
-
-  const timeString = currentDateTime.toLocaleTimeString('en-US', {
-    hour: '2-digit', minute: '2-digit', hour12: true,
-  });
-  const [hour, minute, ampm] = timeString.split(/:| /);
-  const dateStr = currentDateTime.toLocaleDateString('en-US', {
-    weekday: 'long', month: 'long', day: 'numeric',
-  });
-
-  if (!user) return <div style={{ color: 'black' }}>Loading...</div>;
+  if (!user) return <div className="dash-loading">Loading...</div>;
 
   return (
     <div className="app-container">
       <div className="main-content-wrapper">
+
         {roles.length > 0 && isMobile && (
-          <button
-            type="button"
-            className="menu-toggle-btn"
-            onClick={toggleSidebar}
-            aria-label="Toggle menu"
-          >
+          <button type="button" className="menu-toggle-btn" onClick={() => setIsSidebarOpen(o => !o)} aria-label="Toggle menu">
             {isSidebarOpen ? <FaTimes /> : <FaBars />}
           </button>
         )}
-
-        {roles.length > 0 && isMobile && (
-          <div
-            className={`sidebar-backdrop ${isSidebarOpen ? 'active' : ''}`}
-            onClick={() => setIsSidebarOpen(false)}
-          />
-        )}
+        {roles.length > 0 && isMobile && <div className={`sidebar-backdrop ${isSidebarOpen ? 'active' : ''}`} onClick={() => setIsSidebarOpen(false)} />}
 
         {roles.length > 0 && (
-          <aside
-            className={`sidebar ${isSidebarOpen ? 'open' : 'closed'}`}
-            onMouseEnter={() => handleSidebarHover(true)}
-            onMouseLeave={() => handleSidebarHover(false)}
-          >
+          <aside className={`sidebar ${isSidebarOpen ? 'open' : 'closed'}`} onMouseEnter={() => handleSidebarHover(true)} onMouseLeave={() => handleSidebarHover(false)}>
             <div className="sidebar-header">
-              <button
-                type="button"
-                className="sidebar-logo-button"
-                onClick={() => setActiveMenu('dashboard')}
-                style={{
-                  background: 'none',
-                  border: 'none',
-                  cursor: 'pointer',
-                  display: 'flex',
-                  alignItems: 'center',
-                  gap: '10px',
-                  padding: 0,
-                  width: '100%'
-                }}
-              >
+              <button type="button" className="sidebar-logo-button" onClick={() => setActiveMenu('dashboard')}
+                style={{ background: 'none', border: 'none', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '10px', padding: 0, width: '100%' }}>
                 <div className="sidebar-logo">
                   <img src="/logo/Exam.png" alt="Logo" className="logo-img" />
                   {isSidebarOpen && <span className="logo-text">ExamSync</span>}
@@ -293,61 +183,20 @@ const DashboardFaculty = () => {
               <ul>
                 <li className={activeMenu === 'dashboard' ? 'active' : ''}>
                   <button type="button" onClick={() => handleMenuClick('dashboard')}>
-                    <FaHome {...iconStyle} />
-                    {isSidebarOpen && <span>Dashboard</span>}
+                    <FaHome {...iconStyle} />{isSidebarOpen && <span>Dashboard</span>}
                   </button>
                 </li>
-
-                {notificationItem && (
-                  <li className={activeMenu === 'notification' ? 'active' : ''}>
-                    <button type="button" onClick={() => handleMenuClick('notification')}>
-                      <div className="sidebar-icon-wrapper">
-                        {notificationItem.icon}
-                        {unreadNotificationCount > 0 && (
-                          <span className="notification-badge-icon">{unreadNotificationCount}</span>
-                        )}
-                      </div>
-                      {isSidebarOpen && <span>{notificationItem.label}</span>}
-                    </button>
-                  </li>
-                )}
 
                 {mergedSidebarItems.map(({ key, label, icon }) => (
                   <li key={key} className={activeMenu === key ? 'active' : ''}>
                     <button type="button" onClick={() => handleMenuClick(key)}>
-                      {key === 'Request' ? (
-                        <div className="sidebar-icon-wrapper">
-                          {icon}
-                          {pendingRequestCount > 0 && (
-                            <span className="notification-badge-icon">{pendingRequestCount}</span>
-                          )}
-                        </div>
-                      ) : (
-                        icon
-                      )}
+                      {key === 'Request'
+                        ? <div className="sidebar-icon-wrapper">{icon}{pendingRequestCount > 0 && <span className="notification-badge-icon">{pendingRequestCount}</span>}</div>
+                        : icon}
                       {isSidebarOpen && <span>{label}</span>}
                     </button>
                   </li>
                 ))}
-
-                <div className="sidebar-divider"></div>
-
-                <li className={activeMenu === 'profile' ? 'active' : ''}>
-                  <button type='button' onClick={() => handleMenuClick('profile')}>
-                    <FaUser {...iconStyle} />
-                    {isSidebarOpen && <span>Profile</span>}
-                  </button>
-                </li>
-
-                <li>
-                  <button type='button' onClick={() => {
-                    setShowLogoutModal(true);
-                    if (isMobile) setIsSidebarOpen(false);
-                  }}>
-                    <FaSignOutAlt />
-                    {isSidebarOpen && <span>Logout</span>}
-                  </button>
-                </li>
               </ul>
             </nav>
           </aside>
@@ -355,85 +204,103 @@ const DashboardFaculty = () => {
 
         <main className={`main-content ${roles.length > 0 && isSidebarOpen ? 'sidebar-open' : 'sidebar-closed'}`}>
 
-          {activeMenu === 'dashboard' && (
-            <div className="dashboard-grid">
-              <div className="card welcome-card">
-                <h3>Welcome, <span className="robert-name">{user.first_name}!</span></h3>
-                <p>Organize your work and improve your performance here</p>
-                {roles.includes('admin') && (
-                  <div style={{ marginTop: '10px', display: 'flex', alignItems: 'center', gap: '8px', color: '#4CAF50' }}>
-                    <FaUserShield size={16} />
-                    <span style={{ fontSize: '14px', fontWeight: '500' }}>Admin Access Enabled</span>
+          {/* ── Top bar: centered welcome + right cluster ── */}
+          <div className="floating-topbar">
+            {activeMenu === 'dashboard' ? (
+              <div className="topbar-welcome">
+                {greeting}, <span className="highlight">{user.first_name}!</span>
+              </div>
+            ) : (
+              <div className="topbar-pagetitle">
+                {mergedSidebarItems.find(i => i.key === activeMenu)?.label
+                  ?? activeMenu.charAt(0).toUpperCase() + activeMenu.slice(1).replace(/-/g, ' ')}
+              </div>
+            )}
+
+            <div className="topbar-right-cluster">
+              <div className="topbar-datetime-pill">
+                <span className="topbar-date">{formattedDate}</span>
+                <span className="topbar-time">{formattedTime}</span>
+              </div>
+
+              <div className="topbar-avatar-notification-pill" ref={dropdownRef}>
+                <button type="button" className="topbar-bell-btn" onClick={() => handleMenuClick('notification')} aria-label="Notifications">
+                  <FaBell />
+                  {unreadCount > 0 && <span className="topbar-badge">{unreadCount}</span>}
+                </button>
+                <img src={user.avatar_url} alt="avatar" className="topbar-avatar" onClick={() => setDropdownOpen(p => !p)} />
+                {dropdownOpen && (
+                  <div className="topbar-dropdown">
+                    <div className="dropdown-header">
+                      <div className="dropdown-name">{user.full_name}</div>
+                      <div className="dropdown-role">
+                        {displayRoles.length ? displayRoles.map(r => r.charAt(0).toUpperCase() + r.slice(1)).join(', ') : 'Loading...'}
+                      </div>
+                    </div>
+                    <ul className="dropdown-menu-list">
+                      <li><button type="button" onClick={() => handleMenuClick('profile')}><FaUser size={13} /> Profile</button></li>
+                      {isAlsoAdmin && <li><button type="button" onClick={() => navigate('/admin-dashboard')}><FaUserShield size={13} /> Switch to Admin Dashboard</button></li>}
+                      <li className="dropdown-divider" />
+                      <li><button type="button" className="dropdown-signout" onClick={() => { setDropdownOpen(false); setShowLogoutModal(true); }}><FaSignOutAlt size={13} /> Sign out</button></li>
+                    </ul>
                   </div>
                 )}
               </div>
+            </div>
+          </div>
 
-              <div className="card datetime-card">
-                <div className="date-display-simple">{dateStr}</div>
-                <div className="time-display">
-                  <span>{hour}:</span><span>{minute}</span><span className="ampm">{ampm}</span>
+          {/* ── Dashboard shortcuts grid ── */}
+          {activeMenu === 'dashboard' && (
+            <div className="dashboard-shortcuts-wrapper">
+              <div className="shortcuts-grid">
+
+                {/* TOP LEFT — Proctor assignments or role-appropriate card */}
+                <div className="shortcut-card">
+                  {roles.includes('proctor')
+                    ? <ProctorCourseDetails user={user} />
+                    : <div className="placeholder-content"><span className="placeholder-icon">🗂️</span><p>Assigned Proctoring</p><small>No proctor role assigned</small></div>
+                  }
                 </div>
-              </div>
 
-              <div className="card faculty-info-card">
-                <img src={user.avatar_url} alt="Avatar" className="faculty-avatar" />
-                <h4>{user.full_name}</h4>
-                <p>{roles.length ? roles.map(r => r.charAt(0).toUpperCase() + r.slice(1)).join(', ') : 'Loading roles...'}</p>
-              </div>
-
-              <div className="full-width-section">
-                <h2>Shortcut</h2>
-                <div className="try-things-grid">
-
-                  {/* Proctor: Assigned Proctoring with fixed height + scroll */}
-                  {roles.includes('proctor') && (
-                    <div className="try-thing-card" style={{ display: 'flex', flexDirection: 'column', overflow: 'hidden' }}>
-                      <ProctorCourseDetails user={user} />
-                    </div>
-                  )}
-
-                  {/* Exam Date Calendar — always shown */}
-                  <div className="try-thing-card">
-                    <MiniExamDateCalendar user={user} />
-                  </div>
-
-                  {/* Scheduler / Admin: Mini Plot Schedule preview */}
-                  {(roles.includes('scheduler') || roles.includes('admin')) && (
-                    <div className="try-thing-card">
-                      <MiniPlotSchedule
-                        user={user}
-                        onOpenPlotter={() => handleMenuClick('plot-Schedule')}
-                      />
-                    </div>
-                  )}
-
+                {/* TOP RIGHT — Mini exam calendar */}
+                <div className="shortcut-card">
+                  <MiniExamDateCalendar user={user} />
                 </div>
+
+                {/* BOTTOM FULL WIDTH — Plot schedule (schedulers) or exam schedule preview */}
+                <div className="shortcut-card full-width">
+                  {(roles.includes('scheduler') || roles.includes('admin'))
+                    ? <MiniPlotSchedule user={user} onOpenPlotter={() => handleMenuClick('plot-Schedule')} />
+                    : <div className="placeholder-content"><span className="placeholder-icon">📅</span><p>Exam Schedule Preview</p><small>Coming soon</small></div>
+                  }
+                </div>
+
               </div>
             </div>
           )}
 
-          {activeMenu === 'exam-Date' && <ProctorExamDate />}
-          {activeMenu === 'profile' && <Profile user={user} />}
-          {activeMenu === 'set-Availability' && <ProctorSetAvailability user={user} />}
-          {activeMenu === 'exam-Schedule' && <ProctorViewExam user={user} />}
-          {activeMenu === 'proctor-Attendance' && <ProctorAttendance user={user} />}
-          {activeMenu === 'notification' && <Notification user={user} />}
-          {activeMenu === 'set-Modality' && <BayanihanModality user={user} />}
-          {activeMenu === 'plot-Schedule' && <SchedulerPlotSchedule user={user} />}
-          {activeMenu === 'proctors-Availability' && <SchedulerAvailability user={user} />}
-          {activeMenu === 'proctor-Monitoring' && <ProctorMonitoring user={user} />}
-          {activeMenu === 'Request' && <DeanRequests user={user} />}
-          {activeMenu === 'Room-Management' && <RoomManagement user={user} />}
+          {activeMenu === 'exam-Date'           && <ProctorExamDate />}
+          {activeMenu === 'profile'             && <Profile user={user} />}
+          {activeMenu === 'set-Availability'    && <ProctorSetAvailability user={user} />}
+          {activeMenu === 'exam-Schedule'        && <ProctorViewExam user={user} />}
+          {activeMenu === 'proctor-Attendance'  && <ProctorAttendance user={user} />}
+          {activeMenu === 'notification'        && <Notification user={user} />}
+          {activeMenu === 'set-Modality'        && <BayanihanModality user={user} />}
+          {activeMenu === 'plot-Schedule'        && <SchedulerPlotSchedule user={user} />}
+          {activeMenu === 'proctors-Availability'&& <SchedulerAvailability user={user} />}
+          {activeMenu === 'proctor-Monitoring'  && <ProctorMonitoring user={user} />}
+          {activeMenu === 'Request'             && <DeanRequests user={user} />}
+          {activeMenu === 'Room-Management'     && <RoomManagement user={user} />}
         </main>
       </div>
 
       {showLogoutModal && (
         <div className="myModal-overlay" onClick={() => setShowLogoutModal(false)}>
-          <div className="myModal-box" onClick={(e) => e.stopPropagation()}>
+          <div className="myModal-box" onClick={e => e.stopPropagation()}>
             <h3 className="myModal-title">Are you sure you want to logout?</h3>
             <div className="myModal-actions">
-              <button type='button' onClick={handleLogoutConfirm} className="myModal-btn myModal-btn-confirm">Logout</button>
-              <button type='button' onClick={() => setShowLogoutModal(false)} className="myModal-btn myModal-btn-cancel">Cancel</button>
+              <button type="button" onClick={handleLogoutConfirm} className="myModal-btn myModal-btn-confirm">Logout</button>
+              <button type="button" onClick={() => setShowLogoutModal(false)} className="myModal-btn myModal-btn-cancel">Cancel</button>
             </div>
           </div>
         </div>

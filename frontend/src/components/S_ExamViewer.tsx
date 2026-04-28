@@ -33,6 +33,171 @@ interface SchedulerViewProps {
   } | null;
 }
 
+interface Step2ModalProps {
+  schedulerCollegeName: string;
+  loading: boolean;
+  onCancel: () => void;
+  onConfirm: () => void;
+}
+ 
+const Step2Modal: React.FC<Step2ModalProps> = ({
+  schedulerCollegeName,
+  loading,
+  onCancel,
+  onConfirm,
+}) => {
+  const [countdown, setCountdown] = useState(5);
+ 
+  useEffect(() => {
+    if (countdown <= 0) return;
+    const t = setTimeout(() => setCountdown(c => c - 1), 1000);
+    return () => clearTimeout(t);
+  }, [countdown]);
+ 
+  const canDelete = countdown === 0 && !loading;
+  const progress = ((5 - countdown) / 5) * 100;
+ 
+  return (
+    <div style={{
+      position: 'fixed', inset: 0, zIndex: 10000,
+      background: 'rgba(9,44,76,0.55)',
+      display: 'flex', alignItems: 'center', justifyContent: 'center',
+      animation: 'fadeIn 0.2s ease',
+    }}>
+      <div style={{
+        background: 'var(--surface)',
+        borderRadius: 'var(--radius-xl)',
+        padding: '36px 32px 28px',
+        width: 'min(90vw, 420px)',
+        boxShadow: 'var(--shadow-lg)',
+        fontFamily: 'var(--font)',
+        animation: 'slideUp 0.25s ease',
+        display: 'flex', flexDirection: 'column', alignItems: 'center',
+      }}>
+        {/* Danger icon ring */}
+        <div style={{
+          width: 64, height: 64, borderRadius: '50%',
+          background: 'var(--danger-soft)',
+          display: 'flex', alignItems: 'center', justifyContent: 'center',
+          marginBottom: 18,
+        }}>
+          <svg width="30" height="30" viewBox="0 0 24 24" fill="none" stroke="#C0392B" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round">
+            <polyline points="3 6 5 6 21 6"/>
+            <path d="M19 6l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6"/>
+            <path d="M10 11v6"/><path d="M14 11v6"/>
+            <path d="M9 6V4a1 1 0 0 1 1-1h4a1 1 0 0 1 1 1v2"/>
+          </svg>
+        </div>
+ 
+        <h3 style={{ margin: '0 0 8px', fontSize: 17, fontWeight: 700, color: 'var(--danger)', textAlign: 'center' }}>
+          Final Confirmation
+        </h3>
+        <p style={{ margin: '0 0 6px', fontSize: 13, color: 'var(--text-secondary)', textAlign: 'center', lineHeight: 1.6 }}>
+          This will <strong style={{ color: 'var(--danger)' }}>permanently remove</strong> all exam schedules for{' '}
+          <strong style={{ color: 'var(--text-primary)' }}>{schedulerCollegeName}</strong>.
+        </p>
+        <p style={{ margin: '0 0 20px', fontSize: 12, color: 'var(--text-muted)', textAlign: 'center' }}>
+          There is no way to recover deleted schedules.
+        </p>
+ 
+        {/* Countdown progress track */}
+        <div style={{ width: '100%', marginBottom: 16 }}>
+          <div style={{
+            width: '100%', height: 6, borderRadius: 99,
+            background: 'var(--surface-3)', overflow: 'hidden',
+            marginBottom: 6,
+          }}>
+            <div style={{
+              width: `${progress}%`,
+              height: '100%',
+              borderRadius: 99,
+              background: countdown === 0 ? 'var(--danger)' : 'var(--border-2)',
+              transition: 'width 1s linear, background 0.4s',
+            }} />
+          </div>
+          {countdown > 0 && (
+            <p style={{
+              margin: 0, fontSize: 11.5, textAlign: 'center',
+              color: 'var(--text-muted)', fontFamily: 'var(--mono)',
+              letterSpacing: '0.03em',
+            }}>
+            </p>
+          )}
+        </div>
+ 
+        <div style={{ display: 'flex', gap: 10, width: '100%' }}>
+          <button
+            type="button"
+            onClick={onCancel}
+            disabled={loading}
+            style={{
+              flex: 1, height: 40,
+              border: '1.5px solid var(--border)',
+              borderRadius: 'var(--radius-md)',
+              background: 'var(--surface)',
+              color: 'var(--text-secondary)',
+              fontFamily: 'var(--font)',
+              fontSize: 13, fontWeight: 600,
+              cursor: loading ? 'not-allowed' : 'pointer',
+              opacity: loading ? 0.5 : 1,
+            }}
+          >
+            Cancel
+          </button>
+ 
+          <button
+            type="button"
+            onClick={canDelete ? onConfirm : undefined}
+            disabled={!canDelete}
+            style={{
+              flex: 1, height: 40, border: 'none',
+              borderRadius: 'var(--radius-md)',
+              background: canDelete
+                ? (loading ? '#e57373' : 'var(--danger)')
+                : 'var(--surface-3)',
+              color: canDelete ? '#fff' : 'var(--text-muted)',
+              fontFamily: 'var(--font)',
+              fontSize: 13, fontWeight: 700,
+              cursor: canDelete ? 'pointer' : 'not-allowed',
+              transition: 'background 0.3s, color 0.3s',
+              display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8,
+            }}
+          >
+            {loading ? (
+              <>
+                <span style={{
+                  width: 15, height: 15,
+                  border: '2.5px solid rgba(255,255,255,0.35)',
+                  borderTopColor: '#fff',
+                  borderRadius: '50%',
+                  display: 'inline-block',
+                  animation: 'sv-spin 0.7s linear infinite',
+                }} />
+                Deleting…
+              </>
+            ) : countdown > 0 ? (
+              <>
+                <span style={{
+                  width: 20, height: 20, borderRadius: '50%',
+                  border: '2px solid var(--border-2)',
+                  display: 'inline-flex', alignItems: 'center', justifyContent: 'center',
+                  fontSize: 10, fontWeight: 700, color: 'var(--text-muted)',
+                  fontFamily: 'var(--mono)',
+                }}>
+                  {countdown}
+                </span>
+                Delete Permanently
+              </>
+            ) : (
+              'Delete Permanently'
+            )}
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+};
+
 const SchedulerView: React.FC<SchedulerViewProps> = ({ user }) => {
   const [examData, setExamData] = useState<ExamDetail[]>([]);
   const [users, setUsers] = useState<{ user_id: number; first_name: string; last_name: string }[]>([]);
@@ -74,6 +239,7 @@ const SchedulerView: React.FC<SchedulerViewProps> = ({ user }) => {
 
   const [filterMenuOpen, setFilterMenuOpen] = useState(false);
   const filterRef = useRef<HTMLDivElement>(null);
+  const [isScheduleLoading, setIsScheduleLoading] = useState(true);
 
   const [_showExportDropdown, setShowExportDropdown] = useState(false);
   const [collegeDataReady, setCollegeDataReady] = useState(false);
@@ -90,10 +256,15 @@ const SchedulerView: React.FC<SchedulerViewProps> = ({ user }) => {
     return stored ? JSON.parse(stored) : false;
   });
 
-  const [deleteProgress, setDeleteProgress] = useState<{
+  const [_deleteProgress, setDeleteProgress] = useState<{
     isDeleting: boolean;
     progress: number;
     message: string;
+  } | null>(null);
+  
+  const [deleteModal, setDeleteModal] = useState<{
+    step: 'confirm1' | 'confirm2';
+    loading: boolean;
   } | null>(null);
 
   // ✅ Drag-and-drop state for reordering exams
@@ -585,6 +756,7 @@ const SchedulerView: React.FC<SchedulerViewProps> = ({ user }) => {
         if (usersResponse.data) {
           setUsers(usersResponse.data);
         }
+        setIsScheduleLoading(false);
       } catch (error) {
       }
     };
@@ -1192,93 +1364,69 @@ const SchedulerView: React.FC<SchedulerViewProps> = ({ user }) => {
 
   const hasData = searchFilteredData.length > 0;
 
-  const handleDeleteAllSchedules = async () => {
+  const handleDeleteAllSchedules = () => {
     if (!schedulerCollegeName || schedulerCollegeName === "Add schedule first") {
       toast.warn("No college detected. Cannot delete schedules.");
       return;
     }
-
-    const confirmStep1 = globalThis.confirm(
-      `⚠️ WARNING: You are about to delete ALL schedules for ${schedulerCollegeName}.\n\nAre you absolutely sure you want to continue?`
-    );
-    if (!confirmStep1) return;
-
-    const confirmStep2 = globalThis.confirm(
-      `🚨 FINAL CONFIRMATION:\n\nThis will permanently remove ALL exam schedules for ${schedulerCollegeName}.\nThis action cannot be undone.\n\nDo you still want to proceed?`
-    );
-    if (!confirmStep2) return;
-
+    setDeleteModal({ step: 'confirm1', loading: false });
+  };
+  
+  const handleDeleteConfirm1 = () => {
+    setDeleteModal({ step: 'confirm2', loading: false });
+  };
+  
+  const handleDeleteConfirm2 = async () => {
+    setDeleteModal({ step: 'confirm2', loading: true });
+  
+    // small delay so user sees the button spinner
+    await new Promise(resolve => setTimeout(resolve, 400));
+    setDeleteModal(null);
+  
     try {
       const examsToDelete = examData.filter(e => e.college_name === schedulerCollegeName);
-
+  
       if (examsToDelete.length === 0) {
         toast.warn(`No schedules found for ${schedulerCollegeName}`);
         return;
       }
-
-      setDeleteProgress({
-        isDeleting: true,
-        progress: 0,
-        message: 'Preparing to delete schedules...'
-      });
-
+  
+      setDeleteProgress({ isDeleting: true, progress: 0, message: 'Preparing to delete schedules...' });
       await new Promise(resolve => setTimeout(resolve, 500));
-      setDeleteProgress({
-        isDeleting: true,
-        progress: 25,
-        message: `Deleting ${examsToDelete.length} schedule(s)...`
-      });
-
+  
+      setDeleteProgress({ isDeleting: true, progress: 25, message: `Deleting ${examsToDelete.length} schedule(s)...` });
+  
       const response = await api.post('/tbl_examdetails/batch-delete/', {
         college_name: schedulerCollegeName
       });
-
-      setDeleteProgress({
-        isDeleting: true,
-        progress: 60,
-        message: 'Removing approval records...'
-      });
-
-      // Delete approval records
+  
+      setDeleteProgress({ isDeleting: true, progress: 60, message: 'Removing approval records...' });
+  
       try {
         const approvalResponse = await api.get('/tbl_scheduleapproval/', {
           params: { college_name: schedulerCollegeName }
         });
-
-        if (approvalResponse.data && approvalResponse.data.length > 0) {
+        if (approvalResponse.data?.length > 0) {
           const deletePromises = approvalResponse.data.map((approval: any) =>
             api.delete(`/tbl_scheduleapproval/${approval.request_id || approval.id}/`)
           );
           await Promise.all(deletePromises);
         }
-      } catch (approvalError) {
-      }
-
-      setDeleteProgress({
-        isDeleting: true,
-        progress: 85,
-        message: 'Cleaning up data...'
-      });
-
+      } catch (_) {}
+  
+      setDeleteProgress({ isDeleting: true, progress: 85, message: 'Cleaning up data...' });
       await new Promise(resolve => setTimeout(resolve, 300));
-
+  
       setApprovalStatus(null);
       setRemarks(null);
       setExamData([]);
       saveUnscheduledSections([]);
-
-      setDeleteProgress({
-        isDeleting: true,
-        progress: 100,
-        message: 'Delete complete!'
-      });
-
-      await new Promise(resolve => setTimeout(resolve, 500));
-
+  
+      setDeleteProgress({ isDeleting: true, progress: 100, message: 'Delete complete!' });
+      await new Promise(resolve => setTimeout(resolve, 600));
       setDeleteProgress(null);
-
+  
       toast.success(`Successfully deleted ${response.data.deleted_count} schedules for ${schedulerCollegeName}!`);
-
     } catch (error: any) {
       setDeleteProgress(null);
       toast.error(`Failed to delete schedules: ${error?.response?.data?.error || error?.message || 'Unknown error'}`);
@@ -1898,15 +2046,74 @@ const SchedulerView: React.FC<SchedulerViewProps> = ({ user }) => {
                 <div style={{ fontSize: '20px', color: '#333', marginTop: '-10px', fontFamily: 'serif' }}>{examPeriodName}</div>
               </div>
               <hr />
-              <div style={{
-                textAlign: 'center',
-                padding: '100px 20px',
-                fontSize: '24px',
-                color: '#999',
-                fontFamily: 'serif'
-              }}>
-                {selectedFilter === "all" ? "Add schedule first" : "No schedules found for selected filter"}
-              </div>
+              {isScheduleLoading ? (
+                // ── Loading skeleton ──────────────────────────────────────
+                <div style={{
+                  padding: '60px 20px',
+                  display: 'flex',
+                  flexDirection: 'column',
+                  alignItems: 'center',
+                  gap: '20px',
+                }}>
+                  {/* Spinner */}
+                  <div style={{
+                    width: '48px',
+                    height: '48px',
+                    border: '4px solid #e5e7eb',
+                    borderTopColor: '#092C4C',
+                    borderRadius: '50%',
+                    animation: 'sv-spin 0.8s linear infinite',
+                  }} />
+              
+                  {/* Shimmer rows */}
+                  {[90, 75, 82, 68, 78].map((w, i) => (
+                    <div
+                      key={i}
+                      style={{
+                        width: `${w}%`,
+                        height: '14px',
+                        borderRadius: '6px',
+                        background: 'linear-gradient(90deg, #e5e7eb 25%, #f3f4f6 50%, #e5e7eb 75%)',
+                        backgroundSize: '200% 100%',
+                        animation: `sv-shimmer 1.4s ease infinite`,
+                        animationDelay: `${i * 0.1}s`,
+                      }}
+                    />
+                  ))}
+              
+                  <p style={{
+                    fontSize: '15px',
+                    color: '#9ca3af',
+                    fontFamily: 'serif',
+                    marginTop: '8px',
+                  }}>
+                  </p>
+              
+                  {/* Keyframes injected inline */}
+                  <style>{`
+                    @keyframes sv-spin {
+                      to { transform: rotate(360deg); }
+                    }
+                    @keyframes sv-shimmer {
+                      0%   { background-position: 200% 0; }
+                      100% { background-position: -200% 0; }
+                    }
+                  `}</style>
+                </div>
+              ) : (
+                // ── Original empty-state text ────────────────────────────
+                <div style={{
+                  textAlign: 'center',
+                  padding: '100px 20px',
+                  fontSize: '24px',
+                  color: '#999',
+                  fontFamily: 'serif',
+                }}>
+                  {selectedFilter === 'all'
+                    ? 'Add schedule first'
+                    : 'No schedules found for selected filter'}
+                </div>
+              )}
             </div>
           </div>
         ) : selectedFilter === "all" ? (
@@ -2797,142 +3004,114 @@ const SchedulerView: React.FC<SchedulerViewProps> = ({ user }) => {
         />
       </Modal>
 
-      <Modal isOpen={showFooterSettings} onClose={() => setShowFooterSettings(false)}>
-        <FooterSettingsModal
-          isOpen={showFooterSettings}
-          onClose={() => setShowFooterSettings(false)}
-          collegeName={collegeName}
-          collegeId={schedulerCollegeId}
-          showIconLabels={showIconLabels}
-          onIconLabelsChange={(show) => {
-            setShowIconLabels(show);
-            localStorage.setItem('showIconLabels', JSON.stringify(show));
-          }}
-          onSave={async () => {
-            try {
-              const response = await api.get('/tbl_schedule_footer/', {
-                params: { college_id: schedulerCollegeId }
-              });
+      <FooterSettingsModal
+        isOpen={showFooterSettings}
+        onClose={() => setShowFooterSettings(false)}
+        collegeName={collegeName}
+        collegeId={schedulerCollegeId}
+        showIconLabels={showIconLabels}
+        onIconLabelsChange={(show) => {
+          setShowIconLabels(show);
+          localStorage.setItem('showIconLabels', JSON.stringify(show));
+        }}
+        onSave={async () => {
+          try {
+            const response = await api.get('/tbl_schedule_footer/', {
+              params: { college_id: schedulerCollegeId }
+            });
 
-              if (response.data && response.data.length > 0) {
-                setFooterData(response.data[0]);
-              }
-            } catch (error) {
+            if (response.data && response.data.length > 0) {
+              setFooterData(response.data[0]);
             }
-          }}
-        />
-      </Modal>
+          } catch (error) {
+          }
+        }}
+      />
 
       {/* Delete Progress Modal */}
-        { deleteProgress && (
+        {deleteModal?.step === 'confirm1' && (
           <div style={{
-            position: 'fixed',
-            top: 0,
-            left: 0,
-            right: 0,
-            bottom: 0,
-            backgroundColor: 'rgba(0, 0, 0, 0.7)',
-            display: 'flex',
-            alignItems: 'center',
-            justifyContent: 'center',
-            zIndex: 10000,
-            animation: 'fadeIn 0.3s ease'
+            position: 'fixed', inset: 0, zIndex: 10000,
+            background: 'rgba(9,44,76,0.45)',
+            display: 'flex', alignItems: 'center', justifyContent: 'center',
+            animation: 'fadeIn 0.2s ease',
           }}>
             <div style={{
-              backgroundColor: 'white',
-              borderRadius: '16px',
-              padding: '40px',
-              maxWidth: '500px',
-              width: '90%',
-              boxShadow: '0 10px 40px rgba(0, 0, 0, 0.3)',
-              animation: 'slideUp 0.3s ease'
+              background: 'var(--surface)',
+              borderRadius: 'var(--radius-xl)',
+              padding: '36px 32px 28px',
+              width: 'min(90vw, 420px)',
+              boxShadow: 'var(--shadow-lg)',
+              fontFamily: 'var(--font)',
+              animation: 'slideUp 0.25s ease',
+              display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 0,
             }}>
-              {/* Icon */}
+              {/* Warning icon ring */}
               <div style={{
-                textAlign: 'center',
-                marginBottom: '20px'
+                width: 64, height: 64, borderRadius: '50%',
+                background: 'var(--warn-soft)',
+                display: 'flex', alignItems: 'center', justifyContent: 'center',
+                marginBottom: 18,
               }}>
-                <div style={{
-                  width: '80px',
-                  height: '80px',
-                  margin: '0 auto',
-                  borderRadius: '50%',
-                  backgroundColor: deleteProgress.progress === 100 ? '#10b981' : '#ef4444',
-                  display: 'flex',
-                  alignItems: 'center',
-                  justifyContent: 'center',
-                  animation: 'pulse 2s infinite'
-                }}>
-                  {deleteProgress.progress === 100 ? (
-                    <span style={{ fontSize: '40px' }}>✓</span>
-                  ) : (
-                    <FaTrash style={{ fontSize: '32px', color: 'white' }} />
-                  )}
-                </div>
+                <svg width="30" height="30" viewBox="0 0 24 24" fill="none" stroke="#B45309" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round">
+                  <path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"/>
+                  <line x1="12" y1="9" x2="12" y2="13"/><line x1="12" y1="17" x2="12.01" y2="17"/>
+                </svg>
               </div>
-
-              {/* Message */}
-              <h3 style={{
-                textAlign: 'center',
-                color: '#092C4C',
-                marginBottom: '10px',
-                fontSize: '20px',
-                fontWeight: 'bold'
-              }}>
-                {deleteProgress.progress === 100 ? 'Deletion Complete!' : 'Deleting Schedules...'}
+        
+              <h3 style={{ margin: '0 0 8px', fontSize: 17, fontWeight: 700, color: 'var(--text-primary)', textAlign: 'center' }}>
+                Delete All Schedules?
               </h3>
-
-              <p style={{
-                textAlign: 'center',
-                color: '#666',
-                marginBottom: '25px',
-                fontSize: '14px'
-              }}>
-                {deleteProgress.message}
+              <p style={{ margin: '0 0 24px', fontSize: 13, color: 'var(--text-secondary)', textAlign: 'center', lineHeight: 1.6 }}>
+                You are about to delete <strong>all schedules</strong> for{' '}
+                <strong style={{ color: 'var(--text-primary)' }}>{schedulerCollegeName}</strong>.
+                This action cannot be undone.
               </p>
-
-              {/* Progress Bar */}
-              <div style={{
-                width: '100%',
-                height: '12px',
-                backgroundColor: '#e5e7eb',
-                borderRadius: '6px',
-                overflow: 'hidden',
-                marginBottom: '15px'
-              }}>
-                <div style={{
-                  width: `${deleteProgress.progress}%`,
-                  height: '100%',
-                  backgroundColor: deleteProgress.progress === 100 ? '#10b981' : '#ef4444',
-                  transition: 'width 0.5s ease',
-                  borderRadius: '6px'
-                }} />
+        
+              <div style={{ display: 'flex', gap: 10, width: '100%' }}>
+                <button
+                  type="button"
+                  onClick={() => setDeleteModal(null)}
+                  style={{
+                    flex: 1, height: 40, border: '1.5px solid var(--border)',
+                    borderRadius: 'var(--radius-md)', background: 'var(--surface)',
+                    color: 'var(--text-secondary)', fontFamily: 'var(--font)',
+                    fontSize: 13, fontWeight: 600, cursor: 'pointer',
+                    transition: 'background 0.15s',
+                  }}
+                  onMouseEnter={e => e.currentTarget.style.background = 'var(--surface-2)'}
+                  onMouseLeave={e => e.currentTarget.style.background = 'var(--surface)'}
+                >
+                  Cancel
+                </button>
+                <button
+                  type="button"
+                  onClick={handleDeleteConfirm1}
+                  style={{
+                    flex: 1, height: 40, border: 'none',
+                    borderRadius: 'var(--radius-md)', background: '#b45309',
+                    color: '#fff', fontFamily: 'var(--font)',
+                    fontSize: 13, fontWeight: 700, cursor: 'pointer',
+                    transition: 'background 0.15s',
+                  }}
+                  onMouseEnter={e => e.currentTarget.style.background = '#92400e'}
+                  onMouseLeave={e => e.currentTarget.style.background = '#b45309'}
+                >
+                  Yes, Continue
+                </button>
               </div>
-
-              {/* Percentage */}
-              <p style={{
-                textAlign: 'center',
-                color: '#092C4C',
-                fontWeight: 'bold',
-                fontSize: '16px'
-              }}>
-                {deleteProgress.progress}%
-              </p>
-
-              {/* Warning Text */}
-              {deleteProgress.progress < 100 && (
-                <p style={{
-                  textAlign: 'center',
-                  color: '#ef4444',
-                  fontSize: '12px',
-                  marginTop: '20px',
-                  fontWeight: '500'
-                }}>
-                  ⚠️ Please do not close this window
-                </p>
-              )}
             </div>
           </div>
+        )}
+        
+        {/* ── Step-2 Final Confirmation Modal ── */}
+        {deleteModal?.step === 'confirm2' && (
+          <Step2Modal
+            schedulerCollegeName={schedulerCollegeName}
+            loading={deleteModal.loading}
+            onCancel={() => setDeleteModal(null)}
+            onConfirm={handleDeleteConfirm2}
+          />
         )}
 
       <ToastContainer position="top-right" autoClose={1500} />
