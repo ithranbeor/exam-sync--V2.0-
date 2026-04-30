@@ -4,7 +4,16 @@ import '../styles/B_BayanihanModality.css';
 import { ToastContainer, toast } from 'react-toastify';
 import 'react-toastify/dist/ReactToastify.css';
 import Select from 'react-select';
-import { FaPlus, FaPenAlt, FaSearch, FaEdit, FaSave, FaTimes } from 'react-icons/fa';
+import {FaSearch, FaEdit, FaSave, FaTimes } from 'react-icons/fa';
+
+interface BayanihanLeaderStatus {
+  user_id: number;
+  full_name: string;
+  department_id: string;
+  college_id: string;
+  submitted_count: number;
+  modalities: any[];
+}
 
 interface UserProps {
   user: {
@@ -14,6 +23,7 @@ interface UserProps {
     last_name?: string;
     avatar_url?: string;
   } | null;
+  isScheduler?: boolean;
 }
 
 const modalityRoomTypeMap: { [key: string]: string } = {
@@ -69,10 +79,26 @@ const BayanihanModality: React.FC<UserProps> = ({ user }) => {
   const [selectedForDelete, setSelectedForDelete] = useState<number[]>([]);
   const [isDeleting, setIsDeleting] = useState(false);
 
+  const [bayanihanLeaderStatuses, setBayanihanLeaderStatuses] = useState<BayanihanLeaderStatus[]>([]);
+  const [leadersByDepartment, setLeadersByDepartment] = useState<{ [deptId: string]: { dept_name: string; leaders: BayanihanLeaderStatus[] } }>({});
+  const [loadingLeaders, setLoadingLeaders] = useState(false);
+  const [activeTab, setActiveTab] = useState<'submit' | 'manage'>('submit');
+  const [expandedLeaders, setExpandedLeaders] = useState<Set<number>>(new Set());
+  const [showSubmitConfirm, setShowSubmitConfirm] = useState(false);
+
   // ── Manage modal state ────────────────────────────────────────────────────
   const [manageSearch, setManageSearch] = useState('');
   const [editingModality, setEditingModality] = useState<EditingModality | null>(null);
   const [isSavingEdit, setIsSavingEdit] = useState(false);
+
+  const toggleLeader = (userId: number) => {
+    setExpandedLeaders(prev => {
+      if (prev.has(userId)) {
+        return new Set<number>();
+      }
+      return new Set<number>([userId]);
+    });
+  };
 
   const fetchUserModalities = useCallback(async () => {
     if (!user?.user_id) return;
@@ -87,6 +113,201 @@ const BayanihanModality: React.FC<UserProps> = ({ user }) => {
   useEffect(() => {
     fetchUserModalities();
   }, [fetchUserModalities]);
+
+  const fetchBayanihanLeaderStatuses = useCallback(async (
+    schedulerCollegeIds: string[],
+    allDepartments: any[]
+  ) => {
+    setLoadingLeaders(true);
+    try {
+      // Get departments under the scheduler's college(s)
+      const deptIdsInCollege = allDepartments
+        .filter((d: any) => schedulerCollegeIds.includes(String(d.college_id || d.college || '')))
+        .map((d: any) => ({
+          department_id: String(d.department_id),
+          department_name: String(d.department_name || d.department_id),
+          college_id: String(d.college_id || d.college || ''),
+        }));
+
+      console.log('[BL] Depts in scheduler college:', deptIdsInCollege);
+
+      // Fetch ALL user roles without filter to see actual structure
+      const { data: allUserRoles } = await api.get('/tbl_user_role');
+      console.log('[BL] First role entry keys:', allUserRoles?.[0] ? Object.keys(allUserRoles[0]) : 'empty');
+      console.log('[BL] First 3 roles:', JSON.stringify(allUserRoles?.slice(0, 3)));
+
+      // Find all unique user_ids that have bayanihan leader role
+      // Try multiple field name patterns since we don't know the exact structure
+      const blUserRoles = (allUserRoles || []).filter((r: any) => {
+        const roleName = String(r.role_name || r.role?.role_name || r.role?.name || '').toLowerCase();
+        const roleId = r.role_id || r.role?.role_id || r.role?.id || r.role;
+        return roleName.includes('bayanihan') || roleId === 4;
+      });
+
+      console.log('[BL] BL role entries found:', blUserRoles.length);
+      if (blUserRoles.length > 0) {
+        console.log('[BL] Sample BL role entry:', JSON.stringify(blUserRoles[0]));
+      }
+
+      // Get unique user IDs from BL roles
+      const blUserIds = Array.from(new Set(
+        blUserRoles.map((r: any) => r.user_id || r.user?.user_id || r.user).filter(Boolean)
+      ));
+      console.log('[BL] BL user IDs:', blUserIds);
+
+      if (blUserIds.length === 0) {
+        // Fallback: fetch all users and check their roles individually
+        // using the /user-roles/{id}/roles/ endpoint which we know works
+        console.log('[BL] No BL users found via tbl_user_role, trying users list...');
+        const { data: allUsers } = await api.get('/users/');
+        console.log('[BL] Total users:', allUsers?.length);
+
+        const blUsersFromRoles: any[] = [];
+        // Check first 50 users to find BL ones (limit to avoid too many requests)
+        const usersToCheck = (allUsers || []).slice(0, 50);
+        await Promise.all(
+          usersToCheck.map(async (u: any) => {
+            try {
+              const { data: userRoles } = await api.get(`/user-roles/${u.user_id}/roles/`);
+              const hasBL = userRoles.some((r: any) =>
+                r.status?.toLowerCase() === 'active' &&
+                String(r.role_name || '').toLowerCase().includes('bayanihan')
+              );
+              if (hasBL) {
+                const blRole = userRoles.find((r: any) =>
+                  String(r.role_name || '').toLowerCase().includes('bayanihan')
+                );
+                blUsersFromRoles.push({ user: u, role: blRole });
+              }
+            } catch { /* skip */ }
+          })
+        );
+        console.log('[BL] BL users found via roles endpoint:', blUsersFromRoles.length);
+
+        // Filter by college/department match
+        const matched = blUsersFromRoles.filter(({ role }) => {
+          const roleCollegeId = String(role?.college?.college_id || role?.college_id || '');
+          const roleDeptId = String(role?.department?.department_id || role?.department_id || '');
+          const collegeMatch = schedulerCollegeIds.includes(roleCollegeId);
+          const deptMatch = deptIdsInCollege.some(d => d.department_id === roleDeptId);
+          return collegeMatch || deptMatch;
+        });
+
+        const leaderStatuses: BayanihanLeaderStatus[] = await Promise.all(
+          matched.map(async ({ user: u, role }) => {
+            const { data: modalities } = await api.get('/tbl_modality/', { params: { user_id: u.user_id } });
+            return {
+              user_id: u.user_id,
+              full_name: `${u.first_name ?? ''} ${u.middle_name ?? ''} ${u.last_name ?? ''}`.trim(),
+              department_id: String(role?.department?.department_id || role?.department_id || ''),
+              college_id: String(role?.college?.college_id || role?.college_id || ''),
+              submitted_count: Array.isArray(modalities) ? modalities.length : 0,
+              modalities: Array.isArray(modalities) ? modalities : [],
+            };
+          })
+        );
+
+        setBayanihanLeaderStatuses(leaderStatuses);
+
+        // Organize by department
+        const organized: { [deptId: string]: { dept_name: string; leaders: BayanihanLeaderStatus[] } } = {};
+        deptIdsInCollege.forEach(dept => {
+          organized[dept.department_id] = { dept_name: dept.department_name, leaders: [] };
+        });
+        // Add a catch-all for college-level BLs with no specific dept
+        leaderStatuses.forEach(l => {
+          const deptId = l.department_id || 'college-level';
+          if (!organized[deptId]) {
+            organized[deptId] = {
+              dept_name: deptId === 'college-level' ? 'College Level' : deptId,
+              leaders: []
+            };
+          }
+          organized[deptId].leaders.push(l);
+        });
+        setLeadersByDepartment(organized);
+        setLoadingLeaders(false);
+        return;
+      }
+
+      // Normal path: we found BL users from tbl_user_role
+      // Now fetch their details and filter by college/department
+      const leaderDetails = await Promise.all(
+        blUserIds.map(async (userId: any) => {
+          try {
+            // Get this user's roles using the known-working endpoint
+            const [{ data: userData }, { data: userRoles }, { data: modalities }] = await Promise.all([
+              api.get(`/users/${userId}/`),
+              api.get(`/user-roles/${userId}/roles/`),
+              api.get('/tbl_modality/', { params: { user_id: userId } }),
+            ]);
+
+            // Find their BL role to get college/dept
+            const blRole = (userRoles || []).find((r: any) =>
+              String(r.role_name || '').toLowerCase().includes('bayanihan') &&
+              r.status?.toLowerCase() === 'active'
+            );
+
+            if (!blRole) return null;
+
+            const roleCollegeId = String(blRole.college?.college_id || blRole.college_id || '');
+            const roleDeptId = String(blRole.department?.department_id || blRole.department_id || '');
+
+            console.log(`[BL] User ${userId} - college: ${roleCollegeId}, dept: ${roleDeptId}`);
+
+            // Check if this BL is under the scheduler's college or department
+            const collegeMatch = schedulerCollegeIds.includes(roleCollegeId);
+            const deptMatch = deptIdsInCollege.some(d => d.department_id === roleDeptId);
+
+            if (!collegeMatch && !deptMatch) {
+              console.log(`[BL] User ${userId} not in scheduler's scope, skipping`);
+              return null;
+            }
+
+            return {
+              user_id: userId,
+              full_name: `${userData.first_name ?? ''} ${userData.middle_name ?? ''} ${userData.last_name ?? ''}`.trim(),
+              department_id: roleDeptId,
+              college_id: roleCollegeId,
+              submitted_count: Array.isArray(modalities) ? modalities.length : 0,
+              modalities: Array.isArray(modalities) ? modalities : [],
+            } as BayanihanLeaderStatus;
+          } catch (err) {
+            console.error(`[BL] Error for user ${userId}:`, err);
+            return null;
+          }
+        })
+      );
+
+      const valid = leaderDetails.filter(Boolean) as BayanihanLeaderStatus[];
+      console.log('[BL] Final valid leaders:', valid.map(l => `${l.full_name} (dept:${l.department_id})`));
+
+      setBayanihanLeaderStatuses(valid);
+
+      // Organize by department
+      const organized: { [deptId: string]: { dept_name: string; leaders: BayanihanLeaderStatus[] } } = {};
+      deptIdsInCollege.forEach(dept => {
+        organized[dept.department_id] = { dept_name: dept.department_name, leaders: [] };
+      });
+      valid.forEach(l => {
+        const deptId = l.department_id || 'college-level';
+        if (!organized[deptId]) {
+          organized[deptId] = {
+            dept_name: deptId === 'college-level' ? 'College Level' : deptId,
+            leaders: []
+          };
+        }
+        organized[deptId].leaders.push(l);
+      });
+      setLeadersByDepartment(organized);
+
+    } catch (err) {
+      console.error('[BL] Top-level error:', err);
+      toast.error('Failed to load Bayanihan Leaders');
+    } finally {
+      setLoadingLeaders(false);
+    }
+  }, []);
 
   // ── Delete handlers ───────────────────────────────────────────────────────
   const handleDeleteSelected = () => {
@@ -285,12 +506,95 @@ const BayanihanModality: React.FC<UserProps> = ({ user }) => {
 
         if (!roles || roles.length === 0) { setLoadingRooms(false); return; }
 
-        const isAdmin = roles.some((r: any) => r.role === 2 || r.role_id === 2);
+        // Use stored user roles for accurate role name detection
+        const storedUser = JSON.parse(
+          localStorage.getItem('user') || sessionStorage.getItem('user') || '{}'
+        );
+        const storedRoles: any[] = storedUser.roles || [];
+        const activeRoleNames = storedRoles
+          .filter((r: any) => r.status?.toLowerCase() === 'active')
+          .map((r: any) => String(r.role_name || '').toLowerCase());
 
+        const isAdmin = activeRoleNames.includes('admin');
+        const isScheduler = activeRoleNames.includes('scheduler');
+
+        console.log('[fetchData] activeRoleNames:', activeRoleNames);
+        console.log('[fetchData] isAdmin:', isAdmin, '| isScheduler:', isScheduler);
+
+        // ── SCHEDULER PATH (runs even if also admin) ────────────────────────
+        if (isScheduler) {
+          const collegeIds: string[] = Array.from(new Set(
+            storedRoles
+              .filter((r: any) => r.role_name?.toLowerCase() === 'scheduler' && r.status?.toLowerCase() === 'active')
+              .map((r: any) => r.college?.college_id)
+              .filter(Boolean)
+              .map(String)
+          )) as string[];
+
+          console.log('[Scheduler] collegeIds:', collegeIds);
+
+          if (collegeIds.length === 0) {
+            toast.warn('No college assigned to your Scheduler role.');
+            setLoadingRooms(false);
+            return;
+          }
+
+          // Admin-scheduler sees all programs/courses/sections; pure scheduler sees only their college
+          const programs = isAdmin
+            ? allPrograms
+            : allPrograms.filter((p: any) =>
+                collegeIds.includes(String(p.college_id || p.college || ''))
+              );
+          setProgramOptions(programs);
+
+          const programIds = programs.map((p: any) => String(p.program_id));
+          const normalizedSections = (Array.isArray(sectionCourses) ? sectionCourses : []).map((sc: any) => ({
+            course_id: String(sc.course_id ?? sc.course?.course_id ?? ''),
+            program_id: String(sc.program_id ?? sc.program?.program_id ?? ''),
+            section_name: String(sc.section_name ?? ''),
+            number_of_students: Number(sc.number_of_students ?? 0),
+          }));
+          const filteredSections = isAdmin
+            ? normalizedSections
+            : normalizedSections.filter(s => programIds.includes(s.program_id));
+          setSectionOptions(filteredSections);
+
+          const courseIdsForScheduler = Array.from(new Set(filteredSections.map(s => s.course_id)));
+          const filteredCourses = isAdmin
+            ? allCourses
+            : allCourses.filter((c: any) => courseIdsForScheduler.includes(String(c.course_id)));
+          setCourseOptions(filteredCourses);
+
+          const { data: allRooms } = await api.get('/tbl_rooms');
+          if (isAdmin) {
+            setRoomOptions(allRooms);
+            setAvailableRoomIds(allRooms.map((r: any) => r.room_id));
+          } else {
+            const availableRoomsResponses = await Promise.all(
+              collegeIds.map(cId => api.get('/tbl_available_rooms/', { params: { college_id: cId } }))
+            );
+            const allAvailableRooms = availableRoomsResponses.flatMap(r => r.data);
+            const availableIds = allAvailableRooms
+              .map((ar: any) => ar.room?.room_id || ar.room_id || ar.room)
+              .filter(Boolean)
+              .map(String);
+            setAvailableRoomIds(availableIds);
+            setRoomOptions(allRooms.filter((r: any) => availableIds.includes(String(r.room_id))));
+          }
+
+          setBuildingOptions(buildings?.map((b: any) => ({ id: b.building_id, name: b.building_name })) ?? []);
+
+          // Always fetch BL statuses scoped to scheduler's college
+          fetchBayanihanLeaderStatuses(collegeIds, allDepartments);
+          setLoadingRooms(false);
+          return;
+        }
+
+        // ── ADMIN-ONLY PATH (no scheduler role) ──────────────────────────────
         if (isAdmin) {
           setProgramOptions(allPrograms);
           setCourseOptions(allCourses);
-          const allSections = sectionCourses.map((sc: any) => ({
+          const allSections = (Array.isArray(sectionCourses) ? sectionCourses : []).map((sc: any) => ({
             course_id: String(sc.course_id ?? sc.course?.course_id ?? ''),
             program_id: String(sc.program_id ?? sc.program?.program_id ?? ''),
             section_name: String(sc.section_name ?? ''),
@@ -305,6 +609,7 @@ const BayanihanModality: React.FC<UserProps> = ({ user }) => {
           return;
         }
 
+        // ── BAYANIHAN LEADER PATH ────────────────────────────────────────────
         const leaderRoles = roles.filter((r: any) => r.role === 4 || r.role_id === 4);
         if (!leaderRoles || leaderRoles.length === 0) {
           toast.warn('You are not assigned as a Bayanihan Leader.');
@@ -397,7 +702,7 @@ const BayanihanModality: React.FC<UserProps> = ({ user }) => {
       }
     };
     fetchData();
-  }, [user]);
+  }, [user, fetchBayanihanLeaderStatuses]);
 
   useEffect(() => {
     const requiredRoomType = modalityRoomTypeMap[form.modality];
@@ -533,6 +838,61 @@ const BayanihanModality: React.FC<UserProps> = ({ user }) => {
     });
 
     if (successCount > 0) toast.success(`Successfully saved ${successCount} modality group(s)`);
+    if (successCount > 0) {
+      try {
+        const storedUser = JSON.parse(
+          localStorage.getItem('user') || sessionStorage.getItem('user') || '{}'
+        );
+        const myRoles: any[] = storedUser.roles || [];
+        const blRole = myRoles.find((r: any) =>
+          String(r.role_name || '').toLowerCase().includes('bayanihan') &&
+          r.status?.toLowerCase() === 'active'
+        );
+        const myCollegeId = blRole?.college?.college_id
+          ? String(blRole.college.college_id)
+          : null;
+
+        const senderFullName = [user?.first_name, user?.last_name].filter(Boolean).join(' ') || 'A Bayanihan Leader';
+
+        const { data: allUsers } = await api.get('/users/');
+        const schedulerUserIds: number[] = [];
+
+        await Promise.all(
+          (allUsers || []).map(async (u: any) => {
+            try {
+              const { data: uRoles } = await api.get(`/user-roles/${u.user_id}/roles/`);
+              const isMatch = (uRoles || []).some((r: any) => {
+                const roleName = String(r.role_name || '').toLowerCase();
+                const roleCollege = String(r.college?.college_id || r.college_id || '');
+                return (
+                  roleName === 'scheduler' &&
+                  r.status?.toLowerCase() === 'active' &&
+                  (!myCollegeId || roleCollege === myCollegeId)
+                );
+              });
+              if (isMatch) schedulerUserIds.push(u.user_id);
+            } catch { /* skip */ }
+          })
+        );
+
+        await Promise.all(
+          schedulerUserIds.map((schedulerId: number) =>
+            api.post('/notifications/create/', {
+              user_id:    schedulerId,
+              sender_id:  user?.user_id,
+              title:      'New Modality Submitted',
+              message:    `${senderFullName} has submitted ${successCount} modality group(s). Please review their submission.`,
+              type:       'availability_set',
+              is_seen:    false,
+              priority:   1,
+              created_at: new Date().toISOString(),
+            }).catch(() => {})
+          )
+        );
+      } catch (err) {
+        console.error('Failed to notify schedulers:', err);
+      }
+    }
     if (skippedCount > 0) toast.info(`Skipped ${skippedCount} group(s) (already submitted)`);
     if (errorCount > 0) toast.error(`Failed to save ${errorCount} group(s)`);
     setIsSubmitting(false);
@@ -626,17 +986,18 @@ const BayanihanModality: React.FC<UserProps> = ({ user }) => {
             </svg>
           </div>
           <div className="bm-page-title">
-            <h1>Modality Submission</h1>
+            <h1>Modality</h1>
             <p>Fill in all fields before submitting</p>
           </div>
         </div>
         <div className="bm-page-actions">
-          <button type="button" className="bm-btn danger" onClick={() => { setShowDeleteConfirm(true); setManageSearch(''); setEditingModality(null); setSelectedForDelete([]); }}>
-            <FaPenAlt style={{ fontSize: '12px' }} />
+          <button type="button" className="bm-btn primary" onClick={() => { setShowDeleteConfirm(true); setManageSearch(''); setEditingModality(null); setSelectedForDelete([]); }}>
             Manage Modalities
           </button>
-          <button type="button" className="bm-btn primary" onClick={handleSubmit as any} disabled={isSubmitting || calculateRoomAssignments.length === 0}>
-            <FaPlus style={{ fontSize: '12px' }} />
+          <button type="button" className="bm-btn primary" onClick={() => {
+            if (calculateRoomAssignments.length === 0) return;
+            setShowSubmitConfirm(true);
+          }} disabled={isSubmitting || calculateRoomAssignments.length === 0}>
             {isSubmitting ? 'Submitting…' : 'Submit Modality'}
           </button>
         </div>
@@ -834,192 +1195,385 @@ const BayanihanModality: React.FC<UserProps> = ({ user }) => {
           <div className="bm-modal bm-manage-modal" onClick={e => e.stopPropagation()}>
             <div className="bm-modal-header">
               <h3>Manage Modalities</h3>
-              <p>{userModalities.length} modality/modalities on record</p>
+              <p>
+                {bayanihanLeaderStatuses.length > 0
+                  ? `${userModalities.length} of your modalities · ${bayanihanLeaderStatuses.length} Bayanihan Leader(s)`
+                  : `${userModalities.length} modality/modalities on record`}
+              </p>
             </div>
 
             <div className="bm-modal-body" style={{ paddingTop: '12px' }}>
 
-              {/* Search bar */}
-              <div className="bm-manage-search">
-                <FaSearch className="bm-manage-search-icon" />
-                <input
-                  type="text"
-                  className="bm-manage-search-input"
-                  placeholder="Search by course, program, modality, section…"
-                  value={manageSearch}
-                  onChange={e => setManageSearch(e.target.value)}
-                />
-                {manageSearch && (
-                  <button className="bm-manage-search-clear" onClick={() => setManageSearch('')} type="button">✕</button>
-                )}
-              </div>
+              {/* Scheduler tabs */}
+              {bayanihanLeaderStatuses.length > 0 && (
+                <div style={{ display: 'flex', gap: '8px', marginBottom: '14px' }}>
+                  <button
+                    type="button"
+                    className={`notif-filter-tab ${activeTab === 'submit' ? 'active' : ''}`}
+                    onClick={() => setActiveTab('submit')}
+                    style={{ padding: '6px 16px', borderRadius: '6px', border: '1px solid var(--bm-border)', background: activeTab === 'submit' ? '#092c4c' : '#0d4993', color: activeTab === 'submit' ? '#fff' : 'inherit', cursor: 'pointer', fontSize: '13px' }}
+                  >
+                    My Modalities ({userModalities.length})
+                  </button>
+                  <button
+                    type="button"
+                    className={`notif-filter-tab ${activeTab === 'manage' ? 'active' : ''}`}
+                    onClick={() => setActiveTab('manage')}
+                    style={{ padding: '6px 16px', borderRadius: '6px', border: '1px solid var(--bm-border)', background: activeTab === 'manage' ? '#092c4c' : '#0d4993', color: activeTab === 'manage' ? '#fff' : 'inherit', cursor: 'pointer', fontSize: '13px' }}
+                  >
+                    All Bayanihan Leaders ({bayanihanLeaderStatuses.length})
+                  </button>
+                </div>
+              )}
 
-              {userModalities.length === 0 ? (
-                <div className="bm-grid-empty">You haven't created any modalities yet.</div>
-              ) : filteredModalities.length === 0 ? (
-                <div className="bm-grid-empty">No results for "{manageSearch}"</div>
-              ) : (
-                <>
-                  <div className="bm-delete-controls">
-                    <label className="bm-select-all-label">
-                      <input type="checkbox" checked={allVisibleSelected} onChange={toggleSelectAll} />
-                      <strong>Select All ({filteredModalities.length})</strong>
-                    </label>
-                    <span className="bm-hint">{selectedForDelete.length} selected</span>
-                  </div>
-
-                  <div className="bm-modality-list">
-                    {filteredModalities.map(modality => {
-                      const course = courseOptions.find(c => c.course_id === modality.course_id);
-                      const program = programOptions.find(p => p.program_id === modality.program_id);
-                      const isSelected = selectedForDelete.includes(modality.modality_id);
-                      const isEditing = editingModality?.modality_id === modality.modality_id;
-
-                      if (isEditing && editingModality) {
-                        // ── Inline Edit Form ──────────────────────────────
-                        return (
-                          <div key={modality.modality_id} className="bm-modality-row bm-modality-row--editing">
-                            <div className="bm-edit-form">
-                              <div className="bm-edit-form-header">
-                                <span className="bm-edit-label">Editing Modality #{modality.modality_id}</span>
-                                <button type="button" className="bm-edit-cancel-x" onClick={cancelEditing} title="Cancel"><FaTimes /></button>
-                              </div>
-
-                              <div className="bm-edit-grid">
-                                {/* Modality Type */}
-                                <div className="bm-edit-field">
-                                  <label>Modality Type</label>
-                                  <Select
-                                    options={[{ value: 'Hands-on (Laboratory)', label: 'Hands-on (Laboratory)' }, { value: 'Written (Lecture)', label: 'Written (Lecture)' }, { value: 'Written (Laboratory)', label: 'Written (Laboratory)' }]}
-                                    value={{ value: editingModality.modality_type, label: editingModality.modality_type }}
-                                    onChange={s => {
-                                      const newType = s?.value || '';
-                                      const newRoomType = modalityRoomTypeMap[newType] || '';
-                                      setEditingModality(prev => prev ? { ...prev, modality_type: newType, room_type: newRoomType } : prev);
-                                    }}
-                                    menuPortalTarget={document.body}
-                                    styles={{ ...selectStyles, menuPortal: (base: any) => ({ ...base, zIndex: 999999 }) }}
-                                  />
-                                </div>
-
-                                {/* Room Type (auto-filled, read-only) */}
-                                <div className="bm-edit-field">
-                                  <label>Room Type</label>
-                                  <input
-                                    type="text"
-                                    className="bm-edit-input bm-edit-input--readonly"
-                                    value={editingModality.room_type}
-                                    readOnly
-                                  />
-                                </div>
-
-                                {/* Sections */}
-                                <div className="bm-edit-field bm-edit-full-width">
-                                  <label>Sections</label>
-                                  <Select
-                                    isMulti
-                                    closeMenuOnSelect={false}
-                                    options={editSectionOptions}
-                                    value={editingModality.sections.map(s => ({ value: s, label: s }))}
-                                    onChange={opts => setEditingModality(prev => prev ? { ...prev, sections: opts ? opts.map(o => o.value) : [] } : prev)}
-                                    menuPortalTarget={document.body}
-                                    styles={{ ...selectStyles, menuPortal: (base: any) => ({ ...base, zIndex: 999999 }), multiValue: (base: any) => ({ ...base, backgroundColor: '#0d4993', borderRadius: '6px' }), multiValueLabel: (base: any) => ({ ...base, color: '#fff', fontWeight: 600, fontSize: '11px' }) }}
-                                  />
-                                </div>
-
-                                {/* Rooms */}
-                                <div className="bm-edit-field bm-edit-full-width">
-                                  <label>Rooms</label>
-                                  <Select
-                                    isMulti
-                                    options={editRoomOptions.map(r => ({ value: r.room_id, label: `${r.room_id} (Cap: ${r.room_capacity})` }))}
-                                    value={editingModality.possible_rooms.map(r => ({ value: r, label: r }))}
-                                    onChange={opts => setEditingModality(prev => prev ? { ...prev, possible_rooms: opts ? opts.map(o => o.value) : [] } : prev)}
-                                    menuPortalTarget={document.body}
-                                    styles={{ ...selectStyles, menuPortal: (base: any) => ({ ...base, zIndex: 999999 }), multiValue: (base: any) => ({ ...base, backgroundColor: '#0d4993', borderRadius: '6px' }), multiValueLabel: (base: any) => ({ ...base, color: '#fff', fontWeight: 600, fontSize: '11px' }) }}
-                                    placeholder="Select rooms…"
-                                  />
-                                </div>
-
-                                {/* Remarks */}
-                                <div className="bm-edit-field bm-edit-full-width">
-                                  <label>Remarks</label>
-                                  <textarea
-                                    className="bm-edit-textarea"
-                                    value={editingModality.modality_remarks}
-                                    onChange={e => setEditingModality(prev => prev ? { ...prev, modality_remarks: e.target.value } : prev)}
-                                    placeholder="Optional remarks…"
-                                    rows={2}
-                                  />
-                                </div>
-                              </div>
-
-                              <div className="bm-edit-actions">
-                                <button type="button" className="bm-btn" onClick={cancelEditing} disabled={isSavingEdit}>
-                                  <FaTimes style={{ fontSize: '11px' }} /> Cancel
-                                </button>
-                                <button type="button" className="bm-btn primary" onClick={saveEditing} disabled={isSavingEdit}>
-                                  <FaSave style={{ fontSize: '11px' }} />
-                                  {isSavingEdit ? 'Saving…' : 'Save Changes'}
-                                </button>
-                              </div>
-                            </div>
+              {/* ── TAB: Bayanihan Leaders ── */}
+              {activeTab === 'manage' && bayanihanLeaderStatuses.length > 0 ? (
+                loadingLeaders ? (
+                  <div className="notif-loading"><div className="notif-spinner" /> Loading leaders…</div>
+                ) : (
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: '14px' }}>
+                    {Object.entries(leadersByDepartment).map(([deptId, { dept_name, leaders }]) => (
+                      <div key={deptId} style={{ borderRadius: '8px', overflow: 'hidden', border: '1px solid var(--bm-border)' }}>
+                        {/* Department Header */}
+                        <div style={{ padding: '12px 14px', background: 'var(--bm-brand)', borderBottom: '1px solid var(--bm-border)' }}>
+                          <div style={{ fontWeight: 700, fontSize: '14px', color: '#ffffff' }}>
+                            {dept_name} <span style={{ opacity: 0.7, fontSize: '12px' }}>({deptId})</span>
                           </div>
-                        );
-                      }
-
-                      // ── Normal Row ────────────────────────────────────────
-                      return (
-                        <div
-                          key={modality.modality_id}
-                          className={`bm-modality-row${isSelected ? ' selected' : ''}`}
-                          onClick={() => toggleSelectModality(modality.modality_id)}
-                        >
-                          <input
-                            type="checkbox"
-                            checked={isSelected}
-                            onChange={() => toggleSelectModality(modality.modality_id)}
-                            onClick={e => e.stopPropagation()}
-                            style={{ flexShrink: 0, marginTop: '2px' }}
-                          />
-                          <div className="bm-modality-info">
-                            <div className="bm-modality-title">
-                              <span className="bm-type-badge">{modality.modality_type}</span>
-                              <span className="bm-type-badge lab">{modality.room_type}</span>
-                            </div>
-                            <div className="bm-modality-meta">
-                              <span><strong>Course:</strong> {course?.course_id ?? 'N/A'} – {course?.course_name ?? 'Unknown'}</span>
-                              <span><strong>Program:</strong> {program?.program_id ?? 'N/A'} – {program?.program_name ?? 'Unknown'}</span>
-                              <span><strong>Sections:</strong> {Array.isArray(modality.sections) ? modality.sections.join(', ') : modality.sections}</span>
-                              {modality.possible_rooms?.length > 0 && <span><strong>Rooms:</strong> {modality.possible_rooms.join(', ')}</span>}
-                              {modality.modality_remarks && <span><strong>Remarks:</strong> {modality.modality_remarks}</span>}
-                            </div>
+                          <div style={{ fontSize: '12px', color: 'rgba(255,255,255,0.65)', marginTop: '2px' }}>
+                            {leaders.length} leader(s)
                           </div>
-                          <button
-                            type="button"
-                            className="bm-btn bm-edit-btn"
-                            onClick={e => { e.stopPropagation(); startEditing(modality); }}
-                            title="Edit this modality"
-                          >
-                            <FaEdit style={{ fontSize: '12px' }} />
-                            Edit
-                          </button>
                         </div>
-                      );
-                    })}
+
+                        {/* Leaders */}
+                        <div style={{ display: 'flex', flexDirection: 'column', gap: '0', background: 'var(--bm-surface)' }}>
+                          {leaders.length > 0 ? (
+                            leaders.map((leader, idx) => {
+                              const isExpanded = expandedLeaders.has(leader.user_id);
+                              return (
+                                <div
+                                  key={leader.user_id}
+                                  style={{ borderTop: idx > 0 ? '1px solid var(--bm-border)' : 'none' }}
+                                >
+                                  {/* Leader Row — clickable header */}
+                                  <div
+                                    onClick={() => toggleLeader(leader.user_id)}
+                                    style={{
+                                      display: 'flex',
+                                      justifyContent: 'space-between',
+                                      alignItems: 'center',
+                                      padding: '12px 14px',
+                                      cursor: 'pointer',
+                                      background: isExpanded ? 'var(--bm-accent-soft)' : 'var(--bm-surface)',
+                                      transition: 'background 0.15s',
+                                      userSelect: 'none',
+                                    }}
+                                  >
+                                    <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+                                      <div style={{
+                                        width: '36px', height: '36px', borderRadius: '50%',
+                                        background: 'var(--bm-brand)', display: 'flex',
+                                        alignItems: 'center', justifyContent: 'center',
+                                        color: '#fff', fontWeight: 700, fontSize: '13px', flexShrink: 0,
+                                      }}>
+                                        {leader.full_name.split(' ').slice(0, 2).map(n => n[0]?.toUpperCase()).join('')}
+                                      </div>
+                                      <div>
+                                        <div style={{ fontWeight: 600, fontSize: '13.5px', color: 'var(--bm-text-primary)' }}>
+                                          {leader.full_name}
+                                        </div>
+                                        <div style={{ fontSize: '12px', color: 'var(--bm-text-muted)' }}>
+                                          ID: {leader.user_id}
+                                        </div>
+                                      </div>
+                                    </div>
+
+                                    <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+                                      <span style={{
+                                        padding: '3px 10px', borderRadius: '999px', fontSize: '12px', fontWeight: 600,
+                                        background: leader.submitted_count > 0 ? '#d1fae5' : '#fef3c7',
+                                        color: leader.submitted_count > 0 ? '#065f46' : '#92400e',
+                                        border: `1px solid ${leader.submitted_count > 0 ? '#6ee7b7' : '#fcd34d'}`,
+                                        whiteSpace: 'nowrap',
+                                      }}>
+                                        {leader.submitted_count > 0 ? `${leader.submitted_count} submitted` : 'No submission'}
+                                      </span>
+                                      {/* Chevron */}
+                                      <svg
+                                        width="16" height="16" viewBox="0 0 24 24" fill="none"
+                                        stroke="var(--bm-text-muted)" strokeWidth="2.5"
+                                        strokeLinecap="round" strokeLinejoin="round"
+                                        style={{ transition: 'transform 0.2s', transform: isExpanded ? 'rotate(180deg)' : 'rotate(0deg)', flexShrink: 0 }}
+                                      >
+                                        <polyline points="6 9 12 15 18 9" />
+                                      </svg>
+                                    </div>
+                                  </div>
+
+                                  {/* Expanded Modalities */}
+                                  {isExpanded && (
+                                    <div style={{ padding: '0 14px 14px 14px', background: 'var(--bm-surface-2)', borderTop: '1px solid var(--bm-border)' }}>
+                                      {leader.modalities.length === 0 ? (
+                                        <div style={{ padding: '16px 0', textAlign: 'center', color: 'var(--bm-text-muted)', fontSize: '13px' }}>
+                                          No modalities submitted yet.
+                                        </div>
+                                      ) : (
+                                        <div style={{ display: 'flex', flexDirection: 'column', gap: '8px', paddingTop: '12px' }}>
+                                          {leader.modalities.map((modality: any) => {
+                                            const course = courseOptions.find(c => c.course_id === modality.course_id);
+                                            const program = programOptions.find(p => p.program_id === modality.program_id);
+                                            const isEditing = editingModality?.modality_id === modality.modality_id;
+
+                                            if (isEditing && editingModality) {
+                                              return (
+                                                <div key={modality.modality_id} className="bm-modality-row bm-modality-row--editing">
+                                                  <div className="bm-edit-form">
+                                                    <div className="bm-edit-form-header">
+                                                      <span className="bm-edit-label">Editing Modality #{modality.modality_id}</span>
+                                                      <button type="button" className="bm-edit-cancel-x" onClick={cancelEditing} title="Cancel"><FaTimes /></button>
+                                                    </div>
+                                                    <div className="bm-edit-grid">
+                                                      <div className="bm-edit-field">
+                                                        <label>Modality Type</label>
+                                                        <Select
+                                                          options={[
+                                                            { value: 'Hands-on (Laboratory)', label: 'Hands-on (Laboratory)' },
+                                                            { value: 'Written (Lecture)', label: 'Written (Lecture)' },
+                                                            { value: 'Written (Laboratory)', label: 'Written (Laboratory)' },
+                                                          ]}
+                                                          value={{ value: editingModality.modality_type, label: editingModality.modality_type }}
+                                                          onChange={s => {
+                                                            const newType = s?.value || '';
+                                                            const newRoomType = modalityRoomTypeMap[newType] || '';
+                                                            setEditingModality(prev => prev ? { ...prev, modality_type: newType, room_type: newRoomType } : prev);
+                                                          }}
+                                                          menuPortalTarget={document.body}
+                                                          styles={{ ...selectStyles, menuPortal: (base: any) => ({ ...base, zIndex: 999999 }) }}
+                                                        />
+                                                      </div>
+                                                      <div className="bm-edit-field">
+                                                        <label>Room Type</label>
+                                                        <input type="text" className="bm-edit-input bm-edit-input--readonly" value={editingModality.room_type} readOnly />
+                                                      </div>
+                                                      <div className="bm-edit-field bm-edit-full-width">
+                                                        <label>Sections</label>
+                                                        <Select
+                                                          isMulti closeMenuOnSelect={false}
+                                                          options={editSectionOptions}
+                                                          value={editingModality.sections.map(s => ({ value: s, label: s }))}
+                                                          onChange={opts => setEditingModality(prev => prev ? { ...prev, sections: opts ? opts.map(o => o.value) : [] } : prev)}
+                                                          menuPortalTarget={document.body}
+                                                          styles={{ ...selectStyles, menuPortal: (base: any) => ({ ...base, zIndex: 999999 }), multiValue: (base: any) => ({ ...base, backgroundColor: '#0d4993', borderRadius: '6px' }), multiValueLabel: (base: any) => ({ ...base, color: '#fff', fontWeight: 600, fontSize: '11px' }) }}
+                                                        />
+                                                      </div>
+                                                      <div className="bm-edit-field bm-edit-full-width">
+                                                        <label>Rooms</label>
+                                                        <Select
+                                                          isMulti
+                                                          options={editRoomOptions.map(r => ({ value: r.room_id, label: `${r.room_id} (Cap: ${r.room_capacity})` }))}
+                                                          value={editingModality.possible_rooms.map(r => ({ value: r, label: r }))}
+                                                          onChange={opts => setEditingModality(prev => prev ? { ...prev, possible_rooms: opts ? opts.map(o => o.value) : [] } : prev)}
+                                                          menuPortalTarget={document.body}
+                                                          styles={{ ...selectStyles, menuPortal: (base: any) => ({ ...base, zIndex: 999999 }), multiValue: (base: any) => ({ ...base, backgroundColor: '#0d4993', borderRadius: '6px' }), multiValueLabel: (base: any) => ({ ...base, color: '#fff', fontWeight: 600, fontSize: '11px' }) }}
+                                                          placeholder="Select rooms…"
+                                                        />
+                                                      </div>
+                                                      <div className="bm-edit-field bm-edit-full-width">
+                                                        <label>Remarks</label>
+                                                        <textarea
+                                                          className="bm-edit-textarea"
+                                                          value={editingModality.modality_remarks}
+                                                          onChange={e => setEditingModality(prev => prev ? { ...prev, modality_remarks: e.target.value } : prev)}
+                                                          placeholder="Optional remarks…"
+                                                          rows={2}
+                                                        />
+                                                      </div>
+                                                    </div>
+                                                    <div className="bm-edit-actions">
+                                                      <button type="button" className="bm-btn" onClick={cancelEditing} disabled={isSavingEdit}><FaTimes style={{ fontSize: '11px' }} /> Cancel</button>
+                                                      <button type="button" className="bm-btn primary" onClick={saveEditing} disabled={isSavingEdit}><FaSave style={{ fontSize: '11px' }} />{isSavingEdit ? 'Saving…' : 'Save Changes'}</button>
+                                                    </div>
+                                                  </div>
+                                                </div>
+                                              );
+                                            }
+
+                                            return (
+                                              <div key={modality.modality_id} className="bm-modality-row" style={{ cursor: 'default', background: 'var(--bm-surface)' }}>
+                                                <div className="bm-modality-info">
+                                                  <div className="bm-modality-title">
+                                                    <span className="bm-type-badge">{modality.modality_type}</span>
+                                                    <span className="bm-type-badge lab">{modality.room_type}</span>
+                                                  </div>
+                                                  <div className="bm-modality-meta">
+                                                    <span><strong>Course:</strong> {course?.course_id ?? 'N/A'} – {course?.course_name ?? 'Unknown'}</span>
+                                                    <span><strong>Program:</strong> {program?.program_id ?? 'N/A'} – {program?.program_name ?? 'Unknown'}</span>
+                                                    <span><strong>Sections:</strong> {Array.isArray(modality.sections) ? modality.sections.join(', ') : modality.sections}</span>
+                                                    {modality.possible_rooms?.length > 0 && <span><strong>Rooms:</strong> {modality.possible_rooms.join(', ')}</span>}
+                                                    {modality.modality_remarks && <span><strong>Remarks:</strong> {modality.modality_remarks}</span>}
+                                                  </div>
+                                                </div>
+                                                <button
+                                                  type="button"
+                                                  className="bm-btn bm-edit-btn"
+                                                  onClick={e => { e.stopPropagation(); startEditing(modality); }}
+                                                  title="Edit this modality"
+                                                >
+                                                  <FaEdit style={{ fontSize: '12px' }} /> Edit
+                                                </button>
+                                              </div>
+                                            );
+                                          })}
+                                        </div>
+                                      )}
+                                    </div>
+                                  )}
+                                </div>
+                              );
+                            })
+                          ) : (
+                            <div style={{ padding: '12px 14px', textAlign: 'center', color: 'var(--bm-text-muted)', fontSize: '13px' }}>
+                              No bayanihan leaders in this department
+                            </div>
+                          )}
+                        </div>
+                      </div>
+                    ))}
                   </div>
+                )
+              ) : (
+                /* ── TAB: My Modalities (original content) ── */
+                <>
+                  <div className="bm-manage-search">
+                    <FaSearch className="bm-manage-search-icon" />
+                    <input type="text" className="bm-manage-search-input" placeholder="Search by course, program, modality, section…" value={manageSearch} onChange={e => setManageSearch(e.target.value)} />
+                    {manageSearch && (<button className="bm-manage-search-clear" onClick={() => setManageSearch('')} type="button">✕</button>)}
+                  </div>
+
+                  {userModalities.length === 0 ? (
+                    <div className="bm-grid-empty">You haven't created any modalities yet.</div>
+                  ) : filteredModalities.length === 0 ? (
+                    <div className="bm-grid-empty">No results for "{manageSearch}"</div>
+                  ) : (
+                    <>
+                      <div className="bm-delete-controls">
+                        <label className="bm-select-all-label">
+                          <input type="checkbox" checked={allVisibleSelected} onChange={toggleSelectAll} />
+                          <strong>Select All ({filteredModalities.length})</strong>
+                        </label>
+                        <span className="bm-hint">{selectedForDelete.length} selected</span>
+                      </div>
+                      <div className="bm-modality-list">
+                        {filteredModalities.map(modality => {
+                          const course = courseOptions.find(c => c.course_id === modality.course_id);
+                          const program = programOptions.find(p => p.program_id === modality.program_id);
+                          const isSelected = selectedForDelete.includes(modality.modality_id);
+                          const isEditing = editingModality?.modality_id === modality.modality_id;
+
+                          if (isEditing && editingModality) {
+                            return (
+                              <div key={modality.modality_id} className="bm-modality-row bm-modality-row--editing">
+                                <div className="bm-edit-form">
+                                  <div className="bm-edit-form-header">
+                                    <span className="bm-edit-label">Editing Modality #{modality.modality_id}</span>
+                                    <button type="button" className="bm-edit-cancel-x" onClick={cancelEditing} title="Cancel"><FaTimes /></button>
+                                  </div>
+                                  <div className="bm-edit-grid">
+                                    <div className="bm-edit-field">
+                                      <label>Modality Type</label>
+                                      <Select
+                                        options={[{ value: 'Hands-on (Laboratory)', label: 'Hands-on (Laboratory)' }, { value: 'Written (Lecture)', label: 'Written (Lecture)' }, { value: 'Written (Laboratory)', label: 'Written (Laboratory)' }]}
+                                        value={{ value: editingModality.modality_type, label: editingModality.modality_type }}
+                                        onChange={s => {
+                                          const newType = s?.value || '';
+                                          const newRoomType = modalityRoomTypeMap[newType] || '';
+                                          setEditingModality(prev => prev ? { ...prev, modality_type: newType, room_type: newRoomType } : prev);
+                                        }}
+                                        menuPortalTarget={document.body}
+                                        styles={{ ...selectStyles, menuPortal: (base: any) => ({ ...base, zIndex: 999999 }) }}
+                                      />
+                                    </div>
+                                    <div className="bm-edit-field">
+                                      <label>Room Type</label>
+                                      <input type="text" className="bm-edit-input bm-edit-input--readonly" value={editingModality.room_type} readOnly />
+                                    </div>
+                                    <div className="bm-edit-field bm-edit-full-width">
+                                      <label>Sections</label>
+                                      <Select
+                                        isMulti closeMenuOnSelect={false}
+                                        options={editSectionOptions}
+                                        value={editingModality.sections.map(s => ({ value: s, label: s }))}
+                                        onChange={opts => setEditingModality(prev => prev ? { ...prev, sections: opts ? opts.map(o => o.value) : [] } : prev)}
+                                        menuPortalTarget={document.body}
+                                        styles={{ ...selectStyles, menuPortal: (base: any) => ({ ...base, zIndex: 999999 }), multiValue: (base: any) => ({ ...base, backgroundColor: '#0d4993', borderRadius: '6px' }), multiValueLabel: (base: any) => ({ ...base, color: '#fff', fontWeight: 600, fontSize: '11px' }) }}
+                                      />
+                                    </div>
+                                    <div className="bm-edit-field bm-edit-full-width">
+                                      <label>Rooms</label>
+                                      <Select
+                                        isMulti
+                                        options={editRoomOptions.map(r => ({ value: r.room_id, label: `${r.room_id} (Cap: ${r.room_capacity})` }))}
+                                        value={editingModality.possible_rooms.map(r => ({ value: r, label: r }))}
+                                        onChange={opts => setEditingModality(prev => prev ? { ...prev, possible_rooms: opts ? opts.map(o => o.value) : [] } : prev)}
+                                        menuPortalTarget={document.body}
+                                        styles={{ ...selectStyles, menuPortal: (base: any) => ({ ...base, zIndex: 999999 }), multiValue: (base: any) => ({ ...base, backgroundColor: '#0d4993', borderRadius: '6px' }), multiValueLabel: (base: any) => ({ ...base, color: '#fff', fontWeight: 600, fontSize: '11px' }) }}
+                                        placeholder="Select rooms…"
+                                      />
+                                    </div>
+                                    <div className="bm-edit-field bm-edit-full-width">
+                                      <label>Remarks</label>
+                                      <textarea className="bm-edit-textarea" value={editingModality.modality_remarks} onChange={e => setEditingModality(prev => prev ? { ...prev, modality_remarks: e.target.value } : prev)} placeholder="Optional remarks…" rows={2} />
+                                    </div>
+                                  </div>
+                                  <div className="bm-edit-actions">
+                                    <button type="button" className="bm-btn" onClick={cancelEditing} disabled={isSavingEdit}><FaTimes style={{ fontSize: '11px' }} /> Cancel</button>
+                                    <button type="button" className="bm-btn primary" onClick={saveEditing} disabled={isSavingEdit}><FaSave style={{ fontSize: '11px' }} />{isSavingEdit ? 'Saving…' : 'Save Changes'}</button>
+                                  </div>
+                                </div>
+                              </div>
+                            );
+                          }
+
+                          return (
+                            <div key={modality.modality_id} className={`bm-modality-row${isSelected ? ' selected' : ''}`} onClick={() => toggleSelectModality(modality.modality_id)}>
+                              <input type="checkbox" checked={isSelected} onChange={() => toggleSelectModality(modality.modality_id)} onClick={e => e.stopPropagation()} style={{ flexShrink: 0, marginTop: '2px' }} />
+                              <div className="bm-modality-info">
+                                <div className="bm-modality-title">
+                                  <span className="bm-type-badge">{modality.modality_type}</span>
+                                  <span className="bm-type-badge lab">{modality.room_type}</span>
+                                </div>
+                                <div className="bm-modality-meta">
+                                  <span><strong>Course:</strong> {course?.course_id ?? 'N/A'} – {course?.course_name ?? 'Unknown'}</span>
+                                  <span><strong>Program:</strong> {program?.program_id ?? 'N/A'} – {program?.program_name ?? 'Unknown'}</span>
+                                  <span><strong>Sections:</strong> {Array.isArray(modality.sections) ? modality.sections.join(', ') : modality.sections}</span>
+                                  {modality.possible_rooms?.length > 0 && <span><strong>Rooms:</strong> {modality.possible_rooms.join(', ')}</span>}
+                                  {modality.modality_remarks && <span><strong>Remarks:</strong> {modality.modality_remarks}</span>}
+                                </div>
+                              </div>
+                              <button type="button" className="bm-btn bm-edit-btn" onClick={e => { e.stopPropagation(); startEditing(modality); }} title="Edit this modality">
+                                <FaEdit style={{ fontSize: '12px' }} /> Edit
+                              </button>
+                            </div>
+                          );
+                        })}
+                      </div>
+                    </>
+                  )}
                 </>
               )}
             </div>
 
             <div className="bm-modal-footer">
               <button type="button" className="bm-btn" onClick={() => { setShowDeleteConfirm(false); setEditingModality(null); setSelectedForDelete([]); }} disabled={isDeleting}>Close</button>
-              <button type="button" className="bm-btn danger" onClick={handleDeleteSelected} disabled={isDeleting || selectedForDelete.length === 0}>
-                {isDeleting ? 'Deleting…' : `Delete Selected (${selectedForDelete.length})`}
-              </button>
-              <button type="button" className="bm-btn danger-fill" onClick={handleDeleteAll} disabled={isDeleting || userModalities.length === 0}>
-                {isDeleting ? 'Deleting…' : 'Delete All'}
-              </button>
+              {activeTab !== 'manage' && (
+                <>
+                  <button type="button" className="bm-btn danger" onClick={handleDeleteSelected} disabled={isDeleting || selectedForDelete.length === 0}>
+                    {isDeleting ? 'Deleting…' : `Delete Selected (${selectedForDelete.length})`}
+                  </button>
+                  <button type="button" className="bm-btn danger-fill" onClick={handleDeleteAll} disabled={isDeleting || userModalities.length === 0}>
+                    {isDeleting ? 'Deleting…' : 'Delete All'}
+                  </button>
+                </>
+              )}
             </div>
           </div>
         </div>
@@ -1041,6 +1595,121 @@ const BayanihanModality: React.FC<UserProps> = ({ user }) => {
               <button type="button" className="bm-btn" onClick={() => setShowFinalDeleteConfirm(false)} disabled={isDeleting}>Cancel</button>
               <button type="button" className="bm-btn danger-fill" onClick={handleFinalConfirm} disabled={isDeleting}>
                 {isDeleting ? 'Deleting…' : 'Yes, Delete'}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* ════ SUBMIT CONFIRMATION MODAL ════ */}
+      {showSubmitConfirm && (
+        <div className="bm-modal-overlay" onClick={() => setShowSubmitConfirm(false)}>
+          <div className="bm-modal" onClick={e => e.stopPropagation()} style={{ maxWidth: '460px' }}>
+            <div className="bm-modal-header">
+              <h3>Before You Submit</h3>
+            </div>
+            <div className="bm-modal-body">
+
+              {/* Warning banner */}
+              <div style={{
+                display: 'flex',
+                gap: '12px',
+                alignItems: 'flex-start',
+                background: '#fffbeb',
+                border: '1.5px solid #fcd34d',
+                borderRadius: '10px',
+                padding: '14px 16px',
+                marginBottom: '16px',
+              }}>
+                <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#b45309"
+                  strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" style={{ flexShrink: 0, marginTop: '1px' }}>
+                  <path d="M10.29 3.86L1.82 18a2 2 0 001.71 3h16.94a2 2 0 001.71-3L13.71 3.86a2 2 0 00-3.42 0z" />
+                  <line x1="12" y1="9" x2="12" y2="13" />
+                  <line x1="12" y1="17" x2="12.01" y2="17" />
+                </svg>
+                <div>
+                  <div style={{ fontWeight: 700, fontSize: '13px', color: '#92400e', marginBottom: '4px' }}>
+                    Room Assignment Notice
+                  </div>
+                  <div style={{ fontSize: '12.5px', color: '#78350f', lineHeight: 1.65 }}>
+                    The room(s) you selected are <strong>preferred suggestions only</strong> and are <strong>not guaranteed</strong>.
+                    Final room assignments will be determined by the scheduler and may change based on availability,
+                    capacity constraints, or scheduling conflicts.
+                  </div>
+                </div>
+              </div>
+
+              {/* Assignment summary */}
+              <div style={{ marginBottom: '4px' }}>
+                <div style={{
+                  fontSize: '10.5px', fontWeight: 700, color: 'var(--bm-text-muted)',
+                  textTransform: 'uppercase', letterSpacing: '0.8px',
+                  fontFamily: 'var(--bm-mono)', marginBottom: '8px',
+                }}>
+                  Your Submission Summary
+                </div>
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
+                  {calculateRoomAssignments.map((assignment, idx) => {
+                    const room = roomOptions.find(r => r.room_id === assignment.roomId);
+                    return (
+                      <div key={idx} style={{
+                        display: 'flex',
+                        justifyContent: 'space-between',
+                        alignItems: 'center',
+                        padding: '9px 12px',
+                        background: 'var(--bm-surface-2)',
+                        border: '1.5px solid var(--bm-border)',
+                        borderRadius: '8px',
+                        gap: '10px',
+                      }}>
+                        <div style={{ flex: 1, minWidth: 0 }}>
+                          <div style={{ fontSize: '11.5px', fontWeight: 600, color: 'var(--bm-text-primary)', fontFamily: 'var(--bm-mono)' }}>
+                            Room {assignment.roomId}
+                            {assignment.isNightClass && (
+                              <span style={{
+                                marginLeft: '6px', fontSize: '9px', padding: '1px 6px',
+                                background: '#1a237e', color: '#fff', borderRadius: '10px',
+                                fontWeight: 700, letterSpacing: '0.3px',
+                              }}>Night</span>
+                            )}
+                          </div>
+                          <div style={{ fontSize: '11px', color: 'var(--bm-text-muted)', marginTop: '2px' }}>
+                            {assignment.sections.join(', ')}
+                          </div>
+                        </div>
+                        <div style={{
+                          fontSize: '11px', fontFamily: 'var(--bm-mono)',
+                          color: assignment.totalStudents > (room?.room_capacity || 999) ? 'var(--bm-danger)' : 'var(--bm-success)',
+                          fontWeight: 600, flexShrink: 0,
+                        }}>
+                          {assignment.totalStudents} / {room?.room_capacity ?? '?'} students
+                        </div>
+                      </div>
+                    );
+                  })}
+                </div>
+              </div>
+
+            </div>
+            <div className="bm-modal-footer">
+              <button
+                type="button"
+                className="bm-btn"
+                onClick={() => setShowSubmitConfirm(false)}
+                disabled={isSubmitting}
+              >
+                Cancel
+              </button>
+              <button
+                type="button"
+                className="bm-btn primary"
+                disabled={isSubmitting}
+                onClick={async () => {
+                  setShowSubmitConfirm(false);
+                  await handleSubmit({ preventDefault: () => {} } as React.FormEvent);
+                }}
+              >
+                {isSubmitting ? 'Submitting…' : 'Confirm & Submit'}
               </button>
             </div>
           </div>

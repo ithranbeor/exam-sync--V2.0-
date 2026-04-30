@@ -665,8 +665,24 @@ body {
 
 .shortcuts-grid {
   display: grid;
-  grid-template-columns: 1fr 1fr;
+  grid-template-columns: 1fr 1fr 1fr;
   gap: 20px;
+}
+ 
+.shortcut-card.full-width {
+  grid-column: 1 / -1;
+}
+ 
+@media (max-width: 1200px) {
+  .shortcuts-grid {
+    grid-template-columns: 1fr 1fr;
+  }
+}
+ 
+@media (max-width: 768px) {
+  .shortcuts-grid {
+    grid-template-columns: 1fr;
+  }
 }
 
 .shortcut-card {
@@ -1070,4 +1086,816 @@ button.view-button { background-color: var(--orange); }
 
   .sidebar-nav button { padding: 10px 15px; }
   .icon { width: 20px; height: 20px; }
+}
+
+/* ============================================================
+   DashboardHome (dh-*) — Append to F_Dashboard.css
+   ============================================================ */
+
+/* ── Root wrapper ── */
+.dh-root {
+  display: flex;
+  flex-direction: column;
+  gap: 20px;
+  padding: 4px;
+}
+
+/* ── Quick Shortcuts bar ── */
+.dh-shortcuts-bar {
+  display: flex;
+  gap: 12px;
+  flex-wrap: wrap;
+}
+
+.dh-shortcut-btn {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 4px;
+  background: #ffffff;
+  border: 1.5px solid #e8edf3;
+  border-radius: 14px;
+  padding: 14px 16px;
+  cursor: pointer;
+  flex: 1;
+  min-width: 130px;
+  max-width: 200px;
+  text-align: left;
+  transition: border-color 0.2s, box-shadow 0.2s, transform 0.15s;
+  box-shadow: 0 2px 8px rgba(9,44,76,0.06);
+}
+
+.dh-shortcut-btn:hover {
+  border-color: var(--orange);
+  box-shadow: 0 4px 16px rgba(242,153,74,0.18);
+  transform: translateY(-2px);
+}
+
+.dh-shortcut-icon {
+  color: var(--orange);
+  font-size: 18px;
+  margin-bottom: 4px;
+  display: flex;
+  align-items: center;
+}
+
+.dh-shortcut-label {
+  font-size: 0.82rem;
+  font-weight: 700;
+  color: var(--navy);
+  line-height: 1.2;
+}
+
+.dh-shortcut-desc {
+  font-size: 0.7rem;
+  color: #8a97a8;
+  line-height: 1.3;
+}
+
+/* ── Section card ── */
+.dh-section-card {
+  background: #ffffff;
+  border-radius: 18px;
+  box-shadow: 0 4px 18px rgba(9,44,76,0.08);
+  overflow: hidden;
+}
+
+/* ── Calendar header ── */
+.dh-cal-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 18px 20px 14px;
+  border-bottom: 1.5px solid #f0f3f7;
+  gap: 12px;
+  flex-wrap: wrap;
+}
+
+.dh-cal-header-left {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.dh-cal-icon-wrap {
+  width: 36px;
+  height: 36px;
+  border-radius: 10px;
+  background: linear-gradient(135deg, var(--navy) 0%, #1a5fa0 100%);
+  color: #fff;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+}
+
+.dh-cal-title {
+  margin: 0;
+  font-size: 1.05rem;
+  font-weight: 700;
+  color: var(--navy);
+}
+
+.dh-cal-subtitle {
+  margin: 0;
+  font-size: 0.75rem;
+  color: #8a97a8;
+}
+
+.dh-cal-controls {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+.dh-filter-badges {
+  display: flex;
+  gap: 6px;
+  flex-wrap: wrap;
+}
+
+.dh-filter-badge {
+  background: #fff0e4;
+  color: var(--orange);
+  font-size: 0.7rem;
+  font-weight: 700;
+  border-radius: 20px;
+  padding: 2px 10px;
+  border: 1px solid rgba(242,153,74,0.3);
+}
+
+.dh-cal-nav {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+}
+
+.dh-nav-arrow {
+  background: #f5f7fa;
+  border: 1px solid #e5e9ef;
+  border-radius: 8px;
+  padding: 6px 10px;
+  cursor: pointer;
+  color: var(--navy);
+  font-size: 0.75rem;
+  font-weight: 600;
+  transition: background-color 0.15s, border-color 0.15s;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.dh-nav-arrow:hover {
+  background: var(--orange);
+  border-color: var(--orange);
+  color: #fff;
+}
+
+.dh-filter-wrapper {
+  position: relative;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.dh-filter-btn {
+  background: #f5f7fa;
+  border: 1px solid #e5e9ef;
+  border-radius: 8px;
+  padding: 6px 12px;
+  cursor: pointer;
+  color: var(--navy);
+  font-size: 0.75rem;
+  font-weight: 600;
+  transition: background-color 0.15s, border-color 0.15s;
+  display: flex;
+  align-items: center;
+  white-space: nowrap;
+}
+
+.dh-filter-btn:hover,
+.dh-filter-btn--active {
+  background: var(--orange);
+  border-color: var(--orange);
+  color: #fff;
+}
+
+.dh-filter-dropdown {
+  position: absolute;
+  top: calc(100% + 8px);
+  right: 0;
+  background: #fff;
+  border: 1px solid #e0e6ee;
+  border-radius: 12px;
+  padding: 14px;
+  box-shadow: 0 8px 28px rgba(9,44,76,0.14);
+  z-index: 9999;
+  min-width: 200px;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  animation: dropdownFadeIn 0.18s ease-out;
+}
+
+.dh-filter-group {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.dh-filter-group label {
+  font-size: 0.7rem;
+  font-weight: 700;
+  color: #8a97a8;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+}
+
+.dh-filter-group select {
+  border: 1px solid #e0e6ee;
+  border-radius: 7px;
+  padding: 5px 8px;
+  font-size: 0.8rem;
+  color: var(--navy);
+  background: #f9fafb;
+  outline: none;
+  cursor: pointer;
+}
+
+.dh-filter-group select:focus { border-color: var(--orange); }
+
+.dh-filter-clear {
+  background: none;
+  border: 1px solid #e0e6ee;
+  border-radius: 7px;
+  padding: 5px;
+  font-size: 0.75rem;
+  color: #8a97a8;
+  cursor: pointer;
+  transition: color 0.15s, border-color 0.15s;
+}
+
+.dh-filter-clear:hover { color: #e53e3e; border-color: #e53e3e; }
+
+/* ── Calendar layout ── */
+.dh-cal-layout {
+  display: flex;
+  flex-direction: column;
+}
+
+.dh-cal-layout--sidebar {
+  flex-direction: row;
+}
+
+.dh-cal-main { flex: 1; min-width: 0; padding: 16px; }
+
+/* ── Calendar grid ── */
+.dh-cal-weekdays {
+  display: grid;
+  grid-template-columns: repeat(7, 1fr);
+  gap: 2px;
+  margin-bottom: 4px;
+}
+
+.dh-cal-weekday {
+  text-align: center;
+  font-size: 0.7rem;
+  font-weight: 700;
+  color: #8a97a8;
+  padding: 4px 0;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+}
+
+.dh-cal-grid {
+  display: grid;
+  grid-template-columns: repeat(7, 1fr);
+  gap: 3px;
+}
+
+.dh-cal-cell {
+  border: 1px solid #f0f3f7;
+  border-radius: 9px;
+  padding: 6px 5px;
+  min-height: 72px;
+  background: #fafbfc;
+  position: relative;
+  transition: border-color 0.15s, background 0.15s;
+  overflow: hidden;
+}
+
+.dh-cal-cell:not(.dh-cal-empty):hover {
+  border-color: #d0d8e4;
+  background: #fff;
+}
+
+.dh-cal-empty { background: transparent; border-color: transparent; }
+
+.dh-cal-today {
+  background: #fff8f2 !important;
+  border-color: var(--orange) !important;
+  border-width: 2px !important;
+}
+
+.dh-cal-daynumber {
+  font-size: 0.78rem;
+  font-weight: 700;
+  color: #374151;
+  display: block;
+  margin-bottom: 4px;
+}
+
+.dh-cal-today .dh-cal-daynumber { color: var(--orange); }
+
+.dh-cal-events { display: flex; flex-direction: column; gap: 2px; }
+
+.dh-cal-term { font-size: 0.6rem; color: #6b7280; font-weight: 500; }
+.dh-cal-cat  { font-size: 0.6rem; color: var(--navy); font-weight: 700; }
+
+/* ── College badges ── */
+.dh-college-badge {
+  display: inline-block;
+  font-size: 0.6rem;
+  font-weight: 700;
+  border-radius: 4px;
+  padding: 1px 5px;
+  font-family: monospace;
+  letter-spacing: 0.03em;
+}
+
+.dh-col-csm   { background: #dbeafe; color: #1e40af; }
+.dh-col-citc  { background: #fce7f3; color: #9d174d; }
+.dh-col-cot   { background: #d1fae5; color: #065f46; }
+.dh-col-cea   { background: #fef3c7; color: #92400e; }
+.dh-col-cste  { background: #ede9fe; color: #5b21b6; }
+.dh-col-shs   { background: #fee2e2; color: #991b1b; }
+
+/* ── Legend ── */
+.dh-legend {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin-top: 12px;
+  padding-top: 10px;
+  border-top: 1.5px solid #f0f3f7;
+}
+
+.dh-legend-item {
+  font-size: 0.7rem;
+  font-weight: 700;
+  border-radius: 6px;
+  padding: 3px 10px;
+  font-family: monospace;
+}
+
+/* ── Right sidebar ── */
+.dh-right-sidebar {
+  width: 230px;
+  flex-shrink: 0;
+  border-left: 1.5px solid #f0f3f7;
+  display: flex;
+  flex-direction: column;
+  overflow-y: auto;
+  overflow-x: hidden;
+}
+
+.dh-sidebar-card {
+  padding: 14px;
+  border-bottom: 1.5px solid #f0f3f7;
+}
+
+.dh-sidebar-card:last-child { border-bottom: none; }
+
+.dh-sidebar-card-title {
+  font-size: 0.78rem;
+  font-weight: 700;
+  color: var(--navy);
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  margin-bottom: 10px;
+}
+
+.dh-sidebar-count {
+  background: #f0f3f7;
+  color: #6b7280;
+  border-radius: 20px;
+  padding: 1px 7px;
+  font-size: 0.68rem;
+  font-family: monospace;
+}
+
+.dh-college-pill {
+  background: var(--navy);
+  color: #fff;
+  border-radius: 20px;
+  padding: 1px 7px;
+  font-size: 0.65rem;
+  font-weight: 700;
+  font-family: monospace;
+}
+
+.dh-sidebar-empty {
+  font-size: 0.75rem;
+  color: #9ca3af;
+  text-align: center;
+  padding: 12px 0;
+  font-style: italic;
+  margin: 0;
+}
+
+.dh-sidebar-exam-row {
+  padding: 8px 0;
+  border-bottom: 1px solid #f5f7fa;
+}
+
+.dh-sidebar-exam-row:last-child { border-bottom: none; }
+
+.dh-sidebar-exam-date {
+  font-size: 0.68rem;
+  color: #6b7280;
+  margin-bottom: 2px;
+  font-family: monospace;
+}
+
+.dh-sidebar-exam-name {
+  font-size: 0.78rem;
+  font-weight: 700;
+  color: var(--navy);
+}
+
+.dh-sidebar-badges {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px;
+  margin-top: 4px;
+}
+
+.dh-sidebar-college-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 5px 0;
+  border-bottom: 1px solid #f5f7fa;
+}
+
+.dh-sidebar-college-row:last-child { border-bottom: none; }
+
+.dh-sidebar-college-count {
+  font-size: 0.72rem;
+  color: #6b7280;
+  font-family: monospace;
+}
+
+/* College date rows */
+.dh-college-date-row {
+  background: #fff;
+  border: 1.5px solid #e5e7eb;
+  border-radius: 8px;
+  padding: 8px 10px;
+  margin-bottom: 6px;
+}
+
+.dh-college-date-row:last-child { margin-bottom: 0; }
+
+.dh-college-date-row--soon { border-color: var(--orange); }
+
+.dh-college-date-top {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 3px;
+}
+
+.dh-college-date-label {
+  font-size: 0.68rem;
+  font-weight: 700;
+  color: #374151;
+  font-family: monospace;
+}
+
+.dh-college-date-row--soon .dh-college-date-label { color: var(--orange); }
+
+.dh-soon-pill {
+  font-size: 0.58rem;
+  font-weight: 700;
+  background: #fef3c7;
+  color: #d97706;
+  border-radius: 20px;
+  padding: 1px 6px;
+  font-family: monospace;
+}
+
+.dh-college-date-name {
+  font-size: 0.75rem;
+  font-weight: 700;
+  color: #111;
+}
+
+.dh-college-date-meta {
+  font-size: 0.65rem;
+  color: #6b7280;
+  margin-top: 2px;
+  font-family: monospace;
+}
+
+/* ── Proctor Assignments card ── */
+.dh-assignments-card { margin-top: 0; }
+
+.dh-assignments-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 16px 20px 12px;
+  border-bottom: 1.5px solid #f0f3f7;
+  gap: 12px;
+  flex-wrap: wrap;
+}
+
+.dh-assignments-title {
+  margin: 0;
+  font-size: 1rem;
+  font-weight: 700;
+  color: var(--navy);
+}
+
+.dh-assignments-sub {
+  margin: 0;
+  font-size: 0.72rem;
+  color: #8a97a8;
+}
+
+.dh-assign-filters {
+  display: flex;
+  gap: 6px;
+  flex-wrap: wrap;
+  align-items: center;
+}
+
+.dh-assign-filter-btn {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  background: #f5f7fa;
+  border: 1px solid #e5e9ef;
+  border-radius: 8px;
+  padding: 5px 10px;
+  cursor: pointer;
+  font-size: 0.72rem;
+  font-weight: 600;
+  color: var(--navy);
+  transition: background-color 0.15s, border-color 0.15s, color 0.15s;
+  white-space: nowrap;
+}
+
+.dh-assign-filter-btn:hover,
+.dh-assign-filter-btn.active {
+  background: var(--orange);
+  border-color: var(--orange);
+  color: #fff;
+}
+
+.dh-assign-empty {
+  padding: 32px 20px;
+  text-align: center;
+  color: #9ca3af;
+  font-size: 0.85rem;
+}
+
+.dh-assign-empty p { margin: 0; }
+
+.dh-assign-list {
+  padding: 12px 16px;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.dh-assign-item {
+  border: 1.5px solid #e8edf3;
+  border-radius: 12px;
+  overflow: hidden;
+  background: #fafbfc;
+  transition: border-color 0.15s;
+}
+
+.dh-assign-item:hover         { border-color: #c8d4e0; }
+.dh-assign-ongoing            { border-color: #bfdbfe !important; background: #eff6ff; }
+.dh-assign-completed          { opacity: 0.75; }
+
+.dh-assign-item-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 12px 14px;
+  cursor: pointer;
+  gap: 10px;
+}
+
+.dh-assign-item-left {
+  display: flex;
+  align-items: flex-start;
+  gap: 10px;
+  flex: 1;
+  min-width: 0;
+}
+
+.dh-course-code {
+  background: var(--navy);
+  color: #fff;
+  font-size: 0.65rem;
+  font-weight: 700;
+  border-radius: 6px;
+  padding: 4px 8px;
+  white-space: nowrap;
+  font-family: monospace;
+  flex-shrink: 0;
+  margin-top: 2px;
+}
+
+.dh-assign-item-info { flex: 1; min-width: 0; }
+
+.dh-assign-section {
+  margin: 0;
+  font-size: 0.82rem;
+  font-weight: 700;
+  color: var(--navy);
+}
+
+.dh-assign-instructor {
+  margin: 0;
+  font-size: 0.72rem;
+  color: #8a97a8;
+}
+
+.dh-assign-preview {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  flex-wrap: wrap;
+  margin-top: 4px;
+  font-size: 0.68rem;
+  color: #6b7280;
+  font-family: monospace;
+}
+
+.dh-sep { color: #d1d5db; }
+.dh-duration { color: #9ca3af; }
+
+.dh-assign-item-right {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-shrink: 0;
+}
+
+/* Status badges */
+.dh-status-badge {
+  font-size: 0.65rem;
+  font-weight: 700;
+  border-radius: 20px;
+  padding: 3px 9px;
+  white-space: nowrap;
+  font-family: monospace;
+}
+
+.dh-badge-upcoming     { background: #dbeafe; color: #1e40af; }
+.dh-badge-ongoing      { background: #d1fae5; color: #065f46; }
+.dh-badge-completed    { background: #d1fae5; color: #065f46; }
+.dh-badge-late         { background: #fef3c7; color: #92400e; }
+.dh-badge-substitute   { background: #ede9fe; color: #5b21b6; }
+.dh-badge-absent       { background: #fee2e2; color: #991b1b; }
+
+.dh-expand-btn {
+  background: none;
+  border: none;
+  cursor: pointer;
+  color: #8a97a8;
+  display: flex;
+  align-items: center;
+  padding: 4px;
+  border-radius: 6px;
+  transition: background-color 0.15s;
+}
+
+.dh-expand-btn:hover { background: #f0f3f7; color: var(--navy); }
+
+/* Expanded detail */
+.dh-assign-detail {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 10px 20px;
+  padding: 12px 14px 14px;
+  border-top: 1px solid #f0f3f7;
+  background: #fff;
+}
+
+.dh-detail-group {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.dh-detail-label {
+  font-size: 0.65rem;
+  font-weight: 700;
+  color: #9ca3af;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+}
+
+.dh-detail-val {
+  font-size: 0.78rem;
+  color: var(--navy);
+  font-weight: 600;
+}
+
+/* View all button */
+.dh-viewall-btn {
+  background: none;
+  border: 1.5px dashed #d1d9e0;
+  border-radius: 10px;
+  padding: 10px;
+  width: 100%;
+  font-size: 0.78rem;
+  font-weight: 600;
+  color: #8a97a8;
+  cursor: pointer;
+  text-align: center;
+  transition: border-color 0.15s, color 0.15s;
+}
+
+.dh-viewall-btn:hover { border-color: var(--orange); color: var(--orange); }
+
+/* ── Plot Schedule teaser ── */
+.dh-plot-teaser { overflow: visible; }
+
+.dh-plot-teaser-inner {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  padding: 18px 22px;
+}
+
+.dh-plot-teaser-icon {
+  width: 52px;
+  height: 52px;
+  border-radius: 14px;
+  background: linear-gradient(135deg, var(--navy) 0%, #1a5fa0 100%);
+  color: #fff;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+}
+
+.dh-plot-teaser-title {
+  margin: 0;
+  font-size: 0.95rem;
+  font-weight: 700;
+  color: var(--navy);
+}
+
+.dh-plot-teaser-sub {
+  margin: 0;
+  font-size: 0.75rem;
+  color: #8a97a8;
+}
+
+.dh-plot-teaser-btn {
+  margin-left: auto;
+  background: var(--orange);
+  border: none;
+  border-radius: 10px;
+  padding: 10px 20px;
+  color: #fff;
+  font-size: 0.82rem;
+  font-weight: 700;
+  cursor: pointer;
+  white-space: nowrap;
+  transition: background-color 0.15s, transform 0.15s;
+}
+
+.dh-plot-teaser-btn:hover { background: #e08020; transform: translateY(-1px); }
+
+/* ── Responsive tweaks ── */
+@media (max-width: 768px) {
+  .dh-shortcuts-bar { gap: 8px; }
+  .dh-shortcut-btn  { min-width: 100px; max-width: none; padding: 10px 12px; }
+  .dh-shortcut-desc { display: none; }
+  .dh-cal-layout--sidebar { flex-direction: column; }
+  .dh-right-sidebar { width: 100%; border-left: none; border-top: 1.5px solid #f0f3f7; }
+  .dh-cal-cell     { min-height: 50px; padding: 4px 3px; }
+  .dh-cal-daynumber { font-size: 0.7rem; }
+  .dh-college-badge { font-size: 0.55rem; padding: 1px 3px; }
+  .dh-assign-detail { grid-template-columns: 1fr; }
+  .dh-cal-header    { flex-direction: column; align-items: flex-start; }
+  .dh-assignments-header { flex-direction: column; align-items: flex-start; }
+}
+
+@media (min-width: 769px) and (max-width: 1024px) {
+  .dh-cal-layout--sidebar { flex-direction: column; }
+  .dh-right-sidebar { width: 100%; border-left: none; border-top: 1.5px solid #f0f3f7;
+    display: grid; grid-template-columns: repeat(3, 1fr); }
 }

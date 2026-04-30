@@ -493,3 +493,293 @@ body {
 .Toastify__toast-container {
   z-index: 9999999 !important;
 }
+
+/* ─────────────────────────────
+   MODERN FILTER DROPDOWN
+───────────────────────────── */
+
+.filter-dropdown-wrapper {
+  display: flex;
+  gap: 5px;
+}
+
+/* Button */
+.filter-button {
+  display: relative;
+  align-items: center;
+  gap: 6px;
+  padding: 8px 14px;
+  border-radius: 8px;
+  border: 1.5px solid #e0e4ea;
+  background: white;
+  color: #111827;
+  font-size: 13px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.18s ease;
+}
+
+.filter-button:hover {
+  border-color: #092C4C;
+  color: #092C4C;
+  background: #f0f4f8;
+}
+
+.filter-gotoday {
+  display: center;
+  align-items: center;
+  gap: 6px;
+  padding: 8px 14px;
+  border-radius: 8px;
+  border: 1.5px solid #e0e4ea;
+  background: #092C4C;
+  color: #e0e4ea; /* FIX: force dark text */
+  font-size: 13px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.18s ease;
+}
+
+.filter-gotoday:hover {
+  border-color: #092C4C;
+  color: #092C4C;
+  background: #f0f4f8;
+}
+
+/* Glass dropdown */
+.filter-dropdown {
+  position: absolute;
+  top: 29%;
+  width: 260px;
+
+  background: rgba(255, 255, 255, 0.85);
+  backdrop-filter: blur(10px);
+
+  border: 1.5px solid #e0e4ea;
+  border-radius: 12px;
+  box-shadow: 0 12px 30px rgba(0, 0, 0, 0.12);
+
+  padding: 14px;
+  z-index: 100;
+
+  animation: dropdownFade 0.18s ease;
+}
+
+/* Groups */
+.filter-group {
+  display: flex;
+  flex-direction: column;
+  margin-bottom: 12px;
+}
+
+.filter-group label {
+  font-size: 11px;
+  font-weight: 600;
+  color: #374151; /* FIX: visible label */
+  margin-bottom: 4px;
+  font-family: 'DM Mono', monospace;
+}
+
+/* Inputs */
+.filter-dropdown select {
+  padding: 7px 10px;
+  border-radius: 6px;
+  border: 1.2px solid #e0e4ea;
+  font-size: 12px;
+
+  background: #ffffff;
+  color: #111827; /* FIX: force readable */
+
+  cursor: pointer;
+}
+
+.filter-dropdown select:focus {
+  outline: none;
+  border-color: #092C4C;
+}
+
+/* Button inside */
+.filter-dropdown .now-btn {
+  margin-top: 6px;
+  padding: 8px;
+  border-radius: 6px;
+  border: 1.2px solid #e0e4ea;
+
+  background: #f8fafc;
+  color: #111827; /* FIX */
+
+  font-size: 12px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.15s ease;
+}
+
+.filter-dropdown .now-btn:hover {
+  background: #f0f4f8;
+  border-color: #092C4C;
+  color: #092C4C;
+}
+
+/* Active filter badges */
+.filter-badges {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+
+.filter-badge {
+  background: #092C4C;
+  color: white;
+  padding: 4px 10px;
+  border-radius: 20px;
+  font-size: 11px;
+  font-family: 'DM Mono', monospace;
+}
+
+/* Animation */
+@keyframes dropdownFade {
+  from {
+    opacity: 0;
+    transform: translateY(-6px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+/* ══════════════════════════════════════════
+   TWO-COLUMN LAYOUT
+══════════════════════════════════════════ */
+.calendar-with-sidebar {
+  display: flex;
+  gap: 16px;
+  align-items: flex-start;
+}
+
+.calendar-main {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
+/* ── Sidebar ── */
+.exam-sidebar {
+  width: 230px;
+  flex-shrink: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.sidebar-card {
+  background: white;
+  border: 1.5px solid #e0e4ea;
+  border-radius: 12px;
+  padding: 14px;
+}
+
+.sidebar-card-title {
+  font-size: 13px;
+  font-weight: 600;
+  color: #0f1923;
+  margin-bottom: 12px;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-family: 'DM Sans', sans-serif;
+}
+
+.sidebar-count {
+  background: #f4f6f9;
+  color: #6b7280;
+  border-radius: 20px;
+  padding: 1px 8px;
+  font-size: 11px;
+  font-family: 'DM Mono', monospace;
+  font-weight: 500;
+}
+
+.sidebar-empty {
+  font-size: 12px;
+  color: #9ca3af;
+  text-align: center;
+  padding: 16px 0;
+  font-style: italic;
+}
+
+.sidebar-exam-row {
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+  padding: 8px 0;
+  border-bottom: 1px solid #f3f4f6;
+}
+
+.sidebar-exam-row:last-child {
+  border-bottom: none;
+}
+
+.sidebar-exam-date {
+  font-size: 10px;
+  color: #6b7280;
+  font-family: 'DM Mono', monospace;
+}
+
+.sidebar-exam-name {
+  font-size: 12px;
+  font-weight: 600;
+  color: #0f1923;
+}
+
+.sidebar-exam-badges {
+  display: flex;
+  gap: 4px;
+  flex-wrap: wrap;
+  margin-top: 2px;
+}
+
+.sidebar-college-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 6px 0;
+  border-bottom: 1px solid #f3f4f6;
+}
+
+.sidebar-college-row:last-child {
+  border-bottom: none;
+}
+
+.sidebar-college-count {
+  font-size: 11px;
+  color: #6b7280;
+  font-family: 'DM Mono', monospace;
+}
+
+/* Active toggle state */
+.filter-button--active {
+  background: #092C4C;
+  color: white;
+  border-color: #092C4C;
+}
+
+/* ── Responsive: collapse sidebar on small screens ── */
+@media (max-width: 900px) {
+  .calendar-with-sidebar {
+    flex-direction: column;
+  }
+
+  .exam-sidebar {
+    width: 100%;
+    flex-direction: row;
+    flex-wrap: wrap;
+  }
+
+  .sidebar-card {
+    flex: 1;
+    min-width: 200px;
+  }
+}

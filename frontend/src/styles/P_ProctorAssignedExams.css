@@ -470,3 +470,74 @@
 .Toastify__toast-container {
   z-index: 9999999 !important;
 }
+
+/* ══════════════════════════════════════════
+   SIDEBAR LAYOUT ADDITIONS
+   Append these rules to P_ProctorAssignedExams.css
+══════════════════════════════════════════ */
+
+/* Allow the container to go side-by-side */
+.proctor-course-container {
+  flex-direction: row !important;
+  padding: 0 !important;
+  overflow: hidden !important;
+}
+
+/* Sidebar scrollbar */
+.proctor-sidebar::-webkit-scrollbar { width: 4px; }
+.proctor-sidebar::-webkit-scrollbar-track { background: #f1f5f9; border-radius: 4px; }
+.proctor-sidebar::-webkit-scrollbar-thumb { background: #cbd5e1; border-radius: 4px; }
+.proctor-sidebar::-webkit-scrollbar-thumb:hover { background: #94a3b8; }
+
+/* Sidebar toggle button tweak — matches filter-btn active style */
+.filter-btn.sidebar-toggle-btn {
+  white-space: nowrap;
+  gap: 5px;
+}
+
+/* Responsive: stack sidebar below on small cards */
+@media (max-width: 900px) {
+  .proctor-course-container {
+    flex-direction: column !important;
+  }
+
+  .proctor-sidebar {
+    width: 100% !important;
+    border-left: none !important;
+    border-top: 1.5px solid #f0f0f0 !important;
+    flex-direction: row !important;
+    flex-wrap: wrap !important;
+    max-height: none !important;
+    padding: 12px !important;
+    gap: 12px !important;
+  }
+}
+
+/* Status badges not yet in original CSS */
+.status-badge.ongoing-badge {
+  background-color: #DBEAFE;
+  color: #1D4ED8;
+  border: 1px solid #BFDBFE;
+}
+
+.status-badge.late-badge {
+  background-color: #FEE2E2;
+  color: #DC2626;
+  border: 1px solid #FECACA;
+}
+
+.status-badge.substitute-badge {
+  background-color: #EDE9FE;
+  color: #7C3AED;
+  border: 1px solid #DDD6FE;
+}
+
+.status-badge.absent-badge {
+  background-color: #F3F4F6;
+  color: #6B7280;
+  border: 1px solid #E5E7EB;
+}
+
+.course-card.ongoing {
+  border-left: 4px solid #1D4ED8;
+}
