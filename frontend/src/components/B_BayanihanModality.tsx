@@ -339,23 +339,68 @@ const BayanihanModality: React.FC<UserProps> = ({ user }) => {
     else await confirmDeleteAll();
   };
 
+  const handleDeleteAllForLeader = async (leader: BayanihanLeaderStatus) => {
+    if (leader.modalities.length === 0) { toast.warn('This leader has no modalities to delete'); return; }
+    const confirmed = window.confirm(`Delete all ${leader.modalities.length} modality/modalities submitted by ${leader.full_name}? This cannot be undone.`);
+    if (!confirmed) return;
+    setIsDeleting(true);
+    try {
+      await Promise.all(leader.modalities.map(m => api.delete(`/tbl_modality/${m.modality_id}/`)));
+      toast.success(`Deleted all modalities for ${leader.full_name}`);
+      setBayanihanLeaderStatuses(prev =>
+        prev.map(l => l.user_id === leader.user_id ? { ...l, submitted_count: 0, modalities: [] } : l)
+      );
+      setLeadersByDepartment(prev => {
+        const updated = { ...prev };
+        for (const deptId in updated) {
+          updated[deptId] = {
+            ...updated[deptId],
+            leaders: updated[deptId].leaders.map(l =>
+              l.user_id === leader.user_id ? { ...l, submitted_count: 0, modalities: [] } : l
+            ),
+          };
+        }
+        return updated;
+      });
+      setSelectedForDelete(prev => prev.filter(id => !leader.modalities.map(m => m.modality_id).includes(id)));
+    } catch (error) {
+      toast.error(`Failed to delete modalities for ${leader.full_name}`);
+    } finally {
+      setIsDeleting(false);
+    }
+  };
+
   const handleDeleteAll = () => {
-    if (userModalities.length === 0) { toast.warn('No modalities to delete'); return; }
+    if (activeTab === 'manage') {
+      const allLeaderModalities = bayanihanLeaderStatuses.flatMap(l => l.modalities);
+      if (allLeaderModalities.length === 0) { toast.warn('No modalities to delete'); return; }
+    } else {
+      if (userModalities.length === 0) { toast.warn('No modalities to delete'); return; }
+    }
     setDeleteMode('all');
     setShowFinalDeleteConfirm(true);
   };
 
+  // Update confirmDeleteAll to handle manage tab:
   const confirmDeleteAll = async () => {
-    if (userModalities.length === 0) return;
+    const toDelete = activeTab === 'manage'
+      ? bayanihanLeaderStatuses.flatMap(l => l.modalities)
+      : userModalities;
+    if (toDelete.length === 0) return;
     setIsDeleting(true);
     setShowFinalDeleteConfirm(false);
     try {
-      await Promise.all(userModalities.map(m => api.delete(`/tbl_modality/${m.modality_id}/`)));
-      toast.success(`Successfully deleted all ${userModalities.length} modalities`);
+      await Promise.all(toDelete.map(m => api.delete(`/tbl_modality/${m.modality_id}/`)));
+      toast.success(`Successfully deleted all ${toDelete.length} modalities`);
       setUserModalities([]);
       setSelectedForDelete([]);
       setEditingModality(null);
       setShowDeleteConfirm(false);
+      await fetchUserModalities();
+      // Refresh BL statuses if on manage tab
+      if (activeTab === 'manage') {
+        setBayanihanLeaderStatuses(prev => prev.map(l => ({ ...l, submitted_count: 0, modalities: [] })));
+      }
     } catch (error) {
       toast.error('Failed to delete all modalities');
     } finally {
@@ -1297,6 +1342,20 @@ const BayanihanModality: React.FC<UserProps> = ({ user }) => {
                                       }}>
                                         {leader.submitted_count > 0 ? `${leader.submitted_count} submitted` : 'No submission'}
                                       </span>
+
+                                      {/* ── NEW: per-leader Delete All button ── */}
+                                      {leader.modalities.length > 0 && (
+                                        <button
+                                          type="button"
+                                          className="bm-btn danger"
+                                          disabled={isDeleting}
+                                          onClick={e => { e.stopPropagation(); handleDeleteAllForLeader(leader); }}
+                                          style={{ fontSize: '11px', padding: '3px 10px', whiteSpace: 'nowrap' }}
+                                        >
+                                          Delete All
+                                        </button>
+                                      )}
+
                                       {/* Chevron */}
                                       <svg
                                         width="16" height="16" viewBox="0 0 24 24" fill="none"
@@ -1398,7 +1457,19 @@ const BayanihanModality: React.FC<UserProps> = ({ user }) => {
                                             }
 
                                             return (
-                                              <div key={modality.modality_id} className="bm-modality-row" style={{ cursor: 'default', background: 'var(--bm-surface)' }}>
+                                              <div
+                                                key={modality.modality_id}
+                                                className={`bm-modality-row${selectedForDelete.includes(modality.modality_id) ? ' selected' : ''}`}
+                                                onClick={() => toggleSelectModality(modality.modality_id)}
+                                                style={{ background: 'var(--bm-surface)' }}
+                                              >
+                                                <input
+                                                  type="checkbox"
+                                                  checked={selectedForDelete.includes(modality.modality_id)}
+                                                  onChange={() => toggleSelectModality(modality.modality_id)}
+                                                  onClick={e => e.stopPropagation()}
+                                                  style={{ flexShrink: 0, marginTop: '2px' }}
+                                                />
                                                 <div className="bm-modality-info">
                                                   <div className="bm-modality-title">
                                                     <span className="bm-type-badge">{modality.modality_type}</span>
@@ -1564,16 +1635,16 @@ const BayanihanModality: React.FC<UserProps> = ({ user }) => {
 
             <div className="bm-modal-footer">
               <button type="button" className="bm-btn" onClick={() => { setShowDeleteConfirm(false); setEditingModality(null); setSelectedForDelete([]); }} disabled={isDeleting}>Close</button>
-              {activeTab !== 'manage' && (
-                <>
-                  <button type="button" className="bm-btn danger" onClick={handleDeleteSelected} disabled={isDeleting || selectedForDelete.length === 0}>
-                    {isDeleting ? 'Deleting…' : `Delete Selected (${selectedForDelete.length})`}
-                  </button>
+              <>
+                <button type="button" className="bm-btn danger" onClick={handleDeleteSelected} disabled={isDeleting || selectedForDelete.length === 0}>
+                  {isDeleting ? 'Deleting…' : `Delete Selected (${selectedForDelete.length})`}
+                </button>
+                {activeTab !== 'manage' && (
                   <button type="button" className="bm-btn danger-fill" onClick={handleDeleteAll} disabled={isDeleting || userModalities.length === 0}>
                     {isDeleting ? 'Deleting…' : 'Delete All'}
                   </button>
-                </>
-              )}
+                )}
+              </>
             </div>
           </div>
         </div>
