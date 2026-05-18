@@ -1,4 +1,4 @@
-// DashboardFaculty.tsx — Merged: Dashboard + ExamDateViewer + ProctorAssignedExams
+// F_Dashboard.tsx — Merged: Dashboard + ExamDateViewer + ProctorAssignedExams
 import { useEffect, useRef, useState } from 'react';
 import type { JSX } from 'react';
 import { useNavigate } from 'react-router-dom';
@@ -7,7 +7,7 @@ import {
   FaHome, FaClock, FaClipboardList, FaBell, FaUser,
   FaSignOutAlt, FaBuilding, FaPenAlt, FaCalendarPlus, FaUsers, FaUserShield,
   FaBars, FaTimes, FaEye, FaClipboardCheck, FaChevronLeft, FaChevronRight,
-  FaCalendarAlt, FaListUl, FaChevronDown, FaChevronUp, FaCheckCircle,
+  FaCalendarAlt, FaListUl, FaChevronDown, FaCheckCircle,
 } from 'react-icons/fa';
 import { BsFillSendPlusFill } from 'react-icons/bs';
 import '../styles/F_Dashboard.css';
@@ -23,6 +23,7 @@ import DeanRequests from './D_DeanRequests.tsx';
 import RoomManagement from './S_RoomManagement.tsx';
 import ProctorMonitoring from './S_ProctorMonitoring.tsx';
 import ProctorAttendance from './P_ProctorAttendance.tsx';
+import AboutExamSync from './AboutExamSync.tsx';
 
 // ─────────────────────────────────────────────────────────────────────────────
 // Types
@@ -72,33 +73,38 @@ const roleSidebarMap: Record<string, { key: string; label: string; icon: JSX.Ele
     { key: 'set-Availability',   label: 'Set Availability',   icon: <FaClock {...iconStyle} /> },
     { key: 'exam-Schedule',      label: 'Exam Schedule',      icon: <FaClipboardList {...iconStyle} /> },
     { key: 'proctor-Attendance', label: 'Proctor Attendance', icon: <FaClipboardCheck {...iconStyle} /> },
+    { key: 'About-ExamSync',     label: 'About',              icon: <FaUserShield {...iconStyle} /> },
   ],
   scheduler: [
-    { key: 'plot-Schedule',          label: 'Plot Schedule',      icon: <FaCalendarPlus {...iconStyle} /> },
-    { key: 'exam-Schedule',          label: 'Exam Schedule',      icon: <FaClipboardList {...iconStyle} /> },
-    { key: 'proctors-Availability',  label: 'Available Proctor',  icon: <FaUsers {...iconStyle} /> },
-    { key: 'proctor-Monitoring',     label: 'Proctor Monitoring', icon: <FaEye {...iconStyle} /> },
-    { key: 'set-Modality',           label: 'Modality',      icon: <FaPenAlt {...iconStyle} /> },
-    { key: 'Room-Management',        label: 'Room Management',    icon: <FaBuilding {...iconStyle} /> },
+    { key: 'plot-Schedule',         label: 'Plot Schedule',      icon: <FaCalendarPlus {...iconStyle} /> },
+    { key: 'exam-Schedule',         label: 'Exam Schedule',      icon: <FaClipboardList {...iconStyle} /> },
+    { key: 'proctors-Availability', label: 'Available Proctor',  icon: <FaUsers {...iconStyle} /> },
+    { key: 'proctor-Monitoring',    label: 'Proctor Monitoring', icon: <FaEye {...iconStyle} /> },
+    { key: 'set-Modality',          label: 'Modality',           icon: <FaPenAlt {...iconStyle} /> },
+    { key: 'Room-Management',       label: 'Room Management',    icon: <FaBuilding {...iconStyle} /> },
+    { key: 'About-ExamSync',        label: 'About',              icon: <FaUserShield {...iconStyle} /> },
   ],
   dean: [
-    { key: 'Request',   label: 'Requests',  icon: <BsFillSendPlusFill {...iconStyle} /> },
+    { key: 'Request',        label: 'Requests', icon: <BsFillSendPlusFill {...iconStyle} /> },
+    { key: 'About-ExamSync', label: 'About',    icon: <FaUserShield {...iconStyle} /> },
   ],
   'bayanihan leader': [
-    { key: 'set-Modality',  label: 'Modality', icon: <FaPenAlt {...iconStyle} /> },
-    { key: 'exam-Schedule', label: 'Exam Schedule', icon: <FaClipboardList {...iconStyle} /> },
+    { key: 'set-Modality',  label: 'Modality',      icon: <FaPenAlt {...iconStyle} /> },
+    { key: 'exam-Schedule', label: 'Exam Schedule',  icon: <FaClipboardList {...iconStyle} /> },
+    { key: 'About-ExamSync', label: 'About',         icon: <FaUserShield {...iconStyle} /> },
   ],
   admin: [
     { key: 'plot-Schedule',         label: 'Plot Schedule',     icon: <FaCalendarPlus {...iconStyle} /> },
     { key: 'exam-Schedule',         label: 'Exam Schedule',     icon: <FaClipboardList {...iconStyle} /> },
     { key: 'proctors-Availability', label: 'Available Proctor', icon: <FaUsers {...iconStyle} /> },
     { key: 'Room-Management',       label: 'Room Management',   icon: <FaBuilding {...iconStyle} /> },
+    { key: 'About-ExamSync',        label: 'About',             icon: <FaUserShield {...iconStyle} /> },
   ],
 };
 
-const pagesWithNoTitle = ['plot-Schedule'];
+const pagesWithNoTitle = [''];
 
-const COLLEGES   = ['CSM', 'CITC', 'COT', 'CEA', 'CSTE', 'SHS'];
+const COLLEGES = ['CSM', 'CITC', 'COT', 'CEA', 'CSTE', 'SHS'];
 const MONTH_NAMES = [
   'January','February','March','April','May','June',
   'July','August','September','October','November','December',
@@ -158,19 +164,19 @@ const DashboardHome = ({
   onNavigate: (key: string) => void;
 }) => {
   // ── Calendar state ────────────────────────────────────────────────────
-  const [currentMonth, setCurrentMonth]   = useState(new Date());
-  const [examPeriods, setExamPeriods]     = useState<ExamPeriod[]>([]);
-  const [termMap, setTermMap]             = useState<Record<string, string>>({});
-  const [openDropdown, setOpenDropdown]   = useState<string | null>(null);
-  const [showSidebar, setShowSidebar]     = useState(true);
-  const [calFilters, setCalFilters]       = useState({ academicYear: '', examCategory: '', collegeName: '', termId: '' });
+  const [currentMonth, setCurrentMonth] = useState(new Date());
+  const [examPeriods, setExamPeriods]   = useState<ExamPeriod[]>([]);
+  const [termMap, setTermMap]           = useState<Record<string, string>>({});
+  const [openDropdown, setOpenDropdown] = useState<string | null>(null);
+  const [showSidebar, setShowSidebar]   = useState(true);
+  const [calFilters, setCalFilters]     = useState({ academicYear: '', examCategory: '', collegeName: '', termId: '' });
   const dropdownRef = useRef<HTMLDivElement>(null);
 
   // ── Proctor assignment state ──────────────────────────────────────────
-  const [assignments, setAssignments]     = useState<ProctorAssignment[]>([]);
-  const [assignFilter, setAssignFilter]   = useState<'upcoming' | 'ongoing' | 'completed' | 'all'>('upcoming');
-  const [expandedCard, setExpandedCard]   = useState<number | null>(null);
-  const [userCollege, setUserCollege]     = useState<string | null>(null);
+  const [assignments, setAssignments]   = useState<ProctorAssignment[]>([]);
+  const [assignFilter, setAssignFilter] = useState<'upcoming' | 'ongoing' | 'completed' | 'all'>('upcoming');
+  const [expandedCard, setExpandedCard] = useState<number | null>(null);
+  const [userCollege, setUserCollege]   = useState<string | null>(null);
 
   const today         = new Date();
   const currentYear   = currentMonth.getFullYear();
@@ -297,23 +303,14 @@ const DashboardHome = ({
     return acc;
   }, {});
 
-  const collegeCountThisMonth = COLLEGES.reduce<Record<string, number>>((acc, col) => {
-    acc[col] = examPeriods.filter(ep => {
-      const d = new Date(ep.start_date);
-      return d.getFullYear() === currentYear && d.getMonth() === currentMonthI &&
-        (ep.college_id === col || ep.college_name === col);
-    }).length;
-    return acc;
-  }, {});
-
   // ── Proctor filtering ─────────────────────────────────────────────────
   const now = new Date();
 
   const filteredAssignments = assignments.filter(a => {
-    const start     = new Date(a.exam_start_time);
-    const end       = new Date(a.exam_end_time);
-    const ongoing   = isExamOngoing(a.exam_date, a.exam_start_time, a.exam_end_time);
-    const status    = (a.examdetails_status || '').toLowerCase().trim();
+    const start   = new Date(a.exam_start_time);
+    const end     = new Date(a.exam_end_time);
+    const ongoing = isExamOngoing(a.exam_date, a.exam_start_time, a.exam_end_time);
+    const status  = (a.examdetails_status || '').toLowerCase().trim();
     const checkedIn = ['present','late','substitute','confirmed','absent'].some(s => status.includes(s));
     if (assignFilter === 'upcoming')  return start > now && !a.is_history;
     if (assignFilter === 'ongoing')   return ongoing && !checkedIn && !a.is_history;
@@ -390,13 +387,13 @@ const DashboardHome = ({
 
   // ── Quick shortcut cards ──────────────────────────────────────────────
   const shortcuts = [
-    ...(isScheduler ? [{ key: 'plot-Schedule', label: 'Plot Schedule', icon: <FaCalendarPlus size={18} />, desc: 'Create & manage schedules' }] : []),
-    ...(isProctor   ? [{ key: 'set-Availability', label: 'Set Availability', icon: <FaClock size={18} />, desc: 'Manage your availability' }] : []),
+    ...(isScheduler ? [{ key: 'plot-Schedule',        label: 'Plot Schedule',      icon: <FaCalendarPlus size={18} />, desc: 'Create & manage schedules' }]    : []),
+    ...(isProctor   ? [{ key: 'set-Availability',     label: 'Set Availability',   icon: <FaClock size={18} />,        desc: 'Manage your availability' }]      : []),
     { key: 'exam-Schedule', label: 'Exam Schedule', icon: <FaClipboardList size={18} />, desc: 'View all exam schedules' },
-    ...(isScheduler ? [{ key: 'proctors-Availability', label: 'Available Proctors', icon: <FaUsers size={18} />, desc: 'Check proctor availability' }] : []),
-    ...(roles.includes('dean') ? [{ key: 'Request', label: 'Requests', icon: <BsFillSendPlusFill size={18} />, desc: 'Manage approval requests' }] : []),
-    ...(isProctor   ? [{ key: 'proctor-Attendance', label: 'My Attendance', icon: <FaClipboardCheck size={18} />, desc: 'View proctor attendance' }] : []),
-    ...(isScheduler ? [{ key: 'Room-Management', label: 'Room Management', icon: <FaBuilding size={18} />, desc: 'Manage exam rooms' }] : []),
+    ...(isScheduler ? [{ key: 'proctors-Availability', label: 'Available Proctors', icon: <FaUsers size={18} />,       desc: 'Check proctor availability' }]    : []),
+    ...(roles.includes('dean') ? [{ key: 'Request',   label: 'Requests',           icon: <BsFillSendPlusFill size={18} />, desc: 'Manage approval requests' }]  : []),
+    ...(isProctor   ? [{ key: 'proctor-Attendance',   label: 'My Attendance',      icon: <FaClipboardCheck size={18} />, desc: 'View proctor attendance' }]     : []),
+    ...(isScheduler ? [{ key: 'Room-Management',      label: 'Room Management',    icon: <FaBuilding size={18} />,     desc: 'Manage exam rooms' }]             : []),
   ];
 
   return (
@@ -420,353 +417,352 @@ const DashboardHome = ({
         </div>
       )}
 
-      {/* ── Calendar Section ─────────────────────────────────────────── */}
-      <div className="dh-section-card">
+      {/* ── Two-column grid: Assignments (left) + Calendar (right) ────── */}
+      <div className="dashboard-shortcuts-wrapper">
+        <div className="shortcuts-grid">
 
-        {/* Calendar header */}
-        <div className="dh-cal-header">
-          <div className="dh-cal-header-left">
-            <div className="dh-cal-icon-wrap"><FaCalendarAlt size={16} /></div>
-            <div>
-              <h2 className="dh-cal-title">{MONTH_NAMES[currentMonthI]} {currentYear}</h2>
-              <p className="dh-cal-subtitle">
-                {examDaysThisMonth > 0
-                  ? `${examDaysThisMonth} exam day${examDaysThisMonth !== 1 ? 's' : ''} this month`
-                  : 'No exams scheduled this month'}
-              </p>
-            </div>
-          </div>
-
-          <div className="dh-cal-controls">
-            {/* Filter badges */}
-            <div className="dh-filter-badges">
-              {calFilters.examCategory && <span className="dh-filter-badge">{calFilters.examCategory}</span>}
-              {calFilters.termId       && <span className="dh-filter-badge">{termMap[calFilters.termId]}</span>}
-              {calFilters.collegeName  && <span className="dh-filter-badge">{calFilters.collegeName}</span>}
-            </div>
-
-            <div className="dh-cal-nav">
-              <button type="button" className="dh-nav-arrow" onClick={() => { const d = new Date(currentMonth); d.setMonth(d.getMonth() - 1); setCurrentMonth(d); }}>
-                <FaChevronLeft size={12} />
-              </button>
-              <button type="button" className="dh-nav-arrow" onClick={() => setCurrentMonth(new Date())}>Today</button>
-              <button type="button" className="dh-nav-arrow" onClick={() => { const d = new Date(currentMonth); d.setMonth(d.getMonth() + 1); setCurrentMonth(d); }}>
-                <FaChevronRight size={12} />
-              </button>
-            </div>
-
-            {/* Filter dropdown */}
-            <div className="dh-filter-wrapper" ref={dropdownRef}>
-              <button
-                type="button"
-                className="dh-filter-btn"
-                onClick={() => setOpenDropdown(openDropdown === 'cal' ? null : 'cal')}
-              >
-                Filters
-              </button>
-              <button
-                type="button"
-                className={`dh-filter-btn${showSidebar ? ' dh-filter-btn--active' : ''}`}
-                onClick={() => setShowSidebar(v => !v)}
-              >
-                <FaListUl size={10} style={{ marginRight: 4 }} />
-                {showSidebar ? 'Hide Panel' : 'Show Panel'}
-              </button>
-
-              {openDropdown === 'cal' && (
-                <div className="dh-filter-dropdown">
-                  <div className="dh-filter-group">
-                    <label>Month</label>
-                    <select value={currentMonthI} onChange={e => { const d = new Date(currentMonth); d.setMonth(+e.target.value); setCurrentMonth(d); }}>
-                      {MONTH_NAMES.map((m, i) => <option key={i} value={i}>{m}</option>)}
-                    </select>
-                  </div>
-                  <div className="dh-filter-group">
-                    <label>Year</label>
-                    <select value={currentYear} onChange={e => { const d = new Date(currentMonth); d.setFullYear(+e.target.value); setCurrentMonth(d); }}>
-                      {YEAR_OPTIONS.map(y => <option key={y} value={y}>{y}</option>)}
-                    </select>
-                  </div>
-                  <div className="dh-filter-group">
-                    <label>Semester</label>
-                    <select value={calFilters.termId} onChange={e => setCalFilters(f => ({ ...f, termId: e.target.value }))}>
-                      <option value="">All</option>
-                      {Object.entries(termMap).map(([id, name]) => <option key={id} value={id}>{name}</option>)}
-                    </select>
-                  </div>
-                  <div className="dh-filter-group">
-                    <label>Category</label>
-                    <select value={calFilters.examCategory} onChange={e => setCalFilters(f => ({ ...f, examCategory: e.target.value }))}>
-                      <option value="">All</option>
-                      {['Preliminary','Midterm','Prefinal','Final'].map(c => <option key={c} value={c}>{c}</option>)}
-                    </select>
-                  </div>
-                  <div className="dh-filter-group">
-                    <label>College</label>
-                    <select value={calFilters.collegeName} onChange={e => setCalFilters(f => ({ ...f, collegeName: e.target.value }))}>
-                      <option value="">All</option>
-                      {COLLEGES.map(col => <option key={col} value={col}>{col}</option>)}
-                    </select>
-                  </div>
-                  <button type="button" className="dh-filter-clear" onClick={() => setCalFilters({ academicYear: '', examCategory: '', collegeName: '', termId: '' })}>
-                    Clear Filters
+          {/* LEFT — Proctor Assignments (only for proctors) */}
+          {isProctor && (
+            <div className="dh-section-card dh-assignments-card">
+              <div className="dh-assignments-header">
+                <div>
+                  <h3 className="dh-assignments-title">Assigned Proctoring</h3>
+                  <p className="dh-assignments-sub">{assignments.length} total sections</p>
+                </div>
+                <div className="dh-assign-filters">
+                  {([
+                    { key: 'upcoming',  label: `Upcoming (${upcomingCount})`,   icon: <FaClock size={11} /> },
+                    { key: 'ongoing',   label: `On-going (${ongoingCount})`,    icon: <FaClock size={11} /> },
+                    { key: 'completed', label: `Completed (${completedCount})`, icon: <FaCheckCircle size={11} /> },
+                    { key: 'all',       label: `All (${assignments.length})`,   icon: null },
+                  ] as const).map(f => (
+                    <button
+                      key={f.key}
+                      type="button"
+                      className={`dh-assign-filter-btn${assignFilter === f.key ? ' active' : ''}`}
+                      onClick={() => setAssignFilter(f.key)}
+                    >
+                      {f.icon} {f.label}
+                    </button>
+                  ))}
+                  <button
+                    type="button"
+                    className="dh-assign-filter-btn"
+                    onClick={() => onNavigate('exam-Schedule')}
+                  >
+                    View All →
                   </button>
                 </div>
-              )}
-            </div>
-          </div>
-        </div>
+              </div>
 
-        {/* Two-column: calendar + sidebar */}
-        <div className={`dh-cal-layout${showSidebar ? ' dh-cal-layout--sidebar' : ''}`}>
-
-          {/* Calendar */}
-          <div className="dh-cal-main">
-            <div className="dh-cal-weekdays">
-              {['Sun','Mon','Tue','Wed','Thu','Fri','Sat'].map(d => (
-                <div key={d} className="dh-cal-weekday">{d}</div>
-              ))}
-            </div>
-            <div className="dh-cal-grid">{calendarCells}</div>
-
-            {/* Legend */}
-            <div className="dh-legend">
-              {COLLEGES.map(col => (
-                <div key={col} className={`dh-legend-item dh-col-${col.toLowerCase()}`}>{col}</div>
-              ))}
-            </div>
-          </div>
-
-          {/* Right sidebar */}
-          {showSidebar && (
-            <aside className="dh-right-sidebar">
-
-              {/* Upcoming exam dates */}
-              <div className="dh-sidebar-card">
-                <div className="dh-sidebar-card-title">
-                  Upcoming Exams
-                  <span className="dh-sidebar-count">{Object.keys(upcomingByDate).length}</span>
+              {filteredAssignments.length === 0 ? (
+                <div className="dh-assign-empty">
+                  <p>
+                    {assignFilter === 'all' ? 'No proctoring assignments yet'
+                      : assignFilter === 'ongoing' ? 'No on-going exams'
+                      : `No ${assignFilter} proctoring assignments`}
+                  </p>
                 </div>
-                {Object.keys(upcomingByDate).length === 0 ? (
-                  <p className="dh-sidebar-empty">No upcoming exams</p>
-                ) : (
-                  Object.entries(upcomingByDate).slice(0, 6).map(([dateStr, eps]) => {
-                    const d     = new Date(dateStr);
-                    const label = d.toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
-                    const uniqueColleges = Array.from(new Set(eps.map(ep => ep.college_id).filter(Boolean))) as string[];
+              ) : (
+                <div className="dh-assign-list">
+                  {filteredAssignments.slice(0, 5).map(assign => {
+                    const examStart   = new Date(assign.exam_start_time);
+                    const examEnd     = new Date(assign.exam_end_time);
+                    const ongoing     = isExamOngoing(assign.exam_date, assign.exam_start_time, assign.exam_end_time);
+                    const status      = (assign.examdetails_status || 'pending').toLowerCase().trim();
+                    const checkedIn   = ['present','late','substitute','confirmed','absent'].some(s => status.includes(s));
+                    const isUpcoming  = examStart > now;
+                    const isCompleted = checkedIn || examEnd < now || assign.is_history === true;
+                    const isExpanded  = expandedCard === assign.assignment_id;
+                    const duration    = getDuration(assign.exam_start_time, assign.exam_end_time);
+
+                    let displayStatus = 'Upcoming', statusClass = 'dh-badge-upcoming';
+                    if (isCompleted) {
+                      if (status.includes('confirmed') || status.includes('present')) { displayStatus = 'Present';    statusClass = 'dh-badge-completed'; }
+                      else if (status.includes('late'))       { displayStatus = 'Late';       statusClass = 'dh-badge-late'; }
+                      else if (status.includes('substitute')) { displayStatus = 'Substitute'; statusClass = 'dh-badge-substitute'; }
+                      else if (status.includes('absent'))     { displayStatus = 'Absent';     statusClass = 'dh-badge-absent'; }
+                      else                                    { displayStatus = 'Completed';  statusClass = 'dh-badge-completed'; }
+                    } else if (ongoing)  { displayStatus = 'On-going'; statusClass = 'dh-badge-ongoing'; }
+                    else if (isUpcoming) { displayStatus = 'Upcoming'; statusClass = 'dh-badge-upcoming'; }
+
                     return (
-                      <div key={dateStr} className="dh-sidebar-exam-row">
-                        <div className="dh-sidebar-exam-date">
-                          {label} · {termMap[String(eps[0].term_id)] || 'Unknown Term'}
+                      <div
+                        key={`${assign.assignment_id}-${assign.is_history ? 'h' : 'c'}`}
+                        className={[
+                          'dh-assign-item',
+                          isCompleted ? 'dh-assign-completed' : '',
+                          ongoing     ? 'dh-assign-ongoing'   : '',
+                          isExpanded  ? 'dh-assign-item--expanded' : '',
+                        ].filter(Boolean).join(' ')}
+                      >
+                        <div
+                          className="dh-assign-item-header"
+                          onClick={() => setExpandedCard(isExpanded ? null : assign.assignment_id)}
+                        >
+                          <div className="dh-assign-item-left">
+                            <div className="dh-course-code">{assign.course_id}</div>
+                            <div className="dh-assign-item-info">
+                              <p className="dh-assign-section">{assign.section}</p>
+                              <p className="dh-assign-instructor">{assign.instructor}</p>
+                              <div className="dh-assign-preview">
+                                <span>{new Date(assign.exam_date).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })}</span>
+                                <span className="dh-sep">·</span>
+                                <span>{formatTimeFull(assign.exam_start_time)} – {formatTimeFull(assign.exam_end_time)}</span>
+                                <span className="dh-duration">({duration})</span>
+                                <span className="dh-sep">·</span>
+                                <span>{assign.building} Rm {assign.room_id}</span>
+                              </div>
+                            </div>
+                          </div>
+                          <div className="dh-assign-item-right">
+                            <span className={`dh-status-badge ${statusClass}`}>{displayStatus}</span>
+                            {/* Single icon — CSS rotation handles up/down */}
+                            <button type="button" className="dh-expand-btn" aria-label="Toggle">
+                              <FaChevronDown size={13} />
+                            </button>
+                          </div>
                         </div>
-                        <div className="dh-sidebar-exam-name">{eps[0].exam_category} Exam</div>
-                        <div className="dh-sidebar-badges">
-                          {uniqueColleges.map((col, i) => (
-                            <span key={i} className={`dh-college-badge dh-col-${col.toLowerCase()}`}>{col}</span>
-                          ))}
-                        </div>
+
+                        {isExpanded && (
+                          <div className="dh-assign-detail">
+                            <div className="dh-detail-group">
+                              <span className="dh-detail-label">Date</span>
+                              <span className="dh-detail-val">{formatDateFull(assign.exam_date)}</span>
+                            </div>
+                            <div className="dh-detail-group">
+                              <span className="dh-detail-label">Time</span>
+                              <span className="dh-detail-val">{formatTimeFull(assign.exam_start_time)} – {formatTimeFull(assign.exam_end_time)} ({duration})</span>
+                            </div>
+                            <div className="dh-detail-group">
+                              <span className="dh-detail-label">Building</span>
+                              <span className="dh-detail-val">{assign.building}</span>
+                            </div>
+                            <div className="dh-detail-group">
+                              <span className="dh-detail-label">Room</span>
+                              <span className="dh-detail-val">{assign.room_id}</span>
+                            </div>
+                            <div className="dh-detail-group">
+                              <span className="dh-detail-label">Section</span>
+                              <span className="dh-detail-val">{assign.section}</span>
+                            </div>
+                            <div className="dh-detail-group">
+                              <span className="dh-detail-label">Instructor</span>
+                              <span className="dh-detail-val">{assign.instructor}</span>
+                            </div>
+                          </div>
+                        )}
                       </div>
                     );
-                  })
-                )}
-              </div>
+                  })}
 
-              {/* Month overview */}
-              <div className="dh-sidebar-card">
-                <div className="dh-sidebar-card-title">{MONTH_NAMES[currentMonthI]} Overview</div>
-                {COLLEGES.map(col => {
-                  const count = collegeCountThisMonth[col] || 0;
-                  return (
-                    <div key={col} className="dh-sidebar-college-row">
-                      <span className={`dh-college-badge dh-col-${col.toLowerCase()}`}>{col}</span>
-                      <span className="dh-sidebar-college-count">{count} exam{count !== 1 ? 's' : ''}</span>
-                    </div>
-                  );
-                })}
-              </div>
-
-              {/* College exam dates (proctor's college) */}
-              {isProctor && (
-                <div className="dh-sidebar-card">
-                  <div className="dh-sidebar-card-title">
-                    Exam Dates
-                    {userCollege && <span className="dh-college-pill">{userCollege}</span>}
-                  </div>
-                  {Object.keys(collegeExamsByDate).length === 0 ? (
-                    <p className="dh-sidebar-empty">No upcoming exam dates</p>
-                  ) : (
-                    Object.entries(collegeExamsByDate).slice(0, 5).map(([dateStr, eps]) => {
-                      const d         = new Date(dateStr);
-                      const label     = d.toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
-                      const dayName   = d.toLocaleDateString('en-US', { weekday: 'short' });
-                      const isThisWeek = (d.getTime() - now.getTime()) < 7 * 24 * 60 * 60 * 1000;
-                      return (
-                        <div key={dateStr} className={`dh-college-date-row${isThisWeek ? ' dh-college-date-row--soon' : ''}`}>
-                          <div className="dh-college-date-top">
-                            <span className="dh-college-date-label">{dayName}, {label}</span>
-                            {isThisWeek && <span className="dh-soon-pill">SOON</span>}
-                          </div>
-                          <div className="dh-college-date-name">{eps[0].exam_category} Exam</div>
-                          <div className="dh-college-date-meta">
-                            {termMap[String(eps[0].term_id)] || eps[0].term_name || 'Unknown Term'}
-                            {eps[0].academic_year ? ` · ${eps[0].academic_year}` : ''}
-                          </div>
-                        </div>
-                      );
-                    })
+                  {filteredAssignments.length > 5 && (
+                    <button
+                      type="button"
+                      className="dh-viewall-btn"
+                      onClick={() => onNavigate('exam-Schedule')}
+                    >
+                      View all {filteredAssignments.length} assignments →
+                    </button>
                   )}
                 </div>
               )}
-
-            </aside>
-          )}
-        </div>
-      </div>
-
-      {/* ── Proctor Assignments (only for proctors) ────────────────────── */}
-      {isProctor && (
-        <div className="dh-section-card dh-assignments-card">
-          <div className="dh-assignments-header">
-            <div>
-              <h3 className="dh-assignments-title">Assigned Proctoring</h3>
-              <p className="dh-assignments-sub">{assignments.length} total sections</p>
             </div>
-            <div className="dh-assign-filters">
-              {([
-                { key: 'upcoming',  label: `Upcoming (${upcomingCount})`,   icon: <FaClock size={11} /> },
-                { key: 'ongoing',   label: `On-going (${ongoingCount})`,    icon: <FaClock size={11} /> },
-                { key: 'completed', label: `Completed (${completedCount})`, icon: <FaCheckCircle size={11} /> },
-                { key: 'all',       label: `All (${assignments.length})`,   icon: null },
-              ] as const).map(f => (
-                <button
-                  key={f.key}
-                  type="button"
-                  className={`dh-assign-filter-btn${assignFilter === f.key ? ' active' : ''}`}
-                  onClick={() => setAssignFilter(f.key)}
-                >
-                  {f.icon} {f.label}
-                </button>
-              ))}
-              <button
-                type="button"
-                className="dh-assign-filter-btn"
-                onClick={() => onNavigate('exam-Schedule')}
-              >
-                View All →
-              </button>
+          )}
+
+          {/* RIGHT — Calendar (full width if not proctor) */}
+          <div className={`dh-section-card${!isProctor ? ' dh-full-col' : ''}`}>
+
+            {/* Calendar header */}
+            <div className="dh-cal-header">
+              <div className="dh-cal-header-left">
+                <div className="dh-cal-icon-wrap"><FaCalendarAlt size={16} /></div>
+                <div>
+                  <h2 className="dh-cal-title">{MONTH_NAMES[currentMonthI]} {currentYear}</h2>
+                  <p className="dh-cal-subtitle">
+                    {examDaysThisMonth > 0
+                      ? `${examDaysThisMonth} exam day${examDaysThisMonth !== 1 ? 's' : ''} this month`
+                      : 'No exams scheduled this month'}
+                  </p>
+                </div>
+              </div>
+
+              <div className="dh-cal-controls">
+                {/* Filter badges */}
+                <div className="dh-filter-badges">
+                  {calFilters.examCategory && <span className="dh-filter-badge">{calFilters.examCategory}</span>}
+                  {calFilters.termId       && <span className="dh-filter-badge">{termMap[calFilters.termId]}</span>}
+                  {calFilters.collegeName  && <span className="dh-filter-badge">{calFilters.collegeName}</span>}
+                </div>
+
+                <div className="dh-cal-nav">
+                  <button type="button" className="dh-nav-arrow" onClick={() => { const d = new Date(currentMonth); d.setMonth(d.getMonth() - 1); setCurrentMonth(d); }}>
+                    <FaChevronLeft size={12} />
+                  </button>
+                  <button type="button" className="dh-nav-arrow" onClick={() => setCurrentMonth(new Date())}>Today</button>
+                  <button type="button" className="dh-nav-arrow" onClick={() => { const d = new Date(currentMonth); d.setMonth(d.getMonth() + 1); setCurrentMonth(d); }}>
+                    <FaChevronRight size={12} />
+                  </button>
+                </div>
+
+                {/* Filter dropdown */}
+                <div className="dh-filter-wrapper" ref={dropdownRef}>
+                  <button
+                    type="button"
+                    className="dh-filter-btn"
+                    onClick={() => setOpenDropdown(openDropdown === 'cal' ? null : 'cal')}
+                  >
+                    Filters
+                  </button>
+                  <button
+                    type="button"
+                    className={`dh-filter-btn${showSidebar ? ' dh-filter-btn--active' : ''}`}
+                    onClick={() => setShowSidebar(v => !v)}
+                  >
+                    <FaListUl size={10} style={{ marginRight: 4 }} />
+                    {showSidebar ? 'Hide Panel' : 'Show Panel'}
+                  </button>
+
+                  {openDropdown === 'cal' && (
+                    <div className="dh-filter-dropdown">
+                      <div className="dh-filter-group">
+                        <label>Month</label>
+                        <select value={currentMonthI} onChange={e => { const d = new Date(currentMonth); d.setMonth(+e.target.value); setCurrentMonth(d); }}>
+                          {MONTH_NAMES.map((m, i) => <option key={i} value={i}>{m}</option>)}
+                        </select>
+                      </div>
+                      <div className="dh-filter-group">
+                        <label>Year</label>
+                        <select value={currentYear} onChange={e => { const d = new Date(currentMonth); d.setFullYear(+e.target.value); setCurrentMonth(d); }}>
+                          {YEAR_OPTIONS.map(y => <option key={y} value={y}>{y}</option>)}
+                        </select>
+                      </div>
+                      <div className="dh-filter-group">
+                        <label>Semester</label>
+                        <select value={calFilters.termId} onChange={e => setCalFilters(f => ({ ...f, termId: e.target.value }))}>
+                          <option value="">All</option>
+                          {Object.entries(termMap).map(([id, name]) => <option key={id} value={id}>{name}</option>)}
+                        </select>
+                      </div>
+                      <div className="dh-filter-group">
+                        <label>Category</label>
+                        <select value={calFilters.examCategory} onChange={e => setCalFilters(f => ({ ...f, examCategory: e.target.value }))}>
+                          <option value="">All</option>
+                          {['Preliminary','Midterm','Prefinal','Final'].map(c => <option key={c} value={c}>{c}</option>)}
+                        </select>
+                      </div>
+                      <div className="dh-filter-group">
+                        <label>College</label>
+                        <select value={calFilters.collegeName} onChange={e => setCalFilters(f => ({ ...f, collegeName: e.target.value }))}>
+                          <option value="">All</option>
+                          {COLLEGES.map(col => <option key={col} value={col}>{col}</option>)}
+                        </select>
+                      </div>
+                      <button type="button" className="dh-filter-clear" onClick={() => setCalFilters({ academicYear: '', examCategory: '', collegeName: '', termId: '' })}>
+                        Clear Filters
+                      </button>
+                    </div>
+                  )}
+                </div>
+              </div>
+            </div>
+
+            {/* Two-column: calendar + sidebar */}
+            <div className={`dh-cal-layout${showSidebar ? ' dh-cal-layout--sidebar' : ''}`}>
+
+              {/* Calendar */}
+              <div className="dh-cal-main">
+                <div className="dh-cal-weekdays">
+                  {['Sun','Mon','Tue','Wed','Thu','Fri','Sat'].map(d => (
+                    <div key={d} className="dh-cal-weekday">{d}</div>
+                  ))}
+                </div>
+                <div className="dh-cal-grid">{calendarCells}</div>
+
+                {/* Legend */}
+                <div className="dh-legend">
+                  {COLLEGES.map(col => (
+                    <div key={col} className={`dh-legend-item dh-col-${col.toLowerCase()}`}>{col}</div>
+                  ))}
+                </div>
+              </div>
+
+              {/* Right sidebar */}
+              {showSidebar && (
+                <aside className="dh-right-sidebar">
+
+                  {/* Upcoming exam dates */}
+                  <div className="dh-sidebar-card">
+                    <div className="dh-sidebar-card-title">
+                      Upcoming Exams
+                      <span className="dh-sidebar-count">{Object.keys(upcomingByDate).length}</span>
+                    </div>
+                    {Object.keys(upcomingByDate).length === 0 ? (
+                      <p className="dh-sidebar-empty">No upcoming exams</p>
+                    ) : (
+                      Object.entries(upcomingByDate).slice(0, 6).map(([dateStr, eps]) => {
+                        const d     = new Date(dateStr);
+                        const label = d.toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
+                        const uniqueColleges = Array.from(new Set(eps.map(ep => ep.college_id).filter(Boolean))) as string[];
+                        return (
+                          <div key={dateStr} className="dh-sidebar-exam-row">
+                            <div className="dh-sidebar-exam-date">
+                              {label} · {termMap[String(eps[0].term_id)] || 'Unknown Term'}
+                            </div>
+                            <div className="dh-sidebar-exam-name">{eps[0].exam_category} Exam</div>
+                            <div className="dh-sidebar-badges">
+                              {uniqueColleges.map((col, i) => (
+                                <span key={i} className={`dh-college-badge dh-col-${col.toLowerCase()}`}>{col}</span>
+                              ))}
+                            </div>
+                          </div>
+                        );
+                      })
+                    )}
+                  </div>
+
+                  {/* College exam dates (proctor's college) */}
+                  {isProctor && (
+                    <div className="dh-sidebar-card">
+                      <div className="dh-sidebar-card-title">
+                        Exam Dates
+                        {userCollege && <span className="dh-college-pill">{userCollege}</span>}
+                      </div>
+                      {Object.keys(collegeExamsByDate).length === 0 ? (
+                        <p className="dh-sidebar-empty">No upcoming exam dates</p>
+                      ) : (
+                        Object.entries(collegeExamsByDate).slice(0, 5).map(([dateStr, eps]) => {
+                          const d          = new Date(dateStr);
+                          const label      = d.toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
+                          const dayName    = d.toLocaleDateString('en-US', { weekday: 'short' });
+                          const isThisWeek = (d.getTime() - now.getTime()) < 7 * 24 * 60 * 60 * 1000;
+                          return (
+                            <div key={dateStr} className={`dh-college-date-row${isThisWeek ? ' dh-college-date-row--soon' : ''}`}>
+                              <div className="dh-college-date-top">
+                                <span className="dh-college-date-label">{dayName}, {label}</span>
+                                {isThisWeek && <span className="dh-soon-pill">SOON</span>}
+                              </div>
+                              <div className="dh-college-date-name">{eps[0].exam_category} Exam</div>
+                              <div className="dh-college-date-meta">
+                                {termMap[String(eps[0].term_id)] || eps[0].term_name || 'Unknown Term'}
+                                {eps[0].academic_year ? ` · ${eps[0].academic_year}` : ''}
+                              </div>
+                            </div>
+                          );
+                        })
+                      )}
+                    </div>
+                  )}
+
+                </aside>
+              )}
             </div>
           </div>
 
-          {filteredAssignments.length === 0 ? (
-            <div className="dh-assign-empty">
-              <p>
-                {assignFilter === 'all' ? 'No proctoring assignments yet'
-                  : assignFilter === 'ongoing' ? 'No on-going exams'
-                  : `No ${assignFilter} proctoring assignments`}
-              </p>
-            </div>
-          ) : (
-            <div className="dh-assign-list">
-              {filteredAssignments.slice(0, 5).map(assign => {
-                const examStart  = new Date(assign.exam_start_time);
-                const examEnd    = new Date(assign.exam_end_time);
-                const ongoing    = isExamOngoing(assign.exam_date, assign.exam_start_time, assign.exam_end_time);
-                const status     = (assign.examdetails_status || 'pending').toLowerCase().trim();
-                const checkedIn  = ['present','late','substitute','confirmed','absent'].some(s => status.includes(s));
-                const isUpcoming = examStart > now;
-                const isCompleted = checkedIn || examEnd < now || assign.is_history === true;
-                const isExpanded  = expandedCard === assign.assignment_id;
-                const duration    = getDuration(assign.exam_start_time, assign.exam_end_time);
-
-                let displayStatus = 'Upcoming', statusClass = 'dh-badge-upcoming';
-                if (isCompleted) {
-                  if (status.includes('confirmed') || status.includes('present')) { displayStatus = 'Present';    statusClass = 'dh-badge-completed'; }
-                  else if (status.includes('late'))       { displayStatus = 'Late';       statusClass = 'dh-badge-late'; }
-                  else if (status.includes('substitute')) { displayStatus = 'Substitute'; statusClass = 'dh-badge-substitute'; }
-                  else if (status.includes('absent'))     { displayStatus = 'Absent';     statusClass = 'dh-badge-absent'; }
-                  else                                    { displayStatus = 'Completed';  statusClass = 'dh-badge-completed'; }
-                } else if (ongoing)   { displayStatus = 'On-going'; statusClass = 'dh-badge-ongoing'; }
-                else if (isUpcoming)  { displayStatus = 'Upcoming'; statusClass = 'dh-badge-upcoming'; }
-
-                return (
-                  <div
-                    key={`${assign.assignment_id}-${assign.is_history ? 'h' : 'c'}`}
-                    className={`dh-assign-item${isCompleted ? ' dh-assign-completed' : ongoing ? ' dh-assign-ongoing' : ''}`}
-                  >
-                    <div
-                      className="dh-assign-item-header"
-                      onClick={() => setExpandedCard(isExpanded ? null : assign.assignment_id)}
-                    >
-                      <div className="dh-assign-item-left">
-                        <div className="dh-course-code">{assign.course_id}</div>
-                        <div className="dh-assign-item-info">
-                          <p className="dh-assign-section">{assign.section}</p>
-                          <p className="dh-assign-instructor">{assign.instructor}</p>
-                          <div className="dh-assign-preview">
-                            <span>{new Date(assign.exam_date).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })}</span>
-                            <span className="dh-sep">·</span>
-                            <span>{formatTimeFull(assign.exam_start_time)} – {formatTimeFull(assign.exam_end_time)}</span>
-                            <span className="dh-duration">({duration})</span>
-                            <span className="dh-sep">·</span>
-                            <span>{assign.building} Rm {assign.room_id}</span>
-                          </div>
-                        </div>
-                      </div>
-                      <div className="dh-assign-item-right">
-                        <span className={`dh-status-badge ${statusClass}`}>{displayStatus}</span>
-                        <button type="button" className="dh-expand-btn" aria-label="Toggle">
-                          {isExpanded ? <FaChevronUp size={13} /> : <FaChevronDown size={13} />}
-                        </button>
-                      </div>
-                    </div>
-
-                    {isExpanded && (
-                      <div className="dh-assign-detail">
-                        <div className="dh-detail-group">
-                          <span className="dh-detail-label">Date</span>
-                          <span className="dh-detail-val">{formatDateFull(assign.exam_date)}</span>
-                        </div>
-                        <div className="dh-detail-group">
-                          <span className="dh-detail-label">Time</span>
-                          <span className="dh-detail-val">{formatTimeFull(assign.exam_start_time)} – {formatTimeFull(assign.exam_end_time)} ({duration})</span>
-                        </div>
-                        <div className="dh-detail-group">
-                          <span className="dh-detail-label">Building</span>
-                          <span className="dh-detail-val">{assign.building}</span>
-                        </div>
-                        <div className="dh-detail-group">
-                          <span className="dh-detail-label">Room</span>
-                          <span className="dh-detail-val">{assign.room_id}</span>
-                        </div>
-                        <div className="dh-detail-group">
-                          <span className="dh-detail-label">Section</span>
-                          <span className="dh-detail-val">{assign.section}</span>
-                        </div>
-                        <div className="dh-detail-group">
-                          <span className="dh-detail-label">Instructor</span>
-                          <span className="dh-detail-val">{assign.instructor}</span>
-                        </div>
-                      </div>
-                    )}
-                  </div>
-                );
-              })}
-
-              {filteredAssignments.length > 5 && (
-                <button
-                  type="button"
-                  className="dh-viewall-btn"
-                  onClick={() => onNavigate('exam-Schedule')}
-                >
-                  View all {filteredAssignments.length} assignments →
-                </button>
-              )}
-            </div>
-          )}
         </div>
-      )}
+      </div>
 
-      {/* ── Scheduler quick plot (non-proctor scheduler) ───────────────── */}
+      {/* ── Scheduler quick plot (non-proctor scheduler) — full width below ── */}
       {isScheduler && !isProctor && (
         <div className="dh-section-card dh-plot-teaser">
           <div className="dh-plot-teaser-inner">
@@ -803,7 +799,7 @@ const DashboardFaculty = () => {
   const [dropdownOpen, setDropdownOpen]       = useState(false);
   const [notifDropdownOpen, setNotifDropdownOpen] = useState(false);
   const [notifications, setNotifications]     = useState<any[]>([]);
-  const dropdownRef     = useRef<HTMLDivElement>(null);
+  const dropdownRef      = useRef<HTMLDivElement>(null);
   const notifDropdownRef = useRef<HTMLDivElement>(null);
   const navigate = useNavigate();
 
@@ -1055,6 +1051,7 @@ const DashboardFaculty = () => {
           {activeMenu === 'proctor-Monitoring'    && <ProctorMonitoring user={user} />}
           {activeMenu === 'Request'               && <DeanRequests user={user} />}
           {activeMenu === 'Room-Management'       && <RoomManagement user={user} />}
+          {activeMenu === 'About-ExamSync'        && <AboutExamSync />}
         </main>
       </div>
 

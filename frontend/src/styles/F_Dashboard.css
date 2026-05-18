@@ -674,16 +674,20 @@ body {
 }
  
 @media (max-width: 1200px) {
-  .shortcuts-grid {
-    grid-template-columns: 1fr 1fr;
+  .dh-shortcuts-bar {
+    grid-template-columns: repeat(3, 1fr);
   }
 }
  
 @media (max-width: 768px) {
-  .shortcuts-grid {
-    grid-template-columns: 1fr;
+  .dh-shortcuts-bar {
+    grid-template-columns: repeat(2, 1fr);
+    gap: 8px;
   }
-}
+
+  .dh-shortcut-btn  { padding: 10px 12px; }
+  .dh-shortcut-desc { display: none; }
+} 
 
 .shortcut-card {
   background: #ffffff;
@@ -1102,9 +1106,9 @@ button.view-button { background-color: var(--orange); }
 
 /* ── Quick Shortcuts bar ── */
 .dh-shortcuts-bar {
-  display: flex;
-  gap: 12px;
-  flex-wrap: wrap;
+  display: grid;
+  grid-template-columns: repeat(6, 1fr);
+  gap: 10px;
 }
 
 .dh-shortcut-btn {
@@ -1115,11 +1119,10 @@ button.view-button { background-color: var(--orange); }
   background: #ffffff;
   border: 1.5px solid #e8edf3;
   border-radius: 14px;
-  padding: 14px 16px;
+  padding: 12px 14px;
   cursor: pointer;
-  flex: 1;
-  min-width: 130px;
-  max-width: 200px;
+  min-width: 0;
+  width: 100%;
   text-align: left;
   transition: border-color 0.2s, box-shadow 0.2s, transform 0.15s;
   box-shadow: 0 2px 8px rgba(9,44,76,0.06);
@@ -1341,14 +1344,20 @@ button.view-button { background-color: var(--orange); }
 /* ── Calendar layout ── */
 .dh-cal-layout {
   display: flex;
-  flex-direction: column;
+  position: relative;
+  overflow: hidden;
 }
 
 .dh-cal-layout--sidebar {
   flex-direction: row;
 }
 
-.dh-cal-main { flex: 1; min-width: 0; padding: 16px; }
+.dh-cal-main {
+  flex: 1;
+  min-width: 0;
+  padding: 16px;
+  width: 100%;
+}
 
 /* ── Calendar grid ── */
 .dh-cal-weekdays {
@@ -1451,13 +1460,47 @@ button.view-button { background-color: var(--orange); }
 
 /* ── Right sidebar ── */
 .dh-right-sidebar {
-  width: 230px;
-  flex-shrink: 0;
+  position: absolute;
+  top: 0;
+  right: 0;
+  height: 100%;
+  width: 240px;
+  background: #ffffff;
   border-left: 1.5px solid #f0f3f7;
   display: flex;
   flex-direction: column;
   overflow-y: auto;
   overflow-x: hidden;
+  box-shadow: -4px 0 18px rgba(9, 44, 76, 0.10);
+  border-radius: 0 0 18px 0;
+  z-index: 10;
+  transform: translateX(110%);
+  opacity: 0;
+  transition: transform 0.35s cubic-bezier(0.4, 0, 0.2, 1),
+              opacity 0.28s ease,
+              box-shadow 0.35s ease;
+  pointer-events: none;
+  will-change: transform, opacity;
+}
+
+.dh-cal-layout--sidebar .dh-right-sidebar {
+  transform: translateX(0);
+  opacity: 1;
+  pointer-events: auto;
+  box-shadow: -6px 0 24px rgba(9, 44, 76, 0.13);
+}
+
+.dh-cal-layout--sidebar .dh-sidebar-card:nth-child(1) { animation-delay: 0.08s; }
+.dh-cal-layout--sidebar .dh-sidebar-card:nth-child(2) { animation-delay: 0.16s; }
+.dh-cal-layout--sidebar .dh-sidebar-card:nth-child(3) { animation-delay: 0.22s; }
+
+@keyframes sidebarCardIn {
+  from { opacity: 0; transform: translateX(18px); }
+  to   { opacity: 1; transform: translateX(0); }
+}
+
+.dh-cal-layout--sidebar .dh-sidebar-card {
+  animation: sidebarCardIn 0.32s ease both;
 }
 
 .dh-sidebar-card {
@@ -1677,8 +1720,22 @@ button.view-button { background-color: var(--orange); }
   border-radius: 12px;
   overflow: hidden;
   background: #fafbfc;
-  transition: border-color 0.15s;
+  transition: border-color 0.2s, box-shadow 0.2s, transform 0.18s;
 }
+
+.dh-assign-item:hover {
+  border-color: #c8d4e0;
+  box-shadow: 0 4px 14px rgba(9,44,76,0.08);
+  transform: translateY(-1px);
+}
+
+.dh-assign-item--expanded {
+  border-color: var(--orange) !important;
+  box-shadow: 0 4px 18px rgba(242,153,74,0.15);
+}
+
+.dh-assign-ongoing { border-color: #bfdbfe !important; background: #eff6ff; }
+.dh-assign-completed { opacity: 0.75; }
 
 .dh-assign-item:hover         { border-color: #c8d4e0; }
 .dh-assign-ongoing            { border-color: #bfdbfe !important; background: #eff6ff; }
@@ -1776,10 +1833,20 @@ button.view-button { background-color: var(--orange); }
   align-items: center;
   padding: 4px;
   border-radius: 6px;
-  transition: background-color 0.15s;
+  transition: background-color 0.2s, color 0.2s, transform 0.25s cubic-bezier(0.4, 0, 0.2, 1);
 }
 
-.dh-expand-btn:hover { background: #f0f3f7; color: var(--navy); }
+.dh-expand-btn:hover {
+  background: #f0f3f7;
+  color: var(--navy);
+}
+
+.dh-assign-item--expanded .dh-expand-btn {
+  transform: rotate(180deg);
+  color: var(--orange);
+  background: #fff0e4;
+}
+
 
 /* Expanded detail */
 .dh-assign-detail {
@@ -1789,6 +1856,24 @@ button.view-button { background-color: var(--orange); }
   padding: 12px 14px 14px;
   border-top: 1px solid #f0f3f7;
   background: #fff;
+
+  /* animation */
+  animation: detailSlideDown 0.26s cubic-bezier(0.4, 0, 0.2, 1) both;
+  transform-origin: top center;
+  overflow: hidden;
+}
+
+@keyframes detailSlideDown {
+  from {
+    opacity: 0;
+    transform: translateY(-8px) scaleY(0.92);
+    max-height: 0;
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0) scaleY(1);
+    max-height: 500px;
+  }
 }
 
 .dh-detail-group {
@@ -1881,21 +1966,28 @@ button.view-button { background-color: var(--orange); }
 
 /* ── Responsive tweaks ── */
 @media (max-width: 768px) {
-  .dh-shortcuts-bar { gap: 8px; }
-  .dh-shortcut-btn  { min-width: 100px; max-width: none; padding: 10px 12px; }
-  .dh-shortcut-desc { display: none; }
   .dh-cal-layout--sidebar { flex-direction: column; }
-  .dh-right-sidebar { width: 100%; border-left: none; border-top: 1.5px solid #f0f3f7; }
-  .dh-cal-cell     { min-height: 50px; padding: 4px 3px; }
-  .dh-cal-daynumber { font-size: 0.7rem; }
-  .dh-college-badge { font-size: 0.55rem; padding: 1px 3px; }
-  .dh-assign-detail { grid-template-columns: 1fr; }
-  .dh-cal-header    { flex-direction: column; align-items: flex-start; }
-  .dh-assignments-header { flex-direction: column; align-items: flex-start; }
+
+  .dh-right-sidebar {
+    position: absolute;
+    width: 85%;
+    height: 100%;
+    border-left: 1.5px solid #f0f3f7;
+    border-top: none;
+    box-shadow: -4px 0 18px rgba(9,44,76,0.12);
+  }
 }
 
 @media (min-width: 769px) and (max-width: 1024px) {
-  .dh-cal-layout--sidebar { flex-direction: column; }
-  .dh-right-sidebar { width: 100%; border-left: none; border-top: 1.5px solid #f0f3f7;
-    display: grid; grid-template-columns: repeat(3, 1fr); }
+  .dh-cal-layout--sidebar { flex-direction: row; }
+
+  .dh-right-sidebar {
+    position: absolute;
+    width: 240px;
+    height: 100%;
+    border-top: none;
+    display: flex;
+    flex-direction: column;
+    grid-template-columns: unset;
+  }
 }

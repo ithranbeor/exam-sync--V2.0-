@@ -14,24 +14,20 @@ const getGreeting = (): string => {
 };
 
 const roleToDashboardMap: Record<string, string> = {
-  proctor: "/faculty-dashboard",
-  faculty: "/faculty-dashboard",
-  scheduler: "/faculty-dashboard",
+  proctor:            "/faculty-dashboard",
+  faculty:            "/faculty-dashboard",
+  scheduler:          "/faculty-dashboard",
   "bayanihan leader": "/faculty-dashboard",
-  dean: "/faculty-dashboard",
-  admin: "/admin-dashboard",
+  dean:               "/faculty-dashboard",
+  admin:              "/admin-dashboard",
 };
-
-type LoginMode = "faculty" | "admin";
 
 const UnifiedLogin: React.FC = () => {
   const navigate = useNavigate();
-  const [mode, setMode] = useState<LoginMode>("faculty");
   const [form, setForm] = useState({ id: "", password: "" });
   const [rememberMe, setRememberMe] = useState(false);
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(false);
-  const [animating, setAnimating] = useState(false);
 
   const showPasswordRef = useRef(false);
   const [, forceRerender] = useState(false);
@@ -46,20 +42,6 @@ const UnifiedLogin: React.FC = () => {
     showPasswordRef.current = !showPasswordRef.current;
     forceRerender((x) => !x);
   }, []);
-
-  const switchMode = useCallback(
-    (newMode: LoginMode) => {
-      if (newMode === mode || animating) return;
-      setAnimating(true);
-      setTimeout(() => {
-        setMode(newMode);
-        setError("");
-        setForm({ id: "", password: "" });
-        setAnimating(false);
-      }, 300);
-    },
-    [mode, animating]
-  );
 
   const handleLogin = useCallback(
     async (e: React.FormEvent) => {
@@ -86,52 +68,33 @@ const UnifiedLogin: React.FC = () => {
             ?.map((r: any) => r.role_name?.toLowerCase()) ?? [];
 
         if (activeRoles.length === 0) {
-          setError("No active roles assigned to this account.");
+          setError("No active roles are assigned to this account.");
           return;
         }
 
         const userData = {
-          user_id: authData.user_id,
+          user_id:       authData.user_id,
           email_address: authData.email,
-          first_name: authData.first_name,
-          last_name: authData.last_name,
-          token: authData.token,
-          roles: authData.roles,
+          first_name:    authData.first_name,
+          last_name:     authData.last_name,
+          token:         authData.token,
+          roles:         authData.roles,
         };
 
         const storage = rememberMe ? localStorage : sessionStorage;
+        storage.setItem("user", JSON.stringify(userData));
 
-        if (mode === "admin") {
-          // Admin tab: must have admin role
-          if (!activeRoles.includes("admin")) {
-            setError("Admin access denied. Your account has no admin role.");
-            return;
-          }
-          storage.setItem("user", JSON.stringify(userData));
-          navigate("/admin-dashboard");
-        } else {
-          // Faculty tab: accepts any role.
-          // If the user ONLY has admin and no other role, still let them in
-          // but land them on the admin dashboard (they chose wrong tab).
-          const nonAdminRoles = activeRoles.filter((r) => r !== "admin");
+        // Route by first active role (admin takes priority)
+        const primaryRole = activeRoles.includes("admin")
+          ? "admin"
+          : activeRoles[0];
 
-          if (nonAdminRoles.length === 0) {
-            // Pure admin account logged in via Faculty tab → redirect to admin
-            storage.setItem("user", JSON.stringify(userData));
-            navigate("/admin-dashboard");
-            return;
-          }
+        const dashboard = roleToDashboardMap[primaryRole] ?? "/faculty-dashboard";
+        navigate(dashboard);
 
-          // Pick the first non-admin role for dashboard routing
-          const primaryRole = nonAdminRoles[0];
-          const dashboard = roleToDashboardMap[primaryRole] ?? "/faculty-dashboard";
-          storage.setItem("user", JSON.stringify(userData));
-          navigate(dashboard);
-        }
       } catch (err: any) {
-        const roleLabel = mode === "admin" ? "Admin" : "Employee";
         setError(
-          err.response?.data?.message ?? `Invalid ${roleLabel} ID or password.`
+          err.response?.data?.message ?? "Invalid ID or password. Please try again."
         );
       } finally {
         setLoading(false);
@@ -139,63 +102,64 @@ const UnifiedLogin: React.FC = () => {
 
       return () => ctrl.abort();
     },
-    [form, rememberMe, navigate, mode]
+    [form, rememberMe, navigate]
   );
 
   return (
     <div className="ul-root">
-      {/* Animated background */}
-      <div className={`ul-bg ul-bg--${mode}`}>
-        <div className="ul-bg__orb ul-bg__orb--1" />
-        <div className="ul-bg__orb ul-bg__orb--2" />
-        <div className="ul-bg__orb ul-bg__orb--3" />
-        <div className="ul-grid-overlay" />
+      {/* Split background */}
+      <div className="ul-bg">
+        <div
+          className="ul-bg__left"
+          style={{ backgroundImage: `url('/logo/CITC.jpg')` }}
+        >
+          <div className="ul-bg__pattern" />
+          <div className="ul-bg__arc" />
+          <div className="ul-bg__arc ul-bg__arc--2" />
+        </div>
+        <div className="ul-bg__right" />
       </div>
 
-      {/* Greeting pill top-left */}
+      {/* Brand panel — left side */}
+      <div className="ul-brand">
+        <div className="ul-brand__lockup">
+          <img src="/logo/Exam.png" alt="ExamSync" className="ul-brand__img" />
+          <span className="ul-brand__name">ExamSync V2</span>
+        </div>
+
+        <h1 className="ul-brand__tagline">
+          Smart exams,<br />
+          <em>seamless</em> results.
+        </h1>
+        <p className="ul-brand__sub">
+          Streamline your institution's examination process — from scheduling and proctoring to results management — all in one secure platform.
+        </p>
+
+        <div className="ul-brand__dots">
+          <div className="ul-brand__dot ul-brand__dot--gold" />
+          <div className="ul-brand__dot" />
+          <div className="ul-brand__dot" />
+        </div>
+      </div>
+
+      {/* Greeting pill */}
       <div className="ul-greeting">
         <span className="ul-greeting__wave">👋</span>
         <span>{greeting}!</span>
       </div>
 
-      {/* Center card */}
-      <div className={`ul-card ${animating ? "ul-card--exit" : "ul-card--enter"}`}>
+      {/* Login card */}
+      <div className="ul-card ul-card--enter">
         {/* Logo */}
-        <div className="ul-logo">
-          <img src="/logo/Exam.png" alt="ExamSync" className="ul-logo__img" />
-          <span className="ul-logo__name">ExamSync</span>
+        <div className="ul-card-logo">
+          <img src="/logo/Exam.png" alt="ExamSync" className="ul-card-logo__img" />
+          <span className="ul-card-logo__name">ExamSync V2</span>
         </div>
 
-        {/* Mode toggle tabs */}
-        <div className="ul-tabs">
-          <button
-            type="button"
-            className={`ul-tab ${mode === "faculty" ? "ul-tab--active" : ""}`}
-            onClick={() => switchMode("faculty")}
-          >
-            <span className="ul-tab__dot" />
-            Faculty
-          </button>
-          <button
-            type="button"
-            className={`ul-tab ${mode === "admin" ? "ul-tab--active" : ""}`}
-            onClick={() => switchMode("admin")}
-          >
-            <span className="ul-tab__dot" />
-            Admin
-          </button>
-          <div className={`ul-tabs__slider ul-tabs__slider--${mode}`} />
-        </div>
+        <div className="ul-divider" />
 
-        {/* Title */}
-        <h2 className="ul-title">
-          {mode === "faculty" ? "Faculty Login" : "Admin Login"}
-        </h2>
-        <p className="ul-subtitle">
-          {mode === "faculty"
-            ? "Sign in with your employee credentials"
-            : "Sign in with your administrator credentials"}
-        </p>
+        <h2 className="ul-title">Sign In</h2>
+        <p className="ul-subtitle">Enter your credentials.</p>
 
         {/* Form */}
         <form className="ul-form" onSubmit={handleLogin}>
@@ -211,7 +175,7 @@ const UnifiedLogin: React.FC = () => {
               className="ul-field__input"
             />
             <label htmlFor="id" className="ul-field__label">
-              {mode === "faculty" ? "Employee ID" : "Admin ID"}
+              Employee / Admin ID
             </label>
             <div className="ul-field__bar" />
           </div>
@@ -236,14 +200,15 @@ const UnifiedLogin: React.FC = () => {
               className="ul-field__eye"
               onClick={togglePassword}
               tabIndex={-1}
+              aria-label={showPasswordRef.current ? "Hide password" : "Show password"}
             >
               {showPasswordRef.current ? <FaEyeSlash /> : <FaEye />}
             </button>
           </div>
 
           {/* Error */}
-          <div className={`ul-error ${error ? "ul-error--visible" : ""}`}>
-            <span className="ul-error__icon">!</span>
+          <div className={`ul-error ${error ? "ul-error--visible" : ""}`} role="alert">
+            <span className="ul-error__icon" aria-hidden="true">!</span>
             {error}
           </div>
 
@@ -256,7 +221,7 @@ const UnifiedLogin: React.FC = () => {
               className="ul-remember__input"
             />
             <span className="ul-remember__box">
-              <svg viewBox="0 0 12 10" fill="none">
+              <svg viewBox="0 0 12 10" fill="none" aria-hidden="true">
                 <polyline
                   points="1,5 4,8 11,1"
                   stroke="white"
@@ -265,26 +230,34 @@ const UnifiedLogin: React.FC = () => {
                 />
               </svg>
             </span>
-            <span className="ul-remember__label">Remember me</span>
+            <span className="ul-remember__label">Keep me signed in</span>
           </label>
 
           {/* Submit */}
           <button
             type="submit"
-            className={`ul-submit ul-submit--${mode}`}
+            className="ul-submit"
             disabled={loading}
           >
             {loading ? (
-              <span className="ul-submit__spinner" />
+              <span className="ul-submit__spinner" aria-label="Signing in…" />
             ) : (
-              <span>Sign In</span>
+              <>
+                <span>Sign In</span>
+              </>
             )}
           </button>
         </form>
+
+        {/* Footer */}
+        <div className="ul-footer">
+          <span className="ul-footer__text">© 2025 ExamSync V2</span>
+          <span className="ul-footer__dev">Developed by Ithran Beor Turno</span>
+        </div>
       </div>
 
       {/* Version tag */}
-      <div className="ul-version">ExamSync v2.0</div>
+      <div className="ul-version">v2.0</div>
     </div>
   );
 };

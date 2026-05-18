@@ -515,9 +515,35 @@ def proctor_assigned_exams(request, user_id):
 
         now = timezone.now()
 
-        # Get all assigned exams
+        # Only include exams whose schedule has been approved by the dean.
+        approved_schedule_data = TblScheduleapproval.objects.filter(
+            status__iexact='approved'
+        ).values_list('schedule_data', flat=True)
+
+        approved_schedule_keys = set()
+        for schedule_data in approved_schedule_data:
+            if not isinstance(schedule_data, dict):
+                continue
+            approved_schedule_keys.add(
+                (
+                    str(schedule_data.get('college_name', '')).strip().lower(),
+                    str(schedule_data.get('exam_period', '')).strip().lower(),
+                    str(schedule_data.get('semester', '')).strip().lower(),
+                    str(schedule_data.get('academic_year', '')).strip().lower(),
+                )
+            )
+
+        def is_schedule_approved(exam):
+            return (
+                str(exam.college_name or '').strip().lower(),
+                str(exam.exam_period or '').strip().lower(),
+                str(exam.semester or '').strip().lower(),
+                str(exam.academic_year or '').strip().lower(),
+            ) in approved_schedule_keys
+
+        # Get all assigned exams for this proctor, but only those covered by an approved schedule.
         exams = TblExamdetails.objects.filter(
-            Q(proctor_id=user_id) | Q(proctors__contains=[user_id])
+            (Q(proctor_id=user_id) | Q(proctors__contains=[user_id]))
         ).select_related(
             'room',
             'room__building',
@@ -556,6 +582,9 @@ def proctor_assigned_exams(request, user_id):
                         exam.exam_date, exam.exam_end_time
                     )
             except Exception:
+                continue
+
+            if not is_schedule_approved(exam):
                 continue
 
             attendance = exam.attendance_records.filter(
